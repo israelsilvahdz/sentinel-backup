@@ -27,6 +27,8 @@ export function DashboardFilters() {
     setCaseType,
     hasData,
     isLoading,
+    subjectRiskFilter,
+    setSubjectRiskFilter,
   } = useDashboardFilters();
 
   if (!hasData && !isLoading) return null;
@@ -56,14 +58,18 @@ export function DashboardFilters() {
   const handleValueChange = (value: string | null) => {
     setSelectedValue(value === 'all' ? null : value);
     setCaseType(null); // Clear case type when selecting a new value
+    setSubjectRiskFilter(null);
   };
 
   const handleFilterTypeChange = (val: string) => {
     setFilterType(val as any);
     setSelectedValue(null);
     setCaseType(null); // Also clear case type here
+    setSubjectRiskFilter(null);
   }
   
+  const hasActiveComplexFilter = !!caseType || !!subjectRiskFilter;
+
   return (
     <div className="space-y-4">
         <div className="flex items-center gap-2 text-muted-foreground font-semibold px-2">
@@ -91,7 +97,7 @@ export function DashboardFilters() {
 
         <div className="px-2 group-data-[collapsible=icon]:hidden">
             <label className="text-sm font-medium">Seleccionar valor</label>
-             <Select onValueChange={handleValueChange} value={selectedValue || 'all'} disabled={!!caseType}>
+             <Select onValueChange={handleValueChange} value={selectedValue || 'all'} disabled={hasActiveComplexFilter}>
                 <SelectTrigger className='w-full'>
                     <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
@@ -104,8 +110,8 @@ export function DashboardFilters() {
                     ))}
                 </SelectContent>
             </Select>
-            {caseType && (
-                <Button variant="ghost" size="sm" className="mt-2 text-primary" onClick={() => setCaseType(null)}>
+            {hasActiveComplexFilter && (
+                <Button variant="ghost" size="sm" className="mt-2 text-primary" onClick={() => { setCaseType(null); setSubjectRiskFilter(null); }}>
                     Limpiar filtro de caso
                 </Button>
             )}

@@ -120,3 +120,24 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
         });
     });
 }
+
+
+/**
+ * Criterio: Alumnos con riesgo medio o alto (>= 50%) en una materia y categoría específicas.
+ */
+export function findRiskCasesBySubject(students: Student[], subjectName: string, riskType: 'absences' | 'missedAssignments'): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+
+        const relevantSubject = student.subjectSummaries.find(s => s.name === subjectName);
+        if (!relevantSubject) return false;
+
+        if (riskType === 'absences') {
+            const percentage = relevantSubject.absenceLimit > 0 ? (relevantSubject.absences / relevantSubject.absenceLimit) : 0;
+            return percentage >= 0.5;
+        } else { // missedAssignments
+            const percentage = relevantSubject.missedAssignmentLimit > 0 ? (relevantSubject.missedAssignments / relevantSubject.missedAssignmentLimit) : 0;
+            return percentage >= 0.5;
+        }
+    });
+}

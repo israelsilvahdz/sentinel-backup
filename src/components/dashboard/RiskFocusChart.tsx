@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { type Student } from '@/types/student';
 import { getRisk } from '@/lib/dataProcessor';
+import { useDashboardFilters } from './DashboardClient';
 
 interface RiskFocusChartProps {
   students: Student[];
@@ -37,7 +38,17 @@ function processRiskData(students: Student[], riskType: 'absences' | 'missedAssi
         .slice(0, 5); // Top 5
 }
 
-function ChartComponent({ data, title, barColor }: { data: any[], title: string, barColor: string }) {
+function ChartComponent({ 
+    data, 
+    title, 
+    barColor, 
+    onBarClick 
+}: { 
+    data: any[], 
+    title: string, 
+    barColor: string,
+    onBarClick: (subjectName: string) => void
+}) {
     
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
@@ -69,7 +80,7 @@ function ChartComponent({ data, title, barColor }: { data: any[], title: string,
                         tickLine={false}
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                    <Bar dataKey="riesgo" fill={barColor} barSize={20} />
+                    <Bar dataKey="riesgo" fill={barColor} barSize={20} onClick={(data) => onBarClick(data.name)} className="cursor-pointer" />
                 </BarChart>
             </ResponsiveContainer>
         </div>
@@ -78,9 +89,15 @@ function ChartComponent({ data, title, barColor }: { data: any[], title: string,
 
 
 export function RiskFocusChart({ students }: RiskFocusChartProps) {
+  const { setSubjectRiskFilter, setActiveView } = useDashboardFilters();
 
   const absenceData = useMemo(() => processRiskData(students, 'absences'), [students]);
   const assignmentData = useMemo(() => processRiskData(students, 'missedAssignments'), [students]);
+
+  const handleBarClick = (subjectName: string, riskType: 'absences' | 'missedAssignments') => {
+    setSubjectRiskFilter({ subjectName, riskType });
+    setActiveView('students');
+  };
 
   const hasData = absenceData.length > 0 || assignmentData.length > 0;
 
@@ -88,13 +105,23 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
     <Card className="lg:col-span-1">
       <CardHeader>
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
-        <CardDescription>Top 5 materias con mayor riesgo promedio entre alumnos.</CardDescription>
+        <CardDescription>Top 5 materias con mayor riesgo promedio. Haz clic en una barra para ver los alumnos.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {hasData ? (
           <>
-            <ChartComponent data={absenceData} title="Riesgo por Faltas" barColor="hsl(var(--chart-4))" />
-            <ChartComponent data={assignmentData} title="Riesgo por Tareas No Entregadas" barColor="hsl(var(--chart-3))" />
+            <ChartComponent 
+                data={absenceData} 
+                title="Riesgo por Faltas" 
+                barColor="hsl(var(--chart-4))" 
+                onBarClick={(subjectName) => handleBarClick(subjectName, 'absences')}
+            />
+            <ChartComponent 
+                data={assignmentData} 
+                title="Riesgo por Tareas No Entregadas" 
+                barColor="hsl(var(--chart-3))" 
+                onBarClick={(subjectName) => handleBarClick(subjectName, 'missedAssignments')}
+            />
           </>
         ) : (
             <div className="flex items-center justify-center h-[300px]">

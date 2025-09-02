@@ -29,11 +29,13 @@ import type { Student, Change, Subject, UploadHistory } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory, getUploadHistory } from '@/app/actions/firestoreActions';
-import { findLostCases, findObservationCases, findUrgentCases } from '@/lib/dataProcessor';
+import { findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 export type CaseType = 'lost' | 'urgent' | 'observation';
 export type ActiveView = 'dashboard' | 'students' | 'history';
+export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
+
 
 interface DashboardContextType {
   filteredStudents: Student[];
@@ -49,6 +51,8 @@ interface DashboardContextType {
   setSelectedValue: (value: string | null) => void;
   caseType: CaseType | null;
   setCaseType: (caseType: CaseType | null) => void;
+  subjectRiskFilter: SubjectRiskFilter | null;
+  setSubjectRiskFilter: (filter: SubjectRiskFilter | null) => void;
   loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
   getStudentChanges: (studentId: string) => Promise<Change[]>;
   activeView: ActiveView;
@@ -101,6 +105,7 @@ export function DashboardClient() {
   const [filterType, setFilterType] = useState<FilterType>('leader');
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
+  const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
@@ -108,14 +113,27 @@ export function DashboardClient() {
     setFilterType(type);
     setSelectedValue(null);
     setCaseType(null); // Reset case type when changing main filter
+    setSubjectRiskFilter(null);
   };
 
   const handleSetActiveView = (view: ActiveView) => {
     setActiveView(view);
     if (view !== 'students') {
       setCaseType(null); // Reset case type when navigating away from the student panel
+      setSubjectRiskFilter(null);
     }
   }
+
+  const handleSetCaseType = (type: CaseType | null) => {
+    setCaseType(type);
+    setSubjectRiskFilter(null); // Clear other filters
+  };
+
+  const handleSetSubjectRiskFilter = (filter: SubjectRiskFilter | null) => {
+    setSubjectRiskFilter(filter);
+    setCaseType(null); // Clear other filters
+  };
+
   
   const refreshData = useCallback(async () => {
     setIsLoading(true);
@@ -259,8 +277,12 @@ export function DashboardClient() {
         }
     }
 
+    if (subjectRiskFilter) {
+      return findRiskCasesBySubject(students, subjectRiskFilter.subjectName, subjectRiskFilter.riskType);
+    }
+
     return students;
-  }, [allStudents, filterType, selectedValue, caseType]);
+  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     try {
@@ -295,7 +317,9 @@ export function DashboardClient() {
     selectedValue,
     setSelectedValue,
     caseType,
-    setCaseType,
+    setCaseType: handleSetCaseType,
+    subjectRiskFilter,
+    setSubjectRiskFilter: handleSetSubjectRiskFilter,
     loadStudentSubjects: loadStudentSubjectsWrapper,
     getStudentChanges: getStudentChangesWrapper,
     activeView,

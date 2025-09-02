@@ -8,7 +8,17 @@ import { useDashboardFilters } from './DashboardClient';
 import { Button } from '../ui/button';
 
 export function StudentPanel() {
-  const { filteredStudents, hasData, isLoading, caseType, setCaseType, setActiveView, setSelectedStudentId } = useDashboardFilters();
+  const { 
+    filteredStudents, 
+    hasData, 
+    isLoading, 
+    caseType, 
+    setCaseType, 
+    setActiveView, 
+    setSelectedStudentId,
+    subjectRiskFilter,
+    setSubjectRiskFilter 
+  } = useDashboardFilters();
 
   if (isLoading) {
     return (
@@ -29,23 +39,39 @@ export function StudentPanel() {
     observation: 'Alumnos en Observación',
   };
 
+  const getPanelTitle = () => {
+    if (caseType) {
+        return <>Mostrando: <span className="font-semibold text-primary">{caseTypeMap[caseType]}</span></>;
+    }
+    if (subjectRiskFilter) {
+        const riskTypeText = subjectRiskFilter.riskType === 'absences' ? 'Faltas' : 'Tareas (NE)';
+        return <>Mostrando: Alumnos en riesgo por <span className="font-semibold text-primary">{riskTypeText}</span> en <span className="font-semibold text-primary">{subjectRiskFilter.subjectName}</span></>;
+    }
+    return 'Explora y monitorea los casos individuales de cada alumno.';
+  };
+
+  const handleClearFilter = () => {
+    setCaseType(null);
+    setSubjectRiskFilter(null);
+  };
+  
+  const hasActiveFilter = !!caseType || !!subjectRiskFilter;
+
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
        <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Panel de Alumnos</h1>
-         {caseType ? (
-            <div className="flex items-center gap-2 mt-2">
-                 <p className="text-muted-foreground">
-                    Mostrando: <span className="font-semibold text-primary">{caseTypeMap[caseType]}</span>
-                </p>
-                <Button variant="ghost" size="sm" onClick={() => setCaseType(null)}>
+         <div className="flex items-center gap-2 mt-2">
+             <p className="text-muted-foreground">
+                {getPanelTitle()}
+            </p>
+            {hasActiveFilter && (
+                 <Button variant="ghost" size="sm" onClick={handleClearFilter}>
                    <X className="mr-2 h-4 w-4"/>
                    Limpiar filtro
                 </Button>
-            </div>
-         ) : (
-            <p className="text-muted-foreground">Explora y monitorea los casos individuales de cada alumno.</p>
-         )}
+            )}
+        </div>
       </header>
 
       {hasData && (
