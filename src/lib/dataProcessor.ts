@@ -123,7 +123,7 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
 
 
 /**
- * Criterio: Alumnos con riesgo medio o alto (>= 50%) en una materia y categoría específicas.
+ * Criterio: Alumnos con riesgo > 0% en una materia y categoría específicas.
  */
 export function findRiskCasesBySubject(students: Student[], subjectName: string, riskType: 'absences' | 'missedAssignments'): Student[] {
     return students.filter(student => {
@@ -133,11 +133,9 @@ export function findRiskCasesBySubject(students: Student[], subjectName: string,
         if (!relevantSubject) return false;
 
         if (riskType === 'absences') {
-            const percentage = relevantSubject.absenceLimit > 0 ? (relevantSubject.absences / relevantSubject.absenceLimit) : 0;
-            return percentage >= 0.5;
+            return relevantSubject.absences > 0;
         } else { // missedAssignments
-            const percentage = relevantSubject.missedAssignmentLimit > 0 ? (relevantSubject.missedAssignments / relevantSubject.missedAssignmentLimit) : 0;
-            return percentage >= 0.5;
+            return relevantSubject.missedAssignments > 0;
         }
     });
 }
