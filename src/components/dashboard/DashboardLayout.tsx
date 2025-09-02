@@ -150,8 +150,8 @@ export function DashboardLayout() {
     return Object.values(currentData);
   }, [currentData]);
 
-  const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean).filter(l => l !== 'N/A'))], [allStudents]);
-  const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean).filter(t => t !== 'N/A'))], [allStudents]);
+  const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
+  const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))], [allStudents]);
   const subjects = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjects.map(sub => sub.name)).filter(Boolean))], [allStudents]);
 
   const filteredStudents = useMemo(() => {
