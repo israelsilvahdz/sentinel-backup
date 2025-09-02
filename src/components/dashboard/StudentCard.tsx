@@ -16,7 +16,6 @@ import { useDashboardFilters } from './DashboardClient';
 
 interface StudentCardProps {
   student: Student;
-  changes: Change[];
 }
 
 function RiskCell({ value, limit }: { value: number; limit: number; }) {
@@ -35,15 +34,18 @@ function RiskCell({ value, limit }: { value: number; limit: number; }) {
   );
 }
 
-function AiSummary({ student }: { student: Student }) {
+function AiSummary({ student, isOpen }: { student: Student, isOpen: boolean }) {
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { getStudentChanges } = useDashboardFilters();
+  const [hasBeenCalled, setHasBeenCalled] = useState(false);
 
   useEffect(() => {
     async function fetchChangesAndSummarize() {
-      if (!student.id) return;
+      if (!student.id || !isOpen || hasBeenCalled) return;
+      
       setIsLoading(true);
+      setHasBeenCalled(true);
       
       const studentChanges = await getStudentChanges(student.id);
 
@@ -59,19 +61,23 @@ function AiSummary({ student }: { student: Student }) {
             console.error("AI Summary failed", e);
             setSummary("No se pudo generar el resumen.");
         }
+      } else {
+        setSummary("No se han detectado cambios desde el último reporte.");
       }
       
       setIsLoading(false);
     }
 
-    // fetchChangesAndSummarize(); // We will call this manually for now to prevent permission errors on load
-  }, [student.id, student.name, getStudentChanges]);
+    fetchChangesAndSummarize();
+  }, [student.id, student.name, getStudentChanges, isOpen, hasBeenCalled]);
 
 
   if(isLoading) {
-    return <Skeleton className="h-10 w-full" />
+    return <div className="p-4"><Skeleton className="h-10 w-full" /></div>;
   }
-  if (!summary) return null;
+  
+  // No renderizar si no está abierto, no hay resumen y no está cargando
+  if (!isOpen && !summary && !isLoading) return null;
 
   return (
     <div className="flex items-start gap-2 text-sm text-muted-foreground bg-secondary/50 p-3 rounded-md">
@@ -187,7 +193,7 @@ export function StudentCard({ student }: StudentCardProps) {
             </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-            <AiSummary student={student} />
+            <AiSummary student={student} isOpen={isOpen} />
             <CollapsibleContent>
               <StudentSubjects student={student} isOpen={isOpen} />
             </CollapsibleContent>
