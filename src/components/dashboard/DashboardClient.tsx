@@ -54,26 +54,27 @@ export function useDashboardFilters() {
   return context;
 }
 
-function formatDateFromFilename(filename: string): string {
-    // Extrae la parte del nombre que parece fecha (YYYYMMDD)
-    const match = filename.match(/(\d{8})/);
-    if (!match) return "Fecha desconocida";
+function formatDateFromCustomFilename(filename: string): string {
+    const match = filename.match(/(\d{2})\.(\d{2})\.(\d{2})(\d{2})/);
+    if (!match) return filename; // Devuelve el nombre original si no coincide
 
-    let dateStr = match[1];
-    // Omite los últimos dos dígitos como se pidió
-    dateStr = dateStr.substring(0, 6);
-    
-    const year = parseInt(dateStr.substring(0, 4), 10);
-    const month = parseInt(dateStr.substring(4, 6), 10) - 1; // Meses en JS son 0-11
-    
-    try {
-        return new Date(year, month, 1).toLocaleDateString('es-MX', {
-            year: 'numeric',
-            month: 'long',
-        });
-    } catch {
-        return "Fecha inválida";
-    }
+    const [, day, month, yearSuffix, periodCode] = match;
+    const year = `20${yearSuffix}`;
+
+    const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const monthName = monthNames[parseInt(month, 10) - 1] || 'mes desconocido';
+
+    const periodMap: Record<string, string> = {
+        '10': 'Tetra Enero',
+        '20': 'Tetra Mayo',
+        '30': 'Tetra Septiembre',
+        '40': 'Semestre Enero',
+        '50': 'Semestre Mayo',
+        '60': 'Semestre Septiembre',
+    };
+    const periodName = periodMap[periodCode] || 'Periodo desconocido';
+
+    return `${parseInt(day, 10)} de ${monthName} del ${year} (${periodName})`;
 }
 
 
@@ -255,7 +256,7 @@ export function DashboardClient() {
   return (
     <DashboardContext.Provider value={contextValue}>
       <SidebarProvider>
-        <Sidebar>
+        <Sidebar collapsible="icon">
           <SidebarHeader>
             <h2 className="text-xl font-semibold">Controles</h2>
           </SidebarHeader>
@@ -272,7 +273,7 @@ export function DashboardClient() {
                 <ul className="space-y-1 px-2 text-sm">
                   {uploadHistory.map(upload => (
                     <li key={upload.id} className="text-muted-foreground">
-                      {formatDateFromFilename(upload.fileName)}
+                      {formatDateFromCustomFilename(upload.fileName)}
                     </li>
                   ))}
                 </ul>
@@ -284,7 +285,7 @@ export function DashboardClient() {
         </Sidebar>
         <SidebarInset>
             <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
-                 <SidebarTrigger className="md:hidden"/>
+                 <SidebarTrigger />
                  <div className="flex-1">
                     <h1 className="font-semibold text-lg">Academic Sentinel</h1>
                  </div>
@@ -308,5 +309,3 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
-
-    
