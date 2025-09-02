@@ -12,7 +12,7 @@ import { summarizeStudentChanges } from '@/ai/flows/summarize-student-changes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '../ui/button';
-import { useDashboardFilters } from './DashboardLayout';
+import { useDashboardFilters } from './DashboardClient';
 
 interface StudentCardProps {
   student: Student;

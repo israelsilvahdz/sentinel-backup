@@ -10,7 +10,7 @@ import { StudentCard } from './StudentCard';
 import { AlertCircle, BarChart2, BellRing, Users } from 'lucide-react';
 
 import { calculateKpis } from '@/lib/dataProcessor';
-import { useDashboardFilters } from './DashboardLayout';
+import { useDashboardFilters } from './DashboardClient';
 
 export function Dashboard() {
   const { filteredStudents, changes, isLoading, hasData } = useDashboardFilters();

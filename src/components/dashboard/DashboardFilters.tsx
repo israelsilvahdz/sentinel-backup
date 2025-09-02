@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useDashboardFilters } from './DashboardLayout';
+import { useDashboardFilters } from './DashboardClient';
 import {
   Select,
   SelectContent,
