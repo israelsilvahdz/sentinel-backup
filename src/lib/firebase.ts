@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApp, getApps } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -18,5 +18,22 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+if (typeof window !== 'undefined') {
+  try {
+    enableIndexedDbPersistence(db);
+  } catch (err: any) {
+    if (err.code === 'failed-precondition') {
+      console.warn(
+        'Multiple tabs open, persistence can only be enabled in one tab at a a time.'
+      );
+    } else if (err.code === 'unimplemented') {
+      console.warn(
+        'The current browser does not support all of the features required to enable persistence.'
+      );
+    }
+  }
+}
+
 
 export { app, db };
