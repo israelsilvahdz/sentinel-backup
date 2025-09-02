@@ -71,7 +71,7 @@ export function CoursePlanner() {
       return { recommendedLoad: [], remainingCourses: remaining, availableCoursesCount: 0 };
     }
 
-    // 1. Start with pending courses
+    // 1. Start with pending courses that meet prerequisites
     const load: CurriculumCourse[] = Array.from(pendingCourses)
       .map(name => curriculum.flatMap(t => t.courses).find(c => c.name === name))
       .filter((c): c is CurriculumCourse => !!c)
@@ -285,5 +285,3 @@ export function CoursePlanner() {
     </div>
   );
 }
-
-    
