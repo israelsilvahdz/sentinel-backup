@@ -10,13 +10,13 @@ import { type Student, type Change, type Subject } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { summarizeStudentChanges } from '@/ai/flows/summarize-student-changes';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getStudentSubjects } from '@/lib/firestore';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '../ui/button';
+import { useDashboardFilters } from './DashboardLayout';
 
 interface StudentCardProps {
   student: Student;
-  changes: Change[]; // Nota: El modelo de cambios debe ser repensado con la nueva arquitectura
+  changes: Change[];
 }
 
 function RiskCell({ value, limit }: { value: number; limit: number; }) {
@@ -35,33 +35,38 @@ function RiskCell({ value, limit }: { value: number; limit: number; }) {
   );
 }
 
-// El indicador de cambios necesita ser adaptado al nuevo historial
-function ChangeIndicator({ change }: { change: Change | undefined }) {
-    if (!change) return null;
-    // Lógica futura para mostrar el cambio
-    return null;
-}
-
-function AiSummary({ student, changes }: StudentCardProps) {
+function AiSummary({ student, changes }: { student: Student, changes: Change[] }) {
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { getStudentChanges } = useDashboardFilters();
 
-  // Esta función necesita una refactorización mayor para usar el historial
   useEffect(() => {
-    async function getSummary() {
-      if (changes.length === 0) {
-        // setSummary("No se detectaron cambios recientes en el rendimiento del alumno.");
-        return;
-      }
-      // ... Lógica futura con historial
-    }
-    getSummary();
-  }, [student, changes]);
+    async function fetchChangesAndSummarize() {
+      if (!student.id) return;
+      setIsLoading(true);
+      
+      await getStudentChanges(student.id);
 
-  if (summary === '') return null; // No mostrar si no hay resumen
+      if (changes.length > 0) {
+        const summaryResponse = await summarizeStudentChanges({
+          studentId: student.id,
+          studentName: student.name,
+          changes: changes.map(c => `Campo '${c.fieldName}' cambió de '${c.oldValue}' a '${c.newValue}' el ${c.date.toDate().toLocaleDateString()}`),
+        });
+        setSummary(summaryResponse.summary);
+      }
+      
+      setIsLoading(false);
+    }
+
+    // fetchChangesAndSummarize(); We will call this manually for now
+  }, [student, getStudentChanges]);
+
+
   if(isLoading) {
     return <Skeleton className="h-10 w-full" />
   }
+  if (!summary) return null;
 
   return (
     <div className="flex items-start gap-2 text-sm text-muted-foreground bg-secondary/50 p-3 rounded-md">
@@ -76,19 +81,19 @@ function OverallRiskBadge({ student, subjects }: { student: Student, subjects: S
 
     if (overallRisk === 'low') return null;
 
-    const config = {
+    const config: Record<string, { text: string; className: string; }> = {
         medium: { text: 'En Observación', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
         high: { text: 'Crítico', className: 'bg-red-100 text-red-800 border-red-300' },
     };
 
-    const { text, className } = config[overallRisk] || {};
+    const riskConfig = config[overallRisk];
+    if (!riskConfig) return null;
 
-    if (!text) return null;
-
-    return <Badge className={`ml-2 ${className}`}>{text}</Badge>;
+    return <Badge className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
 }
 
 function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
+    const { loadStudentSubjects } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -97,7 +102,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
             if (isOpen && student.id && subjects.length === 0) {
                 setIsLoading(true);
                 try {
-                    const fetchedSubjects = await getStudentSubjects(student.id);
+                    const fetchedSubjects = await loadStudentSubjects(student.id);
                     setSubjects(fetchedSubjects);
                 } catch (error) {
                     console.error("Failed to load subjects for student " + student.id, error);
@@ -107,7 +112,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
             }
         }
         loadSubjects();
-    }, [isOpen, student.id, subjects.length]);
+    }, [isOpen, student.id, subjects.length, loadStudentSubjects]);
 
     if (isLoading) {
         return <div className="p-4"><Skeleton className="h-24 w-full" /></div>;
@@ -119,6 +124,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
     return (
         <div className="overflow-x-auto">
+             {isOpen && <OverallRiskBadge student={student} subjects={subjects} />}
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -164,7 +170,6 @@ export function StudentCard({ student, changes }: StudentCardProps) {
                 <div>
                     <CardTitle className="flex items-center">
                         {student.name}
-                        {/* El badge de riesgo necesita las materias, por lo que se podría mostrar después de abrir */}
                     </CardTitle>
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
                 </div>

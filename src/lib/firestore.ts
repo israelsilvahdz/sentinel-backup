@@ -1,3 +1,8 @@
+// This file is now a server-only module.
+// All client-side components should interact with these functions
+// via the server action defined in 'app/actions/firestoreActions.ts'.
+'use server';
+
 import { db } from './firebase';
 import {
   doc,
@@ -7,34 +12,33 @@ import {
   writeBatch,
   collection,
   Timestamp,
-  updateDoc,
   runTransaction,
+  query,
+  where,
 } from 'firebase/firestore';
 import type { Student, Subject, Change, StudentData } from '@/types/student';
 
-// --- Colecciones Principales ---
 const ALUMNOS_COLLECTION = 'alumnos';
 const HISTORIAL_COLLECTION = 'historialCambios';
 
 /**
- * Procesa los datos del Excel, los compara con Firestore y actualiza/crea los documentos necesarios.
- * @param studentData Los datos parseados del archivo Excel.
+ * Processes data from Excel, compares it with Firestore, and updates/creates documents.
+ * @param studentData Parsed data from the Excel file.
  */
 export async function processAndSaveData(studentData: StudentData): Promise<{ processed: number, changes: number }> {
   let processedCount = 0;
   let changesCount = 0;
 
-  const changesToWrite: Change[] = [];
-
   for (const studentId in studentData) {
     const incomingStudent = studentData[studentId];
+    if (!incomingStudent || !incomingStudent.id) continue;
 
     await runTransaction(db, async (transaction) => {
       const studentDocRef = doc(db, ALUMNOS_COLLECTION, studentId);
       const studentDoc = await transaction.get(studentDocRef);
+      const changesToWrite: Change[] = [];
 
-      // 1. Actualizar o crear datos del alumno
-      const studentInfo = {
+      const studentInfo: Omit<Student, 'subjects'> = {
         id: incomingStudent.id,
         name: incomingStudent.name,
         leader: incomingStudent.leader,
@@ -47,139 +51,134 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
       } else {
         transaction.set(studentDocRef, studentInfo);
       }
-
-      // 2. Procesar materias del alumno
+      
       if (incomingStudent.subjects) {
         for (const incomingSubject of incomingStudent.subjects) {
+          if (!incomingSubject.id) continue;
           const subjectDocRef = doc(db, ALUMNOS_COLLECTION, studentId, 'materias', incomingSubject.id);
           const subjectDoc = await transaction.get(subjectDocRef);
 
           const newSubjectData: Subject = { ...incomingSubject };
-          
+
           if (subjectDoc.exists()) {
             const existingSubject = subjectDoc.data() as Subject;
-
-            // Comparar campos para detectar cambios
             const fieldsToCompare: (keyof Subject)[] = ['absences', 'missedAssignments', 'grade', 'finalGrade', 'statusDescription'];
-            
+
             fieldsToCompare.forEach(field => {
               if (existingSubject[field] !== newSubjectData[field]) {
                 changesToWrite.push({
-                  date: Timestamp.now(),
-                  studentId: studentId,
-                  subjectId: incomingSubject.id,
-                  fieldName: field,
-                  oldValue: existingSubject[field],
-                  newValue: newSubjectData[field],
+                  date: Timestamp.now(), studentId, subjectId: incomingSubject.id,
+                  fieldName: field, oldValue: existingSubject[field], newValue: newSubjectData[field],
                 });
-                changesCount++;
               }
             });
-            
-            // Comparar mapa de actividades
-            for(const activityKey in newSubjectData.activities) {
-                if(existingSubject.activities?.[activityKey] !== newSubjectData.activities[activityKey]) {
-                     changesToWrite.push({
-                      date: Timestamp.now(),
-                      studentId: studentId,
-                      subjectId: incomingSubject.id,
-                      fieldName: `activities.${activityKey}`,
-                      oldValue: existingSubject.activities?.[activityKey] || null,
-                      newValue: newSubjectData.activities[activityKey],
-                    });
-                    changesCount++;
-                }
-            }
-            
-            transaction.update(subjectDocRef, { ...newSubjectData });
 
+            for (const activityKey in newSubjectData.activities) {
+              if (existingSubject.activities?.[activityKey] !== newSubjectData.activities[activityKey]) {
+                changesToWrite.push({
+                  date: Timestamp.now(), studentId, subjectId: incomingSubject.id,
+                  fieldName: `activities.${activityKey}`,
+                  oldValue: existingSubject.activities?.[activityKey] ?? null,
+                  newValue: newSubjectData.activities[activityKey],
+                });
+              }
+            }
+             transaction.update(subjectDocRef, { ...newSubjectData });
           } else {
-            // Es una materia nueva para el alumno, se registra el historial de su creación
-            changesToWrite.push({
-                date: Timestamp.now(),
-                studentId: studentId,
-                subjectId: incomingSubject.id,
-                fieldName: 'materia',
-                oldValue: null,
-                newValue: 'materia creada',
-            });
-            changesCount++;
+             changesToWrite.push({
+               date: Timestamp.now(), studentId, subjectId: incomingSubject.id,
+               fieldName: 'materia', oldValue: null, newValue: 'materia creada',
+             });
             transaction.set(subjectDocRef, newSubjectData);
           }
         }
+      }
+      
+       if(changesToWrite.length > 0) {
+          const batch = writeBatch(db);
+          changesToWrite.forEach(change => {
+              changesCount++;
+              const historyDocRef = doc(collection(db, HISTORIAL_COLLECTION));
+              batch.set(historyDocRef, change);
+          });
+          await batch.commit();
       }
     });
     processedCount++;
   }
 
-  // Escribir todos los cambios detectados en un solo batch
-  if(changesToWrite.length > 0) {
-      const batch = writeBatch(db);
-      changesToWrite.forEach(change => {
-          const historyDocRef = doc(collection(db, HISTORIAL_COLLECTION));
-          batch.set(historyDocRef, change);
-      });
-      await batch.commit();
-  }
-
   return { processed: processedCount, changes: changesCount };
 }
 
-
 /**
- * Obtiene todos los alumnos de la colección principal.
+ * Gets all students from the main collection.
  */
 export async function getAllStudents(): Promise<Student[]> {
-    const querySnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
-    return querySnapshot.docs.map(doc => doc.data() as Student);
+  const querySnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
+  return querySnapshot.docs.map(doc => doc.data() as Student);
 }
 
-
 /**
- * Obtiene las materias de un alumno específico.
- * @param studentId La matrícula del alumno.
+ * Gets the subjects for a specific student.
+ * @param studentId The student's ID.
  */
 export async function getStudentSubjects(studentId: string): Promise<Subject[]> {
-    const subjectsRef = collection(db, ALUMNOS_COLLECTION, studentId, 'materias');
-    const querySnapshot = await getDocs(subjectsRef);
-    return querySnapshot.docs.map(doc => doc.data() as Subject);
+  const subjectsRef = collection(db, ALUMNOS_COLLECTION, studentId, 'materias');
+  const querySnapshot = await getDocs(subjectsRef);
+  return querySnapshot.docs.map(doc => doc.data() as Subject);
 }
 
-
 /**
- * Obtiene el historial de cambios de un alumno.
- * @param studentId La matrícula del alumno.
+ * Gets the change history for a student.
+ * @param studentId The student's ID.
  */
 export async function getStudentHistory(studentId: string): Promise<Change[]> {
-    // Esta función podría ser más compleja, por ahora la dejamos así
-    // y en el futuro se pueden añadir filtros por fecha, etc.
-    // La consulta real se haría en el componente que lo necesite.
-    return [];
+  const q = query(collection(db, HISTORIAL_COLLECTION), where("studentId", "==", studentId));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => doc.data() as Change);
 }
 
-
 /**
- * Borra TODOS los datos de las colecciones 'alumnos' e 'historialCambios'.
- * Función de alto riesgo para usar solo en entornos de prueba.
+ * Deletes ALL data from the 'alumnos' and 'historialCambios' collections.
+ * High-risk function intended for testing environments only.
  */
 export async function deleteAllData(): Promise<void> {
-    const batch = writeBatch(db);
-
-    // Borrar colección 'alumnos' y sus sub-colecciones
-    const alumnosSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
-    for (const studentDoc of alumnosSnapshot.docs) {
-        const materiasSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION, studentDoc.id, 'materias'));
-        materiasSnapshot.forEach(materiaDoc => {
-            batch.delete(materiaDoc.ref);
-        });
-        batch.delete(studentDoc.ref);
-    }
+  const deleteCollection = async (collPath: string) => {
+    const collRef = collection(db, collPath);
+    const snapshot = await getDocs(collRef);
+    if (snapshot.empty) return;
     
-    // Borrar colección 'historialCambios'
-    const historialSnapshot = await getDocs(collection(db, HISTORIAL_COLLECTION));
-    historialSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(doc => {
+      // If there are subcollections, they must be deleted recursively first.
+      if (collPath === ALUMNOS_COLLECTION) {
+         // This part needs to be improved if there are many subcollections.
+         // For now, we only have 'materias'.
+      }
+      batch.delete(doc.ref);
     });
-
     await batch.commit();
+  };
+
+  // Delete all documents in 'historialCambios'
+  const historialSnapshot = await getDocs(collection(db, HISTORIAL_COLLECTION));
+  if (!historialSnapshot.empty) {
+      const batch = writeBatch(db);
+      historialSnapshot.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+  }
+
+  // Delete all documents (and subcollections) in 'alumnos'
+  const alumnosSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
+  for (const studentDoc of alumnosSnapshot.docs) {
+      const materiasSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION, studentDoc.id, 'materias'));
+      if (!materiasSnapshot.empty) {
+          const batch = writeBatch(db);
+          materiasSnapshot.forEach(materiaDoc => batch.delete(materiaDoc.ref));
+          await batch.commit();
+      }
+      await runTransaction(db, async transaction => {
+        transaction.delete(studentDoc.ref);
+      });
+  }
 }

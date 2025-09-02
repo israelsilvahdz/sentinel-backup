@@ -20,7 +20,7 @@ import { Trash2, RefreshCw } from 'lucide-react';
 import type { Student, Change } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { deleteAllData, processAndSaveData, getAllStudents } from '@/lib/firestore';
+import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory } from '@/lib/firestore';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 
@@ -37,7 +37,7 @@ interface DashboardContextType {
   setFilterType: (type: FilterType) => void;
   selectedValue: string | null;
   setSelectedValue: (value: string | null) => void;
-  reloadStudentSubjects: (studentId: string) => Promise<void>;
+  loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
   getStudentChanges: (studentId: string) => Promise<void>;
 }
 
@@ -74,7 +74,7 @@ export function DashboardLayout() {
       toast({
         variant: 'destructive',
         title: 'Error de Carga',
-        description: 'No se pudieron cargar los datos iniciales desde Firestore.',
+        description: 'No se pudieron cargar los datos iniciales. Revisa los permisos de Firestore.',
       });
       console.error(error);
     } finally {
@@ -107,14 +107,13 @@ export function DashboardLayout() {
         description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
       });
 
-      // Recargar los datos para refrescar la vista
       await loadInitialData();
 
     } catch (error) {
        toast({
         variant: 'destructive',
         title: 'Error al procesar',
-        description: `Hubo un problema al leer o guardar el archivo. Revisa la consola para más detalles.`,
+        description: `Hubo un problema al guardar los datos. Revisa la consola para más detalles.`,
       });
       console.error(error);
     } finally {
@@ -123,7 +122,7 @@ export function DashboardLayout() {
   };
 
   const handleDeleteAllData = async () => {
-    if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos de prueba? Esta acción es irreversible.')) {
+    if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) {
       return;
     }
     setIsLoading(true);
@@ -133,13 +132,13 @@ export function DashboardLayout() {
       setChanges([]);
       toast({
         title: 'Datos Eliminados',
-        description: 'Todos los datos de prueba han sido borrados de Firestore.',
+        description: 'Todos los datos han sido borrados de Firestore.',
       });
     } catch (error) {
       toast({
         variant: 'destructive',
         title: 'Error al Eliminar',
-        description: 'No se pudieron borrar los datos.',
+        description: 'No se pudieron borrar los datos. Revisa los permisos de Firestore.',
       });
       console.error(error);
     } finally {
@@ -150,7 +149,6 @@ export function DashboardLayout() {
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
   const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))], [allStudents]);
   
-  // TODO: Mejorar la obtención de materias únicas. Esto es ineficiente.
   const subjects = useMemo(() => {
       const allSubjects = allStudents.flatMap(s => s.subjects?.map(sub => sub.name) || []);
       return [...new Set(allSubjects.filter(Boolean))];
@@ -167,19 +165,29 @@ export function DashboardLayout() {
       students = students.filter(s => s.tutor === selectedValue);
     }
     if (filterType === 'subject') {
-      // Este filtro es complejo con el nuevo modelo y requiere una consulta diferente.
-      // Por ahora, lo dejamos así, sabiendo que es ineficiente.
-      // Se necesitaría cargar todas las materias de todos los alumnos para filtrar.
+      students = students.filter(s => s.subjects?.some(sub => sub.name === selectedValue));
     }
     return students;
   }, [allStudents, filterType, selectedValue]);
   
-  const reloadStudentSubjects = async (studentId: string) => {
-    // Implementar la lógica para recargar materias de un solo alumno
+  const loadStudentSubjects = async (studentId: string): Promise<Subject[]> => {
+    try {
+      return await getStudentSubjects(studentId);
+    } catch(e) {
+      console.error(e);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las materias del alumno.' });
+      return [];
+    }
   }
   
   const getStudentChanges = async (studentId: string) => {
-    // Implementar la lógica para obtener el historial de cambios de un alumno
+     try {
+      const studentChanges = await getStudentHistory(studentId);
+      setChanges(prev => [...prev.filter(c => c.studentId !== studentId), ...studentChanges]);
+    } catch(e) {
+      console.error(e);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el historial del alumno.' });
+    }
   }
 
   const contextValue: DashboardContextType = {
@@ -195,7 +203,7 @@ export function DashboardLayout() {
     setFilterType: handleSetFilterType,
     selectedValue,
     setSelectedValue,
-    reloadStudentSubjects,
+    loadStudentSubjects,
     getStudentChanges
   };
 
