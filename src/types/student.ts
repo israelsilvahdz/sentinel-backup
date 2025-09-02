@@ -12,6 +12,7 @@ export interface Student {
   name: string;
   leader: string;
   tutor: string;
+  isGraduationCandidate: boolean;
   subjects: Subject[];
 }
 

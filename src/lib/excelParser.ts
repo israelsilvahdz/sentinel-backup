@@ -2,16 +2,24 @@ import * as XLSX from 'xlsx';
 import { type StudentData, type Subject } from '@/types/student';
 
 const COLUMNS = {
-  ID: 'Matrícula',
+  ID: 'Matricula',
   NAME: 'Nombre del alumno',
-  LEADER: 'Lider',
+  LEADER: 'Líder',
   TUTOR: 'Tutor',
+  IS_GRADUATION_CANDIDATE: 'Candidato a graduar (CAG)',
+  SUBJECT_NATIONAL_ID: 'Numero de la materia Nacional',
+  SUBJECT_CAMPUS_ID: 'numero de la materia del campus',
   SUBJECT_NAME: 'Nombre de la materia',
-  ABSENCE_LIMIT: 'Límite de faltas',
-  ABSENCES: 'Faltas del alumno',
-  MISSED_ASSIGNMENT_LIMIT: 'Límite de NE',
-  MISSED_ASSIGNMENTS: 'NE alumno',
-  GRADE: 'Ponderado',
+  SUBJECT_GROUP: 'Grupo',
+  PROFESSOR_ID: 'Nomina',
+  PROFESSOR_NAME: 'Nombre del profesor de la materia',
+  ABSENCE_LIMIT: 'Limite de faltas de la materia',
+  ABSENCES: 'faltas del alumno en la materia',
+  MISSED_ASSIGNMENT_LIMIT: 'Limite de No entregados (NE) de la materia',
+  MISSED_ASSIGNMENTS: 'Cantidad de No Entregados (NE) del alumno en la materia',
+  GRADE: 'ponderado',
+  FINAL_GRADE: 'calificacion final',
+  FINAL_GRADE_REASON: 'motivo de la calificación final'
 };
 
 export async function parseExcel(file: File): Promise<StudentData | null> {
@@ -36,16 +44,22 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         }
         
         const studentData: StudentData = {};
-
-        // Use a sample row to check for required columns
+        
         const firstRow = json[0];
-        const requiredCols = Object.values(COLUMNS);
+        const requiredCols = [
+            COLUMNS.ID, 
+            COLUMNS.NAME, 
+            COLUMNS.SUBJECT_NAME,
+            COLUMNS.ABSENCE_LIMIT,
+            COLUMNS.ABSENCES,
+            COLUMNS.MISSED_ASSIGNMENT_LIMIT,
+            COLUMNS.MISSED_ASSIGNMENTS,
+            COLUMNS.GRADE
+        ];
+
         for(const colName of requiredCols) {
             if(!(colName in firstRow)) {
-                // Allow missing leader/tutor for now
-                if (colName !== COLUMNS.LEADER && colName !== COLUMNS.TUTOR) {
-                    throw new Error(`Missing required column: ${colName}`);
-                }
+                throw new Error(`Missing required column: ${colName}`);
             }
         }
 
@@ -54,7 +68,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
           const studentName = row[COLUMNS.NAME];
           const leader = row[COLUMNS.LEADER] || 'N/A';
           const tutor = row[COLUMNS.TUTOR] || 'N/A';
-
+          const isGraduationCandidate = row[COLUMNS.IS_GRADUATION_CANDIDATE] === 'Sí';
 
           if (!studentId || !studentName) return;
 
@@ -64,16 +78,17 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
               name: studentName,
               leader,
               tutor,
+              isGraduationCandidate,
               subjects: [],
             };
           }
           
           const subject: Subject = {
-            name: row[COLUMNS.SUBJECT_NAME],
+            name: `${row[COLUMNS.SUBJECT_NAME]} (${row[COLUMNS.SUBJECT_GROUP]})`,
             absences: parseInt(String(row[COLUMNS.ABSENCES]), 10) || 0,
-            absenceLimit: parseInt(String(row[COLUMNS.ABSENCE_LIMIT]), 10) || 1, // Avoid division by zero
+            absenceLimit: parseInt(String(row[COLUMNS.ABSENCE_LIMIT]), 10) || 1,
             missedAssignments: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENTS]), 10) || 0,
-            missedAssignmentLimit: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENT_LIMIT]), 10) || 1, // Avoid division by zero
+            missedAssignmentLimit: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENT_LIMIT]), 10) || 1,
             grade: parseFloat(String(row[COLUMNS.GRADE])) || 0,
           };
 
