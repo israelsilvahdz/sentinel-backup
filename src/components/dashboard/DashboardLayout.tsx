@@ -1,9 +1,9 @@
 
-import { getAllStudents } from '@/lib/server/firestore';
+'use client';
+
 import { DashboardClient } from './DashboardClient';
 
-export async function DashboardLayout() {
-  const initialStudents = await getAllStudents();
-
-  return <DashboardClient initialStudents={initialStudents} />;
+export function DashboardLayout() {
+  // We pass empty initial students because data will now be fetched client-side.
+  return <DashboardClient initialStudents={[]} />;
 }

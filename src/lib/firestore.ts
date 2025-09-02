@@ -1,13 +1,7 @@
-// This file is now a server-only module.
-// All client-side components should interact with these functions
-// via the server action defined in 'app/actions/firestoreActions.ts'.
-'use server';
 
 import { db } from './firebase';
 import {
   doc,
-  getDoc,
-  setDoc,
   getDocs,
   writeBatch,
   collection,
@@ -15,6 +9,7 @@ import {
   runTransaction,
   query,
   where,
+  deleteDoc,
 } from 'firebase/firestore';
 import type { Student, Subject, Change, StudentData } from '@/types/student';
 
@@ -28,7 +23,7 @@ const HISTORIAL_COLLECTION = 'historialCambios';
 export async function processAndSaveData(studentData: StudentData): Promise<{ processed: number, changes: number }> {
   let processedCount = 0;
   let changesCount = 0;
-
+  
   for (const studentId in studentData) {
     const incomingStudent = studentData[studentId];
     if (!incomingStudent || !incomingStudent.id) continue;
@@ -95,13 +90,13 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
       }
       
        if(changesToWrite.length > 0) {
-          const batch = writeBatch(db);
+          const historyBatch = writeBatch(db);
           changesToWrite.forEach(change => {
               changesCount++;
               const historyDocRef = doc(collection(db, HISTORIAL_COLLECTION));
-              batch.set(historyDocRef, change);
+              historyBatch.set(historyDocRef, change);
           });
-          await batch.commit();
+          await historyBatch.commit();
       }
     });
     processedCount++;
@@ -143,42 +138,30 @@ export async function getStudentHistory(studentId: string): Promise<Change[]> {
  * High-risk function intended for testing environments only.
  */
 export async function deleteAllData(): Promise<void> {
-  const deleteCollection = async (collPath: string) => {
-    const collRef = collection(db, collPath);
-    const snapshot = await getDocs(collRef);
-    if (snapshot.empty) return;
-    
+  async function deleteCollection(collectionPath: string) {
+    const collectionRef = collection(db, collectionPath);
+    const q = query(collectionRef);
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return;
+    }
+
     const batch = writeBatch(db);
     snapshot.docs.forEach(doc => {
-      // If there are subcollections, they must be deleted recursively first.
-      if (collPath === ALUMNOS_COLLECTION) {
-         // This part needs to be improved if there are many subcollections.
-         // For now, we only have 'materias'.
-      }
       batch.delete(doc.ref);
     });
-    await batch.commit();
-  };
 
-  // Delete all documents in 'historialCambios'
-  const historialSnapshot = await getDocs(collection(db, HISTORIAL_COLLECTION));
-  if (!historialSnapshot.empty) {
-      const batch = writeBatch(db);
-      historialSnapshot.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
+    await batch.commit();
   }
 
-  // Delete all documents (and subcollections) in 'alumnos'
+  // Delete all history
+  await deleteCollection(HISTORIAL_COLLECTION);
+  
+  // Delete all students and their subcollections
   const alumnosSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
   for (const studentDoc of alumnosSnapshot.docs) {
-      const materiasSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION, studentDoc.id, 'materias'));
-      if (!materiasSnapshot.empty) {
-          const batch = writeBatch(db);
-          materiasSnapshot.forEach(materiaDoc => batch.delete(materiaDoc.ref));
-          await batch.commit();
-      }
-      await runTransaction(db, async transaction => {
-        transaction.delete(studentDoc.ref);
-      });
+    await deleteCollection(`${ALUMNOS_COLLECTION}/${studentDoc.id}/materias`);
+    await deleteDoc(doc(db, ALUMNOS_COLLECTION, studentDoc.id));
   }
 }

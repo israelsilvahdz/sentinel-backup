@@ -20,8 +20,7 @@ import { Trash2, RefreshCw } from 'lucide-react';
 import type { Student, Change, Subject } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory } from '@/lib/server/firestore';
-import { useRouter } from 'next/navigation';
+import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory } from '@/lib/firestore';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 
@@ -54,11 +53,10 @@ export function useDashboardFilters() {
 
 
 export function DashboardClient({ initialStudents }: { initialStudents: Student[]}) {
-  const router = useRouter();
   const { toast } = useToast();
   const [allStudents, setAllStudents] = useState<Student[]>(initialStudents);
   const [changes, setChanges] = useState<Change[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with loading true
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
@@ -73,18 +71,22 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     try {
         const students = await getAllStudents();
         setAllStudents(students);
-        router.refresh(); // Re-fetches server components
     } catch(e) {
         console.error(e);
         toast({
             variant: 'destructive',
             title: 'Error de Carga',
-            description: 'No se pudieron recargar los datos.',
+            description: 'No se pudieron recargar los datos. Revisa tus permisos de Firestore.',
         });
     } finally {
         setIsLoading(false);
     }
-  }, [toast, router]);
+  }, [toast]);
+
+  // Fetch initial data on component mount
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
 
   const handleFileUpload = async (file: File) => {
