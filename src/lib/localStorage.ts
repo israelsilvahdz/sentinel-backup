@@ -1,3 +1,6 @@
+// This file is no longer in use as data is now persisted in Firestore.
+// It is kept for reference but can be safely removed if desired.
+
 export function getFromLocalStorage<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') {
     return defaultValue;

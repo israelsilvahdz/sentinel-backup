@@ -10,14 +10,11 @@ import { RiskDistributionChart } from './RiskDistributionChart';
 import { StudentCard } from './StudentCard';
 import { AlertCircle, BarChart2, BellRing, Users } from 'lucide-react';
 
-import type { StudentData, Change, Student } from '@/types/student';
-import { getFromLocalStorage, saveToLocalStorage } from '@/lib/localStorage';
+import type { StudentData, Change } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { compareData, calculateKpis } from '@/lib/dataProcessor';
-
-const MONITORED_IDS_KEY = 'monitoredStudentIds';
-const MONITORED_IDS_STRING_KEY = 'monitoredStudentIdsString';
+import { getMonitoredStudentIds, saveMonitoredStudentIds, getStudentData, saveStudentData } from '@/lib/firestore';
 
 function getTodayDataKey() {
   const today = new Date();
@@ -40,31 +37,60 @@ export function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoading(true);
-    const savedIds = getFromLocalStorage<string[]>(MONITORED_IDS_KEY, []);
-    const savedIdsString = getFromLocalStorage<string>(MONITORED_IDS_STRING_KEY, '');
-    const todayData = getFromLocalStorage<StudentData>(getTodayDataKey(), null);
-    const yesterdayData = getFromLocalStorage<StudentData>(getYesterdayDataKey(), null);
-    
-    setMonitoredStudentIds(savedIds);
-    setMonitoredIdsInput(savedIdsString);
-    setCurrentData(todayData);
-    setPreviousData(yesterdayData);
+    async function loadInitialData() {
+      setIsLoading(true);
+      try {
+        const { ids, idsString } = await getMonitoredStudentIds();
+        setMonitoredStudentIds(ids);
+        setMonitoredIdsInput(idsString);
 
-    if (todayData && yesterdayData) {
-      setChanges(compareData(todayData, yesterdayData));
+        const todayKey = getTodayDataKey();
+        const yesterdayKey = getYesterdayDataKey();
+        
+        const [todayData, yesterdayData] = await Promise.all([
+          getStudentData(todayKey),
+          getStudentData(yesterdayKey)
+        ]);
+
+        setCurrentData(todayData);
+        setPreviousData(yesterdayData);
+
+        if (todayData && yesterdayData) {
+          setChanges(compareData(todayData, yesterdayData));
+        }
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Error de Carga',
+          description: 'No se pudieron cargar los datos desde la base de datos.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
     }
-    setIsLoading(false);
-  }, []);
+    loadInitialData();
+  }, [toast]);
 
-  const handleUpdateMonitoredIds = useCallback((ids: string[]) => {
-    setMonitoredStudentIds(ids);
-    saveToLocalStorage(MONITORED_IDS_KEY, ids);
-  }, []);
+  const handleUpdateMonitoredIds = useCallback(async (ids: string[], idsString: string) => {
+    try {
+      await saveMonitoredStudentIds(ids, idsString);
+      setMonitoredStudentIds(ids);
+      setMonitoredIdsInput(idsString);
+      toast({
+        title: 'Lista Guardada',
+        description: 'La lista de matrículas de alumnos ha sido guardada en la base de datos.',
+      });
+    } catch (error) {
+       toast({
+        variant: 'destructive',
+        title: 'Error al Guardar',
+        description: 'No se pudo guardar la lista de matrículas.',
+      });
+    }
+  }, [toast]);
   
   const handleMonitoredIdsInputChange = useCallback((value: string) => {
     setMonitoredIdsInput(value);
-    saveToLocalStorage(MONITORED_IDS_STRING_KEY, value);
   }, []);
 
   const handleFileUpload = async (file: File) => {
@@ -82,10 +108,11 @@ export function Dashboard() {
       }
 
       const todayKey = getTodayDataKey();
-      const previousDayData = getFromLocalStorage<StudentData>(todayKey, null) || previousData;
+      
+      const previousDayData = currentData || await getStudentData(getYesterdayDataKey());
 
       setCurrentData(data);
-      saveToLocalStorage(todayKey, data);
+      await saveStudentData(todayKey, data);
       
       if (previousDayData) {
         setPreviousData(previousDayData);
