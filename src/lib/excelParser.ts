@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { type StudentData, type Subject } from '@/types/student';
 
 const COLUMNS = {
-  ID: 'Matricula',
+  ID: 'Matrícula',
   NAME: 'Nombre del alumno',
   LEADER: 'Líder',
   TUTOR: 'Tutor',
