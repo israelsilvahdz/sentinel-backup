@@ -13,28 +13,31 @@ interface RiskFocusChartProps {
 }
 
 function processRiskData(students: Student[], riskType: 'absences' | 'missedAssignments') {
-    const subjectRisks: { [name: string]: { totalRisk: number, count: number } } = {};
+    const subjectRisks: { [name: string]: number } = {};
 
     students.forEach(student => {
         (student.subjectSummaries || []).forEach(subject => {
             if (!subjectRisks[subject.name]) {
-                subjectRisks[subject.name] = { totalRisk: 0, count: 0 };
+                subjectRisks[subject.name] = 0;
             }
             const value = riskType === 'absences' ? subject.absences : subject.missedAssignments;
             const limit = riskType === 'absences' ? subject.absenceLimit : subject.missedAssignmentLimit;
-            const { risk } = getRisk(value, limit);
-            subjectRisks[subject.name].totalRisk += risk;
-            subjectRisks[subject.name].count++;
+            const { level } = getRisk(value, limit);
+            
+            // Contar si el alumno está en riesgo medio o alto
+            if (level === 'medium' || level === 'high') {
+                subjectRisks[subject.name]++;
+            }
         });
     });
     
     return Object.entries(subjectRisks)
-        .map(([name, data]) => ({
+        .map(([name, count]) => ({
             name: name,
-            riesgo: (data.totalRisk / data.count) * 100, 
+            alumnos: count, 
         }))
-        .filter(d => d.riesgo > 0)
-        .sort((a, b) => b.riesgo - a.riesgo)
+        .filter(d => d.alumnos > 0)
+        .sort((a, b) => b.alumnos - a.alumnos)
         .slice(0, 5); // Top 5
 }
 
@@ -56,7 +59,7 @@ function ChartComponent({
                 <div className="rounded-lg border bg-background p-2 shadow-sm">
                 <p className="font-bold text-base">{label}</p>
                 <p className="text-sm" style={{ color: payload[0].fill }}>
-                    Riesgo Promedio: {payload[0].value.toFixed(1)}%
+                    Alumnos en Riesgo: {payload[0].value}
                 </p>
                 </div>
             );
@@ -70,7 +73,7 @@ function ChartComponent({
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} layout="vertical" margin={{ left: 100, right: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" unit="%" domain={[0, 100]} />
+                    <XAxis type="number" dataKey="alumnos" allowDecimals={false} name="Nro. de Alumnos"/>
                     <YAxis 
                         type="category" 
                         dataKey="name" 
@@ -80,7 +83,7 @@ function ChartComponent({
                         tickLine={false}
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                    <Bar dataKey="riesgo" fill={barColor} barSize={20} onClick={(data) => onBarClick(data.name)} className="cursor-pointer" />
+                    <Bar dataKey="alumnos" name="Alumnos en Riesgo" fill={barColor} barSize={20} onClick={(data) => onBarClick(data.name)} className="cursor-pointer" />
                 </BarChart>
             </ResponsiveContainer>
         </div>
@@ -105,7 +108,7 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
     <Card className="lg:col-span-1">
       <CardHeader>
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
-        <CardDescription>Top 5 materias con mayor riesgo promedio. Haz clic en una barra para ver los alumnos.</CardDescription>
+        <CardDescription>Top 5 materias con más alumnos en riesgo. Haz clic en una barra para ver los detalles.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {hasData ? (
