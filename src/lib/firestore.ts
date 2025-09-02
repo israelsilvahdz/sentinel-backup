@@ -35,23 +35,26 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
 
     await runTransaction(db, async (transaction) => {
       const studentDocRef = doc(db, ALUMNOS_COLLECTION, studentId);
+      
+      // --- 1. ALL READS FIRST ---
       const studentDoc = await transaction.get(studentDocRef);
       const existingStudentData = studentDoc.exists() ? studentDoc.data() as Student : null;
-      const changesToWrite: Change[] = [];
 
-      // --- 1. ALL READS FIRST ---
-      const subjectDocs = new Map<string, any>();
+      const subjectDocsReads = new Map<string, any>();
       if (incomingStudent.subjects) {
           for (const incomingSubject of incomingStudent.subjects) {
-              if (incomingSubject.id) {
+              if (incomingSubject.id) { // incomingSubject.id is CRN
                   const subjectDocRef = doc(db, ALUMNOS_COLLECTION, studentId, 'materias', incomingSubject.id);
                   const subjectDoc = await transaction.get(subjectDocRef);
-                  subjectDocs.set(incomingSubject.id, subjectDoc);
+                  subjectDocsReads.set(incomingSubject.id, subjectDoc);
               }
           }
       }
+      
+      // --- 2. NOW PREPARE AND EXECUTE ALL WRITES ---
+      const changesToWrite: Change[] = [];
 
-      // --- 2. PREPARE ALL WRITES ---
+      // Student Info write
       const studentInfo: Omit<Student, 'subjects'> = {
         id: incomingStudent.id,
         name: incomingStudent.name,
@@ -61,17 +64,17 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
       };
 
       if (existingStudentData) {
-        // Compare and update student info if changed (optional, but good practice)
         transaction.update(studentDocRef, studentInfo);
       } else {
         transaction.set(studentDocRef, studentInfo);
       }
       
+      // Subjects writes
       if (incomingStudent.subjects) {
         for (const incomingSubject of incomingStudent.subjects) {
           if (!incomingSubject.id) continue;
 
-          const subjectDoc = subjectDocs.get(incomingSubject.id);
+          const subjectDoc = subjectDocsReads.get(incomingSubject.id);
           const newSubjectData: Subject = { ...incomingSubject };
 
           if (subjectDoc && subjectDoc.exists()) {
@@ -97,15 +100,16 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
                 });
               }
             }
+             // Get ref from the read doc to perform the update
              transaction.update(subjectDoc.ref, { ...newSubjectData });
           } else {
              changesToWrite.push({
                date: Timestamp.now(), studentId, subjectId: incomingSubject.id,
                fieldName: 'materia', oldValue: null, newValue: 'materia creada',
              });
-             // Need the ref again to set a new doc
-             const subjectDocRef = doc(db, ALUMNOS_COLLECTION, studentId, 'materias', incomingSubject.id);
-             transaction.set(subjectDocRef, newSubjectData);
+             // Need a fresh ref to set a new doc, since it didn't exist
+             const newSubjectDocRef = doc(db, ALUMNOS_COLLECTION, studentId, 'materias', incomingSubject.id);
+             transaction.set(newSubjectDocRef, newSubjectData);
           }
         }
       }
@@ -113,7 +117,6 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
        if(changesToWrite.length > 0) {
           changesCount += changesToWrite.length;
           // IMPORTANT: Batch writes for history must happen OUTSIDE the transaction.
-          // We will commit the historyBatch after all transactions are done.
           changesToWrite.forEach(change => {
               const historyDocRef = doc(collection(db, HISTORIAL_COLLECTION));
               historyBatch.set(historyDocRef, change);
