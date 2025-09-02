@@ -29,8 +29,10 @@ import type { Student, Change, Subject, UploadHistory } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory, getUploadHistory } from '@/app/actions/firestoreActions';
+import { findLostCases, findObservationCases, findUrgentCases } from '@/lib/dataProcessor';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
+type CaseType = 'lost' | 'urgent' | 'observation';
 export type ActiveView = 'dashboard' | 'students' | 'history';
 
 interface DashboardContextType {
@@ -45,6 +47,8 @@ interface DashboardContextType {
   setFilterType: (type: FilterType) => void;
   selectedValue: string | null;
   setSelectedValue: (value: string | null) => void;
+  caseType: CaseType | null;
+  setCaseType: (caseType: CaseType | null) => void;
   loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
   getStudentChanges: (studentId: string) => Promise<Change[]>;
   activeView: ActiveView;
@@ -96,13 +100,20 @@ export function DashboardClient() {
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
+  const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   const handleSetFilterType = (type: FilterType) => {
     setFilterType(type);
     setSelectedValue(null);
+    setCaseType(null); // Reset case type when changing main filter
   };
+
+  const handleSetActiveView = (view: ActiveView) => {
+    setActiveView(view);
+    setCaseType(null); // Reset case type when changing view
+  }
   
   const refreshData = useCallback(async () => {
     setIsLoading(true);
@@ -213,19 +224,41 @@ export function DashboardClient() {
 
 
   const filteredStudents = useMemo(() => {
-    if (!selectedValue) return allStudents;
     let students = allStudents;
-    if (filterType === 'leader') {
-      students = students.filter(s => s.leader === selectedValue);
+
+    // Apply main filter (leader, tutor, subject)
+    if (selectedValue) {
+      if (filterType === 'leader') {
+        students = students.filter(s => s.leader === selectedValue);
+      }
+      if (filterType === 'tutor') {
+        students = students.filter(s => s.tutor === selectedValue);
+      }
+      if (filterType === 'subject') {
+        students = students.filter(s => s.subjectSummaries?.some(sub => sub.name === selectedValue));
+      }
     }
-    if (filterType === 'tutor') {
-      students = students.filter(s => s.tutor === selectedValue);
+    
+    // Apply case filter (lost, urgent, observation)
+    if (caseType) {
+        if(caseType === 'lost') {
+            return findLostCases(students);
+        }
+        const lostCaseIds = new Set(findLostCases(students).map(s => s.id));
+        
+        if (caseType === 'urgent') {
+            return findUrgentCases(students, lostCaseIds);
+        }
+        
+        if (caseType === 'observation') {
+             const urgentCaseIds = new Set(findUrgentCases(students, lostCaseIds).map(s => s.id));
+             const combinedExclusions = new Set([...lostCaseIds, ...urgentCaseIds]);
+             return findObservationCases(students, combinedExclusions);
+        }
     }
-    if (filterType === 'subject') {
-      students = students.filter(s => s.subjectSummaries?.some(sub => sub.name === selectedValue));
-    }
+
     return students;
-  }, [allStudents, filterType, selectedValue]);
+  }, [allStudents, filterType, selectedValue, caseType]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     try {
@@ -259,10 +292,12 @@ export function DashboardClient() {
     setFilterType: handleSetFilterType,
     selectedValue,
     setSelectedValue,
+    caseType,
+    setCaseType,
     loadStudentSubjects: loadStudentSubjectsWrapper,
     getStudentChanges: getStudentChangesWrapper,
     activeView,
-    setActiveView,
+    setActiveView: handleSetActiveView,
     selectedStudentId,
     setSelectedStudentId
   };
@@ -294,7 +329,7 @@ export function DashboardClient() {
                   <SidebarMenuButton 
                     tooltip="Dashboard" 
                     isActive={activeView === 'dashboard'} 
-                    onClick={() => setActiveView('dashboard')}
+                    onClick={() => handleSetActiveView('dashboard')}
                   >
                     <LayoutDashboard />
                     <span>Dashboard</span>
@@ -304,7 +339,7 @@ export function DashboardClient() {
                   <SidebarMenuButton 
                     tooltip="Panel de Alumnos" 
                     isActive={activeView === 'students'} 
-                    onClick={() => setActiveView('students')}
+                    onClick={() => handleSetActiveView('students')}
                   >
                     <Users />
                     <span>Panel de Alumnos</span>

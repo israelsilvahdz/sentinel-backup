@@ -12,6 +12,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Filter } from 'lucide-react';
+import { Button } from '../ui/button';
 
 export function DashboardFilters() {
   const {
@@ -22,6 +23,8 @@ export function DashboardFilters() {
     setFilterType,
     selectedValue,
     setSelectedValue,
+    caseType,
+    setCaseType,
     hasData,
     isLoading,
   } = useDashboardFilters();
@@ -52,7 +55,14 @@ export function DashboardFilters() {
 
   const handleValueChange = (value: string | null) => {
     setSelectedValue(value === 'all' ? null : value);
+    setCaseType(null); // Clear case type when selecting a new value
   };
+
+  const handleFilterTypeChange = (val: string) => {
+    setFilterType(val as any);
+    setSelectedValue(null);
+    setCaseType(null); // Also clear case type here
+  }
   
   return (
     <div className="space-y-4">
@@ -63,7 +73,7 @@ export function DashboardFilters() {
         
         <div className="px-2 group-data-[collapsible=icon]:hidden">
             <label className="text-sm font-medium">Filtrar por</label>
-            <RadioGroup value={filterType} onValueChange={(val) => setFilterType(val as any)} className="mt-2">
+            <RadioGroup value={filterType} onValueChange={handleFilterTypeChange} className="mt-2">
                 <div className="flex items-center space-x-2">
                     <RadioGroupItem value="leader" id="r-leader" />
                     <Label htmlFor="r-leader">Líder</Label>
@@ -81,7 +91,7 @@ export function DashboardFilters() {
 
         <div className="px-2 group-data-[collapsible=icon]:hidden">
             <label className="text-sm font-medium">Seleccionar valor</label>
-             <Select onValueChange={handleValueChange} value={selectedValue || 'all'}>
+             <Select onValueChange={handleValueChange} value={selectedValue || 'all'} disabled={!!caseType}>
                 <SelectTrigger className='w-full'>
                     <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
@@ -94,6 +104,11 @@ export function DashboardFilters() {
                     ))}
                 </SelectContent>
             </Select>
+            {caseType && (
+                <Button variant="ghost" size="sm" className="mt-2 text-primary" onClick={() => setCaseType(null)}>
+                    Limpiar filtro de caso
+                </Button>
+            )}
         </div>
     </div>
   );

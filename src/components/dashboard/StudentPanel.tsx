@@ -1,13 +1,16 @@
 
+
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StudentCard } from './StudentCard';
 import { Users, Loader2 } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
+import { Button } from '../ui/button';
+import { X } from 'lucide-react';
 
 export function StudentPanel() {
-  const { filteredStudents, hasData, isLoading } = useDashboardFilters();
+  const { filteredStudents, hasData, isLoading, caseType, setCaseType } = useDashboardFilters();
 
   if (isLoading) {
     return (
@@ -17,11 +20,29 @@ export function StudentPanel() {
     );
   }
 
+  const caseTypeMap = {
+    lost: 'Casos Perdidos',
+    urgent: 'Casos Urgentes',
+    observation: 'Alumnos en Observación',
+  };
+
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
        <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Panel de Alumnos</h1>
-        <p className="text-muted-foreground">Explora y monitorea los casos individuales de cada alumno.</p>
+         {caseType ? (
+            <div className="flex items-center gap-2 mt-2">
+                 <p className="text-muted-foreground">
+                    Mostrando: <span className="font-semibold text-primary">{caseTypeMap[caseType]}</span>
+                </p>
+                <Button variant="ghost" size="sm" onClick={() => setCaseType(null)}>
+                   <X className="mr-2 h-4 w-4"/>
+                   Limpiar filtro
+                </Button>
+            </div>
+         ) : (
+            <p className="text-muted-foreground">Explora y monitorea los casos individuales de cada alumno.</p>
+         )}
       </header>
 
       {hasData && (

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,17 +10,23 @@ interface KpiCardProps {
   value: number | string;
   icon: LucideIcon;
   color?: "red" | "yellow" | "blue";
+  onClick?: () => void;
 }
 
-export function KpiCard({ title, value, icon: Icon, color }: KpiCardProps) {
+export function KpiCard({ title, value, icon: Icon, color, onClick }: KpiCardProps) {
   const colorClasses = {
     red: "text-red-600 dark:text-red-400",
     yellow: "text-yellow-600 dark:text-yellow-400",
     blue: "text-blue-600 dark:text-blue-400",
   };
   
+  const isClickable = !!onClick;
+  
   return (
-    <Card>
+    <Card 
+      onClick={onClick}
+      className={cn(isClickable && "cursor-pointer hover:bg-muted/50 transition-colors")}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}

@@ -1,3 +1,4 @@
+
 import { type Student, type Subject, type SubjectSummary } from '@/types/student';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
@@ -14,9 +15,9 @@ export function getRisk(value: number, limit: number): { risk: number; level: Ri
   const percentage = value / limit;
   
   let level: RiskLevel;
-  if (percentage >= 0.5) { // 50% o más es crítico
+  if (percentage >= 0.8) { // 80% o más es crítico. El limite real es > 100%, pero se marca antes
     level = 'high';
-  } else if (percentage > 0) { // Cualquier riesgo mayor que 0 es observación
+  } else if (percentage >= 0.5) { // 50% o más es observación
     level = 'medium';
   } else {
     level = 'low';
@@ -44,7 +45,6 @@ export function getStudentOverallRisk(student: Student, subjects: (Subject | Sub
 
     if (absenceRisk.level === 'high' || assignmentRisk.level === 'high') {
       hasHighRisk = true;
-      break; 
     }
     if (absenceRisk.level === 'medium' || assignmentRisk.level === 'medium') {
       hasMediumRisk = true;
@@ -86,7 +86,7 @@ export function findLostCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
         return student.subjectSummaries.some(subject => 
-            subject.absences > subject.absenceLimit || subject.missedAssignments > subject.missedAssignmentLimit
+            subject.absences >= subject.absenceLimit || subject.missedAssignments >= subject.missedAssignmentLimit
         );
     });
 }
@@ -105,5 +105,20 @@ export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): 
         }).length;
 
         return highRiskSubjects >= 2;
+    });
+}
+
+/**
+ * Encuentra alumnos en observación (con al menos una materia en riesgo medio, pero no son urgentes ni perdidos).
+ */
+export function findObservationCases(students: Student[], excludedIds: Set<string>): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries || excludedIds.has(student.id)) return false;
+        
+        return student.subjectSummaries.some(subject => {
+             const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
+            const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
+            return absenceRisk.level === 'medium' || assignmentRisk.level === 'medium';
+        });
     });
 }
