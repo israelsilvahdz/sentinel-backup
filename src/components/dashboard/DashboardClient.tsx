@@ -100,6 +100,7 @@ export function DashboardClient() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false); // For file uploads/deletes
   const [progress, setProgress] = useState(0);
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
@@ -137,7 +138,6 @@ export function DashboardClient() {
   
   const refreshData = useCallback(async () => {
     setIsLoading(true);
-    setProgress(30);
     try {
         const [students, history] = await Promise.all([
           getAllStudents(),
@@ -145,7 +145,6 @@ export function DashboardClient() {
         ]);
         setAllStudents(students);
         setUploadHistory(history);
-        setProgress(100);
     } catch(e) {
         console.error(e);
         toast({
@@ -154,10 +153,7 @@ export function DashboardClient() {
             description: 'No se pudieron recargar los datos. Revisa la consola para más detalles.',
         });
     } finally {
-        setTimeout(() => {
-          setIsLoading(false);
-          setProgress(0);
-        }, 500);
+        setIsLoading(false);
     }
   }, [toast]);
 
@@ -167,7 +163,7 @@ export function DashboardClient() {
 
 
   const handleFileUpload = async (file: File) => {
-    setIsLoading(true);
+    setIsProcessing(true);
     setProgress(10);
     try {
       const data = await parseExcel(file);
@@ -178,7 +174,7 @@ export function DashboardClient() {
           title: 'Error de Formato',
           description: 'El archivo Excel no tiene el formato esperado, está vacío o no se encontraron alumnos. Revise la consola para más detalles.',
         });
-        setIsLoading(false);
+        setIsProcessing(false);
         setProgress(0);
         return;
       }
@@ -201,6 +197,10 @@ export function DashboardClient() {
       console.error(error);
     } finally {
         await refreshData();
+        setTimeout(() => {
+          setIsProcessing(false);
+          setProgress(0);
+        }, 500);
     }
   };
 
@@ -208,7 +208,7 @@ export function DashboardClient() {
     if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) {
       return;
     }
-    setIsLoading(true);
+    setIsProcessing(true);
     setProgress(20);
     try {
       await deleteAllData();
@@ -228,7 +228,7 @@ export function DashboardClient() {
       console.error(error);
     } finally {
       setTimeout(() => {
-        setIsLoading(false);
+        setIsProcessing(false);
         setProgress(0);
       }, 500);
     }
@@ -307,7 +307,7 @@ export function DashboardClient() {
   const contextValue: DashboardContextType = {
     filteredStudents,
     allStudents,
-    isLoading,
+    isLoading: isLoading || isProcessing, // Combine loading states
     hasData: allStudents.length > 0,
     leaders,
     tutors,
@@ -402,23 +402,25 @@ export function DashboardClient() {
                  <div className="flex-1">
                     <h1 className="font-semibold text-lg">Academic Sentinel</h1>
                  </div>
-                 <Button variant="outline" size="sm" onClick={refreshData} disabled={isLoading}>
+                 <Button variant="outline" size="sm" onClick={refreshData} disabled={isLoading || isProcessing}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Recargar
                  </Button>
-                 <Button variant="destructive" size="sm" onClick={handleDeleteAllData} disabled={isLoading}>
+                 <Button variant="destructive" size="sm" onClick={handleDeleteAllData} disabled={isLoading || isProcessing}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Borrar Datos
                 </Button>
-                <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading}>
+                <FileUpload onFileUpload={handleFileUpload} isLoading={isProcessing}>
                    <UploadCloud className="mr-2" />
                    Cargar Reporte
                 </FileUpload>
             </header>
-            {isLoading && progress > 0 && <Progress value={progress} className="w-full h-1" />}
+            {isProcessing && progress > 0 && <Progress value={progress} className="w-full h-1" />}
             {renderActiveView()}
         </SidebarInset>
       </SidebarProvider>
     </DashboardContext.Provider>
   );
 }
+
+    
