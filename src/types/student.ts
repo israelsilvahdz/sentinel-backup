@@ -10,6 +10,8 @@ export interface Subject {
 export interface Student {
   id: string;
   name: string;
+  leader: string;
+  tutor: string;
   subjects: Subject[];
 }
 

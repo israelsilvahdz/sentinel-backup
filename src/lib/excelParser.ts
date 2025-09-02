@@ -4,6 +4,8 @@ import { type StudentData, type Subject } from '@/types/student';
 const COLUMNS = {
   ID: 'Matrícula',
   NAME: 'Nombre del alumno',
+  LEADER: 'Lider',
+  TUTOR: 'Tutor',
   SUBJECT_NAME: 'Nombre de la materia',
   ABSENCE_LIMIT: 'Límite de faltas',
   ABSENCES: 'Faltas del alumno',
@@ -40,13 +42,19 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         const requiredCols = Object.values(COLUMNS);
         for(const colName of requiredCols) {
             if(!(colName in firstRow)) {
-                throw new Error(`Missing required column: ${colName}`);
+                // Allow missing leader/tutor for now
+                if (colName !== COLUMNS.LEADER && colName !== COLUMNS.TUTOR) {
+                    throw new Error(`Missing required column: ${colName}`);
+                }
             }
         }
 
         json.forEach(row => {
           const studentId = String(row[COLUMNS.ID]);
           const studentName = row[COLUMNS.NAME];
+          const leader = row[COLUMNS.LEADER] || 'N/A';
+          const tutor = row[COLUMNS.TUTOR] || 'N/A';
+
 
           if (!studentId || !studentName) return;
 
@@ -54,6 +62,8 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             studentData[studentId] = {
               id: studentId,
               name: studentName,
+              leader,
+              tutor,
               subjects: [],
             };
           }

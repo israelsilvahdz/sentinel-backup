@@ -9,7 +9,7 @@ import { Save } from 'lucide-react';
 interface MonitoredStudentsProps {
   value: string;
   onChange: (value: string) => void;
-  onUpdateIds: (ids: string[], idsString: string) => Promise<void>;
+  onUpdateIds: (ids: string[]) => Promise<void>;
 }
 
 export function MonitoredStudents({ value, onChange, onUpdateIds }: MonitoredStudentsProps) {
@@ -28,26 +28,26 @@ export function MonitoredStudents({ value, onChange, onUpdateIds }: MonitoredStu
   
   const handleSave = async () => {
     setIsSaving(true);
-    const ids = currentValue.split(',').map(id => id.trim()).filter(Boolean);
-    await onUpdateIds(ids, currentValue);
+    const ids = currentValue.split(/[\s,]+/).map(id => id.trim()).filter(Boolean);
+    await onUpdateIds(ids);
     setIsSaving(false);
   };
   
   return (
     <div className="space-y-2">
-      <Label htmlFor="monitored-students-input">Matrículas de Alumnos Tutorados</Label>
+      <Label htmlFor="monitored-students-input">Filtrar por Matrículas de Alumnos</Label>
       <Textarea
         id="monitored-students-input"
         value={currentValue}
         onChange={handleTextChange}
-        placeholder="Pega aquí una lista de matrículas separadas por comas."
+        placeholder="Pega aquí una lista de matrículas separadas por comas o espacios para filtrar el dashboard. Déjalo vacío para ver a todos los alumnos del reporte."
         className="min-h-[100px] bg-card"
         disabled={isSaving}
       />
       <div className="flex flex-wrap gap-2">
-        <Button onClick={handleSave} disabled={!currentValue.trim() || isSaving}>
+        <Button onClick={handleSave} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
-            {isSaving ? 'Guardando...' : 'Guardar Lista'}
+            {isSaving ? 'Guardando...' : 'Guardar Filtro'}
         </Button>
       </div>
     </div>

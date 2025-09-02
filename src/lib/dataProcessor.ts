@@ -4,16 +4,17 @@ export type RiskLevel = 'low' | 'medium' | 'high';
 
 export function getRisk(value: number, limit: number): { risk: number; level: RiskLevel } {
   if (limit === 0) return { risk: 0, level: 'low' };
-  const risk = value / limit;
+  const percentage = value / limit;
+  
   let level: RiskLevel;
-  if (risk > 0.75) {
+  if (percentage >= 0.5) { // 50% or more is critical
     level = 'high';
-  } else if (risk >= 0.5) {
+  } else if (percentage > 0) { // Any risk greater than 0 is observation
     level = 'medium';
   } else {
     level = 'low';
   }
-  return { risk, level };
+  return { risk: percentage, level };
 }
 
 export function compareData(current: StudentData, previous: StudentData): Change[] {
@@ -77,7 +78,7 @@ export function getStudentOverallRisk(student: Student) {
 
     if (absenceRisk.level === 'high' || assignmentRisk.level === 'high') {
       hasHighRisk = true;
-      break;
+      break; 
     }
     if (absenceRisk.level === 'medium' || assignmentRisk.level === 'medium') {
       hasMediumRisk = true;

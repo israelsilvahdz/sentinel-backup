@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ArrowUp, ArrowDown, Bot } from 'lucide-react';
 import { type Student, type Change } from "@/types/student";
-import { getRisk, type RiskLevel } from '@/lib/dataProcessor';
+import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { summarizeStudentChanges } from '@/ai/flows/summarize-student-changes';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -15,7 +15,7 @@ interface StudentCardProps {
   changes: Change[];
 }
 
-function RiskCell({ value, limit }: { value: number; limit: number; change?: number }) {
+function RiskCell({ value, limit }: { value: number; limit: number; }) {
   const { level } = getRisk(value, limit);
   
   const riskColorMapping: Record<RiskLevel, string> = {
@@ -34,9 +34,13 @@ function RiskCell({ value, limit }: { value: number; limit: number; change?: num
 function ChangeIndicator({ value, type = 'number' }: { value: number, type?: 'number' | 'grade' }) {
     if (value === 0) return null;
     const isUp = value > 0;
-    const isGrade = type === 'grade';
+    
+    // For grades, up is good (green), for others, up is bad (red)
+    const positiveIsGood = type === 'grade';
+    const colorClass = (isUp && positiveIsGood) || (!isUp && !positiveIsGood) ? 'text-green-500' : 'text-red-500';
+
     return (
-        <span className={`inline-flex items-center text-xs ml-1 ${isUp ? 'text-red-500' : 'text-green-500'}`}>
+        <span className={`inline-flex items-center text-xs ml-1 ${colorClass}`}>
             ({isUp ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
             {Math.abs(value)})
         </span>
@@ -89,6 +93,23 @@ function AiSummary({ student, changes }: StudentCardProps) {
   )
 }
 
+function OverallRiskBadge({ student }: { student: Student }) {
+    const { overallRisk } = getStudentOverallRisk(student);
+
+    if (overallRisk === 'low') return null;
+
+    const config = {
+        medium: { text: 'En Observación', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+        high: { text: 'Crítico', className: 'bg-red-100 text-red-800 border-red-300' },
+    };
+
+    const { text, className } = config[overallRisk] || {};
+
+    if (!text) return null;
+
+    return <Badge className={`ml-2 ${className}`}>{text}</Badge>;
+}
+
 export function StudentCard({ student, changes }: StudentCardProps) {
   const getChangeFor = (subjectName: string, type: 'absence' | 'missedAssignment' | 'grade') => {
     const change = changes.find(c => c.subjectName === subjectName && c.type === type);
@@ -100,8 +121,11 @@ export function StudentCard({ student, changes }: StudentCardProps) {
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
-                <CardTitle>{student.name}</CardTitle>
-                <CardDescription>Matrícula: {student.id}</CardDescription>
+                <CardTitle className="flex items-center">
+                    {student.name}
+                    <OverallRiskBadge student={student} />
+                </CardTitle>
+                <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
             </div>
         </div>
       </CardHeader>

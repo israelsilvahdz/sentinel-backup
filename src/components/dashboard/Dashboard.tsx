@@ -71,7 +71,8 @@ export function Dashboard() {
     loadInitialData();
   }, [toast]);
 
-  const handleUpdateMonitoredIds = useCallback(async (ids: string[], idsString: string) => {
+  const handleUpdateMonitoredIds = useCallback(async (ids: string[]) => {
+    const idsString = ids.join(', ');
     try {
       await saveMonitoredStudentIds(ids, idsString);
       setMonitoredStudentIds(ids);
@@ -135,7 +136,8 @@ export function Dashboard() {
   };
 
   const monitoredStudents = useMemo(() => {
-    if (!currentData || monitoredStudentIds.length === 0) return [];
+    if (!currentData) return [];
+    if (monitoredStudentIds.length === 0) return Object.values(currentData);
     return monitoredStudentIds.map(id => currentData[id]).filter(Boolean);
   }, [currentData, monitoredStudentIds]);
 
@@ -145,7 +147,7 @@ export function Dashboard() {
   }, [monitoredStudents]);
   
   const filteredChanges = useMemo(() => {
-    if (monitoredStudentIds.length === 0) return [];
+    if (monitoredStudentIds.length === 0) return changes;
     const idSet = new Set(monitoredStudentIds);
     return changes.filter(c => idSet.has(c.studentId));
   }, [changes, monitoredStudentIds]);
@@ -222,7 +224,7 @@ export function Dashboard() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                    Agrega las matrículas de los alumnos que supervisas en el campo de texto de arriba para ver su progreso.
+                    Sube un reporte para empezar. Si quieres ver alumnos específicos, agrega sus matrículas en el campo de arriba.
                     </p>
                 </CardContent>
             </Card>
