@@ -19,9 +19,10 @@ import {
 import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
 import { StudentPanel } from './StudentPanel';
+import { StudentHistoryPanel } from './StudentHistoryPanel';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, History } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 import type { Student, Change, Subject, UploadHistory } from '@/types/student';
@@ -30,7 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory, getUploadHistory } from '@/app/actions/firestoreActions';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
-type ActiveView = 'dashboard' | 'students';
+export type ActiveView = 'dashboard' | 'students' | 'history';
 
 interface DashboardContextType {
   filteredStudents: Student[];
@@ -46,6 +47,10 @@ interface DashboardContextType {
   setSelectedValue: (value: string | null) => void;
   loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
   getStudentChanges: (studentId: string) => Promise<Change[]>;
+  activeView: ActiveView;
+  setActiveView: (view: ActiveView) => void;
+  selectedStudentId: string | null;
+  setSelectedStudentId: (id: string | null) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -92,6 +97,7 @@ export function DashboardClient() {
   const [filterType, setFilterType] = useState<FilterType>('leader');
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   const handleSetFilterType = (type: FilterType) => {
     setFilterType(type);
@@ -254,8 +260,25 @@ export function DashboardClient() {
     selectedValue,
     setSelectedValue,
     loadStudentSubjects: loadStudentSubjectsWrapper,
-    getStudentChanges: getStudentChangesWrapper
+    getStudentChanges: getStudentChangesWrapper,
+    activeView,
+    setActiveView,
+    selectedStudentId,
+    setSelectedStudentId
   };
+
+  const renderActiveView = () => {
+    switch (activeView) {
+        case 'dashboard':
+            return <Dashboard />;
+        case 'students':
+            return <StudentPanel />;
+        case 'history':
+             return <StudentHistoryPanel />;
+        default:
+            return <Dashboard />;
+    }
+  }
 
   return (
     <DashboardContext.Provider value={contextValue}>
@@ -332,7 +355,7 @@ export function DashboardClient() {
                 </FileUpload>
             </header>
             {isLoading && progress > 0 && <Progress value={progress} className="w-full h-1" />}
-            {activeView === 'dashboard' ? <Dashboard /> : <StudentPanel />}
+            {renderActiveView()}
         </SidebarInset>
       </SidebarProvider>
     </DashboardContext.Provider>

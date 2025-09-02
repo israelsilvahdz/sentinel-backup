@@ -6,15 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { KpiCard } from './KpiCard';
 import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2 } from 'lucide-react';
-import { StudentCard } from './StudentCard';
+import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 import { calculateKpis, findLostCases, findUrgentCases } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
 import type { Student } from '@/types/student';
 
 // Componente para mostrar listas de alumnos (Casos Urgentes / Perdidos)
-function StudentCaseList({ title, description, students, icon: Icon, color }: { title: string, description: string, students: Student[], icon: React.ElementType, color?: "red" | "yellow" | "blue" }) {
+function StudentCaseList({ title, description, students, icon: Icon, color, onStudentClick }: { title: string, description: string, students: Student[], icon: React.ElementType, color?: "red" | "yellow" | "blue", onStudentClick: (studentId: string) => void }) {
     if (students.length === 0) return null;
 
     const colorClasses = {
@@ -32,9 +32,17 @@ function StudentCaseList({ title, description, students, icon: Icon, color }: { 
                 </div>
                 <CardDescription>{description}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-2">
                 {students.map(student => (
-                    <StudentCard key={student.id} student={student} startOpen={false} />
+                    <Button 
+                        key={student.id} 
+                        variant="ghost" 
+                        className="w-full justify-between"
+                        onClick={() => onStudentClick(student.id)}
+                    >
+                        <span>{student.name}</span>
+                        <ArrowRightCircle className="h-4 w-4 text-muted-foreground" />
+                    </Button>
                 ))}
             </CardContent>
         </Card>
@@ -42,7 +50,7 @@ function StudentCaseList({ title, description, students, icon: Icon, color }: { 
 }
 
 export function Dashboard() {
-  const { filteredStudents, isLoading, hasData } = useDashboardFilters();
+  const { filteredStudents, isLoading, hasData, setActiveView, setSelectedStudentId } = useDashboardFilters();
 
   const { kpis, lostCases, urgentCases } = useMemo(() => {
     if (isLoading || !hasData) {
@@ -64,6 +72,10 @@ export function Dashboard() {
     };
   }, [filteredStudents, isLoading, hasData]);
 
+  const handleStudentClick = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setActiveView('history');
+  };
 
   if (isLoading) {
     return (
@@ -118,6 +130,7 @@ export function Dashboard() {
                             students={lostCases}
                             icon={UserX}
                             color="red"
+                            onStudentClick={handleStudentClick}
                         />
                          <StudentCaseList 
                             title="Casos Urgentes"
@@ -125,6 +138,7 @@ export function Dashboard() {
                             students={urgentCases}
                             icon={BellRing}
                             color="yellow"
+                            onStudentClick={handleStudentClick}
                         />
                     </div>
                 </div>
