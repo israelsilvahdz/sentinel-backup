@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -96,7 +97,7 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
         toast({
           variant: 'destructive',
           title: 'Error de Formato',
-          description: 'El archivo Excel no tiene el formato esperado, está vacío o faltan columnas requeridas.',
+          description: 'El archivo Excel no tiene el formato esperado, está vacío o faltan columnas requeridas. Revise la consola para más detalles.',
         });
         setIsLoading(false);
         return;
