@@ -1,3 +1,4 @@
+
 import * as XLSX from 'xlsx';
 import { type StudentData, type Subject } from '@/types/student';
 
@@ -37,7 +38,16 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         const workbook = XLSX.read(data, { type: 'binary' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+        
+        // Use header: 1 to get an array of arrays, and trim headers.
+        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (rows.length < 2) {
+          resolve(null);
+          return;
+        }
+
+        const header = rows[0].map(h => String(h).trim());
+        const json = XLSX.utils.sheet_to_json<any>(worksheet, { header: header, range: 1 });
 
         if (json.length === 0) {
           resolve(null);
@@ -46,7 +56,6 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         
         const studentData: StudentData = {};
         
-        const firstRow = json[0];
         const requiredCols = [
             COLUMNS.ID, 
             COLUMNS.NAME, 
@@ -59,7 +68,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         ];
 
         for(const colName of requiredCols) {
-            if(!(colName in firstRow)) {
+            if(!header.includes(colName)) {
                 throw new Error(`Missing required column: ${colName}`);
             }
         }
