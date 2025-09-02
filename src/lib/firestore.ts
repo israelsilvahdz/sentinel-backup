@@ -161,6 +161,7 @@ export async function getStudentHistory(studentId: string): Promise<Change[]> {
     
     return querySnapshot.docs.map(doc => {
         const data = doc.data();
+        // Convert Firestore Timestamp to a serializable format (ISO string)
         const change: Change = {
             ...data,
             date: data.date.toDate().toISOString(),
