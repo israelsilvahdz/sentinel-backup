@@ -1,4 +1,6 @@
 
+// This file is now intended for server-side use only.
+// Client components should interact with these functions via Server Actions.
 import { db } from './firebase';
 import {
   doc,
@@ -10,6 +12,7 @@ import {
   query,
   where,
   deleteDoc,
+  getDoc,
 } from 'firebase/firestore';
 import type { Student, Subject, Change, StudentData } from '@/types/student';
 
@@ -24,6 +27,8 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
   let processedCount = 0;
   let changesCount = 0;
   
+  const batch = writeBatch(db);
+
   for (const studentId in studentData) {
     const incomingStudent = studentData[studentId];
     if (!incomingStudent || !incomingStudent.id) continue;
@@ -90,18 +95,17 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
       }
       
        if(changesToWrite.length > 0) {
-          const historyBatch = writeBatch(db);
+          changesCount += changesToWrite.length;
           changesToWrite.forEach(change => {
-              changesCount++;
               const historyDocRef = doc(collection(db, HISTORIAL_COLLECTION));
-              historyBatch.set(historyDocRef, change);
+              batch.set(historyDocRef, change);
           });
-          await historyBatch.commit();
       }
     });
     processedCount++;
   }
-
+  
+  await batch.commit();
   return { processed: processedCount, changes: changesCount };
 }
 
@@ -110,8 +114,11 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
  */
 export async function getAllStudents(): Promise<Student[]> {
   const querySnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
+  // Firestore Timestamps can't be passed from server to client components.
+  // We don't need them in the student list anyway.
   return querySnapshot.docs.map(doc => doc.data() as Student);
 }
+
 
 /**
  * Gets the subjects for a specific student.
@@ -128,10 +135,20 @@ export async function getStudentSubjects(studentId: string): Promise<Subject[]> 
  * @param studentId The student's ID.
  */
 export async function getStudentHistory(studentId: string): Promise<Change[]> {
-  const q = query(collection(db, HISTORIAL_COLLECTION), where("studentId", "==", studentId));
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => doc.data() as Change);
+    const q = query(collection(db, HISTORIAL_COLLECTION), where("studentId", "==", studentId));
+    const querySnapshot = await getDocs(q);
+    
+    // Manually convert Timestamps to JSON-serializable format (e.g., ISO string)
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        const change: Change = {
+            ...data,
+            date: data.date.toDate().toISOString(), // Convert timestamp
+        } as Change;
+        return change;
+    });
 }
+
 
 /**
  * Deletes ALL data from the 'alumnos' and 'historialCambios' collections.

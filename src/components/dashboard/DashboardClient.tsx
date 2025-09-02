@@ -20,7 +20,8 @@ import { Trash2, RefreshCw } from 'lucide-react';
 import type { Student, Change, Subject } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory } from '@/lib/firestore';
+// Import server actions instead of directly calling firestore
+import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory } from '@/app/actions/firestoreActions';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 
@@ -76,7 +77,7 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
         toast({
             variant: 'destructive',
             title: 'Error de Carga',
-            description: 'No se pudieron recargar los datos. Revisa tus permisos de Firestore.',
+            description: 'No se pudieron recargar los datos. Revisa la consola para más detalles.',
         });
     } finally {
         setIsLoading(false);
@@ -173,7 +174,7 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     return students;
   }, [allStudents, filterType, selectedValue]);
   
-  const loadStudentSubjects = async (studentId: string): Promise<Subject[]> => {
+  const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     try {
       return await getStudentSubjects(studentId);
     } catch(e) {
@@ -183,7 +184,7 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     }
   }
   
-  const getStudentChanges = async (studentId: string) => {
+  const getStudentChangesWrapper = async (studentId: string) => {
      try {
       const studentChanges = await getStudentHistory(studentId);
       setChanges(prev => [...prev.filter(c => c.studentId !== studentId), ...studentChanges]);
@@ -206,8 +207,8 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     setFilterType: handleSetFilterType,
     selectedValue,
     setSelectedValue,
-    loadStudentSubjects,
-    getStudentChanges
+    loadStudentSubjects: loadStudentSubjectsWrapper,
+    getStudentChanges: getStudentChangesWrapper
   };
 
   return (

@@ -51,7 +51,7 @@ function AiSummary({ student, changes }: { student: Student, changes: Change[] }
         const summaryResponse = await summarizeStudentChanges({
           studentId: student.id,
           studentName: student.name,
-          changes: changes.map(c => `Campo '${c.fieldName}' cambió de '${c.oldValue}' a '${c.newValue}' el ${c.date.toDate().toLocaleDateString()}`),
+          changes: changes.map(c => `Campo '${c.fieldName}' cambió de '${c.oldValue}' a '${c.newValue}' el ${new Date(c.date).toLocaleDateString()}`),
         });
         setSummary(summaryResponse.summary);
       }

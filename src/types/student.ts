@@ -1,3 +1,4 @@
+
 export interface Subject {
   id: string; // CRN o Clave de materia
   name: string;
@@ -26,7 +27,7 @@ export interface Student {
 export type StudentData = Record<string, Student>;
 
 export interface Change {
-  date: any; // Firestore Timestamp
+  date: any; // Firestore Timestamp on server, string on client
   studentId: string;
   subjectId: string; // CRN o Clave de materia
   fieldName: string; // p. ej. 'absences', 'grade', 'activities.A5'
