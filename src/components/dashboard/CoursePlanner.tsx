@@ -274,20 +274,18 @@ export function CoursePlanner() {
           {availableButNotRecommended.length > 0 && (
              <Card>
                 <Collapsible>
-                    <CollapsibleTrigger className="w-full">
-                        <CardHeader>
-                           <div className="flex justify-between items-center">
-                             <div>
-                                <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
-                                <CardDescription className='text-left'>Materias que no se incluyeron en la carga.</CardDescription>
-                             </div>
-                              <Button variant="ghost" size="sm" className="w-9 p-0">
+                    <CardHeader className="flex flex-row justify-between items-center">
+                        <div>
+                            <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
+                            <CardDescription className='text-left'>Materias que no se incluyeron en la carga.</CardDescription>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="w-9 p-0">
                                 <BookOpen className="h-4 w-4" />
                                 <span className="sr-only">Toggle</span>
                             </Button>
-                           </div>
-                        </CardHeader>
-                    </CollapsibleTrigger>
+                        </CollapsibleTrigger>
+                    </CardHeader>
                     <CollapsibleContent>
                         <CardContent>
                             <p className="text-sm text-muted-foreground mb-4">
