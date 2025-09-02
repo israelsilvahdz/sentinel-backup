@@ -71,56 +71,49 @@ export function CoursePlanner() {
       return { recommendedLoad: [], remainingCourses: remaining, availableCoursesCount: 0 };
     }
 
-    // 1. Start with pending courses that meet prerequisites
-    const load: CurriculumCourse[] = Array.from(pendingCourses)
-      .map(name => curriculum.flatMap(t => t.courses).find(c => c.name === name))
-      .filter((c): c is CurriculumCourse => !!c)
-      .filter(c => isPrerequisiteApproved(c.prerequisite));
-
-    // 2. Find available courses from the target term
-    const targetTermCourses = curriculum[targetTermIndex]?.courses || [];
-    const availableTargetCourses = targetTermCourses.filter(course =>
-      !approvedCourses.has(course.name) && isPrerequisiteApproved(course.prerequisite)
-    );
-    
-    // 3. Find available courses from previous terms (that were not marked as pending but prerequisites are met)
-    const availablePreviousCourses = previousTerms
-      .flatMap(t => t.courses)
+    // 1. Identify all truly available courses for this student
+    const allPossibleCourses = curriculum.flatMap(term => term.courses)
       .filter(course => 
-        !approvedCourses.has(course.name) && 
-        !pendingCourses.has(course.name) &&
-        isPrerequisiteApproved(course.prerequisite)
+        !approvedCourses.has(course.name) && // Not already approved
+        isPrerequisiteApproved(course.prerequisite) // Prerequisite is met
       );
 
-    const allAvailable = [...availablePreviousCourses, ...availableTargetCourses];
-    const allAvailableCount = load.length + allAvailable.length;
+    const allAvailableCount = allPossibleCourses.length;
+    
+    // 2. Build the recommended load, starting with pending courses
+    let load: CurriculumCourse[] = allPossibleCourses.filter(c => pendingCourses.has(c.name));
 
-    // 4. Prioritize prerequisites for future terms
+    // 3. Get other available courses (not marked as pending)
+    const otherAvailableCourses = allPossibleCourses.filter(c => !pendingCourses.has(c.name));
+    
+    // 4. Prioritize courses that are prerequisites for future terms
     const futurePrerequisites = new Set(
       curriculum.slice(targetTermIndex + 1).flatMap(t => t.courses.map(c => c.prerequisite).filter(Boolean))
     );
 
-    allAvailable.sort((a, b) => {
+    otherAvailableCourses.sort((a, b) => {
       const aIsPrereq = futurePrerequisites.has(a.name);
       const bIsPrereq = futurePrerequisites.has(b.name);
       if (aIsPrereq && !bIsPrereq) return -1;
       if (!aIsPrereq && bIsPrereq) return 1;
+      // Optional: Prioritize by term, could be added here
       return 0;
     });
 
+    // 5. Fill the rest of the load up to the max course limit
     const maxCourses = isGraduationCandidate && remaining <= 2 ? 9 : 7;
 
     let i = 0;
-    while (load.length < maxCourses && i < allAvailable.length) {
-        if(!load.some(c => c.name === allAvailable[i].name)) {
-           load.push(allAvailable[i]);
+    while (load.length < maxCourses && i < otherAvailableCourses.length) {
+        if(!load.some(c => c.name === otherAvailableCourses[i].name)) {
+           load.push(otherAvailableCourses[i]);
         }
         i++;
     }
 
     return { recommendedLoad: load, remainingCourses: remaining, availableCoursesCount: allAvailableCount };
 
-  }, [approvedCourses, pendingCourses, targetTermIndex, isGraduationCandidate, previousTerms]);
+  }, [approvedCourses, pendingCourses, targetTermIndex, isGraduationCandidate, previousTerms, isPrerequisiteApproved]);
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
