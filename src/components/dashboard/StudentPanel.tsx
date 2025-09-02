@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Users, Loader2, X, ArrowRightCircle } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 
 export function StudentPanel() {
   const { 
@@ -79,12 +80,27 @@ export function StudentPanel() {
         <>
           {filteredStudents.length > 0 ? (
             <div className="space-y-4">
-                {filteredStudents.map(student => (
+                {filteredStudents.map(student => {
+                  const extraordinarySubjects = caseType === 'extraordinary'
+                    ? student.subjectSummaries?.filter(s => s.finalGrade && s.finalGrade >= 50 && s.finalGrade <= 69)
+                    : [];
+
+                  return (
                     <Card key={student.id}>
                       <CardContent className="p-4 flex items-center justify-between">
-                          <div>
+                          <div className="flex-1">
                               <p className="font-semibold">{student.name}</p>
                               <p className="text-sm text-muted-foreground">Matrícula: {student.id}</p>
+                              {extraordinarySubjects && extraordinarySubjects.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-semibold text-muted-foreground mb-1">Materias para Extraordinario:</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {extraordinarySubjects.map(sub => (
+                                      <Badge key={sub.id} variant="secondary">{sub.name}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                           </div>
                           <Button variant="outline" size="sm" onClick={() => handleStudentClick(student.id)}>
                               <ArrowRightCircle className="mr-2 h-4 w-4"/>
@@ -92,7 +108,8 @@ export function StudentPanel() {
                           </Button>
                       </CardContent>
                     </Card>
-                ))}
+                  )
+                })}
             </div>
           ) : (
             <Card className="text-center p-12">
