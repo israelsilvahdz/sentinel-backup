@@ -39,7 +39,7 @@ function processRiskData(students: Student[], riskType: 'absences' | 'missedAssi
             riskCount,
             totalCount,
         }))
-        .filter(d => d.totalCount > 0) // Mantener todas las materias para que el usuario decida el filtro.
+        .filter(d => d.totalCount >= 10)
         .sort((a, b) => b.percentage - a.percentage)
         .slice(0, 5); // Top 5
 }
@@ -113,11 +113,11 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
     <Card className="lg:col-span-1">
       <CardHeader>
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
-        <CardDescription>Top 5 materias con mayor % de alumnos en riesgo. Haz clic en una barra para ver los detalles.</CardDescription>
+        <CardDescription>Top 5 materias con mayor % de alumnos en riesgo (con 10 o más alumnos). Haz clic en una barra para ver los detalles.</CardDescription>
       </CardHeader>
       <CardContent>
         {hasData ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-12">
+          <div className="space-y-12">
             <ChartComponent 
                 data={absenceData} 
                 title="Riesgo por Faltas" 
@@ -125,7 +125,7 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
                 onBarClick={(subjectName) => handleBarClick(subjectName, 'absences')}
             />
             <ChartComponent 
-                data={assignmentData} 
+                data={assignmentData} h
                 title="Riesgo por Tareas No Entregadas" 
                 barColor="hsl(var(--chart-3))" 
                 onBarClick={(subjectName) => handleBarClick(subjectName, 'missedAssignments')}
