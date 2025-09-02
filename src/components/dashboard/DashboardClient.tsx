@@ -19,9 +19,10 @@ import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
 import { StudentPanel } from './StudentPanel';
 import { StudentHistoryPanel } from './StudentHistoryPanel';
+import { CoursePlanner } from './CoursePlanner'; // Importar el nuevo panel
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, History } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
@@ -31,7 +32,7 @@ import { findLostCases, findObservationCases, findRiskCasesBySubject, findUrgent
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 export type CaseType = 'lost' | 'urgent' | 'observation';
-export type ActiveView = 'dashboard' | 'students' | 'history';
+export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner'; // Añadir nueva vista
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -69,6 +70,12 @@ export function useDashboardFilters() {
   return context;
 }
 
+const LOCAL_STORAGE_KEYS = {
+    STUDENTS: 'academic_sentinel_students',
+    HISTORY: 'academic_sentinel_history',
+    UPLOADS: 'academic_sentinel_uploads',
+};
+
 function formatDateFromCustomFilename(filename: string): string {
     const match = filename.match(/(\d{2})\.(\d{2})\.(\d{2})(\d{2})/);
     if (!match) return filename; 
@@ -98,7 +105,7 @@ export function DashboardClient() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -109,6 +116,50 @@ export function DashboardClient() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
+  // Load data from local storage on initial mount
+  useEffect(() => {
+    try {
+      const storedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
+      if (storedStudents) setAllStudents(JSON.parse(storedStudents));
+
+      const storedHistory = localStorage.getItem(LOCAL_STORAGE_KEYS.HISTORY);
+      if (storedHistory) setStudentHistory(JSON.parse(storedHistory));
+
+      const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
+      if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
+    } catch (error) {
+        console.error("Error loading data from Local Storage", error);
+        // If parsing fails, clear the corrupted data
+        localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
+        localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
+        localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Persist data to local storage whenever it changes
+  useEffect(() => {
+    try {
+        if(allStudents.length > 0) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENTS, JSON.stringify(allStudents));
+        }
+        if(Object.keys(studentHistory).length > 0) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.HISTORY, JSON.stringify(studentHistory));
+        }
+        if(uploadHistory.length > 0) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
+        }
+    } catch(error) {
+        console.error("Error saving data to Local Storage", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error de guardado',
+          description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
+        });
+    }
+  }, [allStudents, studentHistory, uploadHistory]);
+
+
   const handleSetFilterType = (type: FilterType) => {
     setFilterType(type);
     setSelectedValue(null);
@@ -121,6 +172,9 @@ export function DashboardClient() {
     if (view !== 'students') {
       setCaseType(null); // Reset case type when navigating away from the student panel
       setSubjectRiskFilter(null);
+    }
+     if (view !== 'history') {
+        setSelectedStudentId(null);
     }
   }
 
@@ -223,24 +277,39 @@ export function DashboardClient() {
     }
   };
 
-  const handleDeleteAllData = async () => {
+  const handleDeleteAllData = () => {
     if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) {
       return;
     }
     setIsProcessing(true);
     setProgress(20);
-    setAllStudents([]);
-    setUploadHistory([]);
-    setStudentHistory({});
-    setProgress(100);
-    toast({
-        title: 'Datos Eliminados',
-        description: 'Todos los datos en memoria han sido borrados.',
-    });
-    setTimeout(() => {
-      setIsProcessing(false);
-      setProgress(0);
-    }, 500);
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
+
+      setAllStudents([]);
+      setStudentHistory({});
+      setUploadHistory([]);
+      
+      setProgress(100);
+      toast({
+          title: 'Datos Eliminados',
+          description: 'Todos los datos guardados en el navegador han sido borrados.',
+      });
+    } catch (error) {
+       console.error("Error clearing Local Storage", error);
+       toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'No se pudieron borrar los datos del almacenamiento local.',
+       });
+    } finally {
+      setTimeout(() => {
+        setIsProcessing(false);
+        setProgress(0);
+      }, 500);
+    }
   };
   
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
@@ -308,6 +377,7 @@ export function DashboardClient() {
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'history': return <StudentHistoryPanel />;
+        case 'planner': return <CoursePlanner />;
         default: return <Dashboard />;
     }
   }
@@ -334,6 +404,12 @@ export function DashboardClient() {
                     <span>Panel de Alumnos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Planificador de Carga" isActive={activeView === 'planner'} onClick={() => handleSetActiveView('planner')}>
+                    <BookMarked />
+                    <span>Planificador</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
             <SidebarSeparator />
@@ -348,7 +424,7 @@ export function DashboardClient() {
               {uploadHistory.length > 0 ? (
                 <ul className="space-y-1 px-2 text-sm group-data-[collapsible=icon]:hidden">
                   {uploadHistory.map(upload => (
-                    <li key={upload.id} className="text-muted-foreground">
+                    <li key={upload.id} className="text-muted-foreground truncate" title={upload.fileName}>
                       {formatDateFromCustomFilename(upload.fileName)}
                     </li>
                   ))}
@@ -378,10 +454,12 @@ export function DashboardClient() {
                    Cargar Reporte
                 </FileUpload>
             </header>
-            {isProcessing && progress > 0 && <Progress value={progress} className="w-full h-1" />}
+            {(isProcessing || isLoading) && progress >= 0 && <Progress value={progress} className="w-full h-1" />}
             {renderActiveView()}
         </SidebarInset>
       </SidebarProvider>
     </DashboardContext.Provider>
   );
 }
+
+    
