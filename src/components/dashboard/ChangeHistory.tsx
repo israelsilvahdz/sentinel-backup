@@ -7,7 +7,7 @@ import { Timeline, TimelineItem, TimelineConnector, TimelineHeader, TimelineIcon
 import { useDashboardFilters } from './DashboardClient';
 import { type Change } from '@/types/student';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, BookOpenCheck, Calendar, Hash, Milestone } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Calendar, FileWarning } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -15,25 +15,17 @@ interface ChangeHistoryProps {
   studentId: string;
 }
 
+const ICONS: Record<string, React.ReactElement> = {
+    absences: <FileWarning />,
+    missedAssignments: <AlertTriangle />,
+};
+
 function formatFieldName(fieldName: string): string {
-    if (fieldName.startsWith('activities.')) {
-        return `Actividad ${fieldName.split('.')[1]}`;
-    }
     const map: Record<string, string> = {
-        'absences': 'Faltas',
-        'missedAssignments': 'Tareas (NE)',
-        'grade': 'Calificación Ponderada',
-        'finalGrade': 'Calificación Final',
-        'statusDescription': 'Estatus',
-        'materia': 'Materia',
+        'absences': 'Falta registrada',
+        'missedAssignments': 'Tarea no entregada',
     };
     return map[fieldName] || fieldName;
-}
-
-function formatValue(value: any): string {
-    if (value === null) return 'N/A';
-    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
-    return String(value);
 }
 
 export function ChangeHistory({ studentId }: ChangeHistoryProps) {
@@ -44,10 +36,20 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
   useEffect(() => {
     async function loadHistory() {
       setIsLoading(true);
-      const changes = await getStudentChanges(studentId);
+      const allChanges = await getStudentChanges(studentId);
+      
+      // Filtrar solo para incrementos en faltas y tareas no entregadas
+      const relevantChanges = allChanges.filter(change => 
+        (change.fieldName === 'absences' || change.fieldName === 'missedAssignments') &&
+        typeof change.newValue === 'number' &&
+        typeof change.oldValue === 'number' &&
+        change.newValue > change.oldValue
+      );
+      
       // Ordenar por fecha, más reciente primero
-      changes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setHistory(changes);
+      relevantChanges.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setHistory(relevantChanges);
       setIsLoading(false);
     }
     loadHistory();
@@ -57,8 +59,8 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Historial de Cambios</CardTitle>
-                <CardDescription>Línea de tiempo de las actualizaciones para este alumno.</CardDescription>
+                <CardTitle>Registro de Faltas y Tareas</CardTitle>
+                <CardDescription>Línea de tiempo de los eventos de riesgo para este alumno.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <Skeleton className="h-16 w-full" />
@@ -72,8 +74,8 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Historial de Cambios</CardTitle>
-         <CardDescription>Línea de tiempo de las actualizaciones para este alumno.</CardDescription>
+        <CardTitle>Registro de Faltas y Tareas</CardTitle>
+         <CardDescription>Línea de tiempo de los eventos de riesgo para este alumno.</CardDescription>
       </CardHeader>
       <CardContent>
         {history.length > 0 ? (
@@ -83,17 +85,16 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
                 <TimelineConnector />
                 <TimelineHeader>
                     <TimelineIcon>
-                        {change.fieldName === 'materia' ? <Milestone /> : <AlertTriangle />}
+                        {ICONS[change.fieldName] || <AlertTriangle />}
                     </TimelineIcon>
-                  <TimelineTitle>{formatFieldName(change.fieldName)} cambió</TimelineTitle>
+                  <TimelineTitle>{formatFieldName(change.fieldName)}</TimelineTitle>
                 </TimelineHeader>
                 <TimelineBody>
                   <div className="font-mono text-sm text-muted-foreground mb-2">
-                    <p>
-                        <span className="font-semibold text-foreground">Valor Anterior:</span> {formatValue(change.oldValue)}
-                    </p>
-                    <p>
-                        <span className="font-semibold text-foreground">Valor Nuevo:</span> {formatValue(change.newValue)}
+                     <p>
+                        <span className="font-semibold text-foreground">
+                            {change.fieldName === 'absences' ? 'Faltas' : 'Tareas (NE)'}:
+                        </span> {change.oldValue} → {change.newValue}
                     </p>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -111,7 +112,7 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
             ))}
           </Timeline>
         ) : (
-          <p className="text-muted-foreground">No se encontraron cambios para este alumno.</p>
+          <p className="text-muted-foreground">No se encontraron registros de faltas o tareas no entregadas para este alumno.</p>
         )}
       </CardContent>
     </Card>
