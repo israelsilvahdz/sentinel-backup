@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -275,18 +275,18 @@ export function CoursePlanner() {
           {availableButNotRecommended.length > 0 && (
             <Card>
                 <Collapsible>
-                    <CollapsibleTrigger asChild>
-                        <div className="flex justify-between items-center cursor-pointer p-6">
-                            <div>
-                                <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
-                                <CardDescription className='text-left mt-1'>Materias que no se incluyeron en la carga.</CardDescription>
-                            </div>
+                    <div className="flex justify-between items-center p-6">
+                        <div>
+                            <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
+                            <CardDescription className='text-left mt-1'>Materias que no se incluyeron en la carga.</CardDescription>
+                        </div>
+                        <CollapsibleTrigger asChild>
                             <Button variant="ghost" size="sm" className="w-9 p-0">
                                 <BookOpen className="h-4 w-4" />
                                 <span className="sr-only">Toggle</span>
                             </Button>
-                        </div>
-                    </CollapsibleTrigger>
+                        </CollapsibleTrigger>
+                    </div>
                     <CollapsibleContent>
                         <CardContent className="pt-0">
                             <p className="text-sm text-muted-foreground mb-4">
