@@ -8,6 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { Filter } from 'lucide-react';
 
 export function DashboardFilters() {
@@ -15,61 +17,62 @@ export function DashboardFilters() {
     leaders,
     tutors,
     subjects,
-    selectedLeader,
-    setSelectedLeader,
-    selectedTutor,
-    setSelectedTutor,
-    selectedSubject,
-    setSelectedSubject,
+    filterType,
+    setFilterType,
+    selectedValue,
+    setSelectedValue,
     hasData,
   } = useDashboardFilters();
 
   if (!hasData) return null;
 
+  const options: string[] = {
+    leader: leaders,
+    tutor: tutors,
+    subject: subjects,
+  }[filterType] || [];
+
+  const handleValueChange = (value: string | null) => {
+    setSelectedValue(value === 'all' ? null : value);
+  };
+  
   return (
     <div className="space-y-4">
         <div className="flex items-center gap-2 text-muted-foreground font-semibold">
             <Filter size={16}/>
             <span>Filtros</span>
         </div>
+        
         <div>
-            <label className="text-sm font-medium">Líder</label>
-            <Select onValueChange={(val) => setSelectedLeader(val === 'all' ? null : val)} value={selectedLeader || 'all'}>
-                <SelectTrigger className='w-full'>
-                    <SelectValue placeholder="Seleccionar líder..." />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {leaders.map(leader => (
-                        <SelectItem key={leader} value={leader}>{leader}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            <label className="text-sm font-medium">Filtrar por</label>
+            <RadioGroup value={filterType} onValueChange={(val) => setFilterType(val as any)} className="mt-2">
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="leader" id="r-leader" />
+                    <Label htmlFor="r-leader">Líder</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="tutor" id="r-tutor" />
+                    <Label htmlFor="r-tutor">Tutor</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="subject" id="r-subject" />
+                    <Label htmlFor="r-subject">Materia</Label>
+                </div>
+            </RadioGroup>
         </div>
+
         <div>
-            <label className="text-sm font-medium">Tutor</label>
-            <Select onValueChange={(val) => setSelectedTutor(val === 'all' ? null : val)} value={selectedTutor || 'all'}>
+            <label className="text-sm font-medium">Seleccionar valor</label>
+             <Select onValueChange={handleValueChange} value={selectedValue || 'all'}>
                 <SelectTrigger className='w-full'>
-                    <SelectValue placeholder="Seleccionar tutor..." />
+                    <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {tutors.map(tutor => (
-                        <SelectItem key={tutor} value={tutor}>{tutor}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-         <div>
-            <label className="text-sm font-medium">Materia</label>
-            <Select onValueChange={(val) => setSelectedSubject(val === 'all' ? null : val)} value={selectedSubject || 'all'}>
-                <SelectTrigger className='w-full'>
-                    <SelectValue placeholder="Seleccionar materia..." />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {subjects.map(subject => (
-                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                    <SelectItem value="all">
+                        {filterType === 'subject' ? 'Todas' : 'Todos'}
+                    </SelectItem>
+                    {options.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))}
                 </SelectContent>
             </Select>

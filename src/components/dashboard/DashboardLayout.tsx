@@ -31,6 +31,8 @@ function getYesterdayDataKey() {
   return `datos_${yesterday.toISOString().split('T')[0]}`;
 }
 
+type FilterType = 'leader' | 'tutor' | 'subject';
+
 interface DashboardContextType {
   filteredStudents: Student[];
   allStudents: Student[];
@@ -40,12 +42,10 @@ interface DashboardContextType {
   leaders: string[];
   tutors: string[];
   subjects: string[];
-  selectedLeader: string | null;
-  setSelectedLeader: (leader: string | null) => void;
-  selectedTutor: string | null;
-  setSelectedTutor: (tutor: string | null) => void;
-  selectedSubject: string | null;
-  setSelectedSubject: (subject: string | null) => void;
+  filterType: FilterType;
+  setFilterType: (type: FilterType) => void;
+  selectedValue: string | null;
+  setSelectedValue: (value: string | null) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -65,9 +65,13 @@ export function DashboardLayout() {
   const [changes, setChanges] = useState<Change[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
-  const [selectedTutor, setSelectedTutor] = useState<string | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<FilterType>('leader');
+  const [selectedValue, setSelectedValue] = useState<string | null>(null);
+  
+  const handleSetFilterType = (type: FilterType) => {
+    setFilterType(type);
+    setSelectedValue(null); // Reset selected value when type changes
+  };
 
   useEffect(() => {
     async function loadInitialData() {
@@ -146,28 +150,30 @@ export function DashboardLayout() {
     return Object.values(currentData);
   }, [currentData]);
 
-  const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
-  const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))], [allStudents]);
+  const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean).filter(l => l !== 'N/A'))], [allStudents]);
+  const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean).filter(t => t !== 'N/A'))], [allStudents]);
   const subjects = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjects.map(sub => sub.name)).filter(Boolean))], [allStudents]);
 
   const filteredStudents = useMemo(() => {
+    if (!selectedValue) return allStudents;
+
     let students = allStudents;
 
-    if (selectedLeader) {
-      students = students.filter(s => s.leader === selectedLeader);
+    if (filterType === 'leader') {
+      students = students.filter(s => s.leader === selectedValue);
     }
-    if (selectedTutor) {
-      students = students.filter(s => s.tutor === selectedTutor);
+    if (filterType === 'tutor') {
+      students = students.filter(s => s.tutor === selectedValue);
     }
-    if (selectedSubject) {
+    if (filterType === 'subject') {
       students = students.map(student => {
-        const filteredSubjects = student.subjects.filter(s => s.name === selectedSubject);
+        const filteredSubjects = student.subjects.filter(s => s.name === selectedValue);
         return { ...student, subjects: filteredSubjects };
       }).filter(student => student.subjects.length > 0);
     }
 
     return students;
-  }, [allStudents, selectedLeader, selectedTutor, selectedSubject]);
+  }, [allStudents, filterType, selectedValue]);
 
   const contextValue: DashboardContextType = {
     filteredStudents,
@@ -178,12 +184,10 @@ export function DashboardLayout() {
     leaders,
     tutors,
     subjects,
-    selectedLeader,
-    setSelectedLeader,
-    selectedTutor,
-    setSelectedTutor,
-    selectedSubject,
-    setSelectedSubject,
+    filterType,
+    setFilterType: handleSetFilterType,
+    selectedValue,
+    setSelectedValue,
   };
 
   return (
