@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileUpload } from './FileUpload';
-import { MonitoredStudents } from './MonitoredStudents';
 import { KpiCard } from './KpiCard';
 import { RiskMatrixChart } from './RiskMatrixChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
@@ -14,7 +13,7 @@ import type { StudentData, Change } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { compareData, calculateKpis } from '@/lib/dataProcessor';
-import { getMonitoredStudentIds, saveMonitoredStudentIds, getStudentData, saveStudentData } from '@/lib/firestore';
+import { getStudentData, saveStudentData } from '@/lib/firestore';
 
 function getTodayDataKey() {
   const today = new Date();
@@ -29,8 +28,6 @@ function getYesterdayDataKey() {
 
 export function Dashboard() {
   const { toast } = useToast();
-  const [monitoredIdsInput, setMonitoredIdsInput] = useState<string>('');
-  const [monitoredStudentIds, setMonitoredStudentIds] = useState<string[]>([]);
   const [currentData, setCurrentData] = useState<StudentData | null>(null);
   const [previousData, setPreviousData] = useState<StudentData | null>(null);
   const [changes, setChanges] = useState<Change[]>([]);
@@ -40,10 +37,6 @@ export function Dashboard() {
     async function loadInitialData() {
       setIsLoading(true);
       try {
-        const { ids, idsString } = await getMonitoredStudentIds();
-        setMonitoredStudentIds(ids);
-        setMonitoredIdsInput(idsString);
-
         const todayKey = getTodayDataKey();
         const yesterdayKey = getYesterdayDataKey();
         
@@ -70,30 +63,7 @@ export function Dashboard() {
     }
     loadInitialData();
   }, [toast]);
-
-  const handleUpdateMonitoredIds = useCallback(async (ids: string[]) => {
-    const idsString = ids.join(', ');
-    try {
-      await saveMonitoredStudentIds(ids, idsString);
-      setMonitoredStudentIds(ids);
-      setMonitoredIdsInput(idsString);
-      toast({
-        title: 'Lista Guardada',
-        description: 'La lista de matrículas de alumnos ha sido guardada en la base de datos.',
-      });
-    } catch (error) {
-       toast({
-        variant: 'destructive',
-        title: 'Error al Guardar',
-        description: 'No se pudo guardar la lista de matrículas.',
-      });
-    }
-  }, [toast]);
   
-  const handleMonitoredIdsInputChange = useCallback((value: string) => {
-    setMonitoredIdsInput(value);
-  }, []);
-
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
     try {
@@ -135,36 +105,21 @@ export function Dashboard() {
     }
   };
 
-  const monitoredStudents = useMemo(() => {
+  const allStudents = useMemo(() => {
     if (!currentData) return [];
-    if (monitoredStudentIds.length === 0) return Object.values(currentData);
-    return monitoredStudentIds.map(id => currentData[id]).filter(Boolean);
-  }, [currentData, monitoredStudentIds]);
+    return Object.values(currentData);
+  }, [currentData]);
 
   const kpis = useMemo(() => {
-    if (monitoredStudents.length === 0) return { criticalRiskCount: 0, observationCount: 0 };
-    return calculateKpis(monitoredStudents);
-  }, [monitoredStudents]);
-  
-  const filteredChanges = useMemo(() => {
-    if (monitoredStudentIds.length === 0) return changes;
-    const idSet = new Set(monitoredStudentIds);
-    return changes.filter(c => idSet.has(c.studentId));
-  }, [changes, monitoredStudentIds]);
-  
+    if (allStudents.length === 0) return { criticalRiskCount: 0, observationCount: 0 };
+    return calculateKpis(allStudents);
+  }, [allStudents]);
 
   return (
     <div className="space-y-8">
       <Card>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-            <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading} />
-            <MonitoredStudents 
-              value={monitoredIdsInput}
-              onChange={handleMonitoredIdsInputChange}
-              onUpdateIds={handleUpdateMonitoredIds}
-            />
-          </div>
+        <CardContent className="p-6 flex justify-center">
+          <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading} />
         </CardContent>
       </Card>
 
@@ -191,24 +146,24 @@ export function Dashboard() {
           <div className="grid gap-4 md:grid-cols-3">
             <KpiCard title="Alumnos en Riesgo Crítico" value={kpis.criticalRiskCount} icon={BellRing} color="red" />
             <KpiCard title="Alumnos en Observación" value={kpis.observationCount} icon={Users} color="yellow" />
-            <KpiCard title="Total de Cambios Hoy" value={filteredChanges.length} icon={BarChart2} color="blue" />
+            <KpiCard title="Total de Cambios Hoy" value={changes.length} icon={BarChart2} color="blue" />
           </div>
 
-          {monitoredStudents.length > 0 ? (
+          {allStudents.length > 0 ? (
             <>
               <div className="grid gap-8 md:grid-cols-2">
-                <RiskMatrixChart students={monitoredStudents} />
-                <RiskDistributionChart students={monitoredStudents} />
+                <RiskMatrixChart students={allStudents} />
+                <RiskDistributionChart students={allStudents} />
               </div>
 
               <div>
                 <h2 className="text-2xl font-bold mb-4">Panel de Alertas y Cambios</h2>
                 <div className="space-y-6">
-                    {monitoredStudents.map(student => (
+                    {allStudents.map(student => (
                         <StudentCard 
                             key={student.id} 
                             student={student} 
-                            changes={filteredChanges.filter(c => c.studentId === student.id)}
+                            changes={changes.filter(c => c.studentId === student.id)}
                         />
                     ))}
                 </div>
@@ -224,7 +179,7 @@ export function Dashboard() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                    Sube un reporte para empezar. Si quieres ver alumnos específicos, agrega sus matrículas en el campo de arriba.
+                    Sube un reporte para empezar a monitorear a tus alumnos.
                     </p>
                 </CardContent>
             </Card>
