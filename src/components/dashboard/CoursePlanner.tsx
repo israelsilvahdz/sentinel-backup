@@ -10,8 +10,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ArrowRight, Info, BookOpen } from 'lucide-react';
-import { curriculum, type CurriculumCourse, type CurriculumTerm } from '@/lib/curriculum';
+import { Info, BookOpen } from 'lucide-react';
+import { curriculum, type CurriculumCourse } from '@/lib/curriculum';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export function CoursePlanner() {
@@ -24,7 +24,6 @@ export function CoursePlanner() {
 
   const handleTargetTermChange = (termName: string) => {
     setTargetTermName(termName);
-    // Reset graduation candidate status if term is not the last one
     if (termName !== 'Sexto Tetramestre') {
       setIsGraduationCandidate(false);
     }
@@ -58,10 +57,11 @@ export function CoursePlanner() {
     return { approvedCourses: allPreviousCourses, previousTerms: prevTerms, targetTermIndex: termIndex };
   }, [targetTermName, pendingCourses]);
 
-  const isPrerequisiteApproved = (prerequisite: string | undefined): boolean => {
+  const isPrerequisiteApproved = useCallback((prerequisite: string | undefined): boolean => {
     if (!prerequisite) return true;
     return approvedCourses.has(prerequisite);
-  };
+  }, [approvedCourses]);
+
 
   const { recommendedLoad, remainingCourses, availableButNotRecommended } = useMemo(() => {
     const allCourseIds = new Set(curriculum.flatMap(t => t.courses.map(c => c.name)));
@@ -71,19 +71,20 @@ export function CoursePlanner() {
     if (targetTermIndex === -1) {
       return { recommendedLoad: [], remainingCourses: remaining, availableButNotRecommended: [] };
     }
-
-    // 1. Identify all truly available courses for this student
-    const allPossibleCourses = curriculum.flatMap(term => term.courses)
+    
+    // 1. Determine all potentially available courses up to the target term.
+    const relevantTerms = curriculum.slice(0, targetTermIndex + 1);
+    const allPotentiallyAvailableCourses = relevantTerms.flatMap(term => term.courses)
       .filter(course => 
         !approvedCourses.has(course.name) && // Not already approved
         isPrerequisiteApproved(course.prerequisite) // Prerequisite is met
       );
-    
+
     // 2. Build the recommended load, starting with pending courses
-    let load: CurriculumCourse[] = allPossibleCourses.filter(c => pendingCourses.has(c.name));
+    let load: CurriculumCourse[] = allPotentiallyAvailableCourses.filter(c => pendingCourses.has(c.name));
 
     // 3. Get other available courses (not marked as pending)
-    const otherAvailableCourses = allPossibleCourses.filter(c => !pendingCourses.has(c.name));
+    const otherAvailableCourses = allPotentiallyAvailableCourses.filter(c => !pendingCourses.has(c.name));
     
     // 4. Prioritize courses that are prerequisites for future terms
     const futurePrerequisites = new Set(
@@ -95,7 +96,7 @@ export function CoursePlanner() {
       const bIsPrereq = futurePrerequisites.has(b.name);
       if (aIsPrereq && !bIsPrereq) return -1;
       if (!aIsPrereq && bIsPrereq) return 1;
-      return 0;
+      return 0; // Keep original order if priorities are the same
     });
 
     // 5. Fill the rest of the load up to the max course limit
@@ -109,9 +110,9 @@ export function CoursePlanner() {
         i++;
     }
     
-    // 6. Determine which available courses were not recommended
+    // 6. Determine which available courses were not recommended from the relevant pool
     const recommendedSet = new Set(load.map(c => c.name));
-    const notRecommended = allPossibleCourses.filter(c => !recommendedSet.has(c.name));
+    const notRecommended = allPotentiallyAvailableCourses.filter(c => !recommendedSet.has(c.name));
 
     return { recommendedLoad: load, remainingCourses: remaining, availableButNotRecommended: notRecommended };
 
@@ -272,24 +273,24 @@ export function CoursePlanner() {
           </Card>
           
           {availableButNotRecommended.length > 0 && (
-             <Card>
+            <Card>
                 <Collapsible>
-                    <CardHeader className="flex flex-row justify-between items-center">
-                        <div>
-                            <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
-                            <CardDescription className='text-left'>Materias que no se incluyeron en la carga.</CardDescription>
-                        </div>
-                        <CollapsibleTrigger asChild>
+                    <CollapsibleTrigger asChild>
+                        <div className="flex justify-between items-center cursor-pointer p-6">
+                            <div>
+                                <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
+                                <CardDescription className='text-left mt-1'>Materias que no se incluyeron en la carga.</CardDescription>
+                            </div>
                             <Button variant="ghost" size="sm" className="w-9 p-0">
                                 <BookOpen className="h-4 w-4" />
                                 <span className="sr-only">Toggle</span>
                             </Button>
-                        </CollapsibleTrigger>
-                    </CardHeader>
+                        </div>
+                    </CollapsibleTrigger>
                     <CollapsibleContent>
-                        <CardContent>
+                        <CardContent className="pt-0">
                             <p className="text-sm text-muted-foreground mb-4">
-                                Estas materias cumplían los prerrequisitos pero no se incluyeron en la recomendación para dar prioridad a las pendientes o porque se alcanzó el límite de carga académica.
+                                Estas materias cumplían los prerrequisitos pero no se incluyeron para dar prioridad a las pendientes o porque se alcanzó el límite de carga académica.
                             </p>
                              <ul className="space-y-2">
                                 {availableButNotRecommended.map(course => (
