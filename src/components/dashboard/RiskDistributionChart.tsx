@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo } from 'react';
@@ -15,11 +16,14 @@ export function RiskDistributionChart({ students }: RiskDistributionChartProps) 
     let absenceRisks = { low: 0, medium: 0, high: 0 };
     let assignmentRisks = { low: 0, medium: 0, high: 0 };
 
+    // Esta lógica es ineficiente con el nuevo modelo.
+    // Requiere que las materias de cada alumno estén pre-cargadas.
     students.forEach(student => {
       let maxAbsenceLevel: RiskLevel = 'low';
       let maxAssignmentLevel: RiskLevel = 'low';
+      const subjects = student.subjects || [];
 
-      student.subjects.forEach(subject => {
+      subjects.forEach(subject => {
         const absenceLevel = getRisk(subject.absences, subject.absenceLimit).level;
         const assignmentLevel = getRisk(subject.missedAssignments, subject.missedAssignmentLimit).level;
 

@@ -1,18 +1,22 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUp, ArrowDown, Bot } from 'lucide-react';
-import { type Student, type Change } from "@/types/student";
+import { Bot, ChevronDown, ChevronUp } from 'lucide-react';
+import { type Student, type Change, type Subject } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { summarizeStudentChanges } from '@/ai/flows/summarize-student-changes';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getStudentSubjects } from '@/lib/firestore';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '../ui/button';
 
 interface StudentCardProps {
   student: Student;
-  changes: Change[];
+  changes: Change[]; // Nota: El modelo de cambios debe ser repensado con la nueva arquitectura
 }
 
 function RiskCell({ value, limit }: { value: number; limit: number; }) {
@@ -31,56 +35,30 @@ function RiskCell({ value, limit }: { value: number; limit: number; }) {
   );
 }
 
-function ChangeIndicator({ value, type = 'number' }: { value: number, type?: 'number' | 'grade' }) {
-    if (value === 0) return null;
-    const isUp = value > 0;
-    
-    // For grades, up is good (green), for others, up is bad (red)
-    const positiveIsGood = type === 'grade';
-    const colorClass = (isUp && positiveIsGood) || (!isUp && !positiveIsGood) ? 'text-green-500' : 'text-red-500';
-
-    return (
-        <span className={`inline-flex items-center text-xs ml-1 ${colorClass}`}>
-            ({isUp ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-            {Math.abs(value)})
-        </span>
-    );
+// El indicador de cambios necesita ser adaptado al nuevo historial
+function ChangeIndicator({ change }: { change: Change | undefined }) {
+    if (!change) return null;
+    // Lógica futura para mostrar el cambio
+    return null;
 }
 
 function AiSummary({ student, changes }: StudentCardProps) {
   const [summary, setSummary] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
+  // Esta función necesita una refactorización mayor para usar el historial
   useEffect(() => {
     async function getSummary() {
       if (changes.length === 0) {
-        setSummary("No se detectaron cambios recientes en el rendimiento del alumno.");
-        setIsLoading(false);
+        // setSummary("No se detectaron cambios recientes en el rendimiento del alumno.");
         return;
       }
-
-      setIsLoading(true);
-      try {
-        const changeDescriptions = changes.map(c => {
-          const changeType = c.type === 'absence' ? 'Faltas' : c.type === 'missedAssignment' ? 'Tareas NE' : 'Calificación';
-          return `${c.subjectName}: ${changeType} cambió de ${c.oldValue} a ${c.newValue}.`;
-        });
-        const result = await summarizeStudentChanges({
-          studentName: student.name,
-          studentId: student.id,
-          changes: changeDescriptions
-        });
-        setSummary(result.summary);
-      } catch (error) {
-        console.error("AI summary failed:", error);
-        setSummary("No se pudo generar el resumen de cambios.");
-      } finally {
-        setIsLoading(false);
-      }
+      // ... Lógica futura con historial
     }
     getSummary();
   }, [student, changes]);
 
+  if (summary === '') return null; // No mostrar si no hay resumen
   if(isLoading) {
     return <Skeleton className="h-10 w-full" />
   }
@@ -93,8 +71,8 @@ function AiSummary({ student, changes }: StudentCardProps) {
   )
 }
 
-function OverallRiskBadge({ student }: { student: Student }) {
-    const { overallRisk } = getStudentOverallRisk(student);
+function OverallRiskBadge({ student, subjects }: { student: Student, subjects: Subject[] }) {
+    const { overallRisk } = getStudentOverallRisk(student, subjects);
 
     if (overallRisk === 'low') return null;
 
@@ -110,29 +88,36 @@ function OverallRiskBadge({ student }: { student: Student }) {
     return <Badge className={`ml-2 ${className}`}>{text}</Badge>;
 }
 
-export function StudentCard({ student, changes }: StudentCardProps) {
-  const getChangeFor = (subjectName: string, type: 'absence' | 'missedAssignment' | 'grade') => {
-    const change = changes.find(c => c.subjectName === subjectName && c.type === type);
-    return change ? change.newValue - change.oldValue : 0;
-  }
-  
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-            <div>
-                <CardTitle className="flex items-center">
-                    {student.name}
-                    <OverallRiskBadge student={student} />
-                </CardTitle>
-                <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
-            </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        
-        <AiSummary student={student} changes={changes} />
-        
+function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
+    const [subjects, setSubjects] = useState<Subject[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        async function loadSubjects() {
+            if (isOpen && student.id && subjects.length === 0) {
+                setIsLoading(true);
+                try {
+                    const fetchedSubjects = await getStudentSubjects(student.id);
+                    setSubjects(fetchedSubjects);
+                } catch (error) {
+                    console.error("Failed to load subjects for student " + student.id, error);
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+        }
+        loadSubjects();
+    }, [isOpen, student.id, subjects.length]);
+
+    if (isLoading) {
+        return <div className="p-4"><Skeleton className="h-24 w-full" /></div>;
+    }
+    
+    if (subjects.length === 0 && isOpen) {
+       return <p className="text-muted-foreground text-sm px-6 pb-4">No se encontraron materias para este alumno.</p>
+    }
+
+    return (
         <div className="overflow-x-auto">
             <Table>
                 <TableHeader>
@@ -144,31 +129,60 @@ export function StudentCard({ student, changes }: StudentCardProps) {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {student.subjects.map((subject) => (
-                    <TableRow key={subject.name}>
+                    {subjects.map((subject) => (
+                    <TableRow key={subject.id}>
                         <TableCell className="font-medium">{subject.name}</TableCell>
                         <TableCell className="text-center">
                             <div className='inline-block'>
                                 <RiskCell value={subject.absences} limit={subject.absenceLimit} />
                             </div>
-                            <ChangeIndicator value={getChangeFor(subject.name, 'absence')} />
                         </TableCell>
                         <TableCell className="text-center">
                             <div className='inline-block'>
                                 <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
                             </div>
-                             <ChangeIndicator value={getChangeFor(subject.name, 'missedAssignment')} />
                         </TableCell>
                         <TableCell className="text-right font-mono">
                             {subject.grade.toFixed(2)}
-                            <ChangeIndicator value={getChangeFor(subject.name, 'grade')} type="grade" />
                         </TableCell>
                     </TableRow>
                     ))}
                 </TableBody>
             </Table>
         </div>
-      </CardContent>
+    );
+}
+
+export function StudentCard({ student, changes }: StudentCardProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <Card>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader>
+            <div className="flex justify-between items-start">
+                <div>
+                    <CardTitle className="flex items-center">
+                        {student.name}
+                        {/* El badge de riesgo necesita las materias, por lo que se podría mostrar después de abrir */}
+                    </CardTitle>
+                    <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
+                </div>
+                <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="w-9 p-0">
+                        {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        <span className="sr-only">Toggle</span>
+                    </Button>
+                </CollapsibleTrigger>
+            </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <AiSummary student={student} changes={changes} />
+            <CollapsibleContent>
+              <StudentSubjects student={student} isOpen={isOpen} />
+            </CollapsibleContent>
+        </CardContent>
+      </Collapsible>
     </Card>
   );
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo } from 'react';
@@ -13,15 +14,18 @@ interface RiskMatrixChartProps {
 export function RiskMatrixChart({ students }: RiskMatrixChartProps) {
   const data = useMemo(() => {
     return students.map(student => {
+      // Esta lógica es ineficiente con el nuevo modelo.
+      // Requiere que las materias de cada alumno estén pre-cargadas.
+      const subjects = student.subjects || [];
       let totalAbsenceRisk = 0;
       let totalAssignmentRisk = 0;
-      let subjectCount = student.subjects.length;
+      let subjectCount = subjects.length;
 
       if (subjectCount === 0) {
         return { name: student.name, x: 0, y: 0 };
       }
 
-      student.subjects.forEach(subject => {
+      subjects.forEach(subject => {
         totalAbsenceRisk += getRisk(subject.absences, subject.absenceLimit).risk;
         totalAssignmentRisk += getRisk(subject.missedAssignments, subject.missedAssignmentLimit).risk;
       });
@@ -61,10 +65,10 @@ export function RiskMatrixChart({ students }: RiskMatrixChartProps) {
           >
             <CartesianGrid strokeDasharray="3 3" />
             
-            <ReferenceArea x1={75} x2={101} y1={75} y2={101} stroke="none" fill="hsl(var(--destructive) / 0.1)" />
-            <ReferenceArea x1={0} x2={75} y1={75} y2={101} stroke="none" fill="hsl(var(--chart-4) / 0.1)" />
-            <ReferenceArea x1={75} x2={101} y1={0} y2={75} stroke="none" fill="hsl(var(--chart-4) / 0.1)" />
-            <ReferenceArea x1={0} x2={75} y1={0} y2={75} stroke="none" fill="hsl(var(--chart-2) / 0.1)" />
+            <ReferenceArea x1={50} x2={101} y1={50} y2={101} stroke="none" fill="hsl(var(--destructive) / 0.1)" />
+            <ReferenceArea x1={0} x2={50} y1={50} y2={101} stroke="none" fill="hsl(var(--chart-4) / 0.1)" />
+            <ReferenceArea x1={50} x2={101} y1={0} y2={50} stroke="none" fill="hsl(var(--chart-4) / 0.1)" />
+            <ReferenceArea x1={0} x2={50} y1={0} y2={50} stroke="none" fill="hsl(var(--chart-2) / 0.1)" />
 
             <XAxis type="number" dataKey="x" name="Faltas" unit="%" domain={[0, 100]}>
               <Label value="% Límite de Faltas" offset={-15} position="insideBottom" />

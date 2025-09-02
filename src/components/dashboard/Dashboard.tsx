@@ -1,14 +1,14 @@
+
 "use client";
 
 import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard } from './KpiCard';
 import { RiskMatrixChart } from './RiskMatrixChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
 import { StudentCard } from './StudentCard';
 import { AlertCircle, BarChart2, BellRing, Users } from 'lucide-react';
 
-import type { Student } from '@/types/student';
 import { calculateKpis } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardLayout';
 
@@ -17,11 +17,8 @@ export function Dashboard() {
 
   const kpis = useMemo(() => {
     if (filteredStudents.length === 0) return { criticalRiskCount: 0, observationCount: 0, totalChanges: 0 };
-    const { criticalRiskCount, observationCount } = calculateKpis(filteredStudents);
-    const studentIds = new Set(filteredStudents.map(s => s.id));
-    const totalChanges = changes.filter(c => studentIds.has(c.studentId)).length;
-    return { criticalRiskCount, observationCount, totalChanges };
-  }, [filteredStudents, changes]);
+    return calculateKpis(filteredStudents);
+  }, [filteredStudents]);
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -42,7 +39,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
                 <p className="text-muted-foreground">
-                Sube un reporte diario en formato Excel para ver el panel de control y las alertas de tus alumnos.
+                Sube un reporte diario en formato Excel para poblar la base de datos y ver el panel de control.
                 </p>
             </CardContent>
          </Card>
@@ -53,7 +50,7 @@ export function Dashboard() {
           <div className="grid gap-4 md:grid-cols-3">
             <KpiCard title="Alumnos en Riesgo Crítico" value={kpis.criticalRiskCount} icon={BellRing} color="red" />
             <KpiCard title="Alumnos en Observación" value={kpis.observationCount} icon={Users} color="yellow" />
-            <KpiCard title="Total de Cambios Hoy" value={kpis.totalChanges} icon={BarChart2} color="blue" />
+            <KpiCard title="Total de Alumnos" value={filteredStudents.length} icon={BarChart2} color="blue" />
           </div>
 
           {filteredStudents.length > 0 ? (
@@ -64,7 +61,7 @@ export function Dashboard() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold mb-4">Panel de Alertas y Cambios</h2>
+                <h2 className="text-2xl font-bold mb-4">Panel de Alumnos</h2>
                 <div className="space-y-6">
                     {filteredStudents.map(student => (
                         <StudentCard 
@@ -86,7 +83,7 @@ export function Dashboard() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                      No se encontraron alumnos con los filtros seleccionados. Intenta con otros valores.
+                      No se encontraron alumnos con los filtros seleccionados o no se ha cargado ningún reporte.
                     </p>
                 </CardContent>
             </Card>

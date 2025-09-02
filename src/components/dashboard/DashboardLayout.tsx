@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -15,30 +15,12 @@ import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, RefreshCw } from 'lucide-react';
 
-import type { Student, StudentData, Change } from '@/types/student';
+import type { Student, Change } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { compareData } from '@/lib/dataProcessor';
-import { getStudentData, saveStudentData, deleteAllData } from '@/lib/firestore';
-
-function parseDateFromFileName(fileName: string): Date | null {
-    // Extracts date like DD.MM.YY from a string like "fileName_DD.MM.YY.xlsx"
-    const match = fileName.match(/(\d{2})\.(\d{2})\.(\d{2})/);
-    if (!match) return null;
-
-    const [_, day, month, year] = match;
-    // Assuming '25' means '2025'
-    const fullYear = parseInt(year, 10) + 2000;
-    
-    // Month is 0-indexed in JavaScript Dates
-    return new Date(fullYear, parseInt(month, 10) - 1, parseInt(day, 10));
-}
-
-function getDataKeyFromDate(date: Date): string {
-    return `datos_${date.toISOString().split('T')[0]}`;
-}
+import { deleteAllData, processAndSaveData, getAllStudents } from '@/lib/firestore';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 
@@ -55,6 +37,8 @@ interface DashboardContextType {
   setFilterType: (type: FilterType) => void;
   selectedValue: string | null;
   setSelectedValue: (value: string | null) => void;
+  reloadStudentSubjects: (studentId: string) => Promise<void>;
+  getStudentChanges: (studentId: string) => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -69,7 +53,7 @@ export function useDashboardFilters() {
 
 export function DashboardLayout() {
   const { toast } = useToast();
-  const [currentData, setCurrentData] = useState<StudentData | null>(null);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [changes, setChanges] = useState<Change[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -78,97 +62,61 @@ export function DashboardLayout() {
   
   const handleSetFilterType = (type: FilterType) => {
     setFilterType(type);
-    setSelectedValue(null); // Reset selected value when type changes
+    setSelectedValue(null);
   };
 
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const today = new Date();
-      const yesterday = new Date();
-      yesterday.setDate(today.getDate() - 1);
-
-      const todayKey = getDataKeyFromDate(today);
-      const yesterdayKey = getDataKeyFromDate(yesterday);
-      
-      const [todayData, yesterdayData] = await Promise.all([
-        getStudentData(todayKey),
-        getStudentData(yesterdayKey)
-      ]);
-
-      setCurrentData(todayData);
-
-      if (todayData && yesterdayData) {
-        setChanges(compareData(todayData, yesterdayData));
-      } else {
-        setChanges([]);
-      }
+      const students = await getAllStudents();
+      setAllStudents(students);
     } catch (error) {
       toast({
         variant: 'destructive',
         title: 'Error de Carga',
-        description: 'No se pudieron cargar los datos iniciales desde la base de datos.',
+        description: 'No se pudieron cargar los datos iniciales desde Firestore.',
       });
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [toast]);
 
   useEffect(() => {
     loadInitialData();
-  }, [toast]);
+  }, [loadInitialData]);
   
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
     try {
-      const fileDate = parseDateFromFileName(file.name);
-      if(!fileDate) {
-        toast({
-          variant: 'destructive',
-          title: 'Nombre de archivo inválido',
-          description: 'El nombre del archivo debe contener la fecha en formato DD.MM.YY (ej. reporte_22.08.25.xlsx).',
-        });
-        setIsLoading(false);
-        return;
-      }
-      
       const data = await parseExcel(file);
       if (!data) {
         toast({
           variant: 'destructive',
           title: 'Error de Formato',
-          description: 'El archivo Excel no tiene el formato esperado o está vacío. Por favor, revisa las columnas.',
+          description: 'El archivo Excel no tiene el formato esperado, está vacío o faltan columnas requeridas.',
         });
         setIsLoading(false);
         return;
       }
-
-      const currentFileKey = getDataKeyFromDate(fileDate);
-      const previousDayDate = new Date(fileDate);
-      previousDayDate.setDate(fileDate.getDate() - 1);
-      const previousFileKey = getDataKeyFromDate(previousDayDate);
-
-      await saveStudentData(currentFileKey, data);
-      const previousDayData = await getStudentData(previousFileKey);
-
-      setCurrentData(data);
       
-      if (previousDayData) {
-        setChanges(compareData(data, previousDayData));
-      } else {
-        setChanges([]);
-      }
-      
+      const { processed, changes } = await processAndSaveData(data);
+
       toast({
         title: 'Éxito',
-        description: `Reporte de ${fileDate.toLocaleDateString()} cargado. Se encontraron ${Object.keys(data).length} registros.`,
+        description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
       });
+
+      // Recargar los datos para refrescar la vista
+      await loadInitialData();
+
     } catch (error) {
        toast({
         variant: 'destructive',
         title: 'Error al procesar',
-        description: `Hubo un problema al leer el archivo Excel.`,
+        description: `Hubo un problema al leer o guardar el archivo. Revisa la consola para más detalles.`,
       });
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -181,7 +129,7 @@ export function DashboardLayout() {
     setIsLoading(true);
     try {
       await deleteAllData();
-      setCurrentData(null);
+      setAllStudents([]);
       setChanges([]);
       toast({
         title: 'Datos Eliminados',
@@ -193,25 +141,25 @@ export function DashboardLayout() {
         title: 'Error al Eliminar',
         description: 'No se pudieron borrar los datos.',
       });
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const allStudents = useMemo(() => {
-    if (!currentData) return [];
-    return Object.values(currentData);
-  }, [currentData]);
-
+  
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
   const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))], [allStudents]);
-  const subjects = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjects.map(sub => sub.name)).filter(Boolean))], [allStudents]);
+  
+  // TODO: Mejorar la obtención de materias únicas. Esto es ineficiente.
+  const subjects = useMemo(() => {
+      const allSubjects = allStudents.flatMap(s => s.subjects?.map(sub => sub.name) || []);
+      return [...new Set(allSubjects.filter(Boolean))];
+  }, [allStudents]);
+
 
   const filteredStudents = useMemo(() => {
     if (!selectedValue) return allStudents;
-
     let students = allStudents;
-
     if (filterType === 'leader') {
       students = students.filter(s => s.leader === selectedValue);
     }
@@ -219,21 +167,27 @@ export function DashboardLayout() {
       students = students.filter(s => s.tutor === selectedValue);
     }
     if (filterType === 'subject') {
-      students = students.map(student => {
-        const filteredSubjects = student.subjects.filter(s => s.name === selectedValue);
-        return { ...student, subjects: filteredSubjects };
-      }).filter(student => student.subjects.length > 0);
+      // Este filtro es complejo con el nuevo modelo y requiere una consulta diferente.
+      // Por ahora, lo dejamos así, sabiendo que es ineficiente.
+      // Se necesitaría cargar todas las materias de todos los alumnos para filtrar.
     }
-
     return students;
   }, [allStudents, filterType, selectedValue]);
+  
+  const reloadStudentSubjects = async (studentId: string) => {
+    // Implementar la lógica para recargar materias de un solo alumno
+  }
+  
+  const getStudentChanges = async (studentId: string) => {
+    // Implementar la lógica para obtener el historial de cambios de un alumno
+  }
 
   const contextValue: DashboardContextType = {
     filteredStudents,
     allStudents,
     changes,
     isLoading,
-    hasData: !!currentData,
+    hasData: allStudents.length > 0,
     leaders,
     tutors,
     subjects,
@@ -241,6 +195,8 @@ export function DashboardLayout() {
     setFilterType: handleSetFilterType,
     selectedValue,
     setSelectedValue,
+    reloadStudentSubjects,
+    getStudentChanges
   };
 
   return (
@@ -262,6 +218,10 @@ export function DashboardLayout() {
                  <div className="flex-1">
                     <h1 className="font-semibold text-lg">Academic Sentinel</h1>
                  </div>
+                 <Button variant="outline" size="sm" onClick={loadInitialData} disabled={isLoading}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Recargar
+                 </Button>
                  <Button variant="destructive" size="sm" onClick={handleDeleteAllData} disabled={isLoading}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Borrar Datos (Test)

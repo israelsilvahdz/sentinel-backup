@@ -2,26 +2,26 @@
 import * as XLSX from 'xlsx';
 import { type StudentData, type Subject } from '@/types/student';
 
+// Columnas definidas según la propuesta de arquitectura
 const COLUMNS = {
-  ID: 'Matrícula',
+  ID: 'Matricula',
   NAME: 'Nombre del alumno',
   LEADER: 'Líder',
   TUTOR: 'Tutor',
   IS_GRADUATION_CANDIDATE: 'CAG',
-  SUBJECT_NATIONAL_ID: 'Numero de la materia Nacional',
-  SUBJECT_CAMPUS_ID: 'numero de la materia del campus',
+  SUBJECT_ID: 'CRN', // Usaremos CRN como el ID único de la materia
   SUBJECT_NAME: 'Nombre de la materia',
   SUBJECT_GROUP: 'Grupo',
   SUBJECT_STATUS_DESCRIPTION: 'Descripción del estatus',
   PROFESSOR_ID: 'Nomina',
   PROFESSOR_NAME: 'Nombre del profesor de la materia',
-  ABSENCE_LIMIT: 'Limite de faltas de la materia',
-  ABSENCES: 'faltas del alumno en la materia',
-  MISSED_ASSIGNMENT_LIMIT: 'Limite de No entregados (NE) de la materia',
-  MISSED_ASSIGNMENTS: 'Cantidad de No Entregados (NE) del alumno en la materia',
-  GRADE: 'ponderado',
-  FINAL_GRADE: 'calificacion final',
-  FINAL_GRADE_REASON: 'motivo de la calificación final'
+  ABSENCE_LIMIT: 'Límite de faltas',
+  ABSENCES: 'Faltas del alumno',
+  MISSED_ASSIGNMENT_LIMIT: 'Límite de NE',
+  MISSED_ASSIGNMENTS: 'NE alumno',
+  GRADE: 'Ponderado',
+  FINAL_GRADE: 'Calificación final actual',
+  FINAL_GRADE_REASON: 'Motivo cf'
 };
 
 export async function parseExcel(file: File): Promise<StudentData | null> {
@@ -35,11 +35,10 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
           resolve(null);
           return;
         }
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        // Use header: 1 to get an array of arrays, and trim headers.
         const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         if (rows.length < 2) {
           resolve(null);
@@ -55,60 +54,49 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         }
         
         const studentData: StudentData = {};
-        
-        const requiredCols = [
-            COLUMNS.ID, 
-            COLUMNS.NAME, 
-            COLUMNS.SUBJECT_NAME,
-            COLUMNS.ABSENCE_LIMIT,
-            COLUMNS.ABSENCES,
-            COLUMNS.MISSED_ASSIGNMENT_LIMIT,
-            COLUMNS.MISSED_ASSIGNMENTS,
-            COLUMNS.GRADE
-        ];
-
-        for(const colName of requiredCols) {
-            if(!header.includes(colName)) {
-                throw new Error(`Missing required column: ${colName}`);
-            }
-        }
+        const activityRegex = /^A\d+$/;
 
         json.forEach(row => {
           const studentId = String(row[COLUMNS.ID]);
-          const studentName = row[COLUMNS.NAME];
-          const leader = row[COLUMNS.LEADER] || 'N/A';
-          const tutor = row[COLUMNS.TUTOR] || 'N/A';
-          const isGraduationCandidate = row[COLUMNS.IS_GRADUATION_CANDIDATE] === 'Sí';
-
-          if (!studentId || !studentName) return;
+          const studentName = String(row[COLUMNS.NAME] || 'N/A').trim();
+          
+          if (!studentId || studentId === 'undefined') return;
 
           if (!studentData[studentId]) {
             studentData[studentId] = {
               id: studentId,
               name: studentName,
-              leader,
-              tutor,
-              isGraduationCandidate,
+              leader: String(row[COLUMNS.LEADER] || 'N/A').trim(),
+              tutor: String(row[COLUMNS.TUTOR] || 'N/A').trim(),
+              isGraduationCandidate: String(row[COLUMNS.IS_GRADUATION_CANDIDATE]).toLowerCase() === 'sí',
               subjects: [],
             };
           }
           
+          const activities: Record<string, number | string> = {};
+          for(const key in row) {
+              if(activityRegex.test(key)) {
+                  activities[key] = row[key];
+              }
+          }
+          
           const subject: Subject = {
-            name: `${row[COLUMNS.SUBJECT_NAME]} (${row[COLUMNS.SUBJECT_GROUP]})`,
-            nationalId: String(row[COLUMNS.SUBJECT_NATIONAL_ID]),
-            campusId: String(row[COLUMNS.SUBJECT_CAMPUS_ID]),
-            professorName: row[COLUMNS.PROFESSOR_NAME],
-            statusDescription: row[COLUMNS.SUBJECT_STATUS_DESCRIPTION],
+            id: String(row[COLUMNS.SUBJECT_ID]),
+            name: String(row[COLUMNS.SUBJECT_NAME] || 'N/A').trim(),
+            group: String(row[COLUMNS.SUBJECT_GROUP] || 'N/A').trim(),
+            professorName: String(row[COLUMNS.PROFESSOR_NAME] || 'N/A').trim(),
+            statusDescription: String(row[COLUMNS.SUBJECT_STATUS_DESCRIPTION] || 'N/A').trim(),
             absences: parseInt(String(row[COLUMNS.ABSENCES]), 10) || 0,
             absenceLimit: parseInt(String(row[COLUMNS.ABSENCE_LIMIT]), 10) || 1,
             missedAssignments: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENTS]), 10) || 0,
             missedAssignmentLimit: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENT_LIMIT]), 10) || 1,
             grade: parseFloat(String(row[COLUMNS.GRADE])) || 0,
             finalGrade: parseFloat(String(row[COLUMNS.FINAL_GRADE])) || null,
-            finalGradeReason: row[COLUMNS.FINAL_GRADE_REASON] || null,
+            finalGradeReason: String(row[COLUMNS.FINAL_GRADE_REASON] || '').trim() || null,
+            activities: activities
           };
 
-          studentData[studentId].subjects.push(subject);
+          studentData[studentId].subjects?.push(subject);
         });
 
         resolve(studentData);

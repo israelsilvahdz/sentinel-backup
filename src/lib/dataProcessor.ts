@@ -1,15 +1,21 @@
-import { type StudentData, type Student, type Subject, type Change } from '@/types/student';
+import { type Student, type Subject } from '@/types/student';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 
+/**
+ * Calcula el nivel de riesgo para un valor y su límite.
+ * @param value El valor actual (ej. número de faltas).
+ * @param limit El límite permitido.
+ * @returns El nivel de riesgo ('low', 'medium', 'high') y el porcentaje de riesgo.
+ */
 export function getRisk(value: number, limit: number): { risk: number; level: RiskLevel } {
   if (limit === 0) return { risk: 0, level: 'low' };
   const percentage = value / limit;
   
   let level: RiskLevel;
-  if (percentage >= 0.5) { // 50% or more is critical
+  if (percentage >= 0.5) { // 50% o más es crítico
     level = 'high';
-  } else if (percentage > 0) { // Any risk greater than 0 is observation
+  } else if (percentage > 0) { // Cualquier riesgo mayor que 0 es observación
     level = 'medium';
   } else {
     level = 'low';
@@ -17,62 +23,21 @@ export function getRisk(value: number, limit: number): { risk: number; level: Ri
   return { risk: percentage, level };
 }
 
-export function compareData(current: StudentData, previous: StudentData): Change[] {
-  const changes: Change[] = [];
-  if (!current || !previous) return [];
-
-  for (const studentId in current) {
-    if (previous[studentId]) {
-      const currentStudent = current[studentId];
-      const previousStudent = previous[studentId];
-
-      currentStudent.subjects.forEach(currentSubject => {
-        const previousSubject = previousStudent.subjects.find(s => s.name === currentSubject.name);
-        if (previousSubject) {
-          if (currentSubject.absences !== previousSubject.absences) {
-            changes.push({
-              studentId,
-              studentName: currentStudent.name,
-              type: 'absence',
-              subjectName: currentSubject.name,
-              oldValue: previousSubject.absences,
-              newValue: currentSubject.absences,
-            });
-          }
-          if (currentSubject.missedAssignments !== previousSubject.missedAssignments) {
-            changes.push({
-              studentId,
-              studentName: currentStudent.name,
-              type: 'missedAssignment',
-              subjectName: currentSubject.name,
-              oldValue: previousSubject.missedAssignments,
-              newValue: currentSubject.missedAssignments,
-            });
-          }
-          if (currentSubject.grade !== previousSubject.grade) {
-            changes.push({
-              studentId,
-              studentName: currentStudent.name,
-              type: 'grade',
-              subjectName: currentSubject.name,
-              oldValue: previousSubject.grade,
-              newValue: currentSubject.grade,
-            });
-          }
-        }
-      });
-    }
-  }
-  return changes;
-}
-
-export function getStudentOverallRisk(student: Student) {
+/**
+ * Calcula el riesgo general de un estudiante basado en sus materias.
+ * @param student El objeto del estudiante.
+ * @param subjects Un array con las materias del estudiante.
+ * @returns El nivel de riesgo general ('low', 'medium', 'high') y flags para cada nivel.
+ */
+export function getStudentOverallRisk(student: Student, subjects: Subject[]) {
   let hasHighRisk = false;
   let hasMediumRisk = false;
   
-  if (!student?.subjects) return { overallRisk: 'low' as RiskLevel, hasHighRisk: false, hasMediumRisk: false };
+  if (!subjects || subjects.length === 0) {
+    return { overallRisk: 'low' as RiskLevel, hasHighRisk: false, hasMediumRisk: false };
+  }
 
-  for (const subject of student.subjects) {
+  for (const subject of subjects) {
     const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
     const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
 
@@ -89,12 +54,20 @@ export function getStudentOverallRisk(student: Student) {
   return { overallRisk, hasHighRisk, hasMediumRisk };
 }
 
+/**
+ * Calcula los KPIs (Key Performance Indicators) para una lista de estudiantes.
+ * Nota: Esta función es ineficiente con el nuevo modelo, ya que requiere que las materias
+ * de todos los alumnos estén pre-cargadas. Debe ser optimizada en el futuro.
+ * @param students Array de estudiantes con sus materias cargadas.
+ * @returns El conteo de alumnos en riesgo crítico y en observación.
+ */
 export function calculateKpis(students: Student[]) {
     let criticalRiskCount = 0;
     let observationCount = 0;
 
     students.forEach(student => {
-        const { hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student);
+        // Asumimos que las materias ya están cargadas en cada objeto student
+        const { hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, student.subjects || []);
         if (hasHighRisk) {
             criticalRiskCount++;
         } else if (hasMediumRisk) {
