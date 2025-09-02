@@ -115,7 +115,7 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
         <CardDescription>Top 5 materias con mayor % de alumnos en riesgo (con 10 o más alumnos). Haz clic en una barra para ver los detalles.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-12">
+      <CardContent className="space-y-12 pb-8">
         {hasData ? (
           <>
             <ChartComponent 
