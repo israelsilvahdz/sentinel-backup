@@ -1,132 +1,39 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileUpload } from './FileUpload';
+import { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { KpiCard } from './KpiCard';
 import { RiskMatrixChart } from './RiskMatrixChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
 import { StudentCard } from './StudentCard';
 import { AlertCircle, BarChart2, BellRing, Users } from 'lucide-react';
 
-import type { StudentData, Change } from '@/types/student';
-import { parseExcel } from '@/lib/excelParser';
-import { useToast } from '@/hooks/use-toast';
-import { compareData, calculateKpis } from '@/lib/dataProcessor';
-import { getStudentData, saveStudentData } from '@/lib/firestore';
-
-function getTodayDataKey() {
-  const today = new Date();
-  return `datos_${today.toISOString().split('T')[0]}`;
-}
-
-function getYesterdayDataKey() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return `datos_${yesterday.toISOString().split('T')[0]}`;
-}
+import type { Student } from '@/types/student';
+import { calculateKpis } from '@/lib/dataProcessor';
+import { useDashboardFilters } from './DashboardLayout';
 
 export function Dashboard() {
-  const { toast } = useToast();
-  const [currentData, setCurrentData] = useState<StudentData | null>(null);
-  const [previousData, setPreviousData] = useState<StudentData | null>(null);
-  const [changes, setChanges] = useState<Change[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadInitialData() {
-      setIsLoading(true);
-      try {
-        const todayKey = getTodayDataKey();
-        const yesterdayKey = getYesterdayDataKey();
-        
-        const [todayData, yesterdayData] = await Promise.all([
-          getStudentData(todayKey),
-          getStudentData(yesterdayKey)
-        ]);
-
-        setCurrentData(todayData);
-        setPreviousData(yesterdayData);
-
-        if (todayData && yesterdayData) {
-          setChanges(compareData(todayData, yesterdayData));
-        }
-      } catch (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error de Carga',
-          description: 'No se pudieron cargar los datos desde la base de datos.',
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadInitialData();
-  }, [toast]);
-  
-  const handleFileUpload = async (file: File) => {
-    setIsLoading(true);
-    try {
-      const data = await parseExcel(file);
-      if (!data) {
-        toast({
-          variant: 'destructive',
-          title: 'Error de Formato',
-          description: 'El archivo Excel no tiene el formato esperado o está vacío. Por favor, revisa las columnas.',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const todayKey = getTodayDataKey();
-      
-      const previousDayData = currentData || await getStudentData(getYesterdayDataKey());
-
-      setCurrentData(data);
-      await saveStudentData(todayKey, data);
-      
-      if (previousDayData) {
-        setPreviousData(previousDayData);
-        setChanges(compareData(data, previousDayData));
-      }
-      
-      toast({
-        title: 'Éxito',
-        description: `Reporte cargado. Se encontraron ${Object.keys(data).length} registros de alumnos.`,
-      });
-    } catch (error) {
-       toast({
-        variant: 'destructive',
-        title: 'Error al procesar',
-        description: `Hubo un problema al leer el archivo Excel.`,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const allStudents = useMemo(() => {
-    if (!currentData) return [];
-    return Object.values(currentData);
-  }, [currentData]);
+  const { filteredStudents, changes, isLoading, hasData } = useDashboardFilters();
 
   const kpis = useMemo(() => {
-    if (allStudents.length === 0) return { criticalRiskCount: 0, observationCount: 0 };
-    return calculateKpis(allStudents);
-  }, [allStudents]);
+    if (filteredStudents.length === 0) return { criticalRiskCount: 0, observationCount: 0, totalChanges: 0 };
+    const { criticalRiskCount, observationCount } = calculateKpis(filteredStudents);
+    const studentIds = new Set(filteredStudents.map(s => s.id));
+    const totalChanges = changes.filter(c => studentIds.has(c.studentId)).length;
+    return { criticalRiskCount, observationCount, totalChanges };
+  }, [filteredStudents, changes]);
 
   return (
-    <div className="space-y-8">
-      <Card>
-        <CardContent className="p-6 flex justify-center">
-          <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading} />
-        </CardContent>
-      </Card>
-
+    <div className="space-y-8 p-4 md:p-8 pt-6">
+       <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard de Progreso Estudiantil</h1>
+        <p className="text-muted-foreground">Una vista general del rendimiento y riesgo de los alumnos.</p>
+      </header>
+      
       {isLoading && <p className="text-center text-muted-foreground">Cargando datos...</p>}
 
-      {!isLoading && !currentData && (
-         <Card className="text-center p-12">
+      {!isLoading && !hasData && (
+         <Card className="text-center p-12 mt-16">
             <CardHeader>
                 <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
                     <AlertCircle className="h-8 w-8 text-primary" />
@@ -141,25 +48,25 @@ export function Dashboard() {
          </Card>
       )}
 
-      {!isLoading && currentData && (
+      {!isLoading && hasData && (
         <>
           <div className="grid gap-4 md:grid-cols-3">
             <KpiCard title="Alumnos en Riesgo Crítico" value={kpis.criticalRiskCount} icon={BellRing} color="red" />
             <KpiCard title="Alumnos en Observación" value={kpis.observationCount} icon={Users} color="yellow" />
-            <KpiCard title="Total de Cambios Hoy" value={changes.length} icon={BarChart2} color="blue" />
+            <KpiCard title="Total de Cambios Hoy" value={kpis.totalChanges} icon={BarChart2} color="blue" />
           </div>
 
-          {allStudents.length > 0 ? (
+          {filteredStudents.length > 0 ? (
             <>
               <div className="grid gap-8 md:grid-cols-2">
-                <RiskMatrixChart students={allStudents} />
-                <RiskDistributionChart students={allStudents} />
+                <RiskMatrixChart students={filteredStudents} />
+                <RiskDistributionChart students={filteredStudents} />
               </div>
 
               <div>
                 <h2 className="text-2xl font-bold mb-4">Panel de Alertas y Cambios</h2>
                 <div className="space-y-6">
-                    {allStudents.map(student => (
+                    {filteredStudents.map(student => (
                         <StudentCard 
                             key={student.id} 
                             student={student} 
@@ -179,7 +86,7 @@ export function Dashboard() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                    Sube un reporte para empezar a monitorear a tus alumnos.
+                      No se encontraron alumnos con los filtros seleccionados. Intenta con otros valores.
                     </p>
                 </CardContent>
             </Card>

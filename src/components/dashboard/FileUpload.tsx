@@ -3,7 +3,6 @@
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
@@ -12,7 +11,6 @@ interface FileUploadProps {
 
 export function FileUpload({ onFileUpload, isLoading }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -25,15 +23,14 @@ export function FileUpload({ onFileUpload, isLoading }: FileUploadProps) {
   };
 
   return (
-    <div className='space-y-2'>
-      <label className="text-sm font-medium">Reporte de Alumnos</label>
+    <>
       <Button 
+        variant="outline"
         onClick={() => fileInputRef.current?.click()} 
         disabled={isLoading}
-        className='w-full md:w-auto'
       >
-        <Upload className="mr-2 h-4 w-4" />
-        {isLoading ? 'Procesando...' : 'Cargar Reporte Diario (Excel)'}
+        <Upload className="mr-2" />
+        {isLoading ? 'Procesando...' : 'Cargar Reporte'}
       </Button>
       <input
         type="file"
@@ -43,6 +40,6 @@ export function FileUpload({ onFileUpload, isLoading }: FileUploadProps) {
         accept=".xlsx, .xls"
         disabled={isLoading}
       />
-    </div>
+    </>
   );
 }
