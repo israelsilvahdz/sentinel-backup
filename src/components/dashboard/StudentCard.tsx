@@ -106,7 +106,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                             </div>
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                            {subject.grade.toFixed(2)}
+                            {isNaN(subject.grade) ? '0.00' : subject.grade.toFixed(2)}
                         </TableCell>
                     </TableRow>
                     ))}
