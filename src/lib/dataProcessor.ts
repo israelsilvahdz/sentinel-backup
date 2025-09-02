@@ -99,6 +99,9 @@ export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): 
         if (!student.subjectSummaries || lostCaseIds.has(student.id)) return false;
         
         const highRiskSubjectsCount = student.subjectSummaries.filter(subject => {
+            const isLostInThisSubject = subject.absences >= subject.absenceLimit || subject.missedAssignments >= subject.missedAssignmentLimit;
+            if (isLostInThisSubject) return false; // No contar la materia si ya es un caso perdido en ELLA
+
             const absenceLevel = getRisk(subject.absences, subject.absenceLimit).level;
             const assignmentLevel = getRisk(subject.missedAssignments, subject.missedAssignmentLimit).level;
             return absenceLevel === 'high' || assignmentLevel === 'high';

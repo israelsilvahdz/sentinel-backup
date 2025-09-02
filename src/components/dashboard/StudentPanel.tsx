@@ -3,13 +3,12 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { StudentCard } from './StudentCard';
-import { Users, Loader2, X } from 'lucide-react';
+import { Users, Loader2, X, ArrowRightCircle } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { Button } from '../ui/button';
 
 export function StudentPanel() {
-  const { filteredStudents, hasData, isLoading, caseType, setCaseType } = useDashboardFilters();
+  const { filteredStudents, hasData, isLoading, caseType, setCaseType, setActiveView, setSelectedStudentId } = useDashboardFilters();
 
   if (isLoading) {
     return (
@@ -17,6 +16,11 @@ export function StudentPanel() {
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
     );
+  }
+
+  const handleStudentClick = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setActiveView('history');
   }
 
   const caseTypeMap = {
@@ -47,12 +51,20 @@ export function StudentPanel() {
       {hasData && (
         <>
           {filteredStudents.length > 0 ? (
-            <div className="space-y-6">
+            <div className="space-y-4">
                 {filteredStudents.map(student => (
-                    <StudentCard 
-                        key={student.id} 
-                        student={student} 
-                    />
+                    <Card key={student.id}>
+                      <CardContent className="p-4 flex items-center justify-between">
+                          <div>
+                              <p className="font-semibold">{student.name}</p>
+                              <p className="text-sm text-muted-foreground">Matrícula: {student.id}</p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => handleStudentClick(student.id)}>
+                              <ArrowRightCircle className="mr-2 h-4 w-4"/>
+                              Ver Detalles
+                          </Button>
+                      </CardContent>
+                    </Card>
                 ))}
             </div>
           ) : (
