@@ -28,7 +28,6 @@ type FilterType = 'leader' | 'tutor' | 'subject';
 interface DashboardContextType {
   filteredStudents: Student[];
   allStudents: Student[];
-  changes: Change[];
   isLoading: boolean;
   hasData: boolean;
   leaders: string[];
@@ -39,7 +38,7 @@ interface DashboardContextType {
   selectedValue: string | null;
   setSelectedValue: (value: string | null) => void;
   loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
-  getStudentChanges: (studentId: string) => Promise<void>;
+  getStudentChanges: (studentId: string) => Promise<Change[]>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -56,7 +55,6 @@ export function useDashboardFilters() {
 export function DashboardClient({ initialStudents }: { initialStudents: Student[]}) {
   const { toast } = useToast();
   const [allStudents, setAllStudents] = useState<Student[]>(initialStudents);
-  const [changes, setChanges] = useState<Change[]>([]);
   const [isLoading, setIsLoading] = useState(true); // Start with loading true
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
@@ -133,7 +131,6 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     try {
       await deleteAllData();
       setAllStudents([]);
-      setChanges([]);
       toast({
         title: 'Datos Eliminados',
         description: 'Todos los datos han sido borrados de Firestore.',
@@ -184,20 +181,19 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     }
   }
   
-  const getStudentChangesWrapper = async (studentId: string) => {
+  const getStudentChangesWrapper = async (studentId: string): Promise<Change[]> => {
      try {
-      const studentChanges = await getStudentHistory(studentId);
-      setChanges(prev => [...prev.filter(c => c.studentId !== studentId), ...studentChanges]);
+      return await getStudentHistory(studentId);
     } catch(e) {
       console.error(e);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el historial del alumno.' });
+      return [];
     }
   }
 
   const contextValue: DashboardContextType = {
     filteredStudents,
     allStudents,
-    changes,
     isLoading,
     hasData: allStudents.length > 0,
     leaders,

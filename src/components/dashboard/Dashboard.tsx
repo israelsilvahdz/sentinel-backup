@@ -13,7 +13,7 @@ import { calculateKpis } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
 
 export function Dashboard() {
-  const { filteredStudents, changes, isLoading, hasData } = useDashboardFilters();
+  const { filteredStudents, isLoading, hasData } = useDashboardFilters();
 
   const kpis = useMemo(() => {
     if (filteredStudents.length === 0) return { criticalRiskCount: 0, observationCount: 0, totalChanges: 0 };
@@ -67,7 +67,6 @@ export function Dashboard() {
                         <StudentCard 
                             key={student.id} 
                             student={student} 
-                            changes={changes.filter(c => c.studentId === student.id)}
                         />
                     ))}
                 </div>

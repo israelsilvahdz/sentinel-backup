@@ -35,7 +35,7 @@ function RiskCell({ value, limit }: { value: number; limit: number; }) {
   );
 }
 
-function AiSummary({ student, changes }: { student: Student, changes: Change[] }) {
+function AiSummary({ student }: { student: Student }) {
   const [summary, setSummary] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { getStudentChanges } = useDashboardFilters();
@@ -45,22 +45,27 @@ function AiSummary({ student, changes }: { student: Student, changes: Change[] }
       if (!student.id) return;
       setIsLoading(true);
       
-      await getStudentChanges(student.id);
+      const studentChanges = await getStudentChanges(student.id);
 
-      if (changes.length > 0) {
-        const summaryResponse = await summarizeStudentChanges({
-          studentId: student.id,
-          studentName: student.name,
-          changes: changes.map(c => `Campo '${c.fieldName}' cambió de '${c.oldValue}' a '${c.newValue}' el ${new Date(c.date).toLocaleDateString()}`),
-        });
-        setSummary(summaryResponse.summary);
+      if (studentChanges && studentChanges.length > 0) {
+        try {
+            const summaryResponse = await summarizeStudentChanges({
+                studentId: student.id,
+                studentName: student.name,
+                changes: studentChanges.map(c => `Campo '${c.fieldName}' cambió de '${c.oldValue}' a '${c.newValue}' el ${new Date(c.date).toLocaleDateString()}`),
+            });
+            setSummary(summaryResponse.summary);
+        } catch(e) {
+            console.error("AI Summary failed", e);
+            setSummary("No se pudo generar el resumen.");
+        }
       }
       
       setIsLoading(false);
     }
 
     // fetchChangesAndSummarize(); // We will call this manually for now to prevent permission errors on load
-  }, [student, getStudentChanges, changes]);
+  }, [student.id, student.name, getStudentChanges]);
 
 
   if(isLoading) {
@@ -159,7 +164,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     );
 }
 
-export function StudentCard({ student, changes }: StudentCardProps) {
+export function StudentCard({ student }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   
   return (
@@ -182,7 +187,7 @@ export function StudentCard({ student, changes }: StudentCardProps) {
             </div>
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
-            <AiSummary student={student} changes={changes} />
+            <AiSummary student={student} />
             <CollapsibleContent>
               <StudentSubjects student={student} isOpen={isOpen} />
             </CollapsibleContent>
