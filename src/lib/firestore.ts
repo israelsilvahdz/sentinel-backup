@@ -152,7 +152,7 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
  * Gets all students and their subject summaries. This is now efficient.
  */
 export async function getAllStudents(): Promise<Student[]> {
-    const studentsSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
+    const studentsSnapshot = await getDocs(collection(db, ALUMNOS_COLlection));
     return studentsSnapshot.docs.map(doc => doc.data() as Student);
 }
 
