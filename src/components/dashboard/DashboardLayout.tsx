@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
@@ -22,15 +23,21 @@ import { useToast } from '@/hooks/use-toast';
 import { compareData } from '@/lib/dataProcessor';
 import { getStudentData, saveStudentData, deleteAllData } from '@/lib/firestore';
 
-function getTodayDataKey() {
-  const today = new Date();
-  return `datos_${today.toISOString().split('T')[0]}`;
+function parseDateFromFileName(fileName: string): Date | null {
+    // Extracts date like DD.MM.YY from a string like "fileName_DD.MM.YY.xlsx"
+    const match = fileName.match(/(\d{2})\.(\d{2})\.(\d{2})/);
+    if (!match) return null;
+
+    const [_, day, month, year] = match;
+    // Assuming '25' means '2025'
+    const fullYear = parseInt(year, 10) + 2000;
+    
+    // Month is 0-indexed in JavaScript Dates
+    return new Date(fullYear, parseInt(month, 10) - 1, parseInt(day, 10));
 }
 
-function getYesterdayDataKey() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return `datos_${yesterday.toISOString().split('T')[0]}`;
+function getDataKeyFromDate(date: Date): string {
+    return `datos_${date.toISOString().split('T')[0]}`;
 }
 
 type FilterType = 'leader' | 'tutor' | 'subject';
@@ -63,7 +70,6 @@ export function useDashboardFilters() {
 export function DashboardLayout() {
   const { toast } = useToast();
   const [currentData, setCurrentData] = useState<StudentData | null>(null);
-  const [previousData, setPreviousData] = useState<StudentData | null>(null);
   const [changes, setChanges] = useState<Change[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -78,8 +84,12 @@ export function DashboardLayout() {
   const loadInitialData = async () => {
     setIsLoading(true);
     try {
-      const todayKey = getTodayDataKey();
-      const yesterdayKey = getYesterdayDataKey();
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+
+      const todayKey = getDataKeyFromDate(today);
+      const yesterdayKey = getDataKeyFromDate(yesterday);
       
       const [todayData, yesterdayData] = await Promise.all([
         getStudentData(todayKey),
@@ -87,7 +97,6 @@ export function DashboardLayout() {
       ]);
 
       setCurrentData(todayData);
-      setPreviousData(yesterdayData);
 
       if (todayData && yesterdayData) {
         setChanges(compareData(todayData, yesterdayData));
@@ -98,7 +107,7 @@ export function DashboardLayout() {
       toast({
         variant: 'destructive',
         title: 'Error de Carga',
-        description: 'No se pudieron cargar los datos desde la base de datos.',
+        description: 'No se pudieron cargar los datos iniciales desde la base de datos.',
       });
     } finally {
       setIsLoading(false);
@@ -112,6 +121,17 @@ export function DashboardLayout() {
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
     try {
+      const fileDate = parseDateFromFileName(file.name);
+      if(!fileDate) {
+        toast({
+          variant: 'destructive',
+          title: 'Nombre de archivo inválido',
+          description: 'El nombre del archivo debe contener la fecha en formato DD.MM.YY (ej. reporte_22.08.25.xlsx).',
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       const data = await parseExcel(file);
       if (!data) {
         toast({
@@ -123,21 +143,25 @@ export function DashboardLayout() {
         return;
       }
 
-      const todayKey = getTodayDataKey();
-      
-      const previousDayData = currentData || await getStudentData(getYesterdayDataKey());
+      const currentFileKey = getDataKeyFromDate(fileDate);
+      const previousDayDate = new Date(fileDate);
+      previousDayDate.setDate(fileDate.getDate() - 1);
+      const previousFileKey = getDataKeyFromDate(previousDayDate);
+
+      await saveStudentData(currentFileKey, data);
+      const previousDayData = await getStudentData(previousFileKey);
 
       setCurrentData(data);
-      await saveStudentData(todayKey, data);
       
       if (previousDayData) {
-        setPreviousData(previousDayData);
         setChanges(compareData(data, previousDayData));
+      } else {
+        setChanges([]);
       }
       
       toast({
         title: 'Éxito',
-        description: `Reporte cargado. Se encontraron ${Object.keys(data).length} registros de alumnos.`,
+        description: `Reporte de ${fileDate.toLocaleDateString()} cargado. Se encontraron ${Object.keys(data).length} registros.`,
       });
     } catch (error) {
        toast({
@@ -158,7 +182,6 @@ export function DashboardLayout() {
     try {
       await deleteAllData();
       setCurrentData(null);
-      setPreviousData(null);
       setChanges([]);
       toast({
         title: 'Datos Eliminados',
