@@ -87,11 +87,9 @@ export function Dashboard() {
             </div>
 
             {filteredStudents.length > 0 ? (
-                <div className="space-y-8">
-                    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
-                        <RiskFocusChart students={filteredStudents} />
-                        <RiskDistributionChart students={filteredStudents} />
-                    </div>
+                <div className="grid grid-cols-1 gap-8">
+                    <RiskDistributionChart students={filteredStudents} />
+                    <RiskFocusChart students={filteredStudents} />
                 </div>
             ) : (
             <Card className="text-center p-12">

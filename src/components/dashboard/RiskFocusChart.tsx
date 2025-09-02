@@ -75,7 +75,7 @@ function ChartComponent({
         <div className="h-[250px] w-full">
             <h3 className="text-center font-semibold text-muted-foreground mb-4">{title}</h3>
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} layout="vertical" margin={{ left: 120, right: 30 }}>
+                <BarChart data={data} layout="vertical" margin={{ left: 120, right: 30, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" dataKey="percentage" allowDecimals={false} unit="%" domain={[0, 100]} name="Porcentaje de Alumnos en Riesgo"/>
                     <YAxis 
@@ -110,14 +110,14 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
   const hasData = absenceData.length > 0 || assignmentData.length > 0;
 
   return (
-    <Card className="lg:col-span-1">
+    <Card>
       <CardHeader>
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
         <CardDescription>Top 5 materias con mayor % de alumnos en riesgo (con 10 o más alumnos). Haz clic en una barra para ver los detalles.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-12">
         {hasData ? (
-          <div className="space-y-12">
+          <>
             <ChartComponent 
                 data={absenceData} 
                 title="Riesgo por Faltas" 
@@ -125,12 +125,12 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
                 onBarClick={(subjectName) => handleBarClick(subjectName, 'absences')}
             />
             <ChartComponent 
-                data={assignmentData} h
+                data={assignmentData} 
                 title="Riesgo por Tareas No Entregadas" 
                 barColor="hsl(var(--chart-3))" 
                 onBarClick={(subjectName) => handleBarClick(subjectName, 'missedAssignments')}
             />
-          </div>
+          </>
         ) : (
             <div className="flex items-center justify-center h-[300px]">
                 <p className="text-muted-foreground">No hay suficientes datos de riesgo para mostrar.</p>
