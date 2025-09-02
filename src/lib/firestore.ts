@@ -32,8 +32,13 @@ export async function deleteAllData(): Promise<void> {
     try {
         const collectionRef = collection(db, DATA_COLLECTION);
         const querySnapshot = await getDocs(collectionRef);
-        const batch = writeBatch(db);
+        
+        if (querySnapshot.empty) {
+            console.log("No documents to delete.");
+            return;
+        }
 
+        const batch = writeBatch(db);
         querySnapshot.forEach((doc) => {
             batch.delete(doc.ref);
         });
