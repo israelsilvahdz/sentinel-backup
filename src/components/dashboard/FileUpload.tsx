@@ -6,7 +6,7 @@ import { Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface FileUploadProps {
-  onFileUpload: (content: string) => void;
+  onFileUpload: (file: File) => void;
   isLoading: boolean;
 }
 
@@ -17,19 +17,7 @@ export function FileUpload({ onFileUpload, isLoading }: FileUploadProps) {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        onFileUpload(text);
-      };
-      reader.onerror = () => {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'No se pudo leer el archivo.',
-        });
-      };
-      reader.readAsText(file);
+      onFileUpload(file);
     }
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -45,14 +33,14 @@ export function FileUpload({ onFileUpload, isLoading }: FileUploadProps) {
         className='w-full md:w-auto'
       >
         <Upload className="mr-2 h-4 w-4" />
-        {isLoading ? 'Procesando...' : 'Cargar Reporte Diario (CSV)'}
+        {isLoading ? 'Procesando...' : 'Cargar Reporte Diario (Excel)'}
       </Button>
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept=".csv"
+        accept=".xlsx, .xls"
         disabled={isLoading}
       />
     </div>

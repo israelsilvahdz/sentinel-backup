@@ -12,7 +12,7 @@ import { AlertCircle, BarChart2, BellRing, Users } from 'lucide-react';
 
 import type { StudentData, Change, Student } from '@/types/student';
 import { getFromLocalStorage, saveToLocalStorage } from '@/lib/localStorage';
-import { parseCsv } from '@/lib/csvParser';
+import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { compareData, calculateKpis } from '@/lib/dataProcessor';
 
@@ -67,35 +67,44 @@ export function Dashboard() {
     saveToLocalStorage(MONITORED_IDS_STRING_KEY, value);
   }, []);
 
-  const handleFileUpload = (csvText: string) => {
+  const handleFileUpload = async (file: File) => {
     setIsLoading(true);
-    const data = parseCsv(csvText);
-    if (!data) {
+    try {
+      const data = await parseExcel(file);
+      if (!data) {
+        toast({
+          variant: 'destructive',
+          title: 'Error de Formato',
+          description: 'El archivo Excel no tiene el formato esperado o está vacío. Por favor, revisa las columnas.',
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const todayKey = getTodayDataKey();
+      const previousDayData = getFromLocalStorage<StudentData>(todayKey, null) || previousData;
+
+      setCurrentData(data);
+      saveToLocalStorage(todayKey, data);
+      
+      if (previousDayData) {
+        setPreviousData(previousDayData);
+        setChanges(compareData(data, previousDayData));
+      }
+      
       toast({
-        variant: 'destructive',
-        title: 'Error de Formato',
-        description: 'El archivo CSV no tiene el formato esperado o está vacío. Por favor, revisa las columnas.',
+        title: 'Éxito',
+        description: `Reporte cargado. Se encontraron ${Object.keys(data).length} registros de alumnos.`,
       });
+    } catch (error) {
+       toast({
+        variant: 'destructive',
+        title: 'Error al procesar',
+        description: `Hubo un problema al leer el archivo Excel.`,
+      });
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    const todayKey = getTodayDataKey();
-    const previousDayData = getFromLocalStorage<StudentData>(todayKey, null) || previousData;
-
-    setCurrentData(data);
-    saveToLocalStorage(todayKey, data);
-    
-    if (previousDayData) {
-      setPreviousData(previousDayData);
-      setChanges(compareData(data, previousDayData));
-    }
-    
-    toast({
-      title: 'Éxito',
-      description: `Reporte cargado. Se encontraron ${Object.keys(data).length} registros de alumnos.`,
-    });
-    setIsLoading(false);
   };
 
   const monitoredStudents = useMemo(() => {
@@ -142,7 +151,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent>
                 <p className="text-muted-foreground">
-                Sube un reporte diario en formato CSV para ver el panel de control y las alertas de tus alumnos.
+                Sube un reporte diario en formato Excel para ver el panel de control y las alertas de tus alumnos.
                 </p>
             </CardContent>
          </Card>

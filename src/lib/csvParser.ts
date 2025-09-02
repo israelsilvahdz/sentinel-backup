@@ -1,5 +1,8 @@
 import { type StudentData, type Subject } from '@/types/student';
 
+// NOTE: This file is no longer used, but is kept for reference.
+// The new parser is located in `src/lib/excelParser.ts`.
+
 const COLUMNS = {
   ID: 'Matrícula',
   NAME: 'Nombre del alumno',
