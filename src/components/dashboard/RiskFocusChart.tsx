@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Label } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { type Student } from '@/types/student';
 import { getRisk } from '@/lib/dataProcessor';
@@ -15,11 +15,11 @@ function processRiskData(students: Student[], riskType: 'absences' | 'missedAssi
     const subjectRisks: { [name: string]: { totalRisk: number, count: number } } = {};
 
     students.forEach(student => {
-        (student.subjects || []).forEach(subject => {
+        (student.subjectSummaries || []).forEach(subject => {
             if (!subjectRisks[subject.name]) {
                 subjectRisks[subject.name] = { totalRisk: 0, count: 0 };
             }
-            const value = subject[riskType];
+            const value = riskType === 'absences' ? subject.absences : subject.missedAssignments;
             const limit = riskType === 'absences' ? subject.absenceLimit : subject.missedAssignmentLimit;
             const { risk } = getRisk(value, limit);
             subjectRisks[subject.name].totalRisk += risk;
@@ -30,7 +30,6 @@ function processRiskData(students: Student[], riskType: 'absences' | 'missedAssi
     return Object.entries(subjectRisks)
         .map(([name, data]) => ({
             name: name,
-            // Promedio de riesgo para esa materia a través de todos los alumnos
             riesgo: (data.totalRisk / data.count) * 100, 
         }))
         .filter(d => d.riesgo > 0)
@@ -55,7 +54,7 @@ function ChartComponent({ data, title, barColor }: { data: any[], title: string,
     };
     
     return (
-        <div className="h-[300px]">
+        <div className="h-[250px]">
             <h3 className="text-center font-semibold text-muted-foreground mb-4">{title}</h3>
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} layout="vertical" margin={{ left: 100, right: 30 }}>
@@ -91,7 +90,7 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
         <CardDescription>Top 5 materias con mayor riesgo promedio entre alumnos.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-8">
+      <CardContent className="space-y-6">
         {hasData ? (
           <>
             <ChartComponent data={absenceData} title="Riesgo por Faltas" barColor="hsl(var(--chart-4))" />

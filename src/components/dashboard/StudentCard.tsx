@@ -2,11 +2,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { type Student, type Subject } from "@/types/student";
+import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -15,6 +15,7 @@ import { useDashboardFilters } from './DashboardClient';
 
 interface StudentCardProps {
   student: Student;
+  startOpen?: boolean;
 }
 
 function RiskCell({ value, limit }: { value: number; limit: number; }) {
@@ -33,7 +34,7 @@ function RiskCell({ value, limit }: { value: number; limit: number; }) {
   );
 }
 
-function OverallRiskBadge({ student, subjects }: { student: Student, subjects: Subject[] }) {
+function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (Subject[] | SubjectSummary[]) }) {
     const { overallRisk } = getStudentOverallRisk(student, subjects);
 
     if (overallRisk === 'low') return null;
@@ -81,7 +82,6 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
     return (
         <div className="overflow-x-auto px-6 pb-4">
-            {isOpen && <OverallRiskBadge student={student} subjects={subjects} />}
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -116,17 +116,18 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     );
 }
 
-export function StudentCard({ student }: StudentCardProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function StudentCard({ student, startOpen = true }: StudentCardProps) {
+  const [isOpen, setIsOpen] = useState(startOpen);
   
   return (
     <Card>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="cursor-pointer">
+        <CardHeader className="cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
             <div className="flex justify-between items-start">
                 <div>
-                    <CardTitle className="flex items-center">
+                    <CardTitle className="flex items-center text-lg">
                         {student.name}
+                        {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
                     </CardTitle>
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
                 </div>

@@ -16,7 +16,7 @@ import {
   orderBy,
   limit,
 } from 'firebase/firestore';
-import type { Student, Subject, Change, StudentData, UploadHistory } from '@/types/student';
+import type { Student, Subject, Change, StudentData, UploadHistory, SubjectSummary } from '@/types/student';
 
 const ALUMNOS_COLLECTION = 'alumnos';
 const HISTORIAL_COLLECTION = 'historialCambios';
@@ -40,12 +40,11 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
     await runTransaction(db, async (transaction) => {
       const studentDocRef = doc(db, ALUMNOS_COLLECTION, studentId);
       
-      // --- 1. ALL READS FIRST ---
       const studentDoc = await transaction.get(studentDocRef);
       const existingStudentData = studentDoc.exists() ? studentDoc.data() as Student : null;
 
       const subjectDocsReads = new Map<string, any>();
-      if (incomingStudent.subjects) {
+       if (incomingStudent.subjects) {
           for (const incomingSubject of incomingStudent.subjects) {
               if (incomingSubject.id) { // incomingSubject.id is CRN
                   const subjectDocRef = doc(db, ALUMNOS_COLLECTION, studentId, 'materias', incomingSubject.id);
@@ -55,9 +54,8 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
           }
       }
       
-      // --- 2. NOW PREPARE AND EXECUTE ALL WRITES ---
       const changesToWrite: Change[] = [];
-      const studentInfo: Omit<Student, 'subjects'> = {
+      const studentInfo: Omit<Student, 'subjects' | 'subjectSummaries'> = {
         id: incomingStudent.id,
         name: incomingStudent.name,
         leader: incomingStudent.leader,
@@ -124,7 +122,6 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
     processedCount++;
   }
   
-  // Record the upload after all transactions
   const uploadDocRef = doc(collection(db, UPLOADS_COLLECTION));
   historyBatch.set(uploadDocRef, { fileName, uploadedAt: Timestamp.now() });
   
@@ -133,11 +130,36 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
 }
 
 /**
- * Gets all students from the main collection.
+ * Gets all students and a summary of their subjects for performance.
  */
 export async function getAllStudents(): Promise<Student[]> {
-  const querySnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
-  return querySnapshot.docs.map(doc => doc.data() as Student);
+    const studentsSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
+    
+    const students: Student[] = await Promise.all(
+        studentsSnapshot.docs.map(async (studentDoc) => {
+            const student = studentDoc.data() as Student;
+            const subjectsRef = collection(db, ALUMNOS_COLLECTION, student.id, 'materias');
+            const subjectsSnapshot = await getDocs(subjectsRef);
+            
+            student.subjectSummaries = subjectsSnapshot.docs.map(doc => {
+                const subjectData = doc.data();
+                return {
+                    id: doc.id,
+                    name: subjectData.name,
+                    absences: subjectData.absences,
+                    absenceLimit: subjectData.absenceLimit,
+                    missedAssignments: subjectData.missedAssignments,
+                    missedAssignmentLimit: subjectData.missedAssignmentLimit,
+                    grade: subjectData.grade,
+                    finalGrade: subjectData.finalGrade,
+                } as SubjectSummary;
+            });
+
+            return student;
+        })
+    );
+    
+    return students;
 }
 
 
@@ -161,7 +183,6 @@ export async function getStudentHistory(studentId: string): Promise<Change[]> {
     
     return querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Convert Firestore Timestamp to a serializable format (ISO string)
         const change: Change = {
             ...data,
             date: data.date.toDate().toISOString(),
@@ -211,8 +232,6 @@ export async function getUploadHistory(): Promise<UploadHistory[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => {
       const data = doc.data();
-      // Firestore Timestamps must be converted to a serializable format (like an ISO string)
-      // before being sent to the client.
       return {
           id: doc.id,
           fileName: data.fileName,

@@ -1,93 +1,77 @@
 
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { KpiCard } from './KpiCard';
 import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { AlertCircle, BarChart2, BellRing, Users, Loader2 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2 } from 'lucide-react';
+import { StudentCard } from './StudentCard';
 
-import { calculateKpis } from '@/lib/dataProcessor';
+import { calculateKpis, findLostCases, findUrgentCases } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
-import type { Student, Subject } from '@/types/student';
+import type { Student } from '@/types/student';
 
-// Componente Wrapper para cargar las materias necesarias para los gráficos.
-function StudentSubjectsLoader({ children }: { children: (subjectsLoaded: boolean, studentsWithSubjects: Student[]) => React.ReactNode }) {
-    const { filteredStudents, loadStudentSubjects } = useDashboardFilters();
-    const [studentsWithSubjects, setStudentsWithSubjects] = useState<Student[]>([]);
-    const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+// Componente para mostrar listas de alumnos (Casos Urgentes / Perdidos)
+function StudentCaseList({ title, description, students, icon: Icon, color }: { title: string, description: string, students: Student[], icon: React.ElementType, color?: "red" | "yellow" | "blue" }) {
+    if (students.length === 0) return null;
 
-    useEffect(() => {
-        const fetchSubjectsForCharts = async () => {
-            if (filteredStudents.length > 0) {
-                setIsLoadingSubjects(true);
-                try {
-                    const studentsWithSubjectsPromises = filteredStudents.map(async (student) => {
-                        const subjects = await loadStudentSubjects(student.id);
-                        return { ...student, subjects };
-                    });
-                    const results = await Promise.all(studentsWithSubjectsPromises);
-                    setStudentsWithSubjects(results);
-                } catch (error) {
-                    console.error("Failed to load subjects for charts", error);
-                    setStudentsWithSubjects([]);
-                } finally {
-                    setIsLoadingSubjects(false);
-                }
-            } else {
-                setStudentsWithSubjects([]);
-                setIsLoadingSubjects(false);
-            }
-        };
+    const colorClasses = {
+        red: "text-red-600 dark:text-red-400",
+        yellow: "text-yellow-600 dark:text-yellow-400",
+        blue: "text-blue-600 dark:text-blue-400",
+      };
 
-        fetchSubjectsForCharts();
-    }, [filteredStudents, loadStudentSubjects]);
-
-    if (isLoadingSubjects) {
-        return (
-            <div className="grid gap-8 md:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <Skeleton className="h-6 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-center h-[300px]">
-                           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <Skeleton className="h-6 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
-                    </CardHeader>
-                    <CardContent>
-                         <div className="flex items-center justify-center h-[300px]">
-                           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-    
-    const subjectsLoaded = studentsWithSubjects.length > 0 && studentsWithSubjects.every(s => s.subjects);
-    
-    return <>{children(subjectsLoaded, studentsWithSubjects)}</>;
+    return (
+        <Card>
+            <CardHeader>
+                <div className='flex items-center gap-3'>
+                     <Icon className={`h-6 w-6 ${color ? colorClasses[color] : 'text-primary'}`} />
+                    <CardTitle>{title} ({students.length})</CardTitle>
+                </div>
+                <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {students.map(student => (
+                    <StudentCard key={student.id} student={student} startOpen={false} />
+                ))}
+            </CardContent>
+        </Card>
+    );
 }
-
 
 export function Dashboard() {
   const { filteredStudents, isLoading, hasData } = useDashboardFilters();
 
-  const kpis = useMemo(() => {
-    if (filteredStudents.length === 0) return { totalStudents: 0 };
-    // Los KPIs de riesgo se calcularán dentro del loader para no duplicar lógica
-    return { totalStudents: filteredStudents.length };
-  }, [filteredStudents]);
+  const { kpis, lostCases, urgentCases } = useMemo(() => {
+    if (isLoading || !hasData) {
+        return { 
+            kpis: { criticalRiskCount: 0, observationCount: 0, totalStudents: 0 },
+            lostCases: [],
+            urgentCases: []
+        };
+    }
+    const kpiResults = calculateKpis(filteredStudents);
+    const lc = findLostCases(filteredStudents);
+    const lostCaseIds = new Set(lc.map(s => s.id));
+    const uc = findUrgentCases(filteredStudents, lostCaseIds);
+
+    return {
+      kpis: { ...kpiResults, totalStudents: filteredStudents.length },
+      lostCases: lc,
+      urgentCases: uc,
+    };
+  }, [filteredStudents, isLoading, hasData]);
+
+
+  if (isLoading) {
+    return (
+        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -96,9 +80,7 @@ export function Dashboard() {
         <p className="text-muted-foreground">Una vista general del rendimiento y riesgo de los alumnos.</p>
       </header>
       
-      {isLoading && <p className="text-center text-muted-foreground">Cargando datos...</p>}
-
-      {!isLoading && !hasData && (
+      {!hasData && (
          <Card className="text-center p-12 mt-16">
             <CardHeader>
                 <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
@@ -114,42 +96,54 @@ export function Dashboard() {
          </Card>
       )}
 
-      {!isLoading && hasData && (
-        <StudentSubjectsLoader>
-        {(subjectsLoaded, studentsWithSubjects) => {
-            const riskKpis = subjectsLoaded ? calculateKpis(studentsWithSubjects) : { criticalRiskCount: 0, observationCount: 0 };
-            return (
-            <>
-              <div className="grid gap-4 md:grid-cols-3">
-                <KpiCard title="Alumnos en Riesgo Crítico" value={riskKpis.criticalRiskCount} icon={BellRing} color="red" />
-                <KpiCard title="Alumnos en Observación" value={riskKpis.observationCount} icon={Users} color="yellow" />
-                <KpiCard title="Total de Alumnos" value={kpis.totalStudents} icon={BarChart2} color="blue" />
-              </div>
+      {hasData && (
+        <>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <KpiCard title="Casos Perdidos" value={lostCases.length} icon={UserX} color="red" />
+                <KpiCard title="Casos Urgentes" value={urgentCases.length} icon={BellRing} color="yellow" />
+                <KpiCard title="Alumnos en Observación" value={kpis.observationCount} icon={Users} color="blue" />
+                <KpiCard title="Total de Alumnos" value={kpis.totalStudents} icon={UserCheck} />
+            </div>
 
-              {filteredStudents.length > 0 ? (
-                  <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
-                    <RiskFocusChart students={studentsWithSubjects} />
-                    <RiskDistributionChart students={studentsWithSubjects} />
-                  </div>
-              ) : (
-                <Card className="text-center p-12">
-                    <CardHeader>
-                        <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
-                            <Users className="h-8 w-8 text-primary" />
-                        </div>
-                        <CardTitle>No hay alumnos para mostrar</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">
-                          No se encontraron alumnos con los filtros seleccionados o no se ha cargado ningún reporte.
-                        </p>
-                    </CardContent>
-                </Card>
-              )}
-            </>
-            )
-        }}
-        </StudentSubjectsLoader>
+            {filteredStudents.length > 0 ? (
+                <div className="space-y-8">
+                    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
+                        <RiskFocusChart students={filteredStudents} />
+                        <RiskDistributionChart students={filteredStudents} />
+                    </div>
+                     <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
+                        <StudentCaseList 
+                            title="Casos Perdidos"
+                            description="Alumnos que han reprobado por superar el límite de faltas o tareas no entregadas."
+                            students={lostCases}
+                            icon={UserX}
+                            color="red"
+                        />
+                         <StudentCaseList 
+                            title="Casos Urgentes"
+                            description="Alumnos con 2 o más materias en riesgo crítico que aún no son casos perdidos."
+                            students={urgentCases}
+                            icon={BellRing}
+                            color="yellow"
+                        />
+                    </div>
+                </div>
+            ) : (
+            <Card className="text-center p-12">
+                <CardHeader>
+                    <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
+                        <Users className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle>No hay alumnos para mostrar</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">
+                        No se encontraron alumnos con los filtros seleccionados o no se ha cargado ningún reporte.
+                    </p>
+                </CardContent>
+            </Card>
+            )}
+        </>
       )}
     </div>
   );

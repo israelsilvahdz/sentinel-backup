@@ -3,11 +3,19 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StudentCard } from './StudentCard';
-import { Users } from 'lucide-react';
+import { Users, Loader2 } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 
 export function StudentPanel() {
   const { filteredStudents, hasData, isLoading } = useDashboardFilters();
+
+  if (isLoading) {
+    return (
+        <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -16,9 +24,7 @@ export function StudentPanel() {
         <p className="text-muted-foreground">Explora y monitorea los casos individuales de cada alumno.</p>
       </header>
 
-      {isLoading && <p className="text-center text-muted-foreground">Cargando datos...</p>}
-
-      {!isLoading && hasData && (
+      {hasData && (
         <>
           {filteredStudents.length > 0 ? (
             <div className="space-y-6">

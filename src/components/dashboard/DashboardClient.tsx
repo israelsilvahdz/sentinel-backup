@@ -201,7 +201,7 @@ export function DashboardClient() {
   const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))], [allStudents]);
   
   const subjects = useMemo(() => {
-      const allSubjects = allStudents.flatMap(s => s.subjects?.map(sub => sub.name) || []);
+      const allSubjects = allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []);
       return [...new Set(allSubjects.filter(Boolean))];
   }, [allStudents]);
 
@@ -216,7 +216,7 @@ export function DashboardClient() {
       students = students.filter(s => s.tutor === selectedValue);
     }
     if (filterType === 'subject') {
-      students = students.filter(s => s.subjects?.some(sub => sub.name === selectedValue));
+      students = students.filter(s => s.subjectSummaries?.some(sub => sub.name === selectedValue));
     }
     return students;
   }, [allStudents, filterType, selectedValue]);

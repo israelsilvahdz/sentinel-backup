@@ -13,8 +13,7 @@ interface RiskDistributionChartProps {
 
 export function RiskDistributionChart({ students }: RiskDistributionChartProps) {
   const data = useMemo(() => {
-    // Si no hay estudiantes o no tienen materias, no mostrar datos.
-    if (!students || students.length === 0 || !students.every(s => s.subjects)) {
+    if (!students || students.length === 0) {
         return [];
     }
 
@@ -24,7 +23,7 @@ export function RiskDistributionChart({ students }: RiskDistributionChartProps) 
     students.forEach(student => {
       let maxAbsenceLevel: RiskLevel = 'low';
       let maxAssignmentLevel: RiskLevel = 'low';
-      const subjects = student.subjects || [];
+      const subjects = student.subjectSummaries || [];
 
       subjects.forEach(subject => {
         const absenceLevel = getRisk(subject.absences, subject.absenceLimit).level;

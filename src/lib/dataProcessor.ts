@@ -1,6 +1,7 @@
-import { type Student, type Subject } from '@/types/student';
+import { type Student, type Subject, type SubjectSummary } from '@/types/student';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
+export type CaseStatus = 'lost' | 'urgent' | 'observation' | 'ok';
 
 /**
  * Calcula el nivel de riesgo para un valor y su límite.
@@ -26,10 +27,10 @@ export function getRisk(value: number, limit: number): { risk: number; level: Ri
 /**
  * Calcula el riesgo general de un estudiante basado en sus materias.
  * @param student El objeto del estudiante.
- * @param subjects Un array con las materias del estudiante.
+ * @param subjects Un array con las materias (o resúmenes de materias) del estudiante.
  * @returns El nivel de riesgo general ('low', 'medium', 'high') y flags para cada nivel.
  */
-export function getStudentOverallRisk(student: Student, subjects: Subject[]) {
+export function getStudentOverallRisk(student: Student, subjects: (Subject | SubjectSummary)[]) {
   let hasHighRisk = false;
   let hasMediumRisk = false;
   
@@ -56,7 +57,7 @@ export function getStudentOverallRisk(student: Student, subjects: Subject[]) {
 
 /**
  * Calcula los KPIs (Key Performance Indicators) para una lista de estudiantes.
- * @param students Array de estudiantes con sus materias cargadas.
+ * @param students Array de estudiantes con sus resúmenes de materias cargados.
  * @returns El conteo de alumnos en riesgo crítico y en observación.
  */
 export function calculateKpis(students: Student[]) {
@@ -64,9 +65,8 @@ export function calculateKpis(students: Student[]) {
     let observationCount = 0;
 
     students.forEach(student => {
-        // Asegurarse que las materias existan antes de procesar
-        if (student.subjects && student.subjects.length > 0) {
-          const { hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, student.subjects);
+        if (student.subjectSummaries && student.subjectSummaries.length > 0) {
+          const { hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, student.subjectSummaries);
           if (hasHighRisk) {
               criticalRiskCount++;
           } else if (hasMediumRisk) {
@@ -76,4 +76,34 @@ export function calculateKpis(students: Student[]) {
     });
 
     return { criticalRiskCount, observationCount };
+}
+
+
+/**
+ * Encuentra los casos perdidos (alumnos que ya reprobaron por faltas o NE).
+ */
+export function findLostCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        return student.subjectSummaries.some(subject => 
+            subject.absences > subject.absenceLimit || subject.missedAssignments > subject.missedAssignmentLimit
+        );
+    });
+}
+
+/**
+ * Encuentra los casos urgentes (alumnos con 2 o más materias en riesgo alto, pero que no son casos perdidos).
+ */
+export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries || lostCaseIds.has(student.id)) return false;
+        
+        const highRiskSubjects = student.subjectSummaries.filter(subject => {
+            const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
+            const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
+            return absenceRisk.level === 'high' || assignmentRisk.level === 'high';
+        }).length;
+
+        return highRiskSubjects >= 2;
+    });
 }

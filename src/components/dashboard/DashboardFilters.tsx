@@ -23,9 +23,26 @@ export function DashboardFilters() {
     selectedValue,
     setSelectedValue,
     hasData,
+    isLoading,
   } = useDashboardFilters();
 
-  if (!hasData) return null;
+  if (!hasData && !isLoading) return null;
+  
+  if (isLoading) {
+      return (
+          <div className="space-y-4 p-2 group-data-[collapsible=icon]:hidden">
+              <div className="animate-pulse">
+                <div className="h-4 bg-muted rounded w-1/3 mb-4"></div>
+                <div className="space-y-2">
+                    <div className="h-4 bg-muted rounded w-1/2"></div>
+                    <div className="h-4 bg-muted rounded w-1/2"></div>
+                    <div className="h-4 bg-muted rounded w-1/2"></div>
+                </div>
+                <div className="h-8 bg-muted rounded w-full mt-4"></div>
+              </div>
+          </div>
+      );
+  }
 
   const options: string[] = {
     leader: leaders,
@@ -39,12 +56,12 @@ export function DashboardFilters() {
   
   return (
     <div className="space-y-4">
-        <div className="flex items-center gap-2 text-muted-foreground font-semibold">
+        <div className="flex items-center gap-2 text-muted-foreground font-semibold px-2">
             <Filter size={16}/>
-            <span>Filtros</span>
+            <span className="group-data-[collapsible=icon]:hidden">Filtros</span>
         </div>
         
-        <div>
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
             <label className="text-sm font-medium">Filtrar por</label>
             <RadioGroup value={filterType} onValueChange={(val) => setFilterType(val as any)} className="mt-2">
                 <div className="flex items-center space-x-2">
@@ -62,7 +79,7 @@ export function DashboardFilters() {
             </RadioGroup>
         </div>
 
-        <div>
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
             <label className="text-sm font-medium">Seleccionar valor</label>
              <Select onValueChange={handleValueChange} value={selectedValue || 'all'}>
                 <SelectTrigger className='w-full'>
