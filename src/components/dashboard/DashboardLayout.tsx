@@ -13,12 +13,14 @@ import {
 import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
 import { DashboardFilters } from './DashboardFilters';
+import { Button } from '@/components/ui/button';
+import { Trash2 } from 'lucide-react';
 
 import type { Student, StudentData, Change } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { compareData } from '@/lib/dataProcessor';
-import { getStudentData, saveStudentData } from '@/lib/firestore';
+import { getStudentData, saveStudentData, deleteAllData } from '@/lib/firestore';
 
 function getTodayDataKey() {
   const today = new Date();
@@ -73,34 +75,37 @@ export function DashboardLayout() {
     setSelectedValue(null); // Reset selected value when type changes
   };
 
-  useEffect(() => {
-    async function loadInitialData() {
-      setIsLoading(true);
-      try {
-        const todayKey = getTodayDataKey();
-        const yesterdayKey = getYesterdayDataKey();
-        
-        const [todayData, yesterdayData] = await Promise.all([
-          getStudentData(todayKey),
-          getStudentData(yesterdayKey)
-        ]);
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    try {
+      const todayKey = getTodayDataKey();
+      const yesterdayKey = getYesterdayDataKey();
+      
+      const [todayData, yesterdayData] = await Promise.all([
+        getStudentData(todayKey),
+        getStudentData(yesterdayKey)
+      ]);
 
-        setCurrentData(todayData);
-        setPreviousData(yesterdayData);
+      setCurrentData(todayData);
+      setPreviousData(yesterdayData);
 
-        if (todayData && yesterdayData) {
-          setChanges(compareData(todayData, yesterdayData));
-        }
-      } catch (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error de Carga',
-          description: 'No se pudieron cargar los datos desde la base de datos.',
-        });
-      } finally {
-        setIsLoading(false);
+      if (todayData && yesterdayData) {
+        setChanges(compareData(todayData, yesterdayData));
+      } else {
+        setChanges([]);
       }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error de Carga',
+        description: 'No se pudieron cargar los datos desde la base de datos.',
+      });
+    } finally {
+      setIsLoading(false);
     }
+  }
+
+  useEffect(() => {
     loadInitialData();
   }, [toast]);
   
@@ -139,6 +144,31 @@ export function DashboardLayout() {
         variant: 'destructive',
         title: 'Error al procesar',
         description: `Hubo un problema al leer el archivo Excel.`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteAllData = async () => {
+    if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos de prueba? Esta acción es irreversible.')) {
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await deleteAllData();
+      setCurrentData(null);
+      setPreviousData(null);
+      setChanges([]);
+      toast({
+        title: 'Datos Eliminados',
+        description: 'Todos los datos de prueba han sido borrados de Firestore.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al Eliminar',
+        description: 'No se pudieron borrar los datos.',
       });
     } finally {
       setIsLoading(false);
@@ -209,6 +239,10 @@ export function DashboardLayout() {
                  <div className="flex-1">
                     <h1 className="font-semibold text-lg">Academic Sentinel</h1>
                  </div>
+                 <Button variant="destructive" size="sm" onClick={handleDeleteAllData} disabled={isLoading}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Borrar Datos (Test)
+                </Button>
                 <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading} />
             </header>
             <Dashboard />
