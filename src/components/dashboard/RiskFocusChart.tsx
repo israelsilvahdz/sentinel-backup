@@ -39,7 +39,7 @@ function processRiskData(students: Student[], riskType: 'absences' | 'missedAssi
             riskCount,
             totalCount,
         }))
-        .filter(d => d.totalCount >= 10 && d.riskCount > 0) // <-- AQUÍ EL CAMBIO
+        .filter(d => d.totalCount > 0) // Mantener todas las materias para que el usuario decida el filtro.
         .sort((a, b) => b.percentage - a.percentage)
         .slice(0, 5); // Top 5
 }
@@ -63,7 +63,7 @@ function ChartComponent({
                 <div className="rounded-lg border bg-background p-2 shadow-sm">
                     <p className="font-bold text-base">{label}</p>
                     <p className="text-sm" style={{ color: payload[0].fill }}>
-                        Riesgo: {data.percentage.toFixed(1)}% ({data.riskCount}/{data.totalCount} alumnos)
+                        {data.percentage.toFixed(1)}% en riesgo ({data.riskCount}/{data.totalCount} alumnos)
                     </p>
                 </div>
             );
@@ -72,19 +72,20 @@ function ChartComponent({
     };
     
     return (
-        <div className="h-[250px]">
+        <div className="h-[250px] w-full">
             <h3 className="text-center font-semibold text-muted-foreground mb-4">{title}</h3>
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} layout="vertical" margin={{ left: 100, right: 30 }}>
+                <BarChart data={data} layout="vertical" margin={{ left: 120, right: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" dataKey="percentage" allowDecimals={false} unit="%" domain={[0, 100]} name="Porcentaje de Alumnos en Riesgo"/>
                     <YAxis 
                         type="category" 
                         dataKey="name" 
-                        width={100}
-                        tick={{ fontSize: 12 }} 
+                        width={120}
+                        tick={{ fontSize: 12, width: 110 }}
                         axisLine={false} 
                         tickLine={false}
+                        interval={0}
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
                     <Bar dataKey="percentage" name="Porcentaje en Riesgo" fill={barColor} barSize={20} onClick={(data) => onBarClick(data.name)} className="cursor-pointer" />
@@ -112,11 +113,11 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
     <Card className="lg:col-span-1">
       <CardHeader>
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
-        <CardDescription>Top 5 materias (con 10+ alumnos) con mayor % de alumnos en riesgo. Haz clic en una barra para ver los detalles.</CardDescription>
+        <CardDescription>Top 5 materias con mayor % de alumnos en riesgo. Haz clic en una barra para ver los detalles.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent>
         {hasData ? (
-          <>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-12">
             <ChartComponent 
                 data={absenceData} 
                 title="Riesgo por Faltas" 
@@ -129,10 +130,10 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
                 barColor="hsl(var(--chart-3))" 
                 onBarClick={(subjectName) => handleBarClick(subjectName, 'missedAssignments')}
             />
-          </>
+          </div>
         ) : (
             <div className="flex items-center justify-center h-[300px]">
-                <p className="text-muted-foreground">No hay datos de riesgo para mostrar (materias con 10+ alumnos).</p>
+                <p className="text-muted-foreground">No hay suficientes datos de riesgo para mostrar.</p>
             </div>
         )}
       </CardContent>
