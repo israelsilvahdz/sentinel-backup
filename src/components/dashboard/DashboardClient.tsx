@@ -130,14 +130,14 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     try {
       const data = await parseExcel(file);
       setProgress(40);
-      if (!data) {
+      if (!data || Object.keys(data).length === 0) {
         toast({
           variant: 'destructive',
           title: 'Error de Formato',
-          description: 'El archivo Excel no tiene el formato esperado, está vacío o faltan columnas requeridas. Revise la consola para más detalles.',
+          description: 'El archivo Excel no tiene el formato esperado, está vacío o no se encontraron alumnos. Revise la consola para más detalles.',
         });
-        setProgress(0);
         setIsLoading(false);
+        setProgress(0);
         return;
       }
       
@@ -150,8 +150,6 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
         description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
       });
 
-      await refreshData();
-
     } catch (error) {
        toast({
         variant: 'destructive',
@@ -159,9 +157,9 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
         description: `Hubo un problema al guardar los datos. Revisa la consola para más detalles.`,
       });
       console.error(error);
-      setProgress(0);
-      setIsLoading(false);
-    } 
+    } finally {
+        await refreshData();
+    }
   };
 
   const handleDeleteAllData = async () => {
