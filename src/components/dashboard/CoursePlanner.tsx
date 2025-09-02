@@ -21,6 +21,14 @@ export function CoursePlanner() {
 
   const totalCourses = useMemo(() => curriculum.flatMap(t => t.courses).length, []);
 
+  const handleTargetTermChange = (termName: string) => {
+    setTargetTermName(termName);
+    // Reset graduation candidate status if term is not the last one
+    if (termName !== 'Sexto Tetramestre') {
+      setIsGraduationCandidate(false);
+    }
+  };
+
   const handlePendingCourseToggle = (courseId: string) => {
     setPendingCourses(prev => {
       const newSet = new Set(prev);
@@ -133,7 +141,7 @@ export function CoursePlanner() {
             <CardContent className="space-y-6">
               <div>
                 <Label htmlFor="term-select" className="text-base font-semibold">¿A qué tetramestre ingresa el alumno?</Label>
-                <Select value={targetTermName} onValueChange={setTargetTermName}>
+                <Select value={targetTermName} onValueChange={handleTargetTermChange}>
                   <SelectTrigger id="term-select" className="mt-2">
                     <SelectValue placeholder="Selecciona un tetramestre..." />
                   </SelectTrigger>
@@ -157,6 +165,7 @@ export function CoursePlanner() {
                 </Label>
               </div>
               
+              {targetTermName === 'Sexto Tetramestre' && (
                 <div className="flex items-center space-x-3">
                     <Checkbox
                     id="graduationCandidate"
@@ -166,7 +175,8 @@ export function CoursePlanner() {
                     <Label htmlFor="graduationCandidate" className="font-semibold">
                      ¿Es candidato a graduarse y debe 2 o menos materias?
                     </Label>
-              </div>
+                </div>
+              )}
 
             </CardContent>
           </Card>
