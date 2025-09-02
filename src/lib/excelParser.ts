@@ -39,14 +39,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        if (rows.length < 2) {
-          resolve(null);
-          return;
-        }
-
-        const header = rows[0].map(h => String(h).trim());
-        const json = XLSX.utils.sheet_to_json<any>(worksheet, { header: header, range: 1 });
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
         if (json.length === 0) {
           resolve(null);
@@ -57,8 +50,14 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         const activityRegex = /^A\d+$/;
 
         json.forEach(row => {
-          const studentId = String(row[COLUMNS.ID]);
-          const studentName = String(row[COLUMNS.NAME] || 'N/A').trim();
+          // Limpia los nombres de las columnas de la fila actual
+          const cleanedRow: {[key: string]: any} = {};
+          for (const key in row) {
+              cleanedRow[key.trim()] = row[key];
+          }
+
+          const studentId = String(cleanedRow[COLUMNS.ID]);
+          const studentName = String(cleanedRow[COLUMNS.NAME] || 'N/A').trim();
           
           if (!studentId || studentId === 'undefined') return;
 
@@ -66,33 +65,33 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             studentData[studentId] = {
               id: studentId,
               name: studentName,
-              leader: String(row[COLUMNS.LEADER] || 'N/A').trim(),
-              tutor: String(row[COLUMNS.TUTOR] || 'N/A').trim(),
-              isGraduationCandidate: String(row[COLUMNS.IS_GRADUATION_CANDIDATE]).toLowerCase() === 'sí',
+              leader: String(cleanedRow[COLUMNS.LEADER] || 'N/A').trim(),
+              tutor: String(cleanedRow[COLUMNS.TUTOR] || 'N/A').trim(),
+              isGraduationCandidate: String(cleanedRow[COLUMNS.IS_GRADUATION_CANDIDATE]).toLowerCase() === 'sí',
               subjects: [],
             };
           }
           
           const activities: Record<string, number | string> = {};
-          for(const key in row) {
+          for(const key in cleanedRow) {
               if(activityRegex.test(key)) {
-                  activities[key] = row[key];
+                  activities[key] = cleanedRow[key];
               }
           }
           
           const subject: Subject = {
-            id: String(row[COLUMNS.SUBJECT_ID]),
-            name: String(row[COLUMNS.SUBJECT_NAME] || 'N/A').trim(),
-            group: String(row[COLUMNS.SUBJECT_GROUP] || 'N/A').trim(),
-            professorName: String(row[COLUMNS.PROFESSOR_NAME] || 'N/A').trim(),
-            statusDescription: String(row[COLUMNS.SUBJECT_STATUS_DESCRIPTION] || 'N/A').trim(),
-            absences: parseInt(String(row[COLUMNS.ABSENCES]), 10) || 0,
-            absenceLimit: parseInt(String(row[COLUMNS.ABSENCE_LIMIT]), 10) || 1,
-            missedAssignments: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENTS]), 10) || 0,
-            missedAssignmentLimit: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENT_LIMIT]), 10) || 1,
-            grade: parseFloat(String(row[COLUMNS.GRADE])) || 0,
-            finalGrade: parseFloat(String(row[COLUMNS.FINAL_GRADE])) || null,
-            finalGradeReason: String(row[COLUMNS.FINAL_GRADE_REASON] || '').trim() || null,
+            id: String(cleanedRow[COLUMNS.SUBJECT_ID]),
+            name: String(cleanedRow[COLUMNS.SUBJECT_NAME] || 'N/A').trim(),
+            group: String(cleanedRow[COLUMNS.SUBJECT_GROUP] || 'N/A').trim(),
+            professorName: String(cleanedRow[COLUMNS.PROFESSOR_NAME] || 'N/A').trim(),
+            statusDescription: String(cleanedRow[COLUMNS.SUBJECT_STATUS_DESCRIPTION] || 'N/A').trim(),
+            absences: parseInt(String(cleanedRow[COLUMNS.ABSENCES]), 10) || 0,
+            absenceLimit: parseInt(String(cleanedRow[COLUMNS.ABSENCE_LIMIT]), 10) || 1,
+            missedAssignments: parseInt(String(cleanedRow[COLUMNS.MISSED_ASSIGNMENTS]), 10) || 0,
+            missedAssignmentLimit: parseInt(String(cleanedRow[COLUMNS.MISSED_ASSIGNMENT_LIMIT]), 10) || 1,
+            grade: parseFloat(String(cleanedRow[COLUMNS.GRADE])) || 0,
+            finalGrade: parseFloat(String(cleanedRow[COLUMNS.FINAL_GRADE])) || null,
+            finalGradeReason: String(cleanedRow[COLUMNS.FINAL_GRADE_REASON] || '').trim() || null,
             activities: activities
           };
 
