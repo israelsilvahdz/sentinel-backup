@@ -38,19 +38,21 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
   // 1. Pre-fetch all existing student and subject data in memory to avoid reads inside the loop.
   const existingStudents = new Map<string, Student>();
   const studentsSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
-  studentsSnapshot.docs.forEach(doc => {
+  studentsSnapshot.forEach(doc => {
     existingStudents.set(doc.id, doc.data() as Student);
   });
 
   const existingSubjects = new Map<string, Subject>(); // Key: studentId-subjectId
-  const subjectsSnapshot = await getDocs(collectionGroup(db, 'materias'));
-  subjectsSnapshot.docs.forEach(doc => {
-    const subject = doc.data() as Subject;
-    const studentId = doc.ref.parent.parent?.id;
-    if (studentId && subject.id) {
-       existingSubjects.set(`${studentId}-${subject.id}`, subject);
-    }
-  });
+  // Instead of a potentially unsafe collectionGroup query, fetch subjects per existing student.
+  for (const [studentId] of existingStudents.entries()) {
+      const subjectsSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION, studentId, 'materias'));
+      subjectsSnapshot.forEach(doc => {
+          const subject = doc.data() as Subject;
+          if (subject.id) {
+              existingSubjects.set(`${studentId}-${subject.id}`, subject);
+          }
+      });
+  }
 
 
   // 2. Iterate through incoming data and prepare batch writes.
