@@ -39,7 +39,7 @@ function processRiskData(students: Student[], riskType: 'absences' | 'missedAssi
             riskCount,
             totalCount,
         }))
-        .filter(d => d.riskCount > 0)
+        .filter(d => d.totalCount >= 10 && d.riskCount > 0) // <-- AQUÍ EL CAMBIO
         .sort((a, b) => b.percentage - a.percentage)
         .slice(0, 5); // Top 5
 }
@@ -112,7 +112,7 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
     <Card className="lg:col-span-1">
       <CardHeader>
         <CardTitle>Focos de Riesgo por Materia</CardTitle>
-        <CardDescription>Top 5 materias con mayor % de alumnos en riesgo. Haz clic en una barra para ver los detalles.</CardDescription>
+        <CardDescription>Top 5 materias (con 10+ alumnos) con mayor % de alumnos en riesgo. Haz clic en una barra para ver los detalles.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {hasData ? (
@@ -132,7 +132,7 @@ export function RiskFocusChart({ students }: RiskFocusChartProps) {
           </>
         ) : (
             <div className="flex items-center justify-center h-[300px]">
-                <p className="text-muted-foreground">No hay datos de riesgo para mostrar.</p>
+                <p className="text-muted-foreground">No hay datos de riesgo para mostrar (materias con 10+ alumnos).</p>
             </div>
         )}
       </CardContent>
