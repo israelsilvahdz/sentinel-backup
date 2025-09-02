@@ -210,6 +210,8 @@ export async function getUploadHistory(): Promise<UploadHistory[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => {
       const data = doc.data();
+      // Firestore Timestamps must be converted to a serializable format (like an ISO string)
+      // before being sent to the client.
       return {
           id: doc.id,
           fileName: data.fileName,
