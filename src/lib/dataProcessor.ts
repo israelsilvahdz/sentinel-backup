@@ -123,6 +123,30 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
 
 
 /**
+ * Criterio: Alumnos con derecho a examen extraordinario.
+ * Calificación final entre 50 y 69 y sin "DA" (Deshonestidad Académica).
+ */
+export function findExtraordinaryCases(students: Student[]): Student[] {
+  return students.filter(student => {
+    if (!student.subjectSummaries) return false;
+
+    // Primero, verificar que el alumno no tenga ninguna materia con "DA".
+    const hasAcademicDishonesty = student.subjects?.some(s => s.finalGradeReason?.toUpperCase() === 'DA');
+    if (hasAcademicDishonesty) {
+      return false;
+    }
+
+    // Luego, verificar si tiene al menos una materia con calificación para extraordinario.
+    const isEligible = student.subjectSummaries.some(subject => {
+      if (subject.finalGrade === null) return false;
+      return subject.finalGrade >= 50 && subject.finalGrade <= 69;
+    });
+
+    return isEligible;
+  });
+}
+
+/**
  * Criterio: Alumnos con riesgo > 0% en una materia y categoría específicas.
  */
 export function findRiskCasesBySubject(students: Student[], subjectName: string, riskType: 'absences' | 'missedAssignments'): Student[] {

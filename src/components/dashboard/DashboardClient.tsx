@@ -28,10 +28,10 @@ import { Progress } from '@/components/ui/progress';
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
+import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
-export type CaseType = 'lost' | 'urgent' | 'observation';
+export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary';
 export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner'; // Añadir nueva vista
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
@@ -332,6 +332,7 @@ export function DashboardClient() {
     
     if (caseType) {
         if(caseType === 'lost') return findLostCases(students);
+        if(caseType === 'extraordinary') return findExtraordinaryCases(students);
         const lostCaseIds = new Set(findLostCases(students).map(s => s.id));
         if (caseType === 'urgent') return findUrgentCases(students, lostCaseIds);
         if (caseType === 'observation') {

@@ -6,22 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { KpiCard } from './KpiCard';
 import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle } from 'lucide-react';
+import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award } from 'lucide-react';
 
-import { calculateKpis, findLostCases, findUrgentCases, findObservationCases } from '@/lib/dataProcessor';
+import { calculateKpis, findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
 import type { Student } from '@/types/student';
 
 export function Dashboard() {
   const { filteredStudents, isLoading, hasData, setActiveView, setCaseType } = useDashboardFilters();
 
-  const { kpis, lostCases, urgentCases, observationCases } = useMemo(() => {
+  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases } = useMemo(() => {
     if (isLoading || !hasData) {
         return { 
             kpis: { totalStudents: 0 },
             lostCases: [],
             urgentCases: [],
-            observationCases: []
+            observationCases: [],
+            extraordinaryCases: []
         };
     }
     const lc = findLostCases(filteredStudents);
@@ -33,15 +34,18 @@ export function Dashboard() {
     const combinedExclusions = new Set([...lostCaseIds, ...urgentCaseIds]);
     const oc = findObservationCases(filteredStudents, combinedExclusions);
 
+    const extraCases = findExtraordinaryCases(filteredStudents);
+
     return {
       kpis: { totalStudents: filteredStudents.length },
       lostCases: lc,
       urgentCases: uc,
       observationCases: oc,
+      extraordinaryCases: extraCases,
     };
   }, [filteredStudents, isLoading, hasData]);
 
-  const handleCaseClick = (caseType: 'lost' | 'urgent' | 'observation' | null) => {
+  const handleCaseClick = (caseType: 'lost' | 'urgent' | 'observation' | 'extraordinary' | null) => {
     setCaseType(caseType);
     setActiveView('students');
   };
@@ -82,8 +86,8 @@ export function Dashboard() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <KpiCard title="Casos Perdidos" value={lostCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('lost')} />
                 <KpiCard title="Casos Urgentes" value={urgentCases.length} icon={BellRing} color="yellow" onClick={() => handleCaseClick('urgent')} />
-                <KpiCard title="Alumnos en Observación" value={observationCases.length} icon={Users} color="blue" onClick={() => handleCaseClick('observation')} />
-                <KpiCard title="Total de Alumnos" value={kpis.totalStudents} icon={UserCheck} />
+                <KpiCard title="En Observación" value={observationCases.length} icon={Users} color="blue" onClick={() => handleCaseClick('observation')} />
+                <KpiCard title="A Extraordinario" value={extraordinaryCases.length} icon={Award} onClick={() => handleCaseClick('extraordinary')} />
             </div>
 
             {filteredStudents.length > 0 ? (
