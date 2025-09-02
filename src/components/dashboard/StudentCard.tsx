@@ -59,8 +59,8 @@ function AiSummary({ student, changes }: { student: Student, changes: Change[] }
       setIsLoading(false);
     }
 
-    // fetchChangesAndSummarize(); We will call this manually for now
-  }, [student, getStudentChanges]);
+    // fetchChangesAndSummarize(); // We will call this manually for now to prevent permission errors on load
+  }, [student, getStudentChanges, changes]);
 
 
   if(isLoading) {
@@ -89,7 +89,7 @@ function OverallRiskBadge({ student, subjects }: { student: Student, subjects: S
     const riskConfig = config[overallRisk];
     if (!riskConfig) return null;
 
-    return <Badge className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
+    return <Badge variant="outline" className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
 }
 
 function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
@@ -124,7 +124,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
     return (
         <div className="overflow-x-auto">
-             {isOpen && <OverallRiskBadge student={student} subjects={subjects} />}
+            {isOpen && <OverallRiskBadge student={student} subjects={subjects} />}
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -181,7 +181,7 @@ export function StudentCard({ student, changes }: StudentCardProps) {
                 </CollapsibleTrigger>
             </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-0">
             <AiSummary student={student} changes={changes} />
             <CollapsibleContent>
               <StudentSubjects student={student} isOpen={isOpen} />
