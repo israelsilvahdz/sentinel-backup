@@ -10,8 +10,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ArrowRight, Info } from 'lucide-react';
+import { ArrowRight, Info, BookOpen } from 'lucide-react';
 import { curriculum, type CurriculumCourse, type CurriculumTerm } from '@/lib/curriculum';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export function CoursePlanner() {
   const [targetTermName, setTargetTermName] = useState<string>('');
@@ -62,13 +63,13 @@ export function CoursePlanner() {
     return approvedCourses.has(prerequisite);
   };
 
-  const { recommendedLoad, remainingCourses, availableCoursesCount } = useMemo(() => {
+  const { recommendedLoad, remainingCourses, availableButNotRecommended } = useMemo(() => {
     const allCourseIds = new Set(curriculum.flatMap(t => t.courses.map(c => c.name)));
     approvedCourses.forEach(course => allCourseIds.delete(course));
     const remaining = allCourseIds.size;
 
     if (targetTermIndex === -1) {
-      return { recommendedLoad: [], remainingCourses: remaining, availableCoursesCount: 0 };
+      return { recommendedLoad: [], remainingCourses: remaining, availableButNotRecommended: [] };
     }
 
     // 1. Identify all truly available courses for this student
@@ -77,8 +78,6 @@ export function CoursePlanner() {
         !approvedCourses.has(course.name) && // Not already approved
         isPrerequisiteApproved(course.prerequisite) // Prerequisite is met
       );
-
-    const allAvailableCount = allPossibleCourses.length;
     
     // 2. Build the recommended load, starting with pending courses
     let load: CurriculumCourse[] = allPossibleCourses.filter(c => pendingCourses.has(c.name));
@@ -96,7 +95,6 @@ export function CoursePlanner() {
       const bIsPrereq = futurePrerequisites.has(b.name);
       if (aIsPrereq && !bIsPrereq) return -1;
       if (!aIsPrereq && bIsPrereq) return 1;
-      // Optional: Prioritize by term, could be added here
       return 0;
     });
 
@@ -110,10 +108,14 @@ export function CoursePlanner() {
         }
         i++;
     }
+    
+    // 6. Determine which available courses were not recommended
+    const recommendedSet = new Set(load.map(c => c.name));
+    const notRecommended = allPossibleCourses.filter(c => !recommendedSet.has(c.name));
 
-    return { recommendedLoad: load, remainingCourses: remaining, availableCoursesCount: allAvailableCount };
+    return { recommendedLoad: load, remainingCourses: remaining, availableButNotRecommended: notRecommended };
 
-  }, [approvedCourses, pendingCourses, targetTermIndex, isGraduationCandidate, previousTerms, isPrerequisiteApproved]);
+  }, [approvedCourses, pendingCourses, targetTermIndex, isGraduationCandidate, isPrerequisiteApproved]);
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -266,13 +268,44 @@ export function CoursePlanner() {
                     </AlertDescription>
                  </Alert>
               )}
-               {availableCoursesCount > recommendedLoad.length && (
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Se encontraron {availableCoursesCount - recommendedLoad.length} materias disponibles adicionales que no se incluyeron en la carga recomendada.
-                  </p>
-               )}
             </CardContent>
           </Card>
+          
+          {availableButNotRecommended.length > 0 && (
+             <Card>
+                <Collapsible>
+                    <CollapsibleTrigger className="w-full">
+                        <CardHeader>
+                           <div className="flex justify-between items-center">
+                             <div>
+                                <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
+                                <CardDescription className='text-left'>Materias que no se incluyeron en la carga.</CardDescription>
+                             </div>
+                              <Button variant="ghost" size="sm" className="w-9 p-0">
+                                <BookOpen className="h-4 w-4" />
+                                <span className="sr-only">Toggle</span>
+                            </Button>
+                           </div>
+                        </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Estas materias cumplían los prerrequisitos pero no se incluyeron en la recomendación para dar prioridad a las pendientes o porque se alcanzó el límite de carga académica.
+                            </p>
+                             <ul className="space-y-2">
+                                {availableButNotRecommended.map(course => (
+                                    <li key={course.name} className="text-sm p-2 bg-muted/50 rounded-md">
+                                    {course.name}
+                                    </li>
+                                ))}
+                            </ul>
+                        </CardContent>
+                    </CollapsibleContent>
+                </Collapsible>
+            </Card>
+          )}
+
         </div>
       </div>
     </div>
