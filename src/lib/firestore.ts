@@ -55,13 +55,27 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
       }
       
       const changesToWrite: Change[] = [];
-      const studentInfo: Omit<Student, 'subjects' | 'subjectSummaries'> = {
+      
+      const subjectSummaries: SubjectSummary[] = (incomingStudent.subjects || []).map(s => ({
+          id: s.id,
+          name: s.name,
+          absences: s.absences,
+          absenceLimit: s.absenceLimit,
+          missedAssignments: s.missedAssignments,
+          missedAssignmentLimit: s.missedAssignmentLimit,
+          grade: s.grade,
+          finalGrade: s.finalGrade,
+      }));
+      
+      const studentInfo: Student = {
         id: incomingStudent.id,
         name: incomingStudent.name,
         leader: incomingStudent.leader,
         tutor: incomingStudent.tutor,
         isGraduationCandidate: incomingStudent.isGraduationCandidate,
+        subjectSummaries: subjectSummaries, // Store denormalized summaries
       };
+
 
       if (existingStudentData) {
         transaction.update(studentDocRef, studentInfo);
@@ -130,36 +144,11 @@ export async function processAndSaveData(studentData: StudentData, fileName: str
 }
 
 /**
- * Gets all students and a summary of their subjects for performance.
+ * Gets all students and their subject summaries. This is now efficient.
  */
 export async function getAllStudents(): Promise<Student[]> {
     const studentsSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
-    
-    const students: Student[] = await Promise.all(
-        studentsSnapshot.docs.map(async (studentDoc) => {
-            const student = studentDoc.data() as Student;
-            const subjectsRef = collection(db, ALUMNOS_COLLECTION, student.id, 'materias');
-            const subjectsSnapshot = await getDocs(subjectsRef);
-            
-            student.subjectSummaries = subjectsSnapshot.docs.map(doc => {
-                const subjectData = doc.data();
-                return {
-                    id: doc.id,
-                    name: subjectData.name,
-                    absences: subjectData.absences,
-                    absenceLimit: subjectData.absenceLimit,
-                    missedAssignments: subjectData.missedAssignments,
-                    missedAssignmentLimit: subjectData.missedAssignmentLimit,
-                    grade: subjectData.grade,
-                    finalGrade: subjectData.finalGrade,
-                } as SubjectSummary;
-            });
-
-            return student;
-        })
-    );
-    
-    return students;
+    return studentsSnapshot.docs.map(doc => doc.data() as Student);
 }
 
 
