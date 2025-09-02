@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -25,10 +24,9 @@ import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, History } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
-import type { Student, Change, Subject, UploadHistory } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory, getUploadHistory } from '@/app/actions/firestoreActions';
 import { findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
@@ -98,9 +96,10 @@ function formatDateFromCustomFilename(filename: string): string {
 export function DashboardClient() {
   const { toast } = useToast();
   const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false); // For file uploads/deletes
+  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
@@ -135,32 +134,51 @@ export function DashboardClient() {
     setCaseType(null); // Clear other filters
   };
 
-  
-  const refreshData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-        const [students, history] = await Promise.all([
-          getAllStudents(),
-          getUploadHistory()
-        ]);
-        setAllStudents(students);
-        setUploadHistory(history);
-    } catch(e) {
-        console.error(e);
-        toast({
-            variant: 'destructive',
-            title: 'Error de Carga',
-            description: 'No se pudieron recargar los datos. Revisa la consola para más detalles.',
-        });
-    } finally {
-        setIsLoading(false);
-    }
-  }, [toast]);
+  const processData = (studentData: StudentData) => {
+      const currentStudents = [...allStudents];
+      const newHistory: Record<string, Change[]> = { ...studentHistory };
+      let changesCount = 0;
 
-  useEffect(() => {
-    refreshData();
-  }, [refreshData]);
+      const newStudents = Object.values(studentData).map(incomingStudent => {
+          const existingStudent = currentStudents.find(s => s.id === incomingStudent.id);
+          
+          if (existingStudent?.subjects && incomingStudent.subjects) {
+              for (const incomingSubject of incomingStudent.subjects) {
+                  const existingSubject = existingStudent.subjects.find(s => s.id === incomingSubject.id);
+                  if (existingSubject) {
+                      const fieldsToCompare: (keyof Subject)[] = ['absences', 'missedAssignments', 'grade', 'finalGrade', 'statusDescription'];
+                      fieldsToCompare.forEach(field => {
+                          if (existingSubject[field] !== incomingSubject[field]) {
+                              if (!newHistory[incomingStudent.id]) newHistory[incomingStudent.id] = [];
+                              newHistory[incomingStudent.id].push({
+                                  date: new Date().toISOString(),
+                                  studentId: incomingStudent.id,
+                                  subjectId: incomingSubject.id,
+                                  fieldName: field,
+                                  oldValue: existingSubject[field],
+                                  newValue: incomingSubject[field],
+                              });
+                              changesCount++;
+                          }
+                      });
+                  }
+              }
+          }
+          
+          return {
+              ...incomingStudent,
+              subjectSummaries: (incomingStudent.subjects || []).map(s => ({
+                  id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+                  missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+                  grade: s.grade, finalGrade: s.finalGrade
+              })),
+          };
+      });
 
+      setAllStudents(newStudents);
+      setStudentHistory(newHistory);
+      return { processed: newStudents.length, changes: changesCount };
+  };
 
   const handleFileUpload = async (file: File) => {
     setIsProcessing(true);
@@ -172,7 +190,7 @@ export function DashboardClient() {
         toast({
           variant: 'destructive',
           title: 'Error de Formato',
-          description: 'El archivo Excel no tiene el formato esperado, está vacío o no se encontraron alumnos. Revise la consola para más detalles.',
+          description: 'El archivo Excel no tiene el formato esperado o está vacío.',
         });
         setIsProcessing(false);
         setProgress(0);
@@ -180,8 +198,10 @@ export function DashboardClient() {
       }
       
       setProgress(60);
-      const { processed, changes } = await processAndSaveData(data, file.name);
+      const { processed, changes } = processData(data);
       setProgress(90);
+
+      setUploadHistory(prev => [{ id: Date.now().toString(), fileName: file.name, uploadedAt: new Date().toISOString() }, ...prev].slice(0, 10));
 
       toast({
         title: 'Éxito',
@@ -192,11 +212,10 @@ export function DashboardClient() {
        toast({
         variant: 'destructive',
         title: 'Error al procesar',
-        description: `Hubo un problema al guardar los datos. Revisa la consola para más detalles.`,
+        description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
       });
       console.error(error);
     } finally {
-        await refreshData();
         setTimeout(() => {
           setIsProcessing(false);
           setProgress(0);
@@ -210,28 +229,18 @@ export function DashboardClient() {
     }
     setIsProcessing(true);
     setProgress(20);
-    try {
-      await deleteAllData();
-      setAllStudents([]);
-      setUploadHistory([]);
-      setProgress(100);
-      toast({
+    setAllStudents([]);
+    setUploadHistory([]);
+    setStudentHistory({});
+    setProgress(100);
+    toast({
         title: 'Datos Eliminados',
-        description: 'Todos los datos han sido borrados de Firestore.',
-      });
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error al Eliminar',
-        description: 'No se pudieron borrar los datos. Revisa los permisos de Firestore.',
-      });
-      console.error(error);
-    } finally {
-      setTimeout(() => {
-        setIsProcessing(false);
-        setProgress(0);
-      }, 500);
-    }
+        description: 'Todos los datos en memoria han sido borrados.',
+    });
+    setTimeout(() => {
+      setIsProcessing(false);
+      setProgress(0);
+    }, 500);
   };
   
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
@@ -246,30 +255,16 @@ export function DashboardClient() {
   const filteredStudents = useMemo(() => {
     let students = allStudents;
 
-    // Apply main filter (leader, tutor, subject)
     if (selectedValue) {
-      if (filterType === 'leader') {
-        students = students.filter(s => s.leader === selectedValue);
-      }
-      if (filterType === 'tutor') {
-        students = students.filter(s => s.tutor === selectedValue);
-      }
-      if (filterType === 'subject') {
-        students = students.filter(s => s.subjectSummaries?.some(sub => sub.name === selectedValue));
-      }
+      if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
+      if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
+      if (filterType === 'subject') students = students.filter(s => s.subjectSummaries?.some(sub => sub.name === selectedValue));
     }
     
-    // Apply case filter (lost, urgent, observation)
     if (caseType) {
-        if(caseType === 'lost') {
-            return findLostCases(students);
-        }
+        if(caseType === 'lost') return findLostCases(students);
         const lostCaseIds = new Set(findLostCases(students).map(s => s.id));
-        
-        if (caseType === 'urgent') {
-            return findUrgentCases(students, lostCaseIds);
-        }
-        
+        if (caseType === 'urgent') return findUrgentCases(students, lostCaseIds);
         if (caseType === 'observation') {
              const urgentCaseIds = new Set(findUrgentCases(students, lostCaseIds).map(s => s.id));
              const combinedExclusions = new Set([...lostCaseIds, ...urgentCaseIds]);
@@ -285,59 +280,35 @@ export function DashboardClient() {
   }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
-    try {
-      return await getStudentSubjects(studentId);
-    } catch(e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar las materias del alumno.' });
-      return [];
-    }
+    const student = allStudents.find(s => s.id === studentId);
+    return student?.subjects || [];
   }
   
   const getStudentChangesWrapper = async (studentId: string): Promise<Change[]> => {
-     try {
-      return await getStudentHistory(studentId);
-    } catch(e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo cargar el historial del alumno.' });
-      return [];
-    }
+     return studentHistory[studentId] || [];
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents,
-    allStudents,
-    isLoading: isLoading || isProcessing, // Combine loading states
+    filteredStudents, allStudents,
+    isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
-    leaders,
-    tutors,
-    subjects,
-    filterType,
-    setFilterType: handleSetFilterType,
-    selectedValue,
-    setSelectedValue,
-    caseType,
-    setCaseType: handleSetCaseType,
-    subjectRiskFilter,
-    setSubjectRiskFilter: handleSetSubjectRiskFilter,
+    leaders, tutors, subjects,
+    filterType, setFilterType: handleSetFilterType,
+    selectedValue, setSelectedValue,
+    caseType, setCaseType: handleSetCaseType,
+    subjectRiskFilter, setSubjectRiskFilter: handleSetSubjectRiskFilter,
     loadStudentSubjects: loadStudentSubjectsWrapper,
     getStudentChanges: getStudentChangesWrapper,
-    activeView,
-    setActiveView: handleSetActiveView,
-    selectedStudentId,
-    setSelectedStudentId
+    activeView, setActiveView: handleSetActiveView,
+    selectedStudentId, setSelectedStudentId
   };
 
   const renderActiveView = () => {
     switch (activeView) {
-        case 'dashboard':
-            return <Dashboard />;
-        case 'students':
-            return <StudentPanel />;
-        case 'history':
-             return <StudentHistoryPanel />;
-        default:
-            return <Dashboard />;
+        case 'dashboard': return <Dashboard />;
+        case 'students': return <StudentPanel />;
+        case 'history': return <StudentHistoryPanel />;
+        default: return <Dashboard />;
     }
   }
 
@@ -352,21 +323,13 @@ export function DashboardClient() {
             <SidebarGroup>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    tooltip="Dashboard" 
-                    isActive={activeView === 'dashboard'} 
-                    onClick={() => handleSetActiveView('dashboard')}
-                  >
+                  <SidebarMenuButton tooltip="Dashboard" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
                     <LayoutDashboard />
                     <span>Dashboard</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    tooltip="Panel de Alumnos" 
-                    isActive={activeView === 'students'} 
-                    onClick={() => handleSetActiveView('students')}
-                  >
+                  <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
                     <Users />
                     <span>Panel de Alumnos</span>
                   </SidebarMenuButton>
@@ -402,7 +365,7 @@ export function DashboardClient() {
                  <div className="flex-1">
                     <h1 className="font-semibold text-lg">Academic Sentinel</h1>
                  </div>
-                 <Button variant="outline" size="sm" onClick={refreshData} disabled={isLoading || isProcessing}>
+                 <Button variant="outline" size="sm" onClick={() => window.location.reload()} disabled={isLoading || isProcessing}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Recargar
                  </Button>
@@ -422,5 +385,3 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
-
-    
