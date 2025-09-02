@@ -56,8 +56,6 @@ export function getStudentOverallRisk(student: Student, subjects: Subject[]) {
 
 /**
  * Calcula los KPIs (Key Performance Indicators) para una lista de estudiantes.
- * Nota: Esta función es ineficiente con el nuevo modelo, ya que requiere que las materias
- * de todos los alumnos estén pre-cargadas. Debe ser optimizada en el futuro.
  * @param students Array de estudiantes con sus materias cargadas.
  * @returns El conteo de alumnos en riesgo crítico y en observación.
  */
@@ -66,12 +64,14 @@ export function calculateKpis(students: Student[]) {
     let observationCount = 0;
 
     students.forEach(student => {
-        // Asumimos que las materias ya están cargadas en cada objeto student
-        const { hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, student.subjects || []);
-        if (hasHighRisk) {
-            criticalRiskCount++;
-        } else if (hasMediumRisk) {
-            observationCount++;
+        // Asegurarse que las materias existan antes de procesar
+        if (student.subjects && student.subjects.length > 0) {
+          const { hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, student.subjects);
+          if (hasHighRisk) {
+              criticalRiskCount++;
+          } else if (hasMediumRisk) {
+              observationCount++;
+          }
         }
     });
 

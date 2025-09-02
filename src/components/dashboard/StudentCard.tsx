@@ -5,10 +5,9 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Bot, ChevronDown, ChevronUp } from 'lucide-react';
-import { type Student, type Change, type Subject } from "@/types/student";
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { type Student, type Subject } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
-import { summarizeStudentChanges } from '@/ai/flows/summarize-student-changes';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '../ui/button';
@@ -32,59 +31,6 @@ function RiskCell({ value, limit }: { value: number; limit: number; }) {
         {value} / {limit}
     </div>
   );
-}
-
-function AiSummary({ student, isOpen }: { student: Student, isOpen: boolean }) {
-  const [summary, setSummary] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { getStudentChanges } = useDashboardFilters();
-  const [hasBeenCalled, setHasBeenCalled] = useState(false);
-
-  useEffect(() => {
-    async function fetchChangesAndSummarize() {
-      if (!student.id || !isOpen || hasBeenCalled) return;
-      
-      setIsLoading(true);
-      setHasBeenCalled(true);
-      
-      const studentChanges = await getStudentChanges(student.id);
-
-      if (studentChanges && studentChanges.length > 0) {
-        try {
-            const summaryResponse = await summarizeStudentChanges({
-                studentId: student.id,
-                studentName: student.name,
-                changes: studentChanges.map(c => `Campo '${c.fieldName}' cambió de '${c.oldValue}' a '${c.newValue}' el ${new Date(c.date).toLocaleDateString()}`),
-            });
-            setSummary(summaryResponse.summary);
-        } catch(e) {
-            console.error("AI Summary failed", e);
-            setSummary("No se pudo generar el resumen.");
-        }
-      } else {
-        setSummary("No se han detectado cambios desde el último reporte.");
-      }
-      
-      setIsLoading(false);
-    }
-
-    fetchChangesAndSummarize();
-  }, [student.id, student.name, getStudentChanges, isOpen, hasBeenCalled]);
-
-
-  if(isLoading) {
-    return <div className="p-4"><Skeleton className="h-10 w-full" /></div>;
-  }
-  
-  // No renderizar si no está abierto, no hay resumen y no está cargando
-  if (!isOpen && !summary && !isLoading) return null;
-
-  return (
-    <div className="flex items-start gap-2 text-sm text-muted-foreground bg-secondary/50 p-3 rounded-md">
-      <Bot className="h-5 w-5 shrink-0 mt-0.5 text-accent"/>
-      <p>{summary}</p>
-    </div>
-  )
 }
 
 function OverallRiskBadge({ student, subjects }: { student: Student, subjects: Subject[] }) {
@@ -134,7 +80,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     }
 
     return (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto px-6 pb-4">
             {isOpen && <OverallRiskBadge student={student} subjects={subjects} />}
             <Table>
                 <TableHeader>
@@ -176,7 +122,7 @@ export function StudentCard({ student }: StudentCardProps) {
   return (
     <Card>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader>
+        <CardHeader className="cursor-pointer">
             <div className="flex justify-between items-start">
                 <div>
                     <CardTitle className="flex items-center">
@@ -192,12 +138,9 @@ export function StudentCard({ student }: StudentCardProps) {
                 </CollapsibleTrigger>
             </div>
         </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-            <AiSummary student={student} isOpen={isOpen} />
-            <CollapsibleContent>
-              <StudentSubjects student={student} isOpen={isOpen} />
-            </CollapsibleContent>
-        </CardContent>
+        <CollapsibleContent>
+          <StudentSubjects student={student} isOpen={isOpen} />
+        </CollapsibleContent>
       </Collapsible>
     </Card>
   );

@@ -13,11 +13,14 @@ interface RiskDistributionChartProps {
 
 export function RiskDistributionChart({ students }: RiskDistributionChartProps) {
   const data = useMemo(() => {
+    // Si no hay estudiantes o no tienen materias, no mostrar datos.
+    if (!students || students.length === 0 || !students.every(s => s.subjects)) {
+        return [];
+    }
+
     let absenceRisks = { low: 0, medium: 0, high: 0 };
     let assignmentRisks = { low: 0, medium: 0, high: 0 };
 
-    // Esta lógica es ineficiente con el nuevo modelo.
-    // Requiere que las materias de cada alumno estén pre-cargadas.
     students.forEach(student => {
       let maxAbsenceLevel: RiskLevel = 'low';
       let maxAssignmentLevel: RiskLevel = 'low';

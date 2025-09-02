@@ -13,9 +13,12 @@ interface RiskMatrixChartProps {
 
 export function RiskMatrixChart({ students }: RiskMatrixChartProps) {
   const data = useMemo(() => {
+    // Si no hay estudiantes o no tienen materias, no mostrar datos.
+    if (!students || students.length === 0 || !students.every(s => s.subjects)) {
+        return [];
+    }
+
     return students.map(student => {
-      // Esta lógica es ineficiente con el nuevo modelo.
-      // Requiere que las materias de cada alumno estén pre-cargadas.
       const subjects = student.subjects || [];
       let totalAbsenceRisk = 0;
       let totalAssignmentRisk = 0;
