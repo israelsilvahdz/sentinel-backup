@@ -4,10 +4,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StudentCard } from './StudentCard';
-import { Users, Loader2 } from 'lucide-react';
+import { Users, Loader2, X } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { Button } from '../ui/button';
-import { X } from 'lucide-react';
 
 export function StudentPanel() {
   const { filteredStudents, hasData, isLoading, caseType, setCaseType } = useDashboardFilters();

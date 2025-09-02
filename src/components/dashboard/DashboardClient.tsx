@@ -32,7 +32,7 @@ import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, 
 import { findLostCases, findObservationCases, findUrgentCases } from '@/lib/dataProcessor';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
-type CaseType = 'lost' | 'urgent' | 'observation';
+export type CaseType = 'lost' | 'urgent' | 'observation';
 export type ActiveView = 'dashboard' | 'students' | 'history';
 
 interface DashboardContextType {
@@ -112,7 +112,9 @@ export function DashboardClient() {
 
   const handleSetActiveView = (view: ActiveView) => {
     setActiveView(view);
-    setCaseType(null); // Reset case type when changing view
+    if (view !== 'students') {
+      setCaseType(null); // Reset case type when navigating away from the student panel
+    }
   }
   
   const refreshData = useCallback(async () => {

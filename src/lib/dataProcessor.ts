@@ -11,7 +11,7 @@ export type CaseStatus = 'lost' | 'urgent' | 'observation' | 'ok';
  * @returns El nivel de riesgo ('low', 'medium', 'high') y el porcentaje de riesgo.
  */
 export function getRisk(value: number, limit: number): { risk: number; level: RiskLevel } {
-  if (limit === 0) return { risk: 0, level: 'low' };
+  if (limit <= 0) return { risk: value > 0 ? 1 : 0, level: value > 0 ? 'high' : 'low' };
   const percentage = value / limit;
   
   let level: RiskLevel;
@@ -98,13 +98,13 @@ export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): 
     return students.filter(student => {
         if (!student.subjectSummaries || lostCaseIds.has(student.id)) return false;
         
-        const highRiskSubjects = student.subjectSummaries.filter(subject => {
-            const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
-            const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
-            return absenceRisk.level === 'high' || assignmentRisk.level === 'high';
+        const highRiskSubjectsCount = student.subjectSummaries.filter(subject => {
+            const absenceLevel = getRisk(subject.absences, subject.absenceLimit).level;
+            const assignmentLevel = getRisk(subject.missedAssignments, subject.missedAssignmentLimit).level;
+            return absenceLevel === 'high' || assignmentLevel === 'high';
         }).length;
 
-        return highRiskSubjects >= 2;
+        return highRiskSubjectsCount >= 2;
     });
 }
 
