@@ -77,9 +77,9 @@ function formatDateFromFilename(filename: string): string {
 }
 
 
-export function DashboardClient({ initialStudents }: { initialStudents: Student[]}) {
+export function DashboardClient() {
   const { toast } = useToast();
-  const [allStudents, setAllStudents] = useState<Student[]>(initialStudents);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [progress, setProgress] = useState(0);
@@ -308,3 +308,5 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
     </DashboardContext.Provider>
   );
 }
+
+    

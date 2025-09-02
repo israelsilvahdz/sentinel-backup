@@ -4,7 +4,9 @@
 import { DashboardClient } from './DashboardClient';
 
 export function DashboardLayout() {
-  // We pass empty initial students because data will now be fetched client-side
-  // via server actions, ensuring security and proper permissions.
-  return <DashboardClient initialStudents={[]} />;
+  // We no longer pass initial students. Data is fetched entirely on the client
+  // via server actions to ensure it reflects the live database state.
+  return <DashboardClient />;
 }
+
+    
