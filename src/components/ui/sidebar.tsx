@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -23,7 +24,7 @@ const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH_ICON = "3.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContext = {
@@ -271,7 +272,7 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)}
+      className={cn("h-8 w-8", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -358,7 +359,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex items-center gap-2 p-2 h-14", className)}
       {...props}
     />
   )
@@ -421,7 +422,7 @@ const SidebarGroup = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="group"
-      className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
+      className={cn("relative flex w-full min-w-0 flex-col px-2", className)}
       {...props}
     />
   )
@@ -512,7 +513,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center gap-3 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-2 [&>span]:group-data-[collapsible=icon]:hidden [&>svg]:size-5 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -521,8 +522,8 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-8 text-sm",
-        sm: "h-7 text-xs",
+        default: "h-9 text-sm",
+        sm: "h-8 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
       },
     },
@@ -570,12 +571,9 @@ const SidebarMenuButton = React.forwardRef<
     if (!tooltip) {
       return button
     }
+    
+    const tooltipContent = typeof tooltip === 'string' ? { children: tooltip } : tooltip;
 
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
-    }
 
     return (
       <Tooltip>
@@ -583,8 +581,9 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
+          sideOffset={12}
           hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
+          {...tooltipContent}
         />
       </Tooltip>
     )

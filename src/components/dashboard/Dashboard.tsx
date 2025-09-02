@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard } from './KpiCard';
-import { RiskMatrixChart } from './RiskMatrixChart';
+import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
 import { AlertCircle, BarChart2, BellRing, Users, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -127,8 +127,8 @@ export function Dashboard() {
               </div>
 
               {filteredStudents.length > 0 ? (
-                  <div className="grid gap-8 md:grid-cols-2">
-                    <RiskMatrixChart students={studentsWithSubjects} />
+                  <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2">
+                    <RiskFocusChart students={studentsWithSubjects} />
                     <RiskDistributionChart students={studentsWithSubjects} />
                   </div>
               ) : (

@@ -262,21 +262,29 @@ export function DashboardClient() {
       <SidebarProvider>
         <Sidebar collapsible="icon">
           <SidebarHeader>
-            <h2 className="text-xl font-semibold">Controles</h2>
+             <SidebarTrigger className="ml-auto md:ml-0" />
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton isActive={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')}>
+                  <SidebarMenuButton 
+                    tooltip="Dashboard" 
+                    isActive={activeView === 'dashboard'} 
+                    onClick={() => setActiveView('dashboard')}
+                  >
                     <LayoutDashboard />
-                    Dashboard
+                    <span>Dashboard</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton isActive={activeView === 'students'} onClick={() => setActiveView('students')}>
+                  <SidebarMenuButton 
+                    tooltip="Panel de Alumnos" 
+                    isActive={activeView === 'students'} 
+                    onClick={() => setActiveView('students')}
+                  >
                     <Users />
-                    Panel de Alumnos
+                    <span>Panel de Alumnos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -287,11 +295,11 @@ export function DashboardClient() {
             </SidebarGroup>
             <SidebarSeparator />
             <SidebarGroup>
-              <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-2 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-2 flex items-center gap-2 group-data-[collapsible=icon]:hidden">
                 <CalendarClock size={16} /> Historial de Cargas
               </h3>
               {uploadHistory.length > 0 ? (
-                <ul className="space-y-1 px-2 text-sm">
+                <ul className="space-y-1 px-2 text-sm group-data-[collapsible=icon]:hidden">
                   {uploadHistory.map(upload => (
                     <li key={upload.id} className="text-muted-foreground">
                       {formatDateFromCustomFilename(upload.fileName)}
@@ -299,14 +307,14 @@ export function DashboardClient() {
                   ))}
                 </ul>
               ) : (
-                <p className="px-2 text-sm text-muted-foreground">No hay cargas anteriores.</p>
+                <p className="px-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">No hay cargas.</p>
               )}
             </SidebarGroup>
           </SidebarContent>
         </Sidebar>
         <SidebarInset>
             <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
-                 <SidebarTrigger />
+                 <SidebarTrigger className="md:hidden" />
                  <div className="flex-1">
                     <h1 className="font-semibold text-lg">Academic Sentinel</h1>
                  </div>
