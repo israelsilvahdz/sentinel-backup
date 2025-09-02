@@ -50,7 +50,7 @@ export const curriculum: CurriculumTerm[] = [
     name: 'Cuarto Tetramestre',
     courses: [
       { name: 'Matemáticas IV: modelos matemáticos', prerequisite: 'Matemáticas III: regularidad y repetición' },
-      { name: 'Materia y energía I', prerequisite: 'Matemáticas III: regularidad y repetición' },
+      { name: 'Materia y energía I', prerequisite: 'Matemáticas II: pensamiento matemático' },
       { name: 'Antropología', prerequisite: 'El ser humano en sociedad' },
       { name: 'Expresión Literaria' },
       { name: 'Optativa de lengua adicional al español IV', prerequisite: 'Optativa de lengua adicional al español III' },
