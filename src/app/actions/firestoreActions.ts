@@ -7,15 +7,16 @@ import {
   getStudentSubjects as getStudentSubjectsFS,
   getStudentHistory as getStudentHistoryFS,
   deleteAllData as deleteAllDataFS,
+  getUploadHistory as getUploadHistoryFS,
 } from '@/lib/firestore';
-import type { Student, Subject, Change, StudentData } from '@/types/student';
+import type { Student, Subject, Change, StudentData, UploadHistory } from '@/types/student';
 
 // This file contains server actions that wrap Firestore functions.
 // Client components will call these actions, ensuring that all Firestore
 // operations are executed securely on the server.
 
-export async function processAndSaveData(studentData: StudentData): Promise<{ processed: number, changes: number }> {
-  return processAndSaveDataFS(studentData);
+export async function processAndSaveData(studentData: StudentData, fileName: string): Promise<{ processed: number, changes: number }> {
+  return processAndSaveDataFS(studentData, fileName);
 }
 
 export async function getAllStudents(): Promise<Student[]> {
@@ -32,4 +33,8 @@ export async function getStudentHistory(studentId: string): Promise<Change[]> {
 
 export async function deleteAllData(): Promise<void> {
   return deleteAllDataFS();
+}
+
+export async function getUploadHistory(): Promise<UploadHistory[]> {
+  return getUploadHistoryFS();
 }

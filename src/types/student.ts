@@ -34,3 +34,9 @@ export interface Change {
   oldValue: any;
   newValue: any;
 }
+
+export interface UploadHistory {
+  id: string;
+  fileName: string;
+  uploadedAt: string; // ISO String
+}

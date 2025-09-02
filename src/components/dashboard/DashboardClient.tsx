@@ -8,21 +8,23 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarInset,
-  SidebarProvider,
   SidebarTrigger,
   SidebarGroup,
+  SidebarSeparator,
+  SidebarProvider,
 } from '@/components/ui/sidebar';
 import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
-import type { Student, Change, Subject } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 // Import server actions instead of directly calling firestore
-import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory } from '@/app/actions/firestoreActions';
+import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory, getUploadHistory } from '@/app/actions/firestoreActions';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 
@@ -52,11 +54,35 @@ export function useDashboardFilters() {
   return context;
 }
 
+function formatDateFromFilename(filename: string): string {
+    // Extrae la parte del nombre que parece fecha (YYYYMMDD)
+    const match = filename.match(/(\d{8})/);
+    if (!match) return "Fecha desconocida";
+
+    let dateStr = match[1];
+    // Omite los últimos dos dígitos como se pidió
+    dateStr = dateStr.substring(0, 6);
+    
+    const year = parseInt(dateStr.substring(0, 4), 10);
+    const month = parseInt(dateStr.substring(4, 6), 10) - 1; // Meses en JS son 0-11
+    
+    try {
+        return new Date(year, month, 1).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: 'long',
+        });
+    } catch {
+        return "Fecha inválida";
+    }
+}
+
 
 export function DashboardClient({ initialStudents }: { initialStudents: Student[]}) {
   const { toast } = useToast();
   const [allStudents, setAllStudents] = useState<Student[]>(initialStudents);
-  const [isLoading, setIsLoading] = useState(true); // Start with loading true
+  const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
@@ -68,9 +94,15 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
   
   const refreshData = useCallback(async () => {
     setIsLoading(true);
+    setProgress(30);
     try {
-        const students = await getAllStudents();
+        const [students, history] = await Promise.all([
+          getAllStudents(),
+          getUploadHistory()
+        ]);
         setAllStudents(students);
+        setUploadHistory(history);
+        setProgress(100);
     } catch(e) {
         console.error(e);
         toast({
@@ -79,7 +111,10 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
             description: 'No se pudieron recargar los datos. Revisa la consola para más detalles.',
         });
     } finally {
-        setIsLoading(false);
+        setTimeout(() => {
+          setIsLoading(false);
+          setProgress(0);
+        }, 500);
     }
   }, [toast]);
 
@@ -91,19 +126,24 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
 
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
+    setProgress(10);
     try {
       const data = await parseExcel(file);
+      setProgress(40);
       if (!data) {
         toast({
           variant: 'destructive',
           title: 'Error de Formato',
           description: 'El archivo Excel no tiene el formato esperado, está vacío o faltan columnas requeridas. Revise la consola para más detalles.',
         });
+        setProgress(0);
         setIsLoading(false);
         return;
       }
       
-      const { processed, changes } = await processAndSaveData(data);
+      setProgress(60);
+      const { processed, changes } = await processAndSaveData(data, file.name);
+      setProgress(90);
 
       toast({
         title: 'Éxito',
@@ -119,9 +159,9 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
         description: `Hubo un problema al guardar los datos. Revisa la consola para más detalles.`,
       });
       console.error(error);
-    } finally {
+      setProgress(0);
       setIsLoading(false);
-    }
+    } 
   };
 
   const handleDeleteAllData = async () => {
@@ -129,9 +169,12 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
       return;
     }
     setIsLoading(true);
+    setProgress(20);
     try {
       await deleteAllData();
       setAllStudents([]);
+      setUploadHistory([]);
+      setProgress(100);
       toast({
         title: 'Datos Eliminados',
         description: 'Todos los datos han sido borrados de Firestore.',
@@ -144,7 +187,10 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
       });
       console.error(error);
     } finally {
-      setIsLoading(false);
+      setTimeout(() => {
+        setIsLoading(false);
+        setProgress(0);
+      }, 500);
     }
   };
   
@@ -213,16 +259,33 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
       <SidebarProvider>
         <Sidebar>
           <SidebarHeader>
-            <h2 className="text-xl font-semibold">Filtros</h2>
+            <h2 className="text-xl font-semibold">Controles</h2>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
               <DashboardFilters />
             </SidebarGroup>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-2 flex items-center gap-2">
+                <CalendarClock size={16} /> Historial de Cargas
+              </h3>
+              {uploadHistory.length > 0 ? (
+                <ul className="space-y-1 px-2 text-sm">
+                  {uploadHistory.map(upload => (
+                    <li key={upload.id} className="text-muted-foreground">
+                      {formatDateFromFilename(upload.fileName)}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="px-2 text-sm text-muted-foreground">No hay cargas anteriores.</p>
+              )}
+            </SidebarGroup>
           </SidebarContent>
         </Sidebar>
         <SidebarInset>
-            <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+            <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
                  <SidebarTrigger className="md:hidden"/>
                  <div className="flex-1">
                     <h1 className="font-semibold text-lg">Academic Sentinel</h1>
@@ -233,10 +296,14 @@ export function DashboardClient({ initialStudents }: { initialStudents: Student[
                  </Button>
                  <Button variant="destructive" size="sm" onClick={handleDeleteAllData} disabled={isLoading}>
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Borrar Datos (Test)
+                    Borrar Datos
                 </Button>
-                <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading} />
+                <FileUpload onFileUpload={handleFileUpload} isLoading={isLoading}>
+                   <UploadCloud className="mr-2" />
+                   Cargar Reporte
+                </FileUpload>
             </header>
+            {isLoading && progress > 0 && <Progress value={progress} className="w-full h-1" />}
             <Dashboard />
         </SidebarInset>
       </SidebarProvider>

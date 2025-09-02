@@ -1,15 +1,15 @@
 "use client";
 
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload } from 'lucide-react';
 
 interface FileUploadProps {
   onFileUpload: (file: File) => void;
   isLoading: boolean;
+  children: ReactNode;
 }
 
-export function FileUpload({ onFileUpload, isLoading }: FileUploadProps) {
+export function FileUpload({ onFileUpload, isLoading, children }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,12 +25,11 @@ export function FileUpload({ onFileUpload, isLoading }: FileUploadProps) {
   return (
     <>
       <Button 
-        variant="outline"
+        variant="default"
         onClick={() => fileInputRef.current?.click()} 
         disabled={isLoading}
       >
-        <Upload className="mr-2" />
-        {isLoading ? 'Procesando...' : 'Cargar Reporte'}
+        {children}
       </Button>
       <input
         type="file"

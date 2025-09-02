@@ -13,17 +13,21 @@ import {
   where,
   deleteDoc,
   getDoc,
+  orderBy,
+  limit,
 } from 'firebase/firestore';
-import type { Student, Subject, Change, StudentData } from '@/types/student';
+import type { Student, Subject, Change, StudentData, UploadHistory } from '@/types/student';
 
 const ALUMNOS_COLLECTION = 'alumnos';
 const HISTORIAL_COLLECTION = 'historialCambios';
+const UPLOADS_COLLECTION = 'cargas';
 
 /**
  * Processes data from Excel, compares it with Firestore, and updates/creates documents.
  * @param studentData Parsed data from the Excel file.
+ * @param fileName The name of the uploaded file.
  */
-export async function processAndSaveData(studentData: StudentData): Promise<{ processed: number, changes: number }> {
+export async function processAndSaveData(studentData: StudentData, fileName: string): Promise<{ processed: number, changes: number }> {
   let processedCount = 0;
   let changesCount = 0;
   
@@ -53,8 +57,6 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
       
       // --- 2. NOW PREPARE AND EXECUTE ALL WRITES ---
       const changesToWrite: Change[] = [];
-
-      // Student Info write
       const studentInfo: Omit<Student, 'subjects'> = {
         id: incomingStudent.id,
         name: incomingStudent.name,
@@ -69,7 +71,6 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
         transaction.set(studentDocRef, studentInfo);
       }
       
-      // Subjects writes
       if (incomingStudent.subjects) {
         for (const incomingSubject of incomingStudent.subjects) {
           if (!incomingSubject.id) continue;
@@ -100,14 +101,12 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
                 });
               }
             }
-             // Get ref from the read doc to perform the update
              transaction.update(subjectDoc.ref, { ...newSubjectData });
           } else {
              changesToWrite.push({
                date: Timestamp.now(), studentId, subjectId: incomingSubject.id,
                fieldName: 'materia', oldValue: null, newValue: 'materia creada',
              });
-             // Need a fresh ref to set a new doc, since it didn't exist
              const newSubjectDocRef = doc(db, ALUMNOS_COLLECTION, studentId, 'materias', incomingSubject.id);
              transaction.set(newSubjectDocRef, newSubjectData);
           }
@@ -116,7 +115,6 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
       
        if(changesToWrite.length > 0) {
           changesCount += changesToWrite.length;
-          // IMPORTANT: Batch writes for history must happen OUTSIDE the transaction.
           changesToWrite.forEach(change => {
               const historyDocRef = doc(collection(db, HISTORIAL_COLLECTION));
               historyBatch.set(historyDocRef, change);
@@ -125,6 +123,10 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
     });
     processedCount++;
   }
+  
+  // Record the upload after all transactions
+  const uploadDocRef = doc(collection(db, UPLOADS_COLLECTION));
+  historyBatch.set(uploadDocRef, { fileName, uploadedAt: Timestamp.now() });
   
   await historyBatch.commit();
   return { processed: processedCount, changes: changesCount };
@@ -135,8 +137,6 @@ export async function processAndSaveData(studentData: StudentData): Promise<{ pr
  */
 export async function getAllStudents(): Promise<Student[]> {
   const querySnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
-  // Firestore Timestamps can't be passed from server to client components.
-  // We don't need them in the student list anyway.
   return querySnapshot.docs.map(doc => doc.data() as Student);
 }
 
@@ -159,12 +159,11 @@ export async function getStudentHistory(studentId: string): Promise<Change[]> {
     const q = query(collection(db, HISTORIAL_COLLECTION), where("studentId", "==", studentId));
     const querySnapshot = await getDocs(q);
     
-    // Manually convert Timestamps to JSON-serializable format (e.g., ISO string)
     return querySnapshot.docs.map(doc => {
         const data = doc.data();
         const change: Change = {
             ...data,
-            date: data.date.toDate().toISOString(), // Convert timestamp
+            date: data.date.toDate().toISOString(),
         } as Change;
         return change;
     });
@@ -193,13 +192,28 @@ export async function deleteAllData(): Promise<void> {
     await batch.commit();
   }
 
-  // Delete all history
   await deleteCollection(HISTORIAL_COLLECTION);
+  await deleteCollection(UPLOADS_COLLECTION);
   
-  // Delete all students and their subcollections
   const alumnosSnapshot = await getDocs(collection(db, ALUMNOS_COLLECTION));
   for (const studentDoc of alumnosSnapshot.docs) {
     await deleteCollection(`${ALUMNOS_COLLECTION}/${studentDoc.id}/materias`);
     await deleteDoc(doc(db, ALUMNOS_COLLECTION, studentDoc.id));
   }
+}
+
+/**
+ * Gets the history of uploaded files.
+ */
+export async function getUploadHistory(): Promise<UploadHistory[]> {
+  const q = query(collection(db, UPLOADS_COLLECTION), orderBy("uploadedAt", "desc"), limit(10));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+          id: doc.id,
+          fileName: data.fileName,
+          uploadedAt: data.uploadedAt.toDate().toISOString(),
+      } as UploadHistory;
+  });
 }
