@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard } from './KpiCard';
 import { RiskMatrixChart } from './RiskMatrixChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { StudentCard } from './StudentCard';
 import { AlertCircle, BarChart2, BellRing, Users } from 'lucide-react';
 
 import { calculateKpis } from '@/lib/dataProcessor';
@@ -54,24 +53,10 @@ export function Dashboard() {
           </div>
 
           {filteredStudents.length > 0 ? (
-            <>
               <div className="grid gap-8 md:grid-cols-2">
                 <RiskMatrixChart students={filteredStudents} />
                 <RiskDistributionChart students={filteredStudents} />
               </div>
-
-              <div>
-                <h2 className="text-2xl font-bold mb-4">Panel de Alumnos</h2>
-                <div className="space-y-6">
-                    {filteredStudents.map(student => (
-                        <StudentCard 
-                            key={student.id} 
-                            student={student} 
-                        />
-                    ))}
-                </div>
-              </div>
-            </>
           ) : (
             <Card className="text-center p-12">
                 <CardHeader>

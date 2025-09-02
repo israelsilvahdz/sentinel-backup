@@ -12,21 +12,25 @@ import {
   SidebarGroup,
   SidebarSeparator,
   SidebarProvider,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
+import { StudentPanel } from './StudentPanel';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 import type { Student, Change, Subject, UploadHistory } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-// Import server actions instead of directly calling firestore
 import { deleteAllData, processAndSaveData, getAllStudents, getStudentSubjects, getStudentHistory, getUploadHistory } from '@/app/actions/firestoreActions';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
+type ActiveView = 'dashboard' | 'students';
 
 interface DashboardContextType {
   filteredStudents: Student[];
@@ -56,7 +60,7 @@ export function useDashboardFilters() {
 
 function formatDateFromCustomFilename(filename: string): string {
     const match = filename.match(/(\d{2})\.(\d{2})\.(\d{2})(\d{2})/);
-    if (!match) return filename; // Devuelve el nombre original si no coincide
+    if (!match) return filename; 
 
     const [, day, month, yearSuffix, periodCode] = match;
     const year = `20${yearSuffix}`;
@@ -87,6 +91,7 @@ export function DashboardClient() {
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   
   const handleSetFilterType = (type: FilterType) => {
     setFilterType(type);
@@ -119,7 +124,6 @@ export function DashboardClient() {
     }
   }, [toast]);
 
-  // Fetch initial data on component mount
   useEffect(() => {
     refreshData();
   }, [refreshData]);
@@ -262,6 +266,23 @@ export function DashboardClient() {
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')}>
+                    <LayoutDashboard />
+                    Dashboard
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={activeView === 'students'} onClick={() => setActiveView('students')}>
+                    <Users />
+                    Panel de Alumnos
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+            <SidebarSeparator />
+            <SidebarGroup>
               <DashboardFilters />
             </SidebarGroup>
             <SidebarSeparator />
@@ -303,7 +324,7 @@ export function DashboardClient() {
                 </FileUpload>
             </header>
             {isLoading && progress > 0 && <Progress value={progress} className="w-full h-1" />}
-            <Dashboard />
+            {activeView === 'dashboard' ? <Dashboard /> : <StudentPanel />}
         </SidebarInset>
       </SidebarProvider>
     </DashboardContext.Provider>
