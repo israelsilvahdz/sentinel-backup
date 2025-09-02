@@ -11,6 +11,7 @@ const COLUMNS = {
   SUBJECT_CAMPUS_ID: 'numero de la materia del campus',
   SUBJECT_NAME: 'Nombre de la materia',
   SUBJECT_GROUP: 'Grupo',
+  SUBJECT_STATUS_DESCRIPTION: 'Descripción del estatus',
   PROFESSOR_ID: 'Nomina',
   PROFESSOR_NAME: 'Nombre del profesor de la materia',
   ABSENCE_LIMIT: 'Limite de faltas de la materia',
@@ -85,11 +86,17 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
           
           const subject: Subject = {
             name: `${row[COLUMNS.SUBJECT_NAME]} (${row[COLUMNS.SUBJECT_GROUP]})`,
+            nationalId: String(row[COLUMNS.SUBJECT_NATIONAL_ID]),
+            campusId: String(row[COLUMNS.SUBJECT_CAMPUS_ID]),
+            professorName: row[COLUMNS.PROFESSOR_NAME],
+            statusDescription: row[COLUMNS.SUBJECT_STATUS_DESCRIPTION],
             absences: parseInt(String(row[COLUMNS.ABSENCES]), 10) || 0,
             absenceLimit: parseInt(String(row[COLUMNS.ABSENCE_LIMIT]), 10) || 1,
             missedAssignments: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENTS]), 10) || 0,
             missedAssignmentLimit: parseInt(String(row[COLUMNS.MISSED_ASSIGNMENT_LIMIT]), 10) || 1,
             grade: parseFloat(String(row[COLUMNS.GRADE])) || 0,
+            finalGrade: parseFloat(String(row[COLUMNS.FINAL_GRADE])) || null,
+            finalGradeReason: row[COLUMNS.FINAL_GRADE_REASON] || null,
           };
 
           studentData[studentId].subjects.push(subject);

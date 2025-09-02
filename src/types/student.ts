@@ -1,10 +1,16 @@
 export interface Subject {
   name: string;
+  nationalId: string;
+  campusId: string;
+  professorName: string;
+  statusDescription: string;
   absences: number;
   absenceLimit: number;
   missedAssignments: number;
   missedAssignmentLimit: number;
   grade: number;
+  finalGrade: number | null;
+  finalGradeReason: string | null;
 }
 
 export interface Student {
