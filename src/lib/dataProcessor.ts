@@ -80,7 +80,7 @@ export function calculateKpis(students: Student[]) {
 
 
 /**
- * Encuentra los casos perdidos (alumnos que ya reprobaron por faltas o NE).
+ * Criterio: Alumnos que superaron el límite de faltas y/o NE.
  */
 export function findLostCases(students: Student[]): Student[] {
     return students.filter(student => {
@@ -92,36 +92,31 @@ export function findLostCases(students: Student[]): Student[] {
 }
 
 /**
- * Encuentra los casos urgentes (alumnos con 2 o más materias en riesgo alto, pero que no son casos perdidos).
+ * Criterio: Alumnos con >= 50% de faltas/NE en alguna materia (y no son casos perdidos).
  */
 export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries || lostCaseIds.has(student.id)) return false;
         
-        const highRiskSubjectsCount = student.subjectSummaries.filter(subject => {
-            const isLostInThisSubject = subject.absences >= subject.absenceLimit || subject.missedAssignments >= subject.missedAssignmentLimit;
-            if (isLostInThisSubject) return false; // No contar la materia si ya es un caso perdido en ELLA
-
-            const absenceLevel = getRisk(subject.absences, subject.absenceLimit).level;
-            const assignmentLevel = getRisk(subject.missedAssignments, subject.missedAssignmentLimit).level;
-            return absenceLevel === 'high' || assignmentLevel === 'high';
-        }).length;
-
-        return highRiskSubjectsCount >= 2;
+        return student.subjectSummaries.some(subject => {
+            const absencePercentage = subject.absenceLimit > 0 ? (subject.absences / subject.absenceLimit) : 0;
+            const assignmentPercentage = subject.missedAssignmentLimit > 0 ? (subject.missedAssignments / subject.missedAssignmentLimit) : 0;
+            return absencePercentage >= 0.5 || assignmentPercentage >= 0.5;
+        });
     });
 }
 
 /**
- * Encuentra alumnos en observación (con al menos una materia en riesgo medio, pero no son urgentes ni perdidos).
+ * Criterio: Alumnos con > 20% de faltas/NE en alguna materia (y no son urgentes ni perdidos).
  */
 export function findObservationCases(students: Student[], excludedIds: Set<string>): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries || excludedIds.has(student.id)) return false;
         
         return student.subjectSummaries.some(subject => {
-             const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
-            const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
-            return absenceRisk.level === 'medium' || assignmentRisk.level === 'medium';
+            const absencePercentage = subject.absenceLimit > 0 ? (subject.absences / subject.absenceLimit) : 0;
+            const assignmentPercentage = subject.missedAssignmentLimit > 0 ? (subject.missedAssignments / subject.missedAssignmentLimit) : 0;
+            return absencePercentage > 0.2 || assignmentPercentage > 0.2;
         });
     });
 }
