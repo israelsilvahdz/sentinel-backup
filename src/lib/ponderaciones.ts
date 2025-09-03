@@ -68,11 +68,14 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'math i': 'Matemáticas I: lenguaje de la ciencia',
     'lengua adicional al español i': 'Optativa de lengua adicional al español I',
     'inglés i': 'Optativa de lengua adicional al español I',
+    'francés i': 'Optativa de lengua adicional al español I',
     'lengua adicional al español ii': 'Optativa de lengua adicional al español II',
     'inglés ii': 'Optativa de lengua adicional al español II',
+    'francés ii': 'Optativa de lengua adicional al español II',
     'lengua adicional al español iii': 'Optativa de lengua adicional al español III',
     'inglés iii': 'Optativa de lengua adicional al español III',
     'alemán iii': 'Optativa de lengua adicional al español III',
+    'francés iii': 'Optativa de lengua adicional al español III',
     'lengua adicional al español iv': 'Optativa de lengua adicional al español IV',
     'inglés iv': 'Optativa de lengua adicional al español IV',
     'alemán iv': 'Optativa de lengua adicional al español IV',
@@ -81,8 +84,8 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'inglés v': 'Optativa de lengua adicional al español V',
     'alemán v': 'Optativa de lengua adicional al español V',
     'francés v': 'Optativa de lengua adicional al español V',
-    'tecnologías de información ii': 'Tecnologías de la Información II',
     'tecnologías de información i': 'Tecnologías de la Información II',
+    'tecnologías de información ii': 'Tecnologías de la Información II',
     'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',
@@ -97,7 +100,10 @@ function normalizeSubjectName(name: string): string {
 
     if (cleanedName.startsWith('habilidades y valores')) {
         const parts = cleanedName.split(':');
-        cleanedName = parts[0].trim();
+        const mainPart = parts[0].trim();
+        // Find the matching official name which is just "Habilidades y valores X"
+        const officialHabilidad = Object.values(CLASIFICACION_MATERIAS['Habilidades']).find(h => h.toLowerCase() === mainPart);
+        if(officialHabilidad) return officialHabilidad;
     }
     
     if (SUBJECT_NAME_NORMALIZATION_MAP[cleanedName]) {

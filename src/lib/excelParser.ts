@@ -35,20 +35,28 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'matematicas i': 'Matemáticas I: lenguaje de la ciencia',
     'math i': 'Matemáticas I: lenguaje de la ciencia',
     'lengua adicional al español i': 'Optativa de lengua adicional al español I',
+    'inglés i': 'Optativa de lengua adicional al español I',
+    'francés i': 'Optativa de lengua adicional al español I',
     'lengua adicional al español ii': 'Optativa de lengua adicional al español II',
+    'inglés ii': 'Optativa de lengua adicional al español II',
+    'francés ii': 'Optativa de lengua adicional al español II',
     'lengua adicional al español iii': 'Optativa de lengua adicional al español III',
+    'inglés iii': 'Optativa de lengua adicional al español III',
+    'alemán iii': 'Optativa de lengua adicional al español III',
+    'francés iii': 'Optativa de lengua adicional al español III',
     'lengua adicional al español iv': 'Optativa de lengua adicional al español IV',
+    'inglés iv': 'Optativa de lengua adicional al español IV',
+    'alemán iv': 'Optativa de lengua adicional al español IV',
+    'francés iv': 'Optativa de lengua adicional al español IV',
     'lengua adicional al español v': 'Optativa de lengua adicional al español V',
-    'tecnologías de información ii': 'Tecnologías de la Información II',
+    'inglés v': 'Optativa de lengua adicional al español V',
+    'alemán v': 'Optativa de lengua adicional al español V',
+    'francés v': 'Optativa de lengua adicional al español V',
     'tecnologías de información i': 'Tecnologías de la Información II',
-    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
+    'tecnologías de información ii': 'Tecnologías de la Información II',
+    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',
-    'el ser humano en sociedad': 'El ser humano en sociedad',
-    'historia de méxico': 'Historia de México',
-    'méxico contemporáneo': 'México Contemporáneo',
-    'comunicación integral': 'Comunicación Integral',
-    'transformación de la materia': 'Transformación de la materia',
     'urban dance': 'IGNORE',
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'
@@ -56,7 +64,13 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
 
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
-    const cleanedName = name.toLowerCase().replace(/"/g, '').trim();
+    let cleanedName = name.toLowerCase().replace(/"/g, '').trim();
+    
+    if (cleanedName.startsWith('habilidades y valores')) {
+        const parts = cleanedName.split(':');
+        cleanedName = parts[0].trim();
+    }
+
     return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName] || name;
 }
 
