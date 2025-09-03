@@ -10,9 +10,9 @@ body {
   :root {
     --background: 120 60% 95%; /* Light Green */
     --foreground: 120 25% 15%;
-    --card: 120 20% 99%;
+    --card: 0 0% 100%;
     --card-foreground: 120 25% 15%;
-    --popover: 120 20% 99%;
+    --popover: 0 0% 100%;
     --popover-foreground: 120 25% 15%;
     --primary: 142 76% 36%; /* Green */
     --primary-foreground: 0 0% 98%;
