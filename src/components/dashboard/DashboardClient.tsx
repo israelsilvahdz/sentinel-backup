@@ -206,14 +206,14 @@ export function DashboardClient() {
                   if (existingSubject) {
                       const fieldsToCompare: (keyof Subject)[] = ['absences', 'missedAssignments', 'grade', 'finalGrade', 'statusDescription'];
                       fieldsToCompare.forEach(field => {
-                          if (existingSubject[field] !== incomingSubject[field]) {
+                          if (existingStudent[field] !== incomingSubject[field]) {
                               if (!newHistory[incomingStudent.id]) newHistory[incomingStudent.id] = [];
                               newHistory[incomingStudent.id].push({
                                   date: new Date().toISOString(),
                                   studentId: incomingStudent.id,
                                   subjectId: incomingSubject.id,
                                   fieldName: field,
-                                  oldValue: existingSubject[field],
+                                  oldValue: existingStudent[field],
                                   newValue: incomingSubject[field],
                               });
                               changesCount++;
@@ -394,8 +394,9 @@ export function DashboardClient() {
       <SidebarProvider>
         <Sidebar collapsible="icon">
           <SidebarHeader>
-             <div className="flex items-center justify-center p-2">
-                <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={40} height={40} className="h-10 w-auto" />
+             <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:justify-center">
+                <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={32} height={32} className="h-8 w-auto" />
+                <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">TECMILENIO</span>
              </div>
           </SidebarHeader>
           <SidebarContent>
@@ -482,5 +483,7 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
+    
 
     
