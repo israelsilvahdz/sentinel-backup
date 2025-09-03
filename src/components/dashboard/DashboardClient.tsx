@@ -15,6 +15,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarToggle,
 } from '@/components/ui/sidebar';
 import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
@@ -392,12 +393,12 @@ export function DashboardClient() {
     <DashboardContext.Provider value={contextValue}>
       <SidebarProvider>
         <Sidebar collapsible="icon">
+           <SidebarToggle />
           <SidebarHeader>
              <div className="flex items-center gap-2 flex-grow">
                 <Image src="https://images.credly.com/images/b8e6d134-79fe-4f11-a50c-309463334760/blob.png" alt="School Logo" width={32} height={32} />
                 <span className="font-semibold group-data-[collapsible=icon]:hidden">Universidad</span>
              </div>
-             <SidebarTrigger className="ml-auto md:ml-0" />
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
@@ -463,11 +464,11 @@ export function DashboardClient() {
                  <div className="flex-1">
                     <Image src="https://sic.cultura.gob.mx/images/135155" alt="School Horizontal Logo" width={150} height={40} className="h-8 w-auto" />
                  </div>
-                 <Button variant="outline" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing}>
+                 <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing}>
                     <RefreshCw className="h-4 w-4" />
                     <span className="sr-only">Recargar</span>
                  </Button>
-                 <Button variant="destructive" size="icon" onClick={handleDeleteAllData} disabled={isLoading || isProcessing}>
+                 <Button variant="ghost" size="icon" onClick={handleDeleteAllData} disabled={isLoading || isProcessing}>
                     <Trash2 className="h-4 w-4" />
                     <span className="sr-only">Borrar Datos</span>
                 </Button>

@@ -4,7 +4,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
+import { ChevronLeft, PanelLeft } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -314,6 +314,32 @@ const SidebarRail = React.forwardRef<
   )
 })
 SidebarRail.displayName = "SidebarRail"
+
+const SidebarToggle = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button">
+>(({ className, ...props }, ref) => {
+  const { state, toggleSidebar } = useSidebar()
+
+  return (
+    <Button
+      ref={ref}
+      variant="ghost"
+      size="icon"
+      className={cn(
+        "absolute top-1/2 -right-3 size-6 -translate-y-1/2 rounded-full bg-background text-foreground shadow-md hover:bg-background hover:text-foreground",
+        "group-data-[state=collapsed]:-right-3 group-data-[state=collapsed]:rotate-180",
+        className
+      )}
+      onClick={toggleSidebar}
+      {...props}
+    >
+      <ChevronLeft className="size-4" />
+      <span className="sr-only">Toggle Sidebar</span>
+    </Button>
+  )
+})
+SidebarToggle.displayName = "SidebarToggle"
 
 const SidebarInset = React.forwardRef<
   HTMLDivElement,
@@ -758,5 +784,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  SidebarToggle,
   useSidebar,
 }
