@@ -23,9 +23,10 @@ import { StudentPanel } from './StudentPanel';
 import { StudentHistoryPanel } from './StudentHistoryPanel';
 import { CoursePlanner } from './CoursePlanner';
 import { PonderacionesDashboard } from './PonderacionesDashboard';
+import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, ChevronLeft } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
@@ -35,7 +36,7 @@ import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCa
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary';
-export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'ponderaciones';
+export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'ponderaciones' | 'unclassified';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -383,6 +384,7 @@ export function DashboardClient() {
         case 'history': return <StudentHistoryPanel />;
         case 'planner': return <CoursePlanner />;
         case 'ponderaciones': return <PonderacionesDashboard />;
+        case 'unclassified': return <UnclassifiedSubjectsPanel />;
         default: return <Dashboard />;
     }
   }
@@ -393,7 +395,7 @@ export function DashboardClient() {
         <Sidebar collapsible="icon">
           <SidebarHeader>
              <div className="flex items-center gap-2 flex-grow">
-                <Image src="https://images.credly.com/images/b8e6d134-79fe-4f11-a50c-309463334760/blob.png" alt="School Logo" width={32} height={32} />
+                <Image src="https://play.triviamaker.com/ImageUpload/upload/yVbBFw0lAzRZ81a4M50yyJX2zx13/20230906169397272366563/131logo.png" alt="School Logo" width={32} height={32} />
                 <span className="font-semibold group-data-[collapsible=icon]:hidden">Universidad</span>
              </div>
           </SidebarHeader>
@@ -422,6 +424,12 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Guía de Ponderación" isActive={activeView === 'ponderaciones'} onClick={() => handleSetActiveView('ponderaciones')}>
                     <BookCopy />
                     <span>Guía de Ponderación</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')}>
+                    <HelpCircle />
+                    <span>Materias sin Clasificar</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
