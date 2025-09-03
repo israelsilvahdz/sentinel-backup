@@ -463,13 +463,13 @@ export function DashboardClient() {
                  <div className="flex-1">
                     <Image src="https://sic.cultura.gob.mx/images/135155" alt="School Horizontal Logo" width={150} height={40} className="h-8 w-auto" />
                  </div>
-                 <Button variant="outline" size="sm" onClick={() => window.location.reload()} disabled={isLoading || isProcessing}>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Recargar
+                 <Button variant="outline" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing}>
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="sr-only">Recargar</span>
                  </Button>
-                 <Button variant="destructive" size="sm" onClick={handleDeleteAllData} disabled={isLoading || isProcessing}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Borrar Datos
+                 <Button variant="destructive" size="icon" onClick={handleDeleteAllData} disabled={isLoading || isProcessing}>
+                    <Trash2 className="h-4 w-4" />
+                    <span className="sr-only">Borrar Datos</span>
                 </Button>
                 <FileUpload onFileUpload={handleFileUpload} isLoading={isProcessing}>
                    <UploadCloud className="mr-2" />
