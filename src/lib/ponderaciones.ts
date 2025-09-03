@@ -61,6 +61,42 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
   'Unknown': [],
 };
 
+const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
+    'matemáticas iii: periodicidad y repetición': 'Matemáticas III: regularidad y repetición',
+    'math iii: regularity and repetition': 'Matemáticas III: regularidad y repetición',
+    'matematicas i': 'Matemáticas I: lenguaje de la ciencia',
+    'math i': 'Matemáticas I: lenguaje de la ciencia',
+    'lengua adicional al español i': 'Optativa de lengua adicional al español I',
+    'lengua adicional al español ii': 'Optativa de lengua adicional al español II',
+    'lengua adicional al español iii': 'Optativa de lengua adicional al español III',
+    'lengua adicional al español iv': 'Optativa de lengua adicional al español IV',
+    'lengua adicional al español v': 'Optativa de lengua adicional al español V',
+    'tecnologías de información ii': 'Tecnologías de la Información II',
+    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
+    'lectura y redacción': 'Lectura y Redacción',
+    'ciencias de la vida': 'Ciencias de la Vida',
+    'urban dance': 'IGNORE',
+    'soccer': 'IGNORE',
+    'tochito': 'IGNORE'
+};
+
+function normalizeSubjectName(name: string): string {
+    const cleanedName = name.toLowerCase().replace(/"/g, '').trim();
+    if (SUBJECT_NAME_NORMALIZATION_MAP[cleanedName]) {
+        return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName];
+    }
+    // Handle simple capitalization for names not in the map
+    for (const area in CLASIFICACION_MATERIAS) {
+        for (const officialName of CLASIFICACION_MATERIAS[area as AreaName]) {
+            if (officialName.toLowerCase() === cleanedName) {
+                return officialName;
+            }
+        }
+    }
+    return name; // Return original if no match
+}
+
+
 // Mapa inverso para búsqueda rápida
 const materiaToAreaMap = new Map<string, AreaName>();
 Object.entries(CLASIFICACION_MATERIAS).forEach(([area, materias]) => {
@@ -70,7 +106,9 @@ Object.entries(CLASIFICACION_MATERIAS).forEach(([area, materias]) => {
 });
 
 export function getAreaForMateria(materiaName: string): AreaName {
-  return materiaToAreaMap.get(materiaName) || 'Unknown';
+  const normalizedName = normalizeSubjectName(materiaName);
+  if (normalizedName === 'IGNORE') return 'Unknown';
+  return materiaToAreaMap.get(normalizedName) || 'Unknown';
 }
 
 

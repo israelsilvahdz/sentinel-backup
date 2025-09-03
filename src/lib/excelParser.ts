@@ -1,3 +1,4 @@
+
 import * as XLSX from 'xlsx';
 import type { StudentData, Subject, Student } from '@/types/student';
 
@@ -26,6 +27,48 @@ const COLUMNS = {
 
 const ACTIVITY_REGEX = /^A\d+$/;
 
+// --- Data Normalization ---
+const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
+    'matemáticas iii: periodicidad y repetición': 'Matemáticas III: regularidad y repetición',
+    'math iii: regularity and repetition': 'Matemáticas III: regularidad y repetición',
+    'matematicas i': 'Matemáticas I: lenguaje de la ciencia',
+    'math i': 'Matemáticas I: lenguaje de la ciencia',
+    'lengua adicional al español i': 'Optativa de lengua adicional al español I',
+    'lengua adicional al español ii': 'Optativa de lengua adicional al español II',
+    'lengua adicional al español iii': 'Optativa de lengua adicional al español III',
+    'lengua adicional al español iv': 'Optativa de lengua adicional al español IV',
+    'lengua adicional al español v': 'Optativa de lengua adicional al español V',
+    'tecnologías de información ii': 'Tecnologías de la Información II',
+    'tecnologias de la informacion i': 'Tecnologías de la Información I',
+    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
+    'lectura y redacción': 'Lectura y Redacción',
+    'ciencias de la vida': 'Ciencias de la Vida',
+    'el ser humano en sociedad': 'El ser humano en sociedad',
+    'historia de méxico': 'Historia de México',
+    'méxico contemporáneo': 'México Contemporáneo',
+    'comunicación integral': 'Comunicación Integral',
+    'transformación de la materia': 'Transformación de la materia',
+    'tecnologías de la información i': 'Tecnologías de la Información I',
+    'habilidades y valores i: bienestar': 'Habilidades y valores I: bienestar',
+    'habilidades y valores ii: pensamiento crítico': 'Habilidades y valores II: pensamiento crítico',
+    'matemáticas ii: pensamiento matemático': 'Matemáticas II: pensamiento matemático',
+    'habilidades y valores iii: ser creativo': 'Habilidades y valores III: ser creativo',
+    'matemáticas iii: regularidad y repetición': 'Matemáticas III: regularidad y repetición',
+    'los grandes escritores universales': 'Los grandes escritores universales',
+    'el carbono y sus componentes': 'El carbono y sus componentes',
+    'conceptos y dilemas éticos': 'Conceptos y dilemas éticos',
+    'urban dance': 'IGNORE',
+    'soccer': 'IGNORE',
+    'tochito': 'IGNORE'
+};
+
+function normalizeSubjectName(name: string): string {
+    if (!name) return '';
+    const cleanedName = name.toLowerCase().replace(/"/g, '').trim();
+    return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName] || name;
+}
+
+
 export async function parseExcel(file: File): Promise<StudentData | null> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -43,10 +86,9 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        // Convertir la hoja a JSON, donde cada objeto es una fila.
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, {
-            header: 1, // Obtiene un array de arrays
-            defval: '', // Celda vacía será un string vacío
+            header: 1, 
+            defval: '', 
         });
 
         if (jsonData.length < 2) {
@@ -65,7 +107,6 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         for (const col of requiredCols) {
             if (headerMap[col] === undefined) {
                 console.error(`Error de formato: Falta la columna requerida '${col}'.`);
-                // Notificar al usuario a través del toast es mejor, pero aquí lo dejamos en consola.
                 resolve(null);
                 return;
             }
@@ -76,12 +117,18 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 
         for (const row of dataRows) {
             if (!row || row.length === 0 || !row[headerMap[COLUMNS.STUDENT_ID]]) {
-                continue; // Ignorar filas vacías o sin matrícula
+                continue; 
+            }
+            
+            const rawSubjectName = String(row[headerMap[COLUMNS.SUBJECT_NAME]] || 'N/A').trim();
+            const normalizedSubjectName = normalizeSubjectName(rawSubjectName);
+
+            if (normalizedSubjectName === 'IGNORE') {
+                continue; // Saltar materias extracurriculares
             }
 
             const studentId = String(row[headerMap[COLUMNS.STUDENT_ID]]).trim();
 
-            // Crear el alumno si no existe
             if (!studentData[studentId]) {
                 studentData[studentId] = {
                     id: studentId,
@@ -103,7 +150,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             const subject: Subject = {
                 id: String(row[headerMap[COLUMNS.SUBJECT_CRN]] || 'N/A').trim(),
                 key: String(row[headerMap[COLUMNS.SUBJECT_KEY]] || 'N/A').trim(),
-                name: String(row[headerMap[COLUMNS.SUBJECT_NAME]] || 'N/A').trim(),
+                name: normalizedSubjectName, // Usar el nombre normalizado
                 group: String(row[headerMap[COLUMNS.SUBJECT_GROUP]] || 'N/A').trim(),
                 professorName: String(row[headerMap[COLUMNS.PROFESSOR_NAME]] || 'N/A').trim(),
                 statusDescription: String(row[headerMap[COLUMNS.SUBJECT_STATUS_DESCRIPTION]] || 'N/A').trim(),
