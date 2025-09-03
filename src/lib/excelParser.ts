@@ -1,4 +1,5 @@
 
+
 import * as XLSX from 'xlsx';
 import type { StudentData, Subject, Student } from '@/types/student';
 
@@ -49,14 +50,6 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'comunicación integral': 'Comunicación Integral',
     'transformación de la materia': 'Transformación de la materia',
     'tecnologías de la información i': 'Tecnologías de la Información I',
-    'habilidades y valores i: bienestar': 'Habilidades y valores I: bienestar',
-    'habilidades y valores ii: pensamiento crítico': 'Habilidades y valores II: pensamiento crítico',
-    'matemáticas ii: pensamiento matemático': 'Matemáticas II: pensamiento matemático',
-    'habilidades y valores iii: ser creativo': 'Habilidades y valores III: ser creativo',
-    'matemáticas iii: regularidad y repetición': 'Matemáticas III: regularidad y repetición',
-    'los grandes escritores universales': 'Los grandes escritores universales',
-    'el carbono y sus componentes': 'El carbono y sus componentes',
-    'conceptos y dilemas éticos': 'Conceptos y dilemas éticos',
     'urban dance': 'IGNORE',
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'
@@ -189,3 +182,4 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
     reader.readAsArrayBuffer(file);
   });
 }
+
