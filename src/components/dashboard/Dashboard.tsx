@@ -61,7 +61,7 @@ export function Dashboard() {
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
        <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard de Progreso Estudiantil</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Progreso Estudiantil</h1>
         <p className="text-muted-foreground">Una vista general del rendimiento y riesgo de los alumnos.</p>
       </header>
       
