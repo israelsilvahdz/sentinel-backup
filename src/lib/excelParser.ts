@@ -78,6 +78,10 @@ function normalizeSubjectName(name: string): string {
         const parts = cleanedName.split(':');
         cleanedName = parts[0].trim();
     }
+    
+    if (cleanedName.startsWith('antropología')) {
+        return 'Antropología';
+    }
 
     return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName] || name;
 }

@@ -117,6 +117,10 @@ function normalizeSubjectName(name: string): string {
         }
     }
     
+    if (cleanedName.startsWith('antropología')) {
+        return 'Antropología';
+    }
+    
     if (SUBJECT_NAME_NORMALIZATION_MAP[cleanedName]) {
         return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName];
     }
