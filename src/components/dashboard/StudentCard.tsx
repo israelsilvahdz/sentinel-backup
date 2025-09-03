@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
+import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '../ui/button';
@@ -88,7 +89,8 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                     <TableHead>Materia</TableHead>
                     <TableHead className="text-center">Faltas</TableHead>
                     <TableHead className="text-center">Tareas (NE)</TableHead>
-                    <TableHead className="text-right">Calificación Ponderada</TableHead>
+                    <TableHead className="text-right">Calif. Reporte</TableHead>
+                    <TableHead className="text-right">Calif. Calculada</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -107,6 +109,9 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                         </TableCell>
                         <TableCell className="text-right font-mono">
                             {isNaN(subject.grade) ? '0.00' : subject.grade.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-primary">
+                            {calculateFinalGrade(subject).toFixed(2)}
                         </TableCell>
                     </TableRow>
                     ))}

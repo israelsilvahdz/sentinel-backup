@@ -22,11 +22,10 @@ import { Dashboard } from './Dashboard';
 import { StudentPanel } from './StudentPanel';
 import { StudentHistoryPanel } from './StudentHistoryPanel';
 import { CoursePlanner } from './CoursePlanner';
-import { GradeCalculatorPanel } from './GradeCalculatorPanel';
-import { PonderacionesDashboard } from './PonderacionesDashboard'; // Importar el nuevo panel
+import { PonderacionesDashboard } from './PonderacionesDashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, Calculator, BookCopy } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, ChevronLeft } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
@@ -36,7 +35,7 @@ import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCa
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary';
-export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'calculator' | 'ponderaciones'; // Añadir nueva vista
+export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'ponderaciones';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -383,7 +382,6 @@ export function DashboardClient() {
         case 'students': return <StudentPanel />;
         case 'history': return <StudentHistoryPanel />;
         case 'planner': return <CoursePlanner />;
-        case 'calculator': return <GradeCalculatorPanel />;
         case 'ponderaciones': return <PonderacionesDashboard />;
         default: return <Dashboard />;
     }
@@ -393,7 +391,6 @@ export function DashboardClient() {
     <DashboardContext.Provider value={contextValue}>
       <SidebarProvider>
         <Sidebar collapsible="icon">
-           <SidebarToggle />
           <SidebarHeader>
              <div className="flex items-center gap-2 flex-grow">
                 <Image src="https://images.credly.com/images/b8e6d134-79fe-4f11-a50c-309463334760/blob.png" alt="School Logo" width={32} height={32} />
@@ -427,12 +424,6 @@ export function DashboardClient() {
                     <span>Guía de Ponderación</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Calculador de Ponderaciones" isActive={activeView === 'calculator'} onClick={() => handleSetActiveView('calculator')}>
-                    <Calculator />
-                    <span>Ponderaciones</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
             <SidebarSeparator />
@@ -457,6 +448,7 @@ export function DashboardClient() {
               )}
             </SidebarGroup>
           </SidebarContent>
+           <SidebarToggle />
         </Sidebar>
         <SidebarInset>
             <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">

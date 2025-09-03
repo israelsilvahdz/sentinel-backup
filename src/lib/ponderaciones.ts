@@ -1,4 +1,6 @@
 
+import type { Subject } from "@/types/student";
+
 export type AreaName = 'Matemáticas' | 'Ciencias' | 'Sociales' | 'Tecnologías' | 'Habilidades' | 'Optativas' | 'Unknown';
 
 export interface Ponderacion {
@@ -69,4 +71,68 @@ Object.entries(CLASIFICACION_MATERIAS).forEach(([area, materias]) => {
 
 export function getAreaForMateria(materiaName: string): AreaName {
   return materiaToAreaMap.get(materiaName) || 'Unknown';
+}
+
+
+// Función para calcular la calificación final de una materia
+export function calculateFinalGrade(subject: Subject): number {
+  const area = getAreaForMateria(subject.name);
+  const ponderacion = PONDERACIONES_POR_AREA[area];
+
+  if (!ponderacion) {
+    return NaN; // Retorna NaN si no hay ponderación definida
+  }
+
+  // Ordenar las actividades cronológicamente (A1, A2, A10, etc.)
+  const sortedActivities = Object.entries(subject.activities)
+    .filter(([key]) => /^A\d+$/.test(key))
+    .sort(([keyA], [keyB]) => {
+      const numA = parseInt(keyA.substring(1), 10);
+      const numB = parseInt(keyB.substring(1), 10);
+      return numA - numB;
+    })
+    .map(([, value]) => (typeof value === 'number' ? value : parseFloat(String(value)) || 0));
+
+  let totalScore = 0;
+  let activityIndex = 0;
+
+  // 1. Actividades Antes del Intermedio (AAI)
+  for (let i = 0; i < ponderacion.aai; i++) {
+    const score = sortedActivities[activityIndex++] ?? 0;
+    totalScore += (score / 100) * ponderacion.vcu_aai;
+  }
+
+  // 2. Proyecto Antes del Intermedio (VPAI)
+  if (ponderacion.vpai) {
+    const score = sortedActivities[activityIndex++] ?? 0;
+    totalScore += (score / 100) * ponderacion.vpai;
+  }
+
+  // 3. Examen Intermedio
+  const intermedioScore = sortedActivities[activityIndex++] ?? 0;
+  totalScore += (intermedioScore / 100) * EXAM_INTERMEDIO_PONDERACION;
+
+  // 4. Actividades Antes del Final (AAF)
+  for (let i = 0; i < ponderacion.aaf; i++) {
+    const score = sortedActivities[activityIndex++] ?? 0;
+    totalScore += (score / 100) * ponderacion.vcu_aaf;
+  }
+
+  // 5. Proyecto Antes del Final (VPAF)
+  if (ponderacion.vpaf) {
+    const score = sortedActivities[activityIndex++] ?? 0;
+    totalScore += (score / 100) * ponderacion.vpaf;
+  }
+  
+  // 6. Segundo Proyecto Antes del Final (VPAF2)
+  if (ponderacion.vpaf2) {
+    const score = sortedActivities[activityIndex++] ?? 0;
+    totalScore += (score / 100) * ponderacion.vpaf2;
+  }
+
+  // 7. Examen Final
+  const finalScore = sortedActivities[activityIndex++] ?? 0;
+  totalScore += (finalScore / 100) * EXAM_FINAL_PONDERACION;
+  
+  return totalScore;
 }
