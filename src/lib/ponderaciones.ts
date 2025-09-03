@@ -24,7 +24,7 @@ export const PONDERACIONES_POR_AREA: Record<AreaName, Ponderacion | null> = {
   'Unknown': null,
 };
 
-const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
+export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
   'Matemáticas': [
     'Matemáticas I: lenguaje de la ciencia', 'Matemáticas II: pensamiento matemático', 
     'Matemáticas III: regularidad y repetición', 'Matemáticas IV: modelos matemáticos', 

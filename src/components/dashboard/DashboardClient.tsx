@@ -21,10 +21,11 @@ import { Dashboard } from './Dashboard';
 import { StudentPanel } from './StudentPanel';
 import { StudentHistoryPanel } from './StudentHistoryPanel';
 import { CoursePlanner } from './CoursePlanner';
-import { GradeCalculatorPanel } from './GradeCalculatorPanel'; // Importar el nuevo panel
+import { GradeCalculatorPanel } from './GradeCalculatorPanel';
+import { PonderacionesDashboard } from './PonderacionesDashboard'; // Importar el nuevo panel
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, Calculator } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, Calculator, BookCopy } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
@@ -34,7 +35,7 @@ import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCa
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary';
-export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'calculator'; // Añadir nueva vista
+export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'calculator' | 'ponderaciones'; // Añadir nueva vista
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -382,6 +383,7 @@ export function DashboardClient() {
         case 'history': return <StudentHistoryPanel />;
         case 'planner': return <CoursePlanner />;
         case 'calculator': return <GradeCalculatorPanel />;
+        case 'ponderaciones': return <PonderacionesDashboard />;
         default: return <Dashboard />;
     }
   }
@@ -416,6 +418,12 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Planificador de Carga" isActive={activeView === 'planner'} onClick={() => handleSetActiveView('planner')}>
                     <BookMarked />
                     <span>Planificador</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Guía de Ponderación" isActive={activeView === 'ponderaciones'} onClick={() => handleSetActiveView('ponderaciones')}>
+                    <BookCopy />
+                    <span>Guía de Ponderación</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
