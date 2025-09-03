@@ -46,6 +46,12 @@ const nextConfig: NextConfig = {
         hostname: 'edukapp.com.mx',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'universidad.tecmilenio.mx',
+        port: '',
+        pathname: '/**',
       }
     ],
   },
