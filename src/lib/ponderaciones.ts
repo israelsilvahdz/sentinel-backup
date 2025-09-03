@@ -44,7 +44,7 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
     'Los grandes escritores universales', 'Expresión Literaria', 'Pensamiento científico',
     'Optativa de lengua adicional al español I', 'Optativa de lengua adicional al español II', 
     'Optativa de lengua adicional al español III', 'Optativa de lengua adicional al español IV', 
-    'Optativa de lengua adicional al español V', 'Expresión musical', 'Conceptos y dilemas éticos', 
+    'Optativa de lengua adicional al español V', 'Expresión musical', 'Conceptos y dilemas éticos',
     'Pensamiento Filosófico'
   ],
   'Tecnologías': [
@@ -82,6 +82,7 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'alemán v': 'Optativa de lengua adicional al español V',
     'francés v': 'Optativa de lengua adicional al español V',
     'tecnologías de información ii': 'Tecnologías de la Información II',
+    'tecnologías de información i': 'Tecnologías de la Información II',
     'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',

@@ -40,7 +40,7 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'lengua adicional al español iv': 'Optativa de lengua adicional al español IV',
     'lengua adicional al español v': 'Optativa de lengua adicional al español V',
     'tecnologías de información ii': 'Tecnologías de la Información II',
-    'tecnologias de la informacion i': 'Tecnologías de la Información I',
+    'tecnologías de información i': 'Tecnologías de la Información II',
     'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',
@@ -49,7 +49,6 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'méxico contemporáneo': 'México Contemporáneo',
     'comunicación integral': 'Comunicación Integral',
     'transformación de la materia': 'Transformación de la materia',
-    'tecnologías de la información i': 'Tecnologías de la Información I',
     'urban dance': 'IGNORE',
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'
@@ -182,4 +181,3 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
     reader.readAsArrayBuffer(file);
   });
 }
-
