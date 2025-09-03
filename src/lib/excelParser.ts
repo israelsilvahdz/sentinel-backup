@@ -57,6 +57,8 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',
+    'art and culture': 'Arte y cultura',
+    'el carbono y sus compuestos': 'El carbono y sus componentes',
     'urban dance': 'IGNORE',
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'

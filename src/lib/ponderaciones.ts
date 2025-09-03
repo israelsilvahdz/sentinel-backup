@@ -45,15 +45,15 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
     'Optativa de lengua adicional al español I', 'Optativa de lengua adicional al español II', 
     'Optativa de lengua adicional al español III', 'Optativa de lengua adicional al español IV', 
     'Optativa de lengua adicional al español V', 'Expresión musical', 'Conceptos y dilemas éticos',
-    'Pensamiento Filosófico'
+    'Pensamiento Filosófico', 'Pueblo y cultura en el México actual'
   ],
   'Tecnologías': [
     'Tecnologías de la Información I', 'Tecnologías de la Información II'
   ],
   'Habilidades': [
-    'Habilidades y valores I', 'Habilidades y valores II', 
-    'Habilidades y valores III', 'Habilidades y valores IV', 
-    'Habilidades y valores V', 'Habilidades y valores VI'
+    'Habilidades y valores I: bienestar', 'Habilidades y valores II: pensamiento crítico', 
+    'Habilidades y valores III: ser creativo', 'Habilidades y valores IV: plan de vida y carrera', 
+    'Habilidades y valores V: lenguaje', 'Habilidades y valores VI: toma de decisiones'
   ],
   'Optativas': [
     'Bienestar Integral', 'Negocios exitosos en un mundo cambiante', 'Sistemas de información para la competitividad'
@@ -86,9 +86,11 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'francés v': 'Optativa de lengua adicional al español V',
     'tecnologías de información i': 'Tecnologías de la Información II',
     'tecnologías de información ii': 'Tecnologías de la Información II',
-    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V',
+    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',
+    'art and culture': 'Arte y cultura',
+    'el carbono y sus compuestos': 'El carbono y sus componentes',
     'urban dance': 'IGNORE',
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'
@@ -101,9 +103,12 @@ function normalizeSubjectName(name: string): string {
     if (cleanedName.startsWith('habilidades y valores')) {
         const parts = cleanedName.split(':');
         const mainPart = parts[0].trim();
-        // Find the matching official name which is just "Habilidades y valores X"
-        const officialHabilidad = Object.values(CLASIFICACION_MATERIAS['Habilidades']).find(h => h.toLowerCase() === mainPart);
-        if(officialHabilidad) return officialHabilidad;
+        // Find the matching official name
+        for (const officialHabilidad of CLASIFICACION_MATERIAS['Habilidades']) {
+            if(officialHabilidad.toLowerCase().startsWith(mainPart)){
+                return officialHabilidad;
+            }
+        }
     }
     
     if (SUBJECT_NAME_NORMALIZATION_MAP[cleanedName]) {
