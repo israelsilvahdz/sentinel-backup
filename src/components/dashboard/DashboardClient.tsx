@@ -395,7 +395,7 @@ export function DashboardClient() {
         <Sidebar collapsible="icon">
           <SidebarHeader>
              <div className="flex items-center justify-center p-2">
-                <Image src="https://universidad.tecmilenio.mx/hubfs/Vive%20Tecmilenio%20v2%20Agosto%202021/logo-tecmilenio.png" alt="School Logo" width={40} height={40} className="h-10 w-auto" />
+                <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={40} height={40} className="h-10 w-auto" />
              </div>
           </SidebarHeader>
           <SidebarContent>

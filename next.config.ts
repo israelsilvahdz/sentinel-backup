@@ -52,6 +52,12 @@ const nextConfig: NextConfig = {
         hostname: 'universidad.tecmilenio.mx',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.postimg.cc',
+        port: '',
+        pathname: '/**',
       }
     ],
   },
