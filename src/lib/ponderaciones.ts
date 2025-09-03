@@ -41,7 +41,10 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
     'El ser humano en sociedad', 'Historia de México', 'México Contemporáneo', 
     'Antropología', 'El mundo contemporáneo', 'Arte y cultura', 
     'México en el siglo XXI', 'Lectura y Redacción', 'Comunicación Integral', 
-    'Los grandes escritores universales', 'Expresión Literaria', 'Pensamiento científico'
+    'Los grandes escritores universales', 'Expresión Literaria', 'Pensamiento científico',
+    'Optativa de lengua adicional al español I', 'Optativa de lengua adicional al español II', 
+    'Optativa de lengua adicional al español III', 'Optativa de lengua adicional al español IV', 
+    'Optativa de lengua adicional al español V', 'Expresión musical'
   ],
   'Tecnologías': [
     'Tecnologías de la Información I', 'Tecnologías de la Información II'
@@ -50,13 +53,11 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
     'Habilidades y valores I: bienestar', 'Habilidades y valores II: pensamiento crítico', 
     'Habilidades y valores III: ser creativo', 'Habilidades y valores IV: plan de vida y carrera', 
     'Habilidades y valores V: lenguaje', 'Habilidades y valores VI: toma de decisiones', 
-    'Conceptos y dilemas éticos', 'Pensamiento Filosófico' // 'Pensamiento Filosófico' no estaba en la lista, pero puede ser de Habilidades.
+    'Conceptos y dilemas éticos', 'Pensamiento Filosófico'
   ],
   'Optativas': [
-    'Optativa de lengua adicional al español I', 'Optativa de lengua adicional al español II', 
-    'Optativa de lengua adicional al español III', 'Optativa de lengua adicional al español IV', 
-    'Optativa de lengua adicional al español V', 'Optativa de módulo de formación', 
-    'Expresión musical'
+    'Bienestar Integral', 'Negocios exitosos en un mundo cambiante', 'Sistemas de información para la competitividad',
+    'Optativa de módulo de formación'
   ],
   'Unknown': [],
 };
@@ -67,10 +68,20 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'matematicas i': 'Matemáticas I: lenguaje de la ciencia',
     'math i': 'Matemáticas I: lenguaje de la ciencia',
     'lengua adicional al español i': 'Optativa de lengua adicional al español I',
+    'inglés i': 'Optativa de lengua adicional al español I',
     'lengua adicional al español ii': 'Optativa de lengua adicional al español II',
+    'inglés ii': 'Optativa de lengua adicional al español II',
     'lengua adicional al español iii': 'Optativa de lengua adicional al español III',
+    'inglés iii': 'Optativa de lengua adicional al español III',
+    'alemán iii': 'Optativa de lengua adicional al español III',
     'lengua adicional al español iv': 'Optativa de lengua adicional al español IV',
+    'inglés iv': 'Optativa de lengua adicional al español IV',
+    'alemán iv': 'Optativa de lengua adicional al español IV',
+    'francés iv': 'Optativa de lengua adicional al español IV',
     'lengua adicional al español v': 'Optativa de lengua adicional al español V',
+    'inglés v': 'Optativa de lengua adicional al español V',
+    'alemán v': 'Optativa de lengua adicional al español V',
+    'francés v': 'Optativa de lengua adicional al español V',
     'tecnologías de información ii': 'Tecnologías de la Información II',
     'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
     'lectura y redacción': 'Lectura y Redacción',
@@ -81,6 +92,7 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
 };
 
 function normalizeSubjectName(name: string): string {
+    if (!name) return '';
     const cleanedName = name.toLowerCase().replace(/"/g, '').trim();
     if (SUBJECT_NAME_NORMALIZATION_MAP[cleanedName]) {
         return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName];
