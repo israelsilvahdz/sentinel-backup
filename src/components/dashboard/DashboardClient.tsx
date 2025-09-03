@@ -403,9 +403,9 @@ export function DashboardClient() {
             <SidebarGroup>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Dashboard" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
+                  <SidebarMenuButton tooltip="Progreso Estudiantil" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
                     <LayoutDashboard />
-                    <span>Dashboard</span>
+                    <span>Progreso Estudiantil</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
@@ -487,3 +487,4 @@ export function DashboardClient() {
     
 
     
+
