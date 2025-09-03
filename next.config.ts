@@ -40,6 +40,12 @@ const nextConfig: NextConfig = {
         hostname: 'play.triviamaker.com',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'edukapp.com.mx',
+        port: '',
+        pathname: '/**',
       }
     ],
   },

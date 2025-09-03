@@ -394,8 +394,8 @@ export function DashboardClient() {
       <SidebarProvider>
         <Sidebar collapsible="icon">
           <SidebarHeader>
-             <div className="flex items-center justify-start p-2">
-                <Image src="https://sic.cultura.gob.mx/images/135155" alt="School Horizontal Logo" width={150} height={40} className="h-8 w-auto" />
+             <div className="flex items-center justify-center p-2">
+                <Image src="https://play.triviamaker.com/ImageUpload/upload/yVbBFw0lAzRZ81a4M50yyJX2zx13/20230906169397272366563/131logo.png" alt="School Logo" width={40} height={40} className="h-10 w-auto" />
              </div>
           </SidebarHeader>
           <SidebarContent>
@@ -460,7 +460,7 @@ export function DashboardClient() {
         <SidebarInset>
             <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
                  <div className="flex-1">
-                    
+                    <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
                  </div>
                  <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing}>
                     <RefreshCw className="h-4 w-4" />
