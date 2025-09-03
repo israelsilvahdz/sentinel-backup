@@ -44,7 +44,8 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
     'Los grandes escritores universales', 'Expresión Literaria', 'Pensamiento científico',
     'Optativa de lengua adicional al español I', 'Optativa de lengua adicional al español II', 
     'Optativa de lengua adicional al español III', 'Optativa de lengua adicional al español IV', 
-    'Optativa de lengua adicional al español V', 'Expresión musical'
+    'Optativa de lengua adicional al español V', 'Expresión musical', 'Conceptos y dilemas éticos', 
+    'Pensamiento Filosófico'
   ],
   'Tecnologías': [
     'Tecnologías de la Información I', 'Tecnologías de la Información II'
@@ -52,12 +53,10 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
   'Habilidades': [
     'Habilidades y valores I: bienestar', 'Habilidades y valores II: pensamiento crítico', 
     'Habilidades y valores III: ser creativo', 'Habilidades y valores IV: plan de vida y carrera', 
-    'Habilidades y valores V: lenguaje', 'Habilidades y valores VI: toma de decisiones', 
-    'Conceptos y dilemas éticos', 'Pensamiento Filosófico'
+    'Habilidades y valores V: lenguaje', 'Habilidades y valores VI: toma de decisiones'
   ],
   'Optativas': [
-    'Bienestar Integral', 'Negocios exitosos en un mundo cambiante', 'Sistemas de información para la competitividad',
-    'Optativa de módulo de formación'
+    'Bienestar Integral', 'Negocios exitosos en un mundo cambiante', 'Sistemas de información para la competitividad'
   ],
   'Unknown': [],
 };
