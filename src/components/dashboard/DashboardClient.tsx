@@ -390,7 +390,7 @@ export function DashboardClient() {
         <Sidebar collapsible="icon">
           <SidebarHeader>
              <div className="flex items-center gap-2 flex-grow">
-                <Image src="https://images.credly.com/images/b8e6d134-79fe-4f11-a50c-309463334760/blob.png" alt="School Logo" width={32} height={32} className="rounded-md" />
+                <Image src="https://images.credly.com/images/b8e6d134-79fe-4f11-a50c-309463334760/blob.png" alt="School Logo" width={32} height={32} className="rounded-md filter-green" />
                 <span className="font-semibold group-data-[collapsible=icon]:hidden">Universidad</span>
              </div>
              <SidebarTrigger className="ml-auto md:ml-0" />
@@ -445,7 +445,7 @@ export function DashboardClient() {
             <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
                  <SidebarTrigger className="md:hidden" />
                  <div className="flex-1">
-                    <Image src="https://sic.cultura.gob.mx/images/135155" alt="School Horizontal Logo" width={150} height={40} className="h-8 w-auto" />
+                    <Image src="https://sic.cultura.gob.mx/images/135155" alt="School Horizontal Logo" width={150} height={40} className="h-8 w-auto filter-green" />
                  </div>
                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} disabled={isLoading || isProcessing}>
                     <RefreshCw className="mr-2 h-4 w-4" />
