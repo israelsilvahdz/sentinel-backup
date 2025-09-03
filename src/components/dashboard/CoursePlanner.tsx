@@ -71,21 +71,22 @@ export function CoursePlanner() {
     if (targetTermIndex === -1) {
       return { recommendedLoad: [], remainingCourses: remaining, availableButNotRecommended: [] };
     }
-
+    
     const maxCourses = isGraduationCandidate && remaining <= 2 ? 9 : 7;
     
-    // 1. Get all pending courses that can be taken (prereqs met)
-    const pendingCoursesToTake = curriculum
+    const pendingCoursesFromCurriculum = curriculum
       .flatMap(term => term.courses)
-      .filter(course => pendingCourses.has(course.name) && isPrerequisiteApproved(course.prerequisite));
+      .filter(course => pendingCourses.has(course.name));
 
-    let load: CurriculumCourse[] = [...pendingCoursesToTake];
+    // Prioritize pending courses that have their prerequisites met
+    const pendingToTake = pendingCoursesFromCurriculum.filter(course => isPrerequisiteApproved(course.prerequisite));
+
+    let load: CurriculumCourse[] = [...pendingToTake];
     
-    // 2. Get courses for the target term
     const targetTermCourses = (curriculum[targetTermIndex]?.courses || [])
-      .filter(c => !approvedCourses.has(c.name) && isPrerequisiteApproved(c.prerequisite));
+        .filter(c => !approvedCourses.has(c.name) && isPrerequisiteApproved(c.prerequisite));
 
-    // 3. Prioritize courses from the target term that are prerequisites for future terms
+    // Sort target term courses by prioritizing those that are prerequisites for future terms
     const futurePrerequisites = new Set(
       curriculum.slice(targetTermIndex + 1).flatMap(t => t.courses.map(c => c.prerequisite).filter(Boolean))
     );
@@ -98,7 +99,6 @@ export function CoursePlanner() {
       return 0;
     });
 
-    // 4. Fill the rest of the load with target term courses
     let i = 0;
     while (load.length < maxCourses && i < targetTermCourses.length) {
       if(!load.some(c => c.name === targetTermCourses[i].name)) {
@@ -106,8 +106,7 @@ export function CoursePlanner() {
       }
       i++;
     }
-
-    // 5. Determine which courses from the target term were not included
+    
     const recommendedSet = new Set(load.map(c => c.name));
     const notRecommended = targetTermCourses.filter(c => !recommendedSet.has(c.name));
 
@@ -274,8 +273,8 @@ export function CoursePlanner() {
                 <Collapsible>
                     <div className="flex justify-between items-center p-6">
                         <div>
-                            <CardTitle className='text-lg'>Otras Materias Disponibles</CardTitle>
-                            <CardDescription className='text-left mt-1'>Materias del tetra actual que no se incluyeron en la carga.</CardDescription>
+                            <CardTitle className='text-lg'>Materias del Tetra No Incluidas</CardTitle>
+                            <CardDescription className='text-left mt-1'>Materias que debería llevar pero se omitieron.</CardDescription>
                         </div>
                         <CollapsibleTrigger asChild>
                             <Button variant="ghost" size="sm" className="w-9 p-0">
@@ -287,7 +286,7 @@ export function CoursePlanner() {
                     <CollapsibleContent>
                         <CardContent className="pt-0">
                             <p className="text-sm text-muted-foreground mb-4">
-                                Estas materias no se recomendaron para dar prioridad a las pendientes o porque se alcanzó el límite de carga académica.
+                                Estas materias corresponden al tetra actual pero no se incluyeron para dar prioridad a las pendientes.
                             </p>
                              <ul className="space-y-2">
                                 {availableButNotRecommended.map(course => (
