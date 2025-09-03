@@ -91,6 +91,7 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'ciencias de la vida': 'Ciencias de la Vida',
     'art and culture': 'Arte y cultura',
     'el carbono y sus compuestos': 'El carbono y sus componentes',
+    'scientific thought': 'Pensamiento científico',
     'urban dance': 'IGNORE',
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'
