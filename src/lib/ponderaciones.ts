@@ -51,9 +51,9 @@ export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
     'Tecnologías de la Información I', 'Tecnologías de la Información II'
   ],
   'Habilidades': [
-    'Habilidades y valores I: bienestar', 'Habilidades y valores II: pensamiento crítico', 
-    'Habilidades y valores III: ser creativo', 'Habilidades y valores IV: plan de vida y carrera', 
-    'Habilidades y valores V: lenguaje', 'Habilidades y valores VI: toma de decisiones'
+    'Habilidades y valores I', 'Habilidades y valores II', 
+    'Habilidades y valores III', 'Habilidades y valores IV', 
+    'Habilidades y valores V', 'Habilidades y valores VI'
   ],
   'Optativas': [
     'Bienestar Integral', 'Negocios exitosos en un mundo cambiante', 'Sistemas de información para la competitividad'
@@ -82,7 +82,7 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'alemán v': 'Optativa de lengua adicional al español V',
     'francés v': 'Optativa de lengua adicional al español V',
     'tecnologías de información ii': 'Tecnologías de la Información II',
-    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
+    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',
     'urban dance': 'IGNORE',
@@ -92,11 +92,17 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
 
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
-    const cleanedName = name.toLowerCase().replace(/"/g, '').trim();
+    let cleanedName = name.toLowerCase().replace(/"/g, '').trim();
+
+    if (cleanedName.startsWith('habilidades y valores')) {
+        const parts = cleanedName.split(':');
+        cleanedName = parts[0].trim();
+    }
+    
     if (SUBJECT_NAME_NORMALIZATION_MAP[cleanedName]) {
         return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName];
     }
-    // Handle simple capitalization for names not in the map
+
     for (const area in CLASIFICACION_MATERIAS) {
         for (const officialName of CLASIFICACION_MATERIAS[area as AreaName]) {
             if (officialName.toLowerCase() === cleanedName) {
@@ -104,7 +110,7 @@ function normalizeSubjectName(name: string): string {
             }
         }
     }
-    return name; // Return original if no match
+    return name;
 }
 
 
