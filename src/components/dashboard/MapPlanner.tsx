@@ -166,12 +166,36 @@ export function MapPlanner() {
     manuallyApprovedCourses.forEach(c => baseApproved.add(c));
     pendingCourses.forEach(pc => baseApproved.delete(pc));
 
+    // --- CASCADING LOCK LOGIC ---
+    const locked = new Set<string>();
+    let prevLockedSize = -1;
+    while (locked.size > prevLockedSize) {
+        prevLockedSize = locked.size;
+
+        for (const course of courseMap.values()) {
+            if (course.isPlaceholder || baseApproved.has(course.name) || locked.has(course.name)) {
+                continue;
+            }
+
+            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+            const courseTermInfo = courseMap.get(course.name);
+            const isTermActive = courseTermInfo && activeTerms.has(courseTermInfo.term);
+
+            const prereq = course.prerequisite;
+            const isPrereqNotMet = prereq && (locked.has(prereq) || pendingCourses.has(prereq));
+            
+            if (isPrereqNotMet || (!isFlex && !isTermActive)) {
+                 locked.add(course.name);
+            }
+        }
+    }
+    
     let recommendedLoad: CurriculumCourse[] = [];
     const maxCourses = isGraduationCandidate && selectedTermIndex === 5 ? 9 : 7;
-
+    
     if (selectedTermIndex > -1) {
       const isCourseAvailable = (course: CurriculumCourse, currentApproved: Set<string>) => {
-        if (!course || course.isPlaceholder) return false;
+        if (!course || course.isPlaceholder || locked.has(course.name)) return false;
         const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
         const courseTermInfo = courseMap.get(course.name);
         if (!courseTermInfo) return false;
@@ -241,32 +265,6 @@ export function MapPlanner() {
     
     const recommended = new Set(recommendedLoad.map(c => c.name));
 
-    // --- CASCADING LOCK LOGIC ---
-    const locked = new Set<string>();
-    let prevLockedSize = -1;
-    // Repeat until no new courses are locked in a full pass
-    while (locked.size > prevLockedSize) {
-        prevLockedSize = locked.size;
-
-        for (const course of courseMap.values()) {
-            if (course.isPlaceholder || baseApproved.has(course.name) || recommended.has(course.name) || locked.has(course.name)) {
-                continue;
-            }
-
-            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-            const courseTermInfo = courseMap.get(course.name);
-            const isTermActive = courseTermInfo && activeTerms.has(courseTermInfo.term);
-
-            const prereq = course.prerequisite;
-            // A course is locked if its prerequisite is locked, or if its prerequisite is pending,
-            // or if it's a non-flexible course in an inactive term.
-            const isPrereqNotMet = prereq && (locked.has(prereq) || pendingCourses.has(prereq) || !baseApproved.has(prereq));
-            
-            if (isPrereqNotMet || (!isFlex && !isTermActive)) {
-                 locked.add(course.name);
-            }
-        }
-    }
 
     return { approvedCourses: baseApproved, lockedCourses: locked, recommendedCourses: recommended };
   }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, isPrerequisiteApproved, activeTerms, isGraduationCandidate]);
@@ -459,4 +457,4 @@ export function MapPlanner() {
   );
 }
 
-
+    
