@@ -1,19 +1,21 @@
 .curriculum-grid {
   display: grid;
-  gap: 1.5rem 2rem; /* Aumenta el gap para las flechas */
+  gap: 1.5rem 2rem;
   position: relative;
+  padding-bottom: 1rem; /* Space for course cards */
 }
 
 .term-header {
-  grid-row: 1; /* Sitúa los encabezados en la primera fila explícitamente */
+  grid-row: 1;
   text-align: center;
   margin-bottom: 0.5rem;
-  padding-bottom: 1rem; /* Espacio para que no se pegue a las materias */
+  padding-bottom: 1rem;
 }
 
 .course-cell {
   position: relative;
   transition: all 0.2s ease-in-out;
+  z-index: 10; /* Ensure cells are above SVG lines */
 }
 
 .course-card {
@@ -29,6 +31,7 @@
   text-align: center;
   transition: all 0.2s ease-in-out;
   cursor: pointer;
+  position: relative;
 }
 
 .course-cell.highlight .course-card {
@@ -50,29 +53,24 @@
     opacity: 0.7;
 }
 
-.prereq-indicator,
-.postreq-indicator {
+.svg-connector-layer {
     position: absolute;
-    background-color: #9ca3af; /* gray-400 */
-    z-index: 5;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Allows clicking through the SVG layer */
+    z-index: 1; /* Position it behind the course cells */
+    overflow: visible;
 }
 
-/* Bolita a la izquierda para indicar "tiene prerrequisito" */
-.prereq-indicator {
-    left: -1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 9999px;
+.connector-line {
+    stroke: hsl(var(--border));
+    stroke-width: 2px;
+    transition: stroke 0.3s ease;
 }
 
-/* Palito a la derecha para indicar "es prerrequisito" */
-.postreq-indicator {
-    right: -1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 2px;
-    height: 0.75rem;
-    border-radius: 2px;
+.connector-line.locked,
+.connector-line.pending {
+    stroke: hsl(var(--destructive) / 0.5);
 }
