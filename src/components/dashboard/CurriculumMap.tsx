@@ -47,7 +47,7 @@ export function CurriculumMap() {
 
         gridRef.current.querySelectorAll('.course-cell').forEach(node => {
             const courseName = (node as HTMLElement).dataset.courseName;
-            if (courseName) {
+            if (courseName && !courseMap.get(courseName)?.isPlaceholder) {
                 const nodeRect = node.getBoundingClientRect();
                 newPositions[courseName] = {
                     x: nodeRect.left - gridRect.left,
@@ -61,9 +61,19 @@ export function CurriculumMap() {
     }
 
     updateNodePositions();
+    const resizeObserver = new ResizeObserver(updateNodePositions);
+    if (gridRef.current) {
+      resizeObserver.observe(gridRef.current);
+    }
     window.addEventListener('resize', updateNodePositions);
-    return () => window.removeEventListener('resize', updateNodePositions);
-  }, []); // Runs once on mount and cleans up
+    
+    return () => {
+      if (gridRef.current) {
+        resizeObserver.unobserve(gridRef.current);
+      }
+      window.removeEventListener('resize', updateNodePositions);
+    };
+  }, []);
 
   const handlePendingToggle = (courseName: string) => {
     setPendingCourses(prev => {
@@ -198,57 +208,61 @@ export function CurriculumMap() {
                   className="curriculum-grid relative"
                   style={{
                       gridTemplateColumns: `repeat(${gridStructure.columns}, minmax(160px, 1fr))`,
-                      gridTemplateRows: `auto repeat(${gridStructure.rows - 1}, minmax(80px, auto))`,
+                      gridTemplateRows: `auto repeat(${gridStructure.rows - 1}, minmax(60px, auto))`,
                   }}
               >
                   <svg className="svg-connector-layer">
                       <g>{connectorLines}</g>
                   </svg>
                   {curriculum.map((term, termIndex) => (
-                      <div key={term.name} className="term-header" style={{ gridColumn: termIndex + 1 }}>
-                          <h2 className="font-bold text-center text-primary">{term.name}</h2>
+                      <div key={term.name} className="term-header" style={{ gridColumn: termIndex + 1 }} onClick={() => setHighlightedTerm(term.name)}>
+                          <h2 className="font-bold text-center text-primary cursor-pointer hover:underline">{term.name}</h2>
                       </div>
                   ))}
 
-                  {Array.from(courseMap.values()).map(course => {
-                      const termIndex = curriculum.findIndex(t => t.name === course.term);
-                      const courseIndex = curriculum[termIndex].courses.findIndex(c => c.name === course.name);
-                      const state = getCourseState(course.name);
-
-                      return (
-                          <div
-                              key={course.name}
-                              data-course-name={course.name}
-                              className={cn('course-cell', {
-                                  'highlight': highlightedTerm === course.term,
-                                  'locked': state === 'locked',
-                                  'pending': state === 'pending'
-                              })}
-                              style={{ 
-                                  gridColumn: termIndex + 1,
-                                  gridRow: courseIndex + 2 // +2 because row 1 is for headers
-                              }}
-                          >
-                              <Tooltip>
-                                  <TooltipTrigger asChild>
-                                      <div className="course-card" onClick={() => handlePendingToggle(course.name)}>
-                                          <p className="text-xs font-semibold leading-tight">{course.name}</p>
-                                      </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                      <p className="font-bold">{course.name}</p>
-                                      <p className="text-xs text-muted-foreground">Estado: {state}</p>
-                                      {course.prerequisite && <p className="text-xs text-muted-foreground">Prerrequisito: {course.prerequisite}</p>}
-                                      {prerequisiteForMap.get(course.name) && (
-                                          <p className="text-xs text-muted-foreground mt-1">
-                                              Requisito para: {prerequisiteForMap.get(course.name)!.join(', ')}
-                                          </p>
-                                      )}
-                                  </TooltipContent>
-                              </Tooltip>
-                          </div>
-                      );
-                  })}
+                  {curriculum.flatMap((term, termIndex) => 
+                      term.courses.map((course, courseIndex) => {
+                         if (course.isPlaceholder) {
+                            return (
+                               <div key={`${term.name}-${course.name}`} style={{ gridColumn: termIndex + 1, gridRow: courseIndex + 2 }}></div>
+                            );
+                         }
+                        const state = getCourseState(course.name);
+                        return (
+                            <div
+                                key={course.name}
+                                data-course-name={course.name}
+                                className={cn('course-cell', {
+                                    'highlight': highlightedTerm === course.term,
+                                    'locked': state === 'locked',
+                                    'pending': state === 'pending'
+                                })}
+                                style={{ 
+                                    gridColumn: termIndex + 1,
+                                    gridRow: courseIndex + 2 // +2 because row 1 is for headers
+                                }}
+                            >
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="course-card" onClick={() => handlePendingToggle(course.name)}>
+                                            <p className="text-xs font-semibold leading-tight">{course.name}</p>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="font-bold">{course.name}</p>
+                                        <p className="text-xs text-muted-foreground">Estado: {state}</p>
+                                        {course.prerequisite && <p className="text-xs text-muted-foreground">Prerrequisito: {course.prerequisite}</p>}
+                                        {prerequisiteForMap.get(course.name) && (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Requisito para: {prerequisiteForMap.get(course.name)!.join(', ')}
+                                            </p>
+                                        )}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        );
+                      })
+                  )}
               </div>
           </main>
         </div>
