@@ -114,7 +114,6 @@ export function CurriculumMap() {
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded-md bg-red-100 border border-red-300 flex items-center justify-center">
-                            <X size={12} className="text-red-600" />
                         </div>
                         <span>Pendiente</span>
                     </div>
@@ -123,7 +122,7 @@ export function CurriculumMap() {
                         <span>Bloqueada</span>
                     </div>
                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-500 ring-2 ring-offset-2 ring-gray-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-gray-500 relative"></div>
                         <span>Tiene prerrequisito</span>
                     </div>
                      <div className="flex items-center gap-2">
@@ -166,7 +165,7 @@ export function CurriculumMap() {
                                 gridRow: courseIndex + 2 // +2 porque la fila 1 es para los headers
                             }}
                         >
-                             <Tooltip>
+                            <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div className="course-card" onClick={() => handlePendingToggle(course.name)}>
                                         <p className="text-xs font-semibold leading-tight">{course.name}</p>
@@ -182,9 +181,8 @@ export function CurriculumMap() {
                                     )}
                                 </TooltipContent>
                             </Tooltip>
-
-                           {course.prerequisite && <div className="prereq-indicator" />}
-                           {prerequisiteForMap.has(course.name) && <div className="postreq-indicator" />}
+                            {course.prerequisite && <div className="prereq-indicator" />}
+                            {prerequisiteForMap.has(course.name) && <div className="postreq-indicator" />}
                         </div>
                     );
                 })}

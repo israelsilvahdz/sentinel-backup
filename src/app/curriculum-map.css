@@ -28,7 +28,7 @@
   justify-content: center;
   text-align: center;
   transition: all 0.2s ease-in-out;
-  cursor: default; /* El tooltip se encarga del hover */
+  cursor: pointer;
 }
 
 .course-cell.highlight .course-card {
@@ -54,11 +54,12 @@
 .postreq-indicator {
     position: absolute;
     background-color: #9ca3af; /* gray-400 */
+    z-index: 5;
 }
 
 /* Bolita a la izquierda para indicar "tiene prerrequisito" */
 .prereq-indicator {
-    left: -0.75rem;
+    left: -1rem;
     top: 50%;
     transform: translateY(-50%);
     width: 0.5rem;
@@ -68,7 +69,7 @@
 
 /* Palito a la derecha para indicar "es prerrequisito" */
 .postreq-indicator {
-    right: -0.75rem;
+    right: -1rem;
     top: 50%;
     transform: translateY(-50%);
     width: 2px;
