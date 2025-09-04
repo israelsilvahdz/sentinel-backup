@@ -258,7 +258,6 @@ export function MapPlanner() {
 
   const getCourseState = (courseName: string, termIndex: number) => {
     // Priority 1: If it's in an already passed term and not pending, it's approved.
-     if (selectedTermIndex > -1 && termIndex < selectedTermIndex && !pendingCourses.has(courseName)) return 'approved';
      if (approvedCourses.has(courseName)) return 'approved';
      
      // Priority 2: Check for other states for current or future courses.
