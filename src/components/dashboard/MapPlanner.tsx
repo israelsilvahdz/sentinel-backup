@@ -241,41 +241,28 @@ export function MapPlanner() {
     
     const recommended = new Set(recommendedLoad.map(c => c.name));
 
+    // --- CASCADING LOCK LOGIC ---
     const locked = new Set<string>();
-    const toCheckForLocking = new Set<string>();
-    const allAvailable = new Set([...baseApproved, ...recommended]);
+    let prevLockedSize = -1;
 
-    // Initial locking pass
-    for (const course of courseMap.values()) {
-        if (course.isPlaceholder || allAvailable.has(course.name)) continue;
+    // Repeat until no new courses are locked in a full pass
+    while (locked.size !== prevLockedSize) {
+        prevLockedSize = locked.size;
 
-        const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-        const isTermActive = activeTerms.has(course.term);
-
-        if (!isPrerequisiteApproved(course.prerequisite, allAvailable) || (!isFlex && !isTermActive)) {
-            toCheckForLocking.add(course.name);
-        }
-    }
-    
-    const processedForPropagation = new Set<string>();
-    while (toCheckForLocking.size > 0) {
-        const courseName = toCheckForLocking.values().next().value;
-        toCheckForLocking.delete(courseName);
-
-        if (locked.has(courseName)) continue;
-        
-        locked.add(courseName);
-
-        if (!processedForPropagation.has(courseName)) {
-            const dependents = prerequisiteForMap.get(courseName);
-            if (dependents) {
-                dependents.forEach(dep => {
-                    if (!locked.has(dep)) {
-                        toCheckForLocking.add(dep);
-                    }
-                });
+        for (const course of courseMap.values()) {
+            if (course.isPlaceholder || baseApproved.has(course.name) || recommended.has(course.name) || locked.has(course.name)) {
+                continue;
             }
-            processedForPropagation.add(courseName);
+
+            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+            const isTermActive = activeTerms.has(course.term);
+
+            const prereq = course.prerequisite;
+            // A course is locked if its prerequisite is locked, or if its prerequisite is pending,
+            // or if it's a non-flexible course in an inactive term.
+            if ((prereq && (locked.has(prereq) || pendingCourses.has(prereq))) || (!isFlex && !isTermActive)) {
+                 locked.add(course.name);
+            }
         }
     }
 
@@ -470,4 +457,3 @@ export function MapPlanner() {
   );
 }
 
-    
