@@ -149,17 +149,20 @@ export function MapPlanner() {
 
   const { approvedCourses, lockedCourses, recommendedCourses } = useMemo(() => {
     // 1. Define the base set of approved courses
-    const approved = new Set<string>();
+    const baseApproved = new Set<string>();
     if (selectedTermIndex > -1) {
       for (let i = 0; i < selectedTermIndex; i++) {
         curriculum[i].courses.forEach(c => {
-          if (!c.isPlaceholder) approved.add(c.name);
+          if (!c.isPlaceholder) baseApproved.add(c.name);
         });
       }
     }
-    manuallyApprovedCourses.forEach(c => approved.add(c));
-    // Crucially, remove any course marked as pending from the approved list
-    pendingCourses.forEach(pc => approved.delete(pc));
+    manuallyApprovedCourses.forEach(c => baseApproved.add(c));
+
+    // Crucially, remove any course marked as pending from the approved list.
+    // A pending course can never be an approved course.
+    pendingCourses.forEach(pc => baseApproved.delete(pc));
+
 
     // 2. Determine locked courses with cascading effect
     const locked = new Set<string>();
@@ -178,8 +181,9 @@ export function MapPlanner() {
             const isTermActive = courseTermInfo && activeTerms.has(courseTermInfo.term);
             
             const prereq = course.prerequisite;
-            // A course is locked if its prerequisite is NOT approved OR if its prerequisite IS locked.
-            const isPrereqMet = prereq ? approved.has(prereq) && !locked.has(prereq) : true;
+            // A course is locked if its prerequisite is NOT in the final approved set.
+            // This also covers cascading locks, as a locked prereq won't be in the approved set.
+            const isPrereqMet = prereq ? baseApproved.has(prereq) : true;
             
             if (!isPrereqMet || (!isFlex && !isTermActive)) {
                  locked.add(course.name);
@@ -187,6 +191,10 @@ export function MapPlanner() {
         }
     }
     
+    // Now that we have the final list of locked courses, we can define the final approved set.
+    const approved = new Set(baseApproved);
+    locked.forEach(c => approved.delete(c));
+
     // Ignore prerequisites for graduation candidates in the final term
     const isGraduationMode = isGraduationCandidate && selectedTermIndex === 5;
 
@@ -290,14 +298,14 @@ export function MapPlanner() {
             const endX = toNode.x;
             const endY = toNode.y + toNode.height / 2;
             
-            // A line is 'pending' if the prerequisite is pending OR the target course is locked
-            const isPendingOrLocked = pendingCourses.has(course.prerequisite) || lockedCourses.has(courseName);
+            const isSourcePending = pendingCourses.has(course.prerequisite);
+            const isTargetLocked = lockedCourses.has(courseName);
 
             lines.push(
                  <path
                     key={`${course.prerequisite}-${courseName}`}
                     d={`M ${startX},${startY} C ${startX + 30},${startY} ${endX - 30},${endY} ${endX},${endY}`}
-                    className={cn('connector-line', { 'pending': isPendingOrLocked, 'locked': isPendingOrLocked })}
+                    className={cn('connector-line', { 'pending': isSourcePending || isTargetLocked })}
                     fill="none"
                 />
             );
@@ -448,3 +456,5 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
+
+    
