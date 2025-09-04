@@ -38,7 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 
 type FilterType = 'leader' | 'tutor' | 'subject';
-export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary';
+export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes';
 export type ActiveView = 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
@@ -349,6 +349,10 @@ export function DashboardClient() {
     }
     
     if (caseType) {
+        if (caseType === 'changes') {
+            const changedStudentIds = new Set(Object.keys(studentHistory).filter(id => studentHistory[id].length > 0));
+            return students.filter(s => changedStudentIds.has(s.id));
+        }
         if(caseType === 'lost') return findLostCases(students);
         if(caseType === 'extraordinary') return findExtraordinaryCases(students);
         const lostCaseIds = new Set(findLostCases(students).map(s => s.id));
@@ -365,7 +369,7 @@ export function DashboardClient() {
     }
 
     return students;
-  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter]);
+  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, studentHistory]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     const student = allStudents.find(s => s.id === studentId);

@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function ChangeStats() {
-    const { studentHistory, allStudents, isLoading, hasData } = useDashboardFilters();
+    const { studentHistory, allStudents, isLoading, hasData, setActiveView, setCaseType } = useDashboardFilters();
 
     const { totalChanges, studentsWithChanges, changesByLeader, changesByTutor, changesBySubject } = useMemo(() => {
         if (isLoading || Object.keys(studentHistory).length === 0) {
@@ -78,6 +78,11 @@ export function ChangeStats() {
 
     }, [studentHistory, allStudents, isLoading]);
 
+    const handleCaseClick = (caseType: 'changes') => {
+        setCaseType(caseType);
+        setActiveView('students');
+    };
+
     if (!hasData) {
         return (
              <Card className="text-center p-12 mt-16 m-8">
@@ -123,7 +128,7 @@ export function ChangeStats() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <KpiCard title="Total de Cambios" value={totalChanges} icon={AlertTriangle} color="yellow" />
-                <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} color="blue" />
+                <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} color="blue" onClick={() => handleCaseClick('changes')} />
                 <KpiCard title="Materia con más Faltas" value={changesBySubject[0]?.name || 'N/A'} icon={AlertTriangle} />
                 <KpiCard title="Materia con más Tareas (NE)" value={changesBySubject.sort((a,b) => b['Tareas (NE)'] - a['Tareas (NE)'])[0]?.name || 'N/A'} icon={BookOpenCheck} />
             </div>

@@ -39,6 +39,7 @@ export function StudentPanel() {
     urgent: 'Casos Urgentes',
     observation: 'Alumnos en Observación',
     extraordinary: 'Alumnos con derecho a extraordinario',
+    changes: 'Alumnos con Cambios Detectados',
   };
 
   const getPanelTitle = () => {
