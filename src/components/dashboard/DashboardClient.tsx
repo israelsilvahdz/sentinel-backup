@@ -196,52 +196,60 @@ export function DashboardClient() {
       return;
     }
     setCurrentFile(file);
-    setIsProcessing(true);
-    setProgress(10);
-    try {
-        const studentData = await parseExcel(file);
-        setProgress(50);
-        
-        if (!studentData) {
+  }, []);
+
+  useEffect(() => {
+    const processFile = async () => {
+        if (!currentFile) return;
+
+        setIsProcessing(true);
+        setProgress(10);
+        try {
+            const studentData = await parseExcel(currentFile);
+            setProgress(50);
+            
+            if (!studentData) {
+                toast({
+                  variant: 'destructive',
+                  title: 'Error de Formato',
+                  description: 'El archivo Excel no tiene el formato esperado o está vacío.',
+                });
+                setIsProcessing(false);
+                setProgress(0);
+                return;
+            }
+
+            const processedCount = processSingleFile(studentData);
+            setProgress(90);
+
+            setUploadHistory(prev => [{ 
+                id: Date.now().toString(), 
+                fileName: currentFile.name, 
+                uploadedAt: new Date().toISOString() 
+            }, ...prev].slice(0, 10));
+
             toast({
-              variant: 'destructive',
-              title: 'Error de Formato',
-              description: 'El archivo Excel no tiene el formato esperado o está vacío.',
+                title: 'Éxito',
+                description: `Se procesaron ${processedCount} alumnos del reporte actual.`,
             });
-            setIsProcessing(false);
-            setProgress(0);
-            return;
+
+        } catch (error) {
+           toast({
+            variant: 'destructive',
+            title: 'Error al procesar',
+            description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
+          });
+          console.error(error);
+        } finally {
+            setTimeout(() => {
+                setIsProcessing(false);
+                setProgress(0);
+                setCurrentFile(null);
+            }, 500);
         }
-
-        const processedCount = processSingleFile(studentData);
-        setProgress(90);
-
-        setUploadHistory(prev => [{ 
-            id: Date.now().toString(), 
-            fileName: file.name, 
-            uploadedAt: new Date().toISOString() 
-        }, ...prev].slice(0, 10));
-
-        toast({
-            title: 'Éxito',
-            description: `Se procesaron ${processedCount} alumnos del reporte actual.`,
-        });
-
-    } catch (error) {
-       toast({
-        variant: 'destructive',
-        title: 'Error al procesar',
-        description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
-      });
-      console.error(error);
-    } finally {
-        setTimeout(() => {
-            setIsProcessing(false);
-            setProgress(0);
-            setCurrentFile(null);
-        }, 500);
-    }
-  }, [toast]);
+    };
+    processFile();
+  }, [currentFile, toast]);
 
 
   const handleDeleteAllData = () => {
@@ -439,7 +447,7 @@ export function DashboardClient() {
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
                  </div>
                  <div className="flex items-center gap-2 flex-wrap">
-                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Diario General" icon={<FileCheck2 />} />
+                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Diario General" icon={<FileCheck2 />} className="max-w-xs" />
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
                         <span className="sr-only">Recargar</span>
