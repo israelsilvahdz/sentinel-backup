@@ -407,7 +407,7 @@ export function DashboardClient() {
   return (
     <DashboardContext.Provider value={contextValue}>
       <SidebarProvider defaultOpen={false}>
-        <Sidebar onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+        <Sidebar>
           <SidebarHeader>
              <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:justify-center">
                 <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={26} height={26} className="h-6 w-auto" />
