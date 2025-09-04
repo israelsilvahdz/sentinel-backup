@@ -42,7 +42,7 @@ interface NodePosition {
   height: number;
 }
 
-export function CurriculumMap() {
+export function MapPlanner() {
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
   const [pendingCourses, setPendingCourses] = useState<Set<string>>(new Set());
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
@@ -105,6 +105,11 @@ export function CurriculumMap() {
     });
   };
   
+    const isPrerequisiteApproved = useCallback((prerequisite: string | undefined, approvedCourses: Set<string>): boolean => {
+        if (!prerequisite) return true;
+        return approvedCourses.has(prerequisite);
+    }, []);
+
   const { approvedCourses, lockedCourses, recommendedCourses } = useMemo(() => {
     const approved = new Set<string>();
     if (selectedTermIndex > -1) {
@@ -117,21 +122,21 @@ export function CurriculumMap() {
     
     pendingCourses.forEach(pc => approved.delete(pc));
     
-    const isPrerequisiteApproved = (prereq: string | undefined) => !prereq || approved.has(prereq);
-
     // --- Start Recommendation Logic ---
     let recommended = new Set<string>();
     if (selectedTermIndex > -1) {
-        const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
-            .filter(c => !c.isPlaceholder && !approved.has(c.name) && isPrerequisiteApproved(c.prerequisite));
+        const isApproved = (prereq: string | undefined) => isPrerequisiteApproved(prereq, approved);
 
         const pendingFromCurriculum = curriculum
             .flatMap(term => term.courses)
             .filter(course => pendingCourses.has(course.name));
             
-        const pendingToTake = pendingFromCurriculum.filter(course => isPrerequisiteApproved(course.prerequisite));
+        const pendingToTake = pendingFromCurriculum.filter(course => isApproved(course.prerequisite));
 
         let load: CurriculumCourse[] = [...pendingToTake];
+
+        const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
+            .filter(c => !c.isPlaceholder && !approved.has(c.name) && isApproved(c.prerequisite));
 
         const allAvailableCourses = [...targetTermCourses];
         
@@ -174,7 +179,7 @@ export function CurriculumMap() {
                locked.add(course.name);
             }
             // Lock if prerequisite is not met
-            if (!isPrerequisiteApproved(course.prerequisite)) {
+            if (!isPrerequisiteApproved(course.prerequisite, approved)) {
                locked.add(course.name);
             }
         }
@@ -201,7 +206,7 @@ export function CurriculumMap() {
     }
 
     return { approvedCourses: approved, lockedCourses: locked, recommendedCourses: recommended };
-  }, [selectedTermIndex, pendingCourses]);
+  }, [selectedTermIndex, pendingCourses, isPrerequisiteApproved]);
 
   const gridStructure = useMemo(() => {
     const maxRows = Math.max(...curriculum.map(t => t.courses.length)) + 1; // +1 for header
@@ -215,7 +220,6 @@ export function CurriculumMap() {
      if (recommendedCourses.has(courseName) && termIndex === selectedTermIndex) return 'recommended';
      if (lockedCourses.has(courseName)) return 'locked';
      if (approvedCourses.has(courseName)) return 'approved';
-     // Pending is now handled by a separate indicator, not as a primary state for the card color.
      if (selectedTermIndex > -1 && termIndex < selectedTermIndex && !pendingCourses.has(courseName)) return 'approved';
      return 'default';
   }
@@ -255,12 +259,12 @@ export function CurriculumMap() {
       <div className="p-6 bg-slate-50 min-h-full">
         <Alert className="mb-6 bg-blue-50 border-blue-200">
             <Lightbulb className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-800">Mapa Curricular Interactivo</AlertTitle>
+            <AlertTitle className="text-blue-800">Planificador por Mapa Interactivo</AlertTitle>
             <AlertDescription className="text-blue-700">
               <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
                 <li>Haz clic en el **título de un tetramestre** para simular el avance de un alumno hasta ese punto.</li>
                 <li>Las materias de tetramestres anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
-                <li>Las materias del tetramestre seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span>.</li>
+                <li>Las materias del tetramestre seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
                 <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> aprobada para marcarla como <span className="font-semibold text-red-700">pendiente</span> y ver cómo afecta el futuro.</li>
               </ol>
             </AlertDescription>
@@ -349,3 +353,5 @@ export function CurriculumMap() {
     </TooltipProvider>
   );
 }
+
+    

@@ -24,9 +24,10 @@ import { StudentHistoryPanel } from './StudentHistoryPanel';
 import { CoursePlanner } from './CoursePlanner';
 import { PonderacionesDashboard } from './PonderacionesDashboard';
 import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
+import { MapPlanner } from './MapPlanner';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
@@ -36,7 +37,7 @@ import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCa
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary';
-export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'ponderaciones' | 'unclassified';
+export type ActiveView = 'dashboard' | 'students' | 'history' | 'planner' | 'ponderaciones' | 'unclassified' | 'map-planner';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -383,6 +384,7 @@ export function DashboardClient() {
         case 'students': return <StudentPanel />;
         case 'history': return <StudentHistoryPanel />;
         case 'planner': return <CoursePlanner />;
+        case 'map-planner': return <MapPlanner />;
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         default: return <Dashboard />;
@@ -418,6 +420,12 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Planificador de Carga" isActive={activeView === 'planner'} onClick={() => handleSetActiveView('planner')}>
                     <BookMarked />
                     <span>Planificador</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Planificador por Mapa" isActive={activeView === 'map-planner'} onClick={() => handleSetActiveView('map-planner')}>
+                    <Map />
+                    <span>Planificador por Mapa</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
@@ -488,3 +496,6 @@ export function DashboardClient() {
 
     
 
+
+
+    

@@ -13,8 +13,6 @@ import { Switch } from '@/components/ui/switch';
 import { Info, BookOpen, BrainCircuit, Map } from 'lucide-react';
 import { curriculum, type CurriculumCourse } from '@/lib/curriculum';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { CurriculumMap } from './CurriculumMap';
 
 const HIGH_PRIORITY_COURSES = new Set([
   'Ecología y Geografía',
@@ -153,22 +151,10 @@ export function CoursePlanner() {
                 Genera una carga recomendada para un alumno basado en su progreso y materias pendientes.
                 </p>
             </div>
-             <Sheet>
-                <SheetTrigger asChild>
-                    <Button variant="outline">
-                        <Map className="mr-2 h-4 w-4" />
-                        Ver Mapa Curricular
-                    </Button>
-                </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-[90vw] p-0">
-                    <SheetHeader className="p-4 border-b">
-                        <SheetTitle>Mapa Curricular Interactivo</SheetTitle>
-                    </SheetHeader>
-                    <div className="overflow-auto h-[calc(100vh-57px)]">
-                         <CurriculumMap />
-                    </div>
-                </SheetContent>
-            </Sheet>
+             <Button variant="outline" disabled>
+                <Map className="mr-2 h-4 w-4" />
+                Ir a Planificador por Mapa
+            </Button>
           </div>
       </header>
 
