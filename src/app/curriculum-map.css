@@ -116,7 +116,7 @@
 }
 
 .connector-line {
-    stroke: hsl(var(--primary));
+    stroke: hsl(145, 63%, 49%);
     stroke-width: 2px;
     transition: stroke 0.3s ease;
     stroke-dasharray: 4;
