@@ -5,9 +5,10 @@
 }
 
 .term-header {
-  grid-row: 0;
+  grid-row: 1; /* Sitúa los encabezados en la primera fila explícitamente */
   text-align: center;
   margin-bottom: 0.5rem;
+  padding-bottom: 1rem; /* Espacio para que no se pegue a las materias */
 }
 
 .course-cell {
@@ -27,6 +28,7 @@
   justify-content: center;
   text-align: center;
   transition: all 0.2s ease-in-out;
+  cursor: default; /* El tooltip se encarga del hover */
 }
 
 .course-cell.highlight .course-card {

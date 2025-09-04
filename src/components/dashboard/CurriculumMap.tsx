@@ -69,16 +69,14 @@ export function CurriculumMap() {
 
   const lockedCourses = useMemo(() => getLockedCourses(), [getLockedCourses]);
 
-  const gridAreas = useMemo(() => {
-    const areas: { [key: string]: string } = {};
-    curriculum.forEach((term, termIndex) => {
-      term.courses.forEach((course, courseIndex) => {
-        const safeName = course.name.replace(/[^a-zA-Z0-9]/g, '');
-        areas[safeName] = `${courseIndex + 1} / ${termIndex + 1}`;
-      });
-    });
-    return areas;
+  const gridStructure = useMemo(() => {
+    const maxRows = Math.max(...curriculum.map(t => t.courses.length)) + 1; // +1 for header
+    return {
+        rows: maxRows,
+        columns: curriculum.length
+    }
   }, []);
+
   
   const getCourseState = (courseName: string) => {
      if (lockedCourses.has(courseName)) return 'locked';
@@ -107,23 +105,31 @@ export function CurriculumMap() {
                     </Button>
                 )}
             </div>
-            <div className="p-4 border rounded-lg bg-white shadow-sm">
-                <h3 className="font-semibold mb-3">Marcar Materias Pendientes</h3>
-                <p className="text-xs text-muted-foreground mb-4">Selecciona las materias que el alumno debe para ver el impacto en su ruta.</p>
-                 <div className="max-h-96 overflow-y-auto space-y-2 pr-2">
-                    {Array.from(courseMap.values()).sort((a,b) => a.term.localeCompare(b.term)).map(course => (
-                        <div key={course.name} className="flex items-center space-x-2">
-                            <Checkbox
-                                id={`check-${course.name}`}
-                                checked={pendingCourses.has(course.name)}
-                                onCheckedChange={() => handlePendingToggle(course.name)}
-                                disabled={lockedCourses.has(course.name)}
-                            />
-                            <Label htmlFor={`check-${course.name}`} className="text-sm">
-                                {course.name}
-                            </Label>
+             <div className="p-4 border rounded-lg bg-white shadow-sm">
+                <h3 className="font-semibold mb-2">Leyenda</h3>
+                <div className="space-y-3 text-sm">
+                    <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-md bg-blue-100 border border-blue-300"></div>
+                        <span>Resaltado</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-md bg-red-100 border border-red-300 flex items-center justify-center">
+                            <X size={12} className="text-red-600" />
                         </div>
-                    ))}
+                        <span>Pendiente</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                         <div className="w-4 h-4 rounded-md bg-gray-200 border border-gray-400"></div>
+                        <span>Bloqueada</span>
+                    </div>
+                     <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-gray-500 ring-2 ring-offset-2 ring-gray-500"></div>
+                        <span>Tiene prerrequisito</span>
+                    </div>
+                     <div className="flex items-center gap-2">
+                        <div className="w-1 h-3 bg-gray-500 rounded-sm"></div>
+                        <span>Es prerrequisito</span>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -132,8 +138,8 @@ export function CurriculumMap() {
             <div
                 className="curriculum-grid"
                 style={{
-                    gridTemplateColumns: `repeat(${curriculum.length}, minmax(160px, 1fr))`,
-                    gridTemplateRows: `repeat(${Math.max(...curriculum.map(t => t.courses.length))}, auto)`,
+                    gridTemplateColumns: `repeat(${gridStructure.columns}, minmax(160px, 1fr))`,
+                    gridTemplateRows: `auto repeat(${gridStructure.rows - 1}, auto)`,
                 }}
             >
                 {curriculum.map((term, termIndex) => (
@@ -143,9 +149,8 @@ export function CurriculumMap() {
                 ))}
 
                 {Array.from(courseMap.values()).map(course => {
-                    const safeName = course.name.replace(/[^a-zA-Z0-9]/g, '');
-                    const gridArea = gridAreas[safeName];
-                    const [row, col] = gridArea ? gridArea.split(' / ').map(Number) : [0,0];
+                    const termIndex = curriculum.findIndex(t => t.name === course.term);
+                    const courseIndex = curriculum[termIndex].courses.findIndex(c => c.name === course.name);
                     const state = getCourseState(course.name);
 
                     return (
@@ -156,26 +161,34 @@ export function CurriculumMap() {
                                 'locked': state === 'locked',
                                 'pending': state === 'pending'
                             })}
-                            style={{ gridArea: gridArea }}
+                            style={{ 
+                                gridColumn: termIndex + 1,
+                                gridRow: courseIndex + 2 // +2 porque la fila 1 es para los headers
+                            }}
                         >
                              <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div className="course-card">
                                         <p className="text-xs font-semibold leading-tight">{course.name}</p>
-                                        {course.prerequisite && <div className="prereq-indicator" />}
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p className="font-bold">{course.name}</p>
                                     {course.prerequisite && <p className="text-xs text-muted-foreground">Prerrequisito: {course.prerequisite}</p>}
+                                    {prerequisiteForMap.get(course.name) && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Requisito para: {prerequisiteForMap.get(course.name)!.join(', ')}
+                                        </p>
+                                    )}
                                 </TooltipContent>
                             </Tooltip>
-                            
-                           {prerequisiteForMap.get(course.name) && <div className="postreq-indicator" />}
+
+                           {course.prerequisite && <div className="prereq-indicator" />}
+                           {prerequisiteForMap.has(course.name) && <div className="postreq-indicator" />}
                            
                            <button
                              onClick={() => handlePendingToggle(course.name)}
-                             className={cn("absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white transition-all", {
+                             className={cn("absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white transition-all shadow-md", {
                                  "bg-gray-300 hover:bg-gray-400": state === 'default',
                                  "bg-red-500 hover:bg-red-600": state === 'pending',
                                  "bg-gray-500 cursor-not-allowed": state === 'locked',
@@ -188,33 +201,6 @@ export function CurriculumMap() {
                         </div>
                     );
                 })}
-            </div>
-            <div className="mt-8 p-4 bg-white rounded-lg shadow-sm border">
-                <h3 className="font-semibold mb-2">Leyenda de Colores</h3>
-                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-blue-100 border border-blue-300"></div>
-                        <span>Materia resaltada</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-red-100 border border-red-300 flex items-center justify-center">
-                            <X size={12} className="text-red-600" />
-                        </div>
-                        <span>Materia pendiente</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <div className="w-4 h-4 rounded-full bg-gray-300 border border-gray-400"></div>
-                        <span>Materia bloqueada</span>
-                    </div>
-                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-500 ring-2 ring-offset-2 ring-gray-500"></div>
-                        <span>Tiene prerrequisito</span>
-                    </div>
-                     <div className="flex items-center gap-2">
-                        <div className="w-1 h-3 bg-gray-500 rounded-full"></div>
-                        <span>Es prerrequisito</span>
-                    </div>
-                </div>
             </div>
         </main>
       </div>
