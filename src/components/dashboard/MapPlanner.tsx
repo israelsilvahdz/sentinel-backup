@@ -245,7 +245,7 @@ export function MapPlanner() {
     const locked = new Set<string>();
     let prevLockedSize = -1;
     // Repeat until no new courses are locked in a full pass
-    while (locked.size !== prevLockedSize) {
+    while (locked.size > prevLockedSize) {
         prevLockedSize = locked.size;
 
         for (const course of courseMap.values()) {
@@ -260,7 +260,9 @@ export function MapPlanner() {
             const prereq = course.prerequisite;
             // A course is locked if its prerequisite is locked, or if its prerequisite is pending,
             // or if it's a non-flexible course in an inactive term.
-            if ((prereq && (locked.has(prereq) || pendingCourses.has(prereq))) || (!isFlex && !isTermActive)) {
+            const isPrereqNotMet = prereq && (locked.has(prereq) || pendingCourses.has(prereq) || !baseApproved.has(prereq));
+            
+            if (isPrereqNotMet || (!isFlex && !isTermActive)) {
                  locked.add(course.name);
             }
         }
@@ -456,4 +458,5 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
+
 
