@@ -300,13 +300,11 @@ export function MapPlanner() {
             const isPending = pendingCourses.has(course.prerequisite);
 
             lines.push(
-                 <line
+                 <path
                     key={`${course.prerequisite}-${courseName}`}
-                    x1={startX}
-                    y1={startY}
-                    x2={endX}
-                    y2={endY}
+                    d={`M ${startX},${startY} C ${startX + 30},${startY} ${endX - 30},${endY} ${endX},${endY}`}
                     className={cn('connector-line', { locked: isLocked, pending: isPending })}
+                    fill="none"
                 />
             );
         }
@@ -456,5 +454,3 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
-
-    
