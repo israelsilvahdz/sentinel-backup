@@ -21,7 +21,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <p className="font-bold text-base">{label}</p>
           {payload.map((entry: any, index: number) => (
              <p key={`item-${index}`} style={{ color: entry.fill }} className="text-sm">
-                {entry.name === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'}: {entry.value}
+                {entry.name}: {entry.value}
              </p>
           ))}
         </div>
@@ -29,6 +29,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     }
     return null;
 };
+
+const legendFormatter = (value: string) => {
+    if (value === 'Tareas (NE)') return 'Nuevas Tareas (NE)';
+    if (value === 'Faltas') return 'Nuevas Faltas';
+    return value;
+}
 
 export function ChangeStats() {
     const { studentHistory, allStudents, isLoading, hasData, setActiveView, setCaseType, setStudentHistory, setUploadHistory } = useDashboardFilters();
@@ -298,7 +304,7 @@ export function ChangeStats() {
                                                 <XAxis type="number" />
                                                 <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }}/>
                                                 <Tooltip content={<CustomTooltip />} />
-                                                <Legend formatter={(value) => value === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'} />
+                                                <Legend formatter={legendFormatter} />
                                                 <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
                                                 <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
                                             </BarChart>
@@ -316,7 +322,7 @@ export function ChangeStats() {
                                                 <XAxis type="number" />
                                                 <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
                                                 <Tooltip content={<CustomTooltip />} />
-                                                <Legend formatter={(value) => value === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'} />
+                                                <Legend formatter={legendFormatter} />
                                                 <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
                                                 <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
                                             </BarChart>
@@ -335,7 +341,7 @@ export function ChangeStats() {
                                             <XAxis type="number" />
                                             <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
                                             <Tooltip content={<CustomTooltip />} />
-                                            <Legend formatter={(value) => value === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'} />
+                                            <Legend formatter={legendFormatter} />
                                             <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
                                             <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
                                         </BarChart>
@@ -349,5 +355,7 @@ export function ChangeStats() {
         </div>
     );
 }
+
+    
 
     
