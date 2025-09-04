@@ -10,9 +10,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Info, BookOpen, BrainCircuit } from 'lucide-react';
+import { Info, BookOpen, BrainCircuit, Map } from 'lucide-react';
 import { curriculum, type CurriculumCourse } from '@/lib/curriculum';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { CurriculumMap } from './CurriculumMap';
 
 const HIGH_PRIORITY_COURSES = new Set([
   'Ecología y Geografía',
@@ -144,10 +146,30 @@ export function CoursePlanner() {
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Planificador de Carga Académica</h1>
-        <p className="text-muted-foreground">
-          Genera una carga recomendada para un alumno basado en su progreso y materias pendientes.
-        </p>
+          <div className="flex justify-between items-center">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Planificador de Carga Académica</h1>
+                <p className="text-muted-foreground">
+                Genera una carga recomendada para un alumno basado en su progreso y materias pendientes.
+                </p>
+            </div>
+             <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="outline">
+                        <Map className="mr-2 h-4 w-4" />
+                        Ver Mapa Curricular
+                    </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-full md:w-3/4 lg:w-4/5 xl:w-5/6 p-0">
+                    <SheetHeader className="p-4 border-b">
+                        <SheetTitle>Mapa Curricular Interactivo</SheetTitle>
+                    </SheetHeader>
+                    <div className="overflow-auto h-[calc(100vh-57px)]">
+                         <CurriculumMap />
+                    </div>
+                </SheetContent>
+            </Sheet>
+          </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
