@@ -447,7 +447,7 @@ export function DashboardClient() {
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
                  </div>
                  <div className="flex items-center gap-2 flex-wrap">
-                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Diario General" icon={<FileCheck2 />} className="max-w-xs" />
+                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" />
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
                         <span className="sr-only">Recargar</span>

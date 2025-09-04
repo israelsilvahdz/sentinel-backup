@@ -2,20 +2,24 @@
 "use client";
 
 import { useRef, type ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, type ButtonProps } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { File, UploadCloud, X } from 'lucide-react';
+import { File, UploadCloud, X, Loader2 } from 'lucide-react';
 
-interface FileUploadProps {
+interface FileUploadProps extends ButtonProps {
   onFileSelect: (file: File | null) => void;
   selectedFile: File | null;
   isLoading: boolean;
-  label: string;
-  icon: ReactNode;
   className?: string;
 }
 
-export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon, className }: FileUploadProps) {
+export function FileUpload({ 
+  onFileSelect, 
+  selectedFile, 
+  isLoading, 
+  className,
+  ...props
+}: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -26,13 +30,16 @@ export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon,
     }
   };
 
-  const handleRemoveFile = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onFileSelect(null);
+  const handleButtonClick = () => {
+    if (selectedFile) {
+      onFileSelect(null);
+    } else {
+      fileInputRef.current?.click();
+    }
   }
 
   return (
-    <div className={cn("w-full", className)}>
+    <>
       <input
         type="file"
         ref={fileInputRef}
@@ -41,42 +48,30 @@ export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon,
         accept=".xlsx, .xls"
         disabled={isLoading}
       />
-      <div 
-        className={cn(
-            "relative w-full border-2 border-dashed rounded-lg p-3 flex flex-row items-center justify-center text-center cursor-pointer hover:border-primary transition-colors min-h-[60px]",
-            isLoading && "cursor-not-allowed opacity-60",
-            selectedFile && "border-solid border-primary bg-primary/5"
-        )}
-        onClick={() => !isLoading && fileInputRef.current?.click()}
+      <Button
+        onClick={handleButtonClick}
+        disabled={isLoading}
+        className={cn("min-w-[180px]", className)}
+        {...props}
       >
-        {selectedFile ? (
-            <>
-                <File className="h-6 w-6 text-primary mr-3 shrink-0" />
-                <div className='text-left'>
-                    <p className="text-xs font-semibold text-primary">{label}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[150px]">{selectedFile.name}</p>
-                </div>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="absolute top-1 right-1 h-5 w-5 rounded-full"
-                    onClick={handleRemoveFile}
-                    disabled={isLoading}
-                >
-                    <X className="h-3 w-3" />
-                    <span className="sr-only">Quitar archivo</span>
-                </Button>
-            </>
+        {isLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <span>Procesando...</span>
+          </>
+        ) : selectedFile ? (
+          <>
+            <File className="mr-2 h-4 w-4" />
+            <span className="truncate max-w-[120px]">{selectedFile.name}</span>
+            <X className="ml-2 h-3 w-3" />
+          </>
         ) : (
-            <>
-                <div className="text-muted-foreground mr-3 shrink-0">{icon}</div>
-                <div className='text-left'>
-                  <p className="text-sm font-semibold">{label}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Seleccionar un .xlsx</p>
-                </div>
-            </>
+          <>
+            <UploadCloud className="mr-2 h-4 w-4" />
+            <span>Cargar Reporte</span>
+          </>
         )}
-      </div>
-    </div>
+      </Button>
+    </>
   );
 }
