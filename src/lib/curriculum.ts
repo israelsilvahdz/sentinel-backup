@@ -86,7 +86,7 @@ export const curriculum: CurriculumTerm[] = [
     courses: [
       { name: 'Cálculo Integral', prerequisite: 'Cálculo Diferencial' },
       { name: 'placeholder11', isPlaceholder: true },
-      { name: 'México en el siglo XXI', prerequisite: 'El mundo contemporáneo' },
+      { name: 'México en el siglo XXI', prerequisite: 'México Contemporáneo' },
       { name: 'Arte y cultura', prerequisite: 'El mundo contemporáneo' },
       { name: 'Pensamiento científico', prerequisite: 'Cuidado del cuerpo humano' },
       { name: 'Optativa de módulo de formación' },
