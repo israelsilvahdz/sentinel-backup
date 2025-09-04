@@ -197,8 +197,7 @@ export function ChangeStats() {
             };
         }
 
-        const allChanges: Change[] = Object.values(studentHistory).flat();
-        const riskChanges = allChanges.filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
+        const riskChanges = Object.values(studentHistory).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
         const studentsWithChangesSet = new Set(riskChanges.map(c => c.studentId));
 
 
@@ -209,7 +208,7 @@ export function ChangeStats() {
         const tutorCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
 
-        for (const change of allChanges) {
+        for (const change of riskChanges) {
             const isRiskIncrement = change.fieldName === 'absences' || change.fieldName === 'missedAssignments';
             if (!isRiskIncrement) continue;
 

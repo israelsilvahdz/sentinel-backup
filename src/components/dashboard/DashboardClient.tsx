@@ -147,7 +147,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, studentHistory, uploadHistory]);
+  }, [allStudents, studentHistory, uploadHistory, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -249,6 +249,7 @@ export function DashboardClient() {
         }
     };
     processFile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFile, toast]);
 
 
@@ -308,7 +309,13 @@ export function DashboardClient() {
     
     if (caseType) {
         if (caseType === 'changes') {
-            const changedStudentIds = new Set(Object.keys(studentHistory).filter(id => studentHistory[id].length > 0));
+            const changedStudentIds = new Set<string>();
+            Object.entries(studentHistory).forEach(([studentId, changes]) => {
+                const hasRiskChange = changes.some(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
+                if (hasRiskChange) {
+                    changedStudentIds.add(studentId);
+                }
+            });
             return students.filter(s => changedStudentIds.has(s.id));
         }
         if(caseType === 'lost') return findLostCases(students);
