@@ -58,7 +58,7 @@ export const curriculum: CurriculumTerm[] = [
     courses: [
       { name: 'Matemáticas IV: modelos matemáticos', prerequisite: 'Matemáticas III: regularidad y repetición' },
       { name: 'Materia y energía I', prerequisite: 'Matemáticas II: pensamiento matemático' },
-      { name: 'Antropología', prerequisite: 'México Contemporáneo' },
+      { name: 'Antropología', prerequisite: 'El ser humano en sociedad' },
       { name: 'Expresión Literaria', prerequisite: 'Los grandes escritores universales' },
       { name: 'Optativa de lengua adicional al español IV', prerequisite: 'Optativa de lengua adicional al español III' },
       { name: 'placeholder7', isPlaceholder: true },
