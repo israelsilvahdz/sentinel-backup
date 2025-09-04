@@ -66,6 +66,7 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'math iii: regularity and repetition': 'Matemáticas III: regularidad y repetición',
     'matematicas i': 'Matemáticas I: lenguaje de la ciencia',
     'math i': 'Matemáticas I: lenguaje de la ciencia',
+    'matemáticas i: lenguaje de la ciencia': 'Matemáticas I: lenguaje de la ciencia', // Ensure exact match
     'math ii: pensamiento matemático': 'Matemáticas II: pensamiento matemático',
     'math ii: mathematical thinking': 'Matemáticas II: pensamiento matemático',
     'lengua adicional al español i': 'Optativa de lengua adicional al español I',
