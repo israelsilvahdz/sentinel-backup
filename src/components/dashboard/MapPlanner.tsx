@@ -294,6 +294,7 @@ export function MapPlanner() {
                       const state = getCourseState(course.name, termIndex);
                       const isPending = pendingCourses.has(course.name);
                       const canBePending = selectedTermIndex > -1 && termIndex < selectedTermIndex;
+                      const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
                       
                       return (
                           <div
@@ -320,6 +321,7 @@ export function MapPlanner() {
                                                 title={isPending ? 'Marcar como aprobada' : 'Marcar como pendiente'}
                                               />
                                           )}
+                                          {isFlex && <div className="course-flex-indicator">F</div>}
                                           <p className="text-xs font-semibold leading-tight">{course.name}</p>
                                       </div>
                                   </TooltipTrigger>
@@ -329,6 +331,7 @@ export function MapPlanner() {
                                         <p className="text-xs text-muted-foreground capitalize">Estado: {state}</p>
                                         {isPending && <p className="text-xs text-red-500 font-semibold">Pendiente</p>}
                                       </div>
+                                      {isFlex && <p className="text-xs text-blue-500 font-semibold">Materia Flexible</p>}
                                       {course.prerequisite && <p className="text-xs text-muted-foreground">Prerrequisito: {course.prerequisite}</p>}
                                       {prerequisiteForMap.get(course.name) && (
                                           <p className="text-xs text-muted-foreground mt-1">
@@ -347,5 +350,3 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
-
-    
