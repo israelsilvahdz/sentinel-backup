@@ -155,16 +155,16 @@ export function MapPlanner() {
   }, [isGraduationCandidate, selectedTermIndex]);
 
   const { approvedCourses, lockedCourses, recommendedCourses } = useMemo(() => {
-    const baseApproved = new Set<string>();
+    const approved = new Set<string>();
     if (selectedTermIndex > -1) {
       for (let i = 0; i < selectedTermIndex; i++) {
         curriculum[i].courses.forEach(c => {
-          if (!c.isPlaceholder) baseApproved.add(c.name);
+          if (!c.isPlaceholder) approved.add(c.name);
         });
       }
     }
-    manuallyApprovedCourses.forEach(c => baseApproved.add(c));
-    pendingCourses.forEach(pc => baseApproved.delete(pc));
+    manuallyApprovedCourses.forEach(c => approved.add(c));
+    pendingCourses.forEach(pc => approved.delete(pc));
 
     // --- CASCADING LOCK LOGIC ---
     const locked = new Set<string>();
@@ -173,7 +173,7 @@ export function MapPlanner() {
         prevLockedSize = locked.size;
 
         for (const course of courseMap.values()) {
-            if (course.isPlaceholder || baseApproved.has(course.name) || locked.has(course.name)) {
+            if (course.isPlaceholder || approved.has(course.name) || locked.has(course.name)) {
                 continue;
             }
 
@@ -182,9 +182,9 @@ export function MapPlanner() {
             const isTermActive = courseTermInfo && activeTerms.has(courseTermInfo.term);
 
             const prereq = course.prerequisite;
-            const isPrereqNotMet = prereq && (locked.has(prereq) || pendingCourses.has(prereq));
+            const isPrereqMet = prereq ? approved.has(prereq) && !locked.has(prereq) : true;
             
-            if (isPrereqNotMet || (!isFlex && !isTermActive)) {
+            if (!isPrereqMet || (!isFlex && !isTermActive)) {
                  locked.add(course.name);
             }
         }
@@ -206,7 +206,7 @@ export function MapPlanner() {
       // Priority 1: Pending courses
       const pendingToTake = Array.from(pendingCourses)
         .map(name => courseMap.get(name)!)
-        .filter(course => isCourseAvailable(course, baseApproved));
+        .filter(course => isCourseAvailable(course, approved));
       
       recommendedLoad = [...pendingToTake];
       let recommendedSet = new Set(recommendedLoad.map(c => c.name));
@@ -216,9 +216,9 @@ export function MapPlanner() {
           const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
               .filter(c => 
                   !c.isPlaceholder && 
-                  !baseApproved.has(c.name) && 
+                  !approved.has(c.name) && 
                   !recommendedSet.has(c.name) && 
-                  isCourseAvailable(c, baseApproved)
+                  isCourseAvailable(c, approved)
               );
           
           for (const course of targetTermCourses) {
@@ -231,7 +231,7 @@ export function MapPlanner() {
 
       // --- ADVANCE SUBJECTS LOGIC ---
       if (recommendedLoad.length < maxCourses) {
-        const effectiveApproved = new Set([...baseApproved, ...recommendedSet]);
+        const effectiveApproved = new Set([...approved, ...recommendedSet]);
         
         const futureTerms = curriculum.slice(selectedTermIndex + 1);
         for (const term of futureTerms) {
@@ -266,7 +266,7 @@ export function MapPlanner() {
     const recommended = new Set(recommendedLoad.map(c => c.name));
 
 
-    return { approvedCourses: baseApproved, lockedCourses: locked, recommendedCourses: recommended };
+    return { approvedCourses: approved, lockedCourses: locked, recommendedCourses: recommended };
   }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, isPrerequisiteApproved, activeTerms, isGraduationCandidate]);
 
   const gridStructure = useMemo(() => {
