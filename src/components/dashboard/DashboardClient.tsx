@@ -21,12 +21,13 @@ import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
 import { StudentPanel } from './StudentPanel';
 import { StudentHistoryPanel } from './StudentHistoryPanel';
+import { ChangeStats } from './ChangeStats';
 import { PonderacionesDashboard } from './PonderacionesDashboard';
 import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
 import { MapPlanner } from './MapPlanner';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -38,13 +39,14 @@ import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCa
 
 type FilterType = 'leader' | 'tutor' | 'subject';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary';
-export type ActiveView = 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner';
+export type ActiveView = 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
 interface DashboardContextType {
   filteredStudents: Student[];
   allStudents: Student[];
+  studentHistory: Record<string, Change[]>;
   isLoading: boolean;
   hasData: boolean;
   leaders: string[];
@@ -285,6 +287,7 @@ export function DashboardClient() {
         setTimeout(() => {
             setIsProcessing(false);
             setProgress(0);
+            setActiveView('change-stats'); // Navigate to stats view after processing
         }, 500);
     }
   };
@@ -374,7 +377,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents,
+    filteredStudents, allStudents, studentHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects,
@@ -393,6 +396,7 @@ export function DashboardClient() {
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'history': return <StudentHistoryPanel />;
+        case 'change-stats': return <ChangeStats />;
         case 'map-planner': return <MapPlanner />;
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
@@ -417,6 +421,12 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Progreso Estudiantil" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
                     <LayoutDashboard />
                     <span>Progreso Estudiantil</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')}>
+                    <BarChart3 />
+                    <span>Análisis de Cambios</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
