@@ -45,6 +45,15 @@ interface NodePosition {
   height: number;
 }
 
+const ORDINAL_MAP: Record<string, string> = {
+    'Primer Tetramestre': '1°',
+    'Segundo Tetramestre': '2°',
+    'Tercer Tetramestre': '3°',
+    'Cuarto Tetramestre': '4°',
+    'Quinto Tetramestre': '5°',
+    'Sexto Tetramestre': '6°',
+};
+
 export function MapPlanner() {
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
   const [pendingCourses, setPendingCourses] = useState<Set<string>>(new Set());
@@ -194,24 +203,31 @@ export function MapPlanner() {
     for(const course of courseMap.values()){
         if(course.isPlaceholder) continue;
 
-        if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
-            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-            const isTermActive = activeTerms.has(course.term);
+        // If a term is selected, we apply locking logic
+        if (selectedTermIndex > -1) {
+            // Lock if it's in a future term or the current term
+            if (course.termIndex >= selectedTermIndex) {
+                 const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+                 const isTermActive = activeTerms.has(course.term);
 
-            // Lock if it's a non-flex course in a non-active term.
-            if (!isFlex && !isTermActive) {
-                locked.add(course.name);
+                 // Lock if it's a non-flex course in a non-active term.
+                 if (!isFlex && !isTermActive) {
+                     locked.add(course.name);
+                 }
+                
+                // If it's in the target term but not recommended, lock it
+                if(course.termIndex === selectedTermIndex && !recommended.has(course.name)) {
+                   if (!pendingCourses.has(course.name)) locked.add(course.name);
+                }
             }
-
-            if(course.termIndex === selectedTermIndex && !recommended.has(course.name) && !pendingCourses.has(course.name)) {
-               locked.add(course.name);
-            }
+            // Lock if prerequisite is not met
             if (!isPrerequisiteApproved(course.prerequisite, approved)) {
                locked.add(course.name);
             }
         }
     }
     
+    // Propagate locking to dependent courses
     const toCheck = new Set(locked);
     const checked = new Set<string>();
     while(toCheck.size > 0) {
@@ -290,9 +306,9 @@ export function MapPlanner() {
             <AlertDescription className="text-blue-700">
               <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
                 <li>Selecciona los **períodos activos** para simular la oferta académica real.</li>
-                <li>Haz clic en el **título de un tetramestre** para simular el avance de un alumno hasta ese punto.</li>
-                <li>Las materias de tetramestres anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
-                <li>Las materias del tetramestre seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
+                <li>Haz clic en el **título de un período (ej. 1°)** para simular el avance de un alumno.</li>
+                <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
+                <li>Las materias del período seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
                 <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> aprobada para marcarla como <span className="font-semibold text-red-700">pendiente</span> y ver cómo afecta el futuro.</li>
               </ol>
             </AlertDescription>
@@ -302,7 +318,7 @@ export function MapPlanner() {
                 <CardTitle>Paso 1: Define los Periodos Activos</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-x-6 gap-y-4">
-                {curriculum.map(term => (
+                {curriculum.map((term) => (
                      <div key={term.name} className="flex items-center space-x-2">
                         <Checkbox
                             id={`active-${term.name}`}
@@ -310,7 +326,7 @@ export function MapPlanner() {
                             onCheckedChange={() => handleActiveTermToggle(term.name)}
                         />
                         <Label htmlFor={`active-${term.name}`} className="font-medium">
-                            {term.name}
+                           {ORDINAL_MAP[term.name] ?? term.name}
                         </Label>
                     </div>
                 ))}
@@ -333,7 +349,7 @@ export function MapPlanner() {
                         <h2 className={cn(
                           "font-bold text-center text-primary cursor-pointer hover:underline p-2 rounded-md transition-colors",
                           selectedTermIndex === termIndex && "bg-primary/10 ring-2 ring-primary"
-                        )}>{term.name}</h2>
+                        )}>{ORDINAL_MAP[term.name] ?? term.name}</h2>
                     </div>
                 ))}
 
@@ -341,7 +357,7 @@ export function MapPlanner() {
                     term.courses.map((course, courseIndex) => {
                         if (course.isPlaceholder) {
                           return (
-                              <div key={`${term.name}-${course.name}`} style={{ gridColumn: termIndex + 1, gridRow: courseIndex + 2 }}></div>
+                              <div key={`${term.name}-${course.name}-${courseIndex}`} style={{ gridColumn: termIndex + 1, gridRow: courseIndex + 2 }}></div>
                           );
                         }
                       const state = getCourseState(course.name, termIndex);
@@ -403,4 +419,3 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
-
