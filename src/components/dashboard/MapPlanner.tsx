@@ -243,6 +243,7 @@ export function MapPlanner() {
 
     const locked = new Set<string>();
     const allApprovedAndRecommended = new Set([...baseApproved, ...recommended]);
+    const toCheckForLocking = new Set<string>();
 
     for(const course of courseMap.values()){
         if(course.isPlaceholder || allApprovedAndRecommended.has(course.name)) continue;
@@ -251,29 +252,28 @@ export function MapPlanner() {
         const isTermActive = activeTerms.has(course.term);
 
         if (!isPrerequisiteApproved(course.prerequisite, allApprovedAndRecommended)) {
-            locked.add(course.name);
+            toCheckForLocking.add(course.name);
         } else if (!isFlex && !isTermActive) {
-            locked.add(course.name);
+            toCheckForLocking.add(course.name);
         }
     }
     
-    const toCheck = new Set(locked);
-    const checked = new Set<string>();
-    while(toCheck.size > 0) {
-      const courseName = toCheck.values().next().value;
-      toCheck.delete(courseName);
+    const checkedForPropagation = new Set<string>();
+    while(toCheckForLocking.size > 0) {
+      const courseName = toCheckForLocking.values().next().value;
+      toCheckForLocking.delete(courseName);
+      locked.add(courseName);
 
-      if(!checked.has(courseName)){
+      if(!checkedForPropagation.has(courseName)){
         const dependents = prerequisiteForMap.get(courseName);
         if (dependents) {
           dependents.forEach(dep => {
             if(!locked.has(dep)){
-              locked.add(dep);
-              toCheck.add(dep);
+              toCheckForLocking.add(dep);
             }
           });
         }
-        checked.add(courseName);
+        checkedForPropagation.add(courseName);
       }
     }
 
