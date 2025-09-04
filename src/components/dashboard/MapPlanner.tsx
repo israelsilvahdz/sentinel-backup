@@ -205,16 +205,15 @@ export function MapPlanner() {
 
         // If a term is selected, we apply locking logic
         if (selectedTermIndex > -1) {
+            // Lock if it's a non-flex course in a non-active term.
+             const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+             const isTermActive = activeTerms.has(course.term);
+             if (!isFlex && !isTermActive) {
+                 locked.add(course.name);
+             }
+
             // Lock if it's in a future term or the current term
             if (course.termIndex >= selectedTermIndex) {
-                 const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-                 const isTermActive = activeTerms.has(course.term);
-
-                 // Lock if it's a non-flex course in a non-active term.
-                 if (!isFlex && !isTermActive) {
-                     locked.add(course.name);
-                 }
-                
                 // If it's in the target term but not recommended, lock it
                 if(course.termIndex === selectedTermIndex && !recommended.has(course.name)) {
                    if (!pendingCourses.has(course.name)) locked.add(course.name);
