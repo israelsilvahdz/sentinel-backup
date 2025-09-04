@@ -146,15 +146,9 @@ export function MapPlanner() {
         return newSet;
       })
   }
-  
-  const isPrerequisiteApproved = useCallback((prerequisite: string | undefined, approvedCourses: Set<string>): boolean => {
-      if (!prerequisite) return true;
-      // For graduation candidates, prerequisites are ignored.
-      if (isGraduationCandidate && selectedTermIndex === 5) return true;
-      return approvedCourses.has(prerequisite);
-  }, [isGraduationCandidate, selectedTermIndex]);
 
   const { approvedCourses, lockedCourses, recommendedCourses } = useMemo(() => {
+    // 1. Define the base set of approved courses
     const approved = new Set<string>();
     if (selectedTermIndex > -1) {
       for (let i = 0; i < selectedTermIndex; i++) {
@@ -164,24 +158,27 @@ export function MapPlanner() {
       }
     }
     manuallyApprovedCourses.forEach(c => approved.add(c));
+    // Crucially, remove any course marked as pending from the approved list
     pendingCourses.forEach(pc => approved.delete(pc));
 
-    // --- CASCADING LOCK LOGIC ---
+    // 2. Determine locked courses with cascading effect
     const locked = new Set<string>();
     let prevLockedSize = -1;
+
     while (locked.size > prevLockedSize) {
         prevLockedSize = locked.size;
 
         for (const course of courseMap.values()) {
-            if (course.isPlaceholder || approved.has(course.name) || locked.has(course.name)) {
+            if (course.isPlaceholder || locked.has(course.name)) {
                 continue;
             }
 
             const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
             const courseTermInfo = courseMap.get(course.name);
             const isTermActive = courseTermInfo && activeTerms.has(courseTermInfo.term);
-
+            
             const prereq = course.prerequisite;
+            // A course is locked if its prerequisite is NOT approved OR if its prerequisite IS locked.
             const isPrereqMet = prereq ? approved.has(prereq) && !locked.has(prereq) : true;
             
             if (!isPrereqMet || (!isFlex && !isTermActive)) {
@@ -190,23 +187,33 @@ export function MapPlanner() {
         }
     }
     
+    // Ignore prerequisites for graduation candidates in the final term
+    const isGraduationMode = isGraduationCandidate && selectedTermIndex === 5;
+
+    // 3. Determine recommended courses for the current term
     let recommendedLoad: CurriculumCourse[] = [];
-    const maxCourses = isGraduationCandidate && selectedTermIndex === 5 ? 9 : 7;
+    const maxCourses = isGraduationMode ? 9 : 7;
     
     if (selectedTermIndex > -1) {
       const isCourseAvailable = (course: CurriculumCourse, currentApproved: Set<string>) => {
-        if (!course || course.isPlaceholder || locked.has(course.name)) return false;
-        const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+        if (!course || course.isPlaceholder || locked.has(course.name) || currentApproved.has(course.name)) return false;
+
         const courseTermInfo = courseMap.get(course.name);
         if (!courseTermInfo) return false;
+
+        if (isGraduationMode) return true; // In graduation mode, all non-approved/non-locked are available
+
+        const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
         const isTermActive = activeTerms.has(courseTermInfo.term);
-        return isPrerequisiteApproved(course.prerequisite, currentApproved) && (isFlex || isTermActive);
+        const prereqMet = course.prerequisite ? currentApproved.has(course.prerequisite) : true;
+        
+        return prereqMet && (isFlex || isTermActive);
       };
 
-      // Priority 1: Pending courses
+      // Priority 1: Pending courses from past terms that can be taken now
       const pendingToTake = Array.from(pendingCourses)
         .map(name => courseMap.get(name)!)
-        .filter(course => isCourseAvailable(course, approved));
+        .filter(course => course && isCourseAvailable(course, approved));
       
       recommendedLoad = [...pendingToTake];
       let recommendedSet = new Set(recommendedLoad.map(c => c.name));
@@ -214,12 +221,7 @@ export function MapPlanner() {
       // Priority 2: Courses from the current term
       if (recommendedLoad.length < maxCourses) {
           const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
-              .filter(c => 
-                  !c.isPlaceholder && 
-                  !approved.has(c.name) && 
-                  !recommendedSet.has(c.name) && 
-                  isCourseAvailable(c, approved)
-              );
+              .filter(c => !recommendedSet.has(c.name) && isCourseAvailable(c, approved));
           
           for (const course of targetTermCourses) {
               if (recommendedLoad.length < maxCourses) {
@@ -229,34 +231,27 @@ export function MapPlanner() {
           }
       }
 
-      // --- ADVANCE SUBJECTS LOGIC ---
+      // Priority 3: Advance subjects if there's space
       if (recommendedLoad.length < maxCourses) {
         const effectiveApproved = new Set([...approved, ...recommendedSet]);
-        
         const futureTerms = curriculum.slice(selectedTermIndex + 1);
+
         for (const term of futureTerms) {
           if (recommendedLoad.length >= maxCourses) break;
-
-          const termIndex = curriculum.indexOf(term);
-          const prevTermCourses = curriculum[termIndex - 1]?.courses.filter(c => !c.isPlaceholder).map(c => c.name) ?? [];
-          const approvedInPrevTermCount = prevTermCourses.filter(c => effectiveApproved.has(c)).length;
-
-          if (approvedInPrevTermCount < 3) continue; // Base Academica rule
-
           for (const course of term.courses) {
             if (recommendedLoad.length >= maxCourses) break;
-            if (course.isPlaceholder || effectiveApproved.has(course.name)) continue;
-
-            const isCourseSeq = course.prerequisite && recommendedSet.has(course.prerequisite);
-            if (isCourseSeq) continue; // No Secuencia rule
             
-            const isBlockedByPending = course.prerequisite && pendingCourses.has(course.prerequisite);
-            if(isBlockedByPending) continue;
-
+            // Check availability based on the dynamically growing set of approved+recommended courses
             if (isCourseAvailable(course, effectiveApproved)) {
-              recommendedLoad.push(course);
-              recommendedSet.add(course.name);
-              effectiveApproved.add(course.name);
+                // Additional rules for advancing subjects
+                const isCourseSeq = course.prerequisite && recommendedSet.has(course.prerequisite);
+                const isBlockedByPending = course.prerequisite && pendingCourses.has(course.prerequisite);
+
+                if (!isCourseSeq && !isBlockedByPending) {
+                    recommendedLoad.push(course);
+                    recommendedSet.add(course.name);
+                    effectiveApproved.add(course.name); // Update for next iteration
+                }
             }
           }
         }
@@ -265,9 +260,8 @@ export function MapPlanner() {
     
     const recommended = new Set(recommendedLoad.map(c => c.name));
 
-
     return { approvedCourses: approved, lockedCourses: locked, recommendedCourses: recommended };
-  }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, isPrerequisiteApproved, activeTerms, isGraduationCandidate]);
+  }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, activeTerms, isGraduationCandidate]);
 
   const gridStructure = useMemo(() => {
     const maxRows = Math.max(...curriculum.map(t => t.courses.length)) + 1; // +1 for header
@@ -296,14 +290,14 @@ export function MapPlanner() {
             const endX = toNode.x;
             const endY = toNode.y + toNode.height / 2;
             
-            const isLocked = lockedCourses.has(courseName);
-            const isPending = pendingCourses.has(course.prerequisite);
+            // A line is 'pending' if the prerequisite is pending OR the target course is locked
+            const isPendingOrLocked = pendingCourses.has(course.prerequisite) || lockedCourses.has(courseName);
 
             lines.push(
                  <path
                     key={`${course.prerequisite}-${courseName}`}
                     d={`M ${startX},${startY} C ${startX + 30},${startY} ${endX - 30},${endY} ${endX},${endY}`}
-                    className={cn('connector-line', { locked: isLocked, pending: isPending })}
+                    className={cn('connector-line', { 'pending': isPendingOrLocked, 'locked': isPendingOrLocked })}
                     fill="none"
                 />
             );
