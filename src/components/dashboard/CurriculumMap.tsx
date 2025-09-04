@@ -89,7 +89,7 @@ export function CurriculumMap() {
     setPendingCourses(new Set()); // Reset pending courses when a new term is selected
   };
   
-  const handleCourseClick = (courseName: string, termIndex: number) => {
+  const handlePendingToggle = (courseName: string, termIndex: number) => {
     if (selectedTermIndex === -1 || termIndex >= selectedTermIndex) {
         return; // Can only mark courses from previous terms as pending
     }
@@ -169,8 +169,8 @@ export function CurriculumMap() {
         if(course.isPlaceholder) continue;
 
         if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
-            // Lock if it's in the current or future term but not recommended
-            if(course.termIndex === selectedTermIndex && !recommended.has(course.name)) {
+            // Lock if it's in the current or future term but not recommended and not already pending
+            if(course.termIndex === selectedTermIndex && !recommended.has(course.name) && !pendingCourses.has(course.name)) {
                locked.add(course.name);
             }
             // Lock if prerequisite is not met
@@ -214,9 +214,9 @@ export function CurriculumMap() {
   const getCourseState = (courseName: string, termIndex: number) => {
      if (recommendedCourses.has(courseName) && termIndex === selectedTermIndex) return 'recommended';
      if (lockedCourses.has(courseName)) return 'locked';
-     if (pendingCourses.has(courseName)) return 'pending';
      if (approvedCourses.has(courseName)) return 'approved';
-     if (selectedTermIndex > -1 && termIndex < selectedTermIndex) return 'approved';
+     // Pending is now handled by a separate indicator, not as a primary state for the card color.
+     if (selectedTermIndex > -1 && termIndex < selectedTermIndex && !pendingCourses.has(courseName)) return 'approved';
      return 'default';
   }
 
@@ -261,7 +261,7 @@ export function CurriculumMap() {
                 <li>Haz clic en el **título de un tetramestre** para simular el avance de un alumno hasta ese punto.</li>
                 <li>Las materias de tetramestres anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
                 <li>Las materias del tetramestre seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span>.</li>
-                <li>Haz clic en una materia aprobada para marcarla como <span className="font-semibold text-red-700">pendiente</span> y ver cómo afecta el futuro.</li>
+                <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> aprobada para marcarla como <span className="font-semibold text-red-700">pendiente</span> y ver cómo afecta el futuro.</li>
               </ol>
             </AlertDescription>
         </Alert>
@@ -294,13 +294,16 @@ export function CurriculumMap() {
                           );
                         }
                       const state = getCourseState(course.name, termIndex);
+                      const isPending = pendingCourses.has(course.name);
+                      const canBePending = selectedTermIndex > -1 && termIndex < selectedTermIndex;
+                      
                       return (
                           <div
                               key={course.name}
                               data-course-name={course.name}
                               className={cn('course-cell', {
                                   'locked': state === 'locked',
-                                  'pending': state === 'pending',
+                                  'pending': isPending,
                                   'approved': state === 'approved',
                                   'recommended': state === 'recommended',
                               })}
@@ -311,13 +314,23 @@ export function CurriculumMap() {
                           >
                               <Tooltip>
                                   <TooltipTrigger asChild>
-                                      <div className="course-card" onClick={() => handleCourseClick(course.name, termIndex)}>
+                                      <div className="course-card">
+                                          {canBePending && (
+                                              <div 
+                                                className="course-status-indicator" 
+                                                onClick={() => handlePendingToggle(course.name, termIndex)}
+                                                title={isPending ? 'Marcar como aprobada' : 'Marcar como pendiente'}
+                                              />
+                                          )}
                                           <p className="text-xs font-semibold leading-tight">{course.name}</p>
                                       </div>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                       <p className="font-bold">{course.name}</p>
-                                      <p className="text-xs text-muted-foreground capitalize">Estado: {state}</p>
+                                      <div className='flex gap-2 items-center'>
+                                        <p className="text-xs text-muted-foreground capitalize">Estado: {state}</p>
+                                        {isPending && <p className="text-xs text-red-500 font-semibold">Pendiente</p>}
+                                      </div>
                                       {course.prerequisite && <p className="text-xs text-muted-foreground">Prerrequisito: {course.prerequisite}</p>}
                                       {prerequisiteForMap.get(course.name) && (
                                           <p className="text-xs text-muted-foreground mt-1">
