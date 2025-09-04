@@ -242,39 +242,41 @@ export function MapPlanner() {
     const recommended = new Set(recommendedLoad.map(c => c.name));
 
     const locked = new Set<string>();
-    const allApprovedAndRecommended = new Set([...baseApproved, ...recommended]);
     const toCheckForLocking = new Set<string>();
+    const allAvailable = new Set([...baseApproved, ...recommended]);
 
-    for(const course of courseMap.values()){
-        if(course.isPlaceholder || allApprovedAndRecommended.has(course.name)) continue;
-        
+    // Initial locking pass
+    for (const course of courseMap.values()) {
+        if (course.isPlaceholder || allAvailable.has(course.name)) continue;
+
         const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
         const isTermActive = activeTerms.has(course.term);
 
-        if (!isPrerequisiteApproved(course.prerequisite, allApprovedAndRecommended)) {
-            toCheckForLocking.add(course.name);
-        } else if (!isFlex && !isTermActive) {
+        if (!isPrerequisiteApproved(course.prerequisite, allAvailable) || (!isFlex && !isTermActive)) {
             toCheckForLocking.add(course.name);
         }
     }
     
-    const checkedForPropagation = new Set<string>();
-    while(toCheckForLocking.size > 0) {
-      const courseName = toCheckForLocking.values().next().value;
-      toCheckForLocking.delete(courseName);
-      locked.add(courseName);
+    const processedForPropagation = new Set<string>();
+    while (toCheckForLocking.size > 0) {
+        const courseName = toCheckForLocking.values().next().value;
+        toCheckForLocking.delete(courseName);
 
-      if(!checkedForPropagation.has(courseName)){
-        const dependents = prerequisiteForMap.get(courseName);
-        if (dependents) {
-          dependents.forEach(dep => {
-            if(!locked.has(dep)){
-              toCheckForLocking.add(dep);
+        if (locked.has(courseName)) continue;
+        
+        locked.add(courseName);
+
+        if (!processedForPropagation.has(courseName)) {
+            const dependents = prerequisiteForMap.get(courseName);
+            if (dependents) {
+                dependents.forEach(dep => {
+                    if (!locked.has(dep)) {
+                        toCheckForLocking.add(dep);
+                    }
+                });
             }
-          });
+            processedForPropagation.add(courseName);
         }
-        checkedForPropagation.add(courseName);
-      }
     }
 
     return { approvedCourses: baseApproved, lockedCourses: locked, recommendedCourses: recommended };
