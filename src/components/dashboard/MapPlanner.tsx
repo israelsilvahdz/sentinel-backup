@@ -151,14 +151,6 @@ export function MapPlanner() {
     if (selectedTermIndex > -1) {
         const isApproved = (prereq: string | undefined) => isPrerequisiteApproved(prereq, approved);
 
-        const pendingFromCurriculum = curriculum
-            .flatMap(term => term.courses)
-            .filter(course => pendingCourses.has(course.name));
-            
-        // Highest priority: Pending courses that have their prerequisites met.
-        const pendingToTake = pendingFromCurriculum.filter(course => isApproved(course.prerequisite));
-        let load: CurriculumCourse[] = [...pendingToTake];
-
         const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
             .filter(c => {
                  if(c.isPlaceholder || approved.has(c.name) || !isApproved(c.prerequisite)) return false;
@@ -169,41 +161,15 @@ export function MapPlanner() {
                  
                  const isTermActive = activeTerms.has(courseTermInfo.term);
                  
-                 // A non-flex course can only be recommended if its term is active. Flex courses are always available.
                  return isFlex || isTermActive;
             });
         
-        targetTermCourses.sort((a, b) => {
-            const aIsHighPriority = HIGH_PRIORITY_COURSES.has(a.name);
-            const bIsHighPriority = HIGH_PRIORITY_COURSES.has(b.name);
-            if (aIsHighPriority && !bIsHighPriority) return -1;
-            if (!aIsHighPriority && bIsHighPriority) return 1;
-
-            const futurePrerequisites = new Set(
-                curriculum.slice(selectedTermIndex + 1).flatMap(t => t.courses.map(c => c.prerequisite).filter(Boolean))
-            );
-            const aIsPrereq = futurePrerequisites.has(a.name);
-            const bIsPrereq = futurePrerequisites.has(b.name);
-            if (aIsPrereq && !bIsPrereq) return -1;
-            if (!aIsPrereq && bIsPrereq) return 1;
-
-            return 0;
-        });
-        
-        let i = 0;
-        while (load.length < 7 && i < targetTermCourses.length) {
-            const courseToAdd = targetTermCourses[i];
-            if(!load.some(c => c.name === courseToAdd.name)) {
-                load.push(courseToAdd);
-            }
-            i++;
-        }
-        recommended = new Set(load.map(c => c.name));
+        recommended = new Set(targetTermCourses.map(c => c.name));
     }
 
     const locked = new Set<string>();
     for(const course of courseMap.values()){
-        if(course.isPlaceholder) continue;
+        if(course.isPlaceholder || approved.has(course.name) || recommended.has(course.name)) continue;
 
         const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
         const isTermActive = activeTerms.has(course.term);
@@ -215,12 +181,6 @@ export function MapPlanner() {
         if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
             if (!isPrerequisiteApproved(course.prerequisite, approved)) {
                locked.add(course.name);
-            }
-        }
-
-        if (selectedTermIndex > -1 && course.termIndex === selectedTermIndex && !recommended.has(course.name)) {
-            if (!pendingCourses.has(course.name)) {
-                locked.add(course.name);
             }
         }
     }
