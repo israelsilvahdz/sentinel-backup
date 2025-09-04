@@ -35,15 +35,15 @@
   position: relative;
 }
 
-.course-cell.highlight .course-card {
+.course-cell.approved .course-card {
   background-color: hsl(var(--primary) / 0.1);
   border-color: hsl(var(--primary) / 0.5);
-  transform: scale(1.05);
 }
 
 .course-cell.pending .course-card {
     background-color: hsl(var(--destructive) / 0.1);
     border-color: hsl(var(--destructive) / 0.5);
+    transform: scale(1.05);
 }
 
 .course-cell.locked .course-card {
