@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { curriculum, type CurriculumCourse } from '@/lib/curriculum';
+import { curriculum, type CurriculumCourse, type CurriculumTerm } from '@/lib/curriculum';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Lightbulb } from 'lucide-react';
+import { Lightbulb, Users } from 'lucide-react';
 
 const courseMap = new Map(curriculum.flatMap((term, termIndex) => term.courses.map(course => [course.name, { ...course, term: term.name, termIndex }])));
 
@@ -58,6 +58,7 @@ export function MapPlanner() {
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
   const [pendingCourses, setPendingCourses] = useState<Set<string>>(new Set());
   const [activeTerms, setActiveTerms] = useState<Set<string>>(new Set());
+  const [isGraduationCandidate, setIsGraduationCandidate] = useState(false);
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +101,9 @@ export function MapPlanner() {
   const handleTermClick = (termIndex: number) => {
     setSelectedTermIndex(termIndex);
     setPendingCourses(new Set()); // Reset pending courses when a new term is selected
+    if (termIndex < 5) {
+        setIsGraduationCandidate(false);
+    }
   };
   
   const handlePendingToggle = (courseName: string, termIndex: number) => {
@@ -130,10 +134,12 @@ export function MapPlanner() {
       })
   }
   
-    const isPrerequisiteApproved = useCallback((prerequisite: string | undefined, approvedCourses: Set<string>): boolean => {
-        if (!prerequisite) return true;
-        return approvedCourses.has(prerequisite);
-    }, []);
+  const isPrerequisiteApproved = useCallback((prerequisite: string | undefined, approvedCourses: Set<string>): boolean => {
+      if (!prerequisite) return true;
+      // For graduation candidates, prerequisites are ignored.
+      if (isGraduationCandidate && selectedTermIndex === 5) return true;
+      return approvedCourses.has(prerequisite);
+  }, [isGraduationCandidate, selectedTermIndex]);
 
   const { approvedCourses, lockedCourses, recommendedCourses } = useMemo(() => {
     const approved = new Set<string>();
@@ -147,47 +153,87 @@ export function MapPlanner() {
     pendingCourses.forEach(pc => approved.delete(pc));
     
     let recommendedLoad: CurriculumCourse[] = [];
+    const maxCourses = isGraduationCandidate && selectedTermIndex === 5 ? 9 : 7;
+    
     if (selectedTermIndex > -1) {
         const isCourseAvailable = (course: CurriculumCourse) => {
-            if (!course || course.isPlaceholder || approved.has(course.name)) return false;
-            
-            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+            if (!course || course.isPlaceholder) return false;
             const courseTermInfo = courseMap.get(course.name);
             if (!courseTermInfo) return false;
 
+            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
             const isTermActive = activeTerms.has(courseTermInfo.term);
-            const canTake = isFlex || isTermActive;
-
-            return canTake && isPrerequisiteApproved(course.prerequisite, approved);
+            return isFlex || isTermActive;
         };
-        
-        // Priority 1: Pending courses that are available
+
+        // Priority 1: Pending courses that are available and prerequisites met
         const pendingToTake = Array.from(pendingCourses)
             .map(name => courseMap.get(name)!)
-            .filter(isCourseAvailable);
-
+            .filter(course => isCourseAvailable(course) && isPrerequisiteApproved(course.prerequisite, approved));
+        
         recommendedLoad = [...pendingToTake];
-        const recommendedSet = new Set(recommendedLoad.map(c => c.name));
+        let recommendedSet = new Set(recommendedLoad.map(c => c.name));
 
-        // Priority 2: Courses from the current term that are available
+        // Priority 2: Courses from the current term
         const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
-            .filter(c => !recommendedSet.has(c.name) && isCourseAvailable(c));
+            .filter(c => !c.isPlaceholder && !recommendedSet.has(c.name) && isCourseAvailable(c) && isPrerequisiteApproved(c.prerequisite, approved));
         
         recommendedLoad.push(...targetTermCourses);
+
+        // --- ADVANCE SUBJECTS LOGIC ---
+        if (recommendedLoad.length < maxCourses) {
+          const loadCourseNames = new Set(recommendedLoad.map(c => c.name));
+          const allPendingAndRecommendedPrereqs = new Set(
+            recommendedLoad.flatMap(c => courseMap.get(c.name)?.prerequisite).filter(Boolean)
+          );
+
+          // Find courses to advance
+          const futureTerms = curriculum.slice(selectedTermIndex + 1);
+          for (const term of futureTerms) {
+            if (recommendedLoad.length >= maxCourses) break;
+
+            const termIndex = curriculum.indexOf(term);
+            const prevTermCourses = curriculum[termIndex - 1]?.courses.filter(c => !c.isPlaceholder).map(c => c.name) ?? [];
+            const approvedInPrevTermCount = prevTermCourses.filter(c => approved.has(c)).length;
+
+            if (approvedInPrevTermCount < 3) continue; // Base Academica rule
+
+            for (const course of term.courses) {
+              if (recommendedLoad.length >= maxCourses) break;
+              if (course.isPlaceholder || loadCourseNames.has(course.name)) continue;
+
+              const isCourseSeq = course.prerequisite && loadCourseNames.has(course.prerequisite);
+              if (isCourseSeq) continue; // No Secuencia rule
+              
+              const isBlockedByPending = course.prerequisite && pendingCourses.has(course.prerequisite);
+              if(isBlockedByPending) continue;
+
+              if (isCourseAvailable(course) && isPrerequisiteApproved(course.prerequisite, approved)) {
+                recommendedLoad.push(course);
+                loadCourseNames.add(course.name);
+              }
+            }
+          }
+        }
     }
+    
     const recommended = new Set(recommendedLoad.map(c => c.name));
 
     const locked = new Set<string>();
     for(const course of courseMap.values()){
         if(course.isPlaceholder || approved.has(course.name) || recommended.has(course.name)) continue;
         
-        if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
-            if (!isPrerequisiteApproved(course.prerequisite, approved)) {
-               locked.add(course.name);
-            }
+        const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+        const isTermActive = activeTerms.has(course.term);
+
+        if (!isPrerequisiteApproved(course.prerequisite, approved)) {
+            locked.add(course.name);
+        } else if (!isFlex && !isTermActive) {
+            locked.add(course.name);
         }
     }
     
+    // Lock dependents
     const toCheck = new Set(locked);
     const checked = new Set<string>();
     while(toCheck.size > 0) {
@@ -209,7 +255,7 @@ export function MapPlanner() {
     }
 
     return { approvedCourses: approved, lockedCourses: locked, recommendedCourses: recommended };
-  }, [selectedTermIndex, pendingCourses, isPrerequisiteApproved, activeTerms]);
+  }, [selectedTermIndex, pendingCourses, isPrerequisiteApproved, activeTerms, isGraduationCandidate]);
 
   const gridStructure = useMemo(() => {
     const maxRows = Math.max(...curriculum.map(t => t.courses.length)) + 1; // +1 for header
@@ -274,21 +320,38 @@ export function MapPlanner() {
         </Alert>
          <Card className="mb-6">
             <CardHeader>
-                <CardTitle>Paso 1: Define los Periodos Activos</CardTitle>
+                <CardTitle>Define el Contexto</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-x-6 gap-y-4">
-                {curriculum.map((term) => (
-                     <div key={term.name} className="flex items-center space-x-2">
+            <CardContent className="flex flex-wrap gap-x-6 gap-y-4 items-center">
+                 <div>
+                    <h3 className='font-medium mb-2'>Periodos Activos</h3>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {curriculum.map((term) => (
+                        <div key={term.name} className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`active-${term.name}`}
+                                checked={activeTerms.has(term.name)}
+                                onCheckedChange={() => handleActiveTermToggle(term.name)}
+                            />
+                            <Label htmlFor={`active-${term.name}`} className="font-medium cursor-pointer">
+                            {ORDINAL_MAP[term.name] ?? term.name}
+                            </Label>
+                        </div>
+                    ))}
+                    </div>
+                 </div>
+                 {selectedTermIndex === 5 && (
+                    <div className="flex items-center space-x-2 pt-5 pl-4">
                         <Checkbox
-                            id={`active-${term.name}`}
-                            checked={activeTerms.has(term.name)}
-                            onCheckedChange={() => handleActiveTermToggle(term.name)}
+                            id="graduation-candidate"
+                            checked={isGraduationCandidate}
+                            onCheckedChange={(checked) => setIsGraduationCandidate(!!checked)}
                         />
-                        <Label htmlFor={`active-${term.name}`} className="font-medium">
-                           {ORDINAL_MAP[term.name] ?? term.name}
+                        <Label htmlFor="graduation-candidate" className="font-medium flex items-center gap-2 cursor-pointer">
+                           <Users className='h-4 w-4' /> Es Candidato a Graduación
                         </Label>
                     </div>
-                ))}
+                 )}
             </CardContent>
          </Card>
         <main className="flex-1 overflow-x-auto">
@@ -378,3 +441,5 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
+
+    
