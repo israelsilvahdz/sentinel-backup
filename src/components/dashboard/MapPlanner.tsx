@@ -208,19 +208,16 @@ export function MapPlanner() {
         const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
         const isTermActive = activeTerms.has(course.term);
 
-        // **Primary Locking Rule**: If a course is not flex and its term is not active, it's locked.
         if (!isFlex && !isTermActive) {
             locked.add(course.name);
         }
         
-        // Lock if prerequisite is not met, but only for terms at or after selection
         if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
             if (!isPrerequisiteApproved(course.prerequisite, approved)) {
                locked.add(course.name);
             }
         }
 
-        // Lock if in the target term but not recommended.
         if (selectedTermIndex > -1 && course.termIndex === selectedTermIndex && !recommended.has(course.name)) {
             if (!pendingCourses.has(course.name)) {
                 locked.add(course.name);
@@ -228,7 +225,6 @@ export function MapPlanner() {
         }
     }
     
-    // Propagate locking to dependent courses
     const toCheck = new Set(locked);
     const checked = new Set<string>();
     while(toCheck.size > 0) {
@@ -261,10 +257,14 @@ export function MapPlanner() {
   }, []);
 
   const getCourseState = (courseName: string, termIndex: number) => {
+    // Priority 1: If it's in an already passed term and not pending, it's approved.
+     if (selectedTermIndex > -1 && termIndex < selectedTermIndex && !pendingCourses.has(courseName)) return 'approved';
+     if (approvedCourses.has(courseName)) return 'approved';
+     
+     // Priority 2: Check for other states for current or future courses.
      if (lockedCourses.has(courseName)) return 'locked';
      if (recommendedCourses.has(courseName)) return 'recommended';
-     if (approvedCourses.has(courseName)) return 'approved';
-     if (selectedTermIndex > -1 && termIndex < selectedTermIndex && !pendingCourses.has(courseName)) return 'approved';
+
      return 'default';
   }
 
@@ -420,5 +420,3 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
-
-    
