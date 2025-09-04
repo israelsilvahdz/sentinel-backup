@@ -80,5 +80,3 @@ export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon,
     </div>
   );
 }
-
-    

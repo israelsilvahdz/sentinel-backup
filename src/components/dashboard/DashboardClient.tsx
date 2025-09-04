@@ -191,20 +191,15 @@ export function DashboardClient() {
     return studentsArray.length;
   };
 
-
-  const handleFileUpload = async () => {
-    if (!currentFile) {
-        toast({
-            variant: 'destructive',
-            title: 'Falta archivo',
-            description: 'Por favor, carga el reporte actual.',
-        });
-        return;
+  const handleFileUpload = useCallback(async (file: File | null) => {
+    if (!file) {
+      return;
     }
+    setCurrentFile(file);
     setIsProcessing(true);
     setProgress(10);
     try {
-        const studentData = await parseExcel(currentFile);
+        const studentData = await parseExcel(file);
         setProgress(50);
         
         if (!studentData) {
@@ -223,7 +218,7 @@ export function DashboardClient() {
 
         setUploadHistory(prev => [{ 
             id: Date.now().toString(), 
-            fileName: currentFile.name, 
+            fileName: file.name, 
             uploadedAt: new Date().toISOString() 
         }, ...prev].slice(0, 10));
 
@@ -243,9 +238,10 @@ export function DashboardClient() {
         setTimeout(() => {
             setIsProcessing(false);
             setProgress(0);
+            setCurrentFile(null);
         }, 500);
     }
-  };
+  }, [toast]);
 
 
   const handleDeleteAllData = () => {
@@ -443,11 +439,7 @@ export function DashboardClient() {
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
                  </div>
                  <div className="flex items-center gap-2 flex-wrap">
-                    <FileUpload onFileSelect={setCurrentFile} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Diario General" icon={<FileCheck2 />} />
-                    <Button onClick={handleFileUpload} disabled={isProcessing || !currentFile}>
-                        <UploadCloud className="mr-2 h-4 w-4" />
-                        Cargar Reporte
-                    </Button>
+                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Diario General" icon={<FileCheck2 />} />
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
                         <span className="sr-only">Recargar</span>
@@ -470,5 +462,3 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
-
-    
