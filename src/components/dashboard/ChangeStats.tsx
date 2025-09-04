@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useDashboardFilters } from './DashboardClient';
 import { KpiCard } from './KpiCard';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2, Library } from 'lucide-react';
 import { type Change, type Student, type StudentData } from '@/types/student';
 import { FileUpload } from './FileUpload';
 import { Button } from '../ui/button';
@@ -21,7 +21,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <p className="font-bold text-base">{label}</p>
           {payload.map((entry: any, index: number) => (
              <p key={`item-${index}`} style={{ color: entry.fill }} className="text-sm">
-                {entry.name}: {entry.value}
+                {entry.name === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'}: {entry.value}
              </p>
           ))}
         </div>
@@ -110,7 +110,7 @@ export function ChangeStats() {
     useEffect(() => {
         const runComparison = async () => {
             if (!previousFile || !hasData) {
-                if (previousFile) {
+                if (previousFile && !hasData) {
                     toast({
                         variant: 'destructive',
                         title: 'Falta reporte actual',
@@ -139,10 +139,9 @@ export function ChangeStats() {
                 const { processed, changes } = processAndCompareData(previousData, allStudents);
                 setProgress(90);
                 
-                const currentReportName = "Reporte Actual en Memoria";
                 setUploadHistory(prev => [{ 
                     id: Date.now().toString(), 
-                    fileName: `COMPARE: ${previousFile.name} vs ${currentReportName}`, 
+                    fileName: `COMPARE: ${previousFile.name} vs Reporte Actual`, 
                     uploadedAt: new Date().toISOString() 
                 }, ...prev].slice(0, 10));
 
@@ -168,6 +167,7 @@ export function ChangeStats() {
         };
 
         runComparison();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [previousFile, hasData, allStudents]);
 
 
@@ -281,13 +281,11 @@ export function ChangeStats() {
                         </Card>
                     ) : (
                         <>
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                                 <KpiCard title="Total de Cambios de Riesgo" value={totalChanges} icon={AlertTriangle} color="yellow" />
                                 <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} color="blue" onClick={() => handleCaseClick('changes')} />
-                                <KpiCard title="Materia con más Faltas" value={changesBySubject[0]?.name || 'N/A'} icon={AlertTriangle} />
-                                <KpiCard title="Materia con más Tareas (NE)" value={changesBySubject.sort((a,b) => b['Tareas (NE)'] - a['Tareas (NE)'])[0]?.name || 'N/A'} icon={BookOpenCheck} />
                             </div>
-
+                            
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <Card>
                                     <CardHeader>
@@ -300,9 +298,9 @@ export function ChangeStats() {
                                                 <XAxis type="number" />
                                                 <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }}/>
                                                 <Tooltip content={<CustomTooltip />} />
-                                                <Legend />
-                                                <Bar dataKey="Faltas" stackId="a" fill="hsl(var(--chart-4))" />
-                                                <Bar dataKey="Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
+                                                <Legend formatter={(value) => value === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'} />
+                                                <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
+                                                <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </CardContent>
@@ -318,14 +316,32 @@ export function ChangeStats() {
                                                 <XAxis type="number" />
                                                 <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
                                                 <Tooltip content={<CustomTooltip />} />
-                                                <Legend />
-                                                <Bar dataKey="Faltas" stackId="a" fill="hsl(var(--chart-4))" />
-                                                <Bar dataKey="Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
+                                                <Legend formatter={(value) => value === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'} />
+                                                <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
+                                                <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </CardContent>
                                 </Card>
                             </div>
+                             <Card>
+                                <CardHeader>
+                                    <CardTitle>Cambios por Materia</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <BarChart data={changesBySubject} layout="vertical" margin={{ left: 150 }}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis type="number" />
+                                            <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
+                                            <Tooltip content={<CustomTooltip />} />
+                                            <Legend formatter={(value) => value === 'Tareas (NE)' ? 'Nuevas Tareas (NE)' : 'Nuevas Faltas'} />
+                                            <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
+                                            <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
                         </>
                     )}
                 </>
@@ -333,3 +349,5 @@ export function ChangeStats() {
         </div>
     );
 }
+
+    
