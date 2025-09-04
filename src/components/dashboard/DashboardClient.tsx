@@ -393,7 +393,7 @@ export function DashboardClient() {
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={false}>
         <Sidebar collapsible="icon">
           <SidebarHeader>
              <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:justify-center">
