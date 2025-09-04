@@ -357,5 +357,3 @@ export function CoursePlanner() {
     </div>
   );
 }
-
-    
