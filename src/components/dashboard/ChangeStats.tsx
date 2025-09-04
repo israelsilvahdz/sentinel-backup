@@ -198,7 +198,9 @@ export function ChangeStats() {
         }
 
         const allChanges: Change[] = Object.values(studentHistory).flat();
-        const studentsWithChangesSet = new Set(allChanges.map(c => c.studentId));
+        const riskChanges = allChanges.filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
+        const studentsWithChangesSet = new Set(riskChanges.map(c => c.studentId));
+
 
         let newAbsences = 0;
         let newMissedAssignments = 0;
@@ -237,7 +239,7 @@ export function ChangeStats() {
         const formatChartData = (data: Record<string, any>) => Object.entries(data).map(([name, counts]) => ({ name, Faltas: counts.absences, 'Tareas (NE)': counts.missedAssignments })).sort((a,b) => (b.Faltas + b['Tareas (NE)']) - (a.Faltas + a['Tareas (NE)'])).slice(0, 10);
 
         return {
-            totalChanges: allChanges.filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments').length,
+            totalChanges: riskChanges.length,
             studentsWithChanges: studentsWithChangesSet.size,
             totalNewAbsences: newAbsences,
             totalNewMissedAssignments: newMissedAssignments,
