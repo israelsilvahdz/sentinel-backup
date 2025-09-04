@@ -57,6 +57,7 @@ const ORDINAL_MAP: Record<string, string> = {
 export function MapPlanner() {
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
   const [pendingCourses, setPendingCourses] = useState<Set<string>>(new Set());
+  const [manuallyApprovedCourses, setManuallyApprovedCourses] = useState<Set<string>>(new Set());
   const [activeTerms, setActiveTerms] = useState<Set<string>>(new Set());
   const [isGraduationCandidate, setIsGraduationCandidate] = useState(false);
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
@@ -101,25 +102,37 @@ export function MapPlanner() {
   const handleTermClick = (termIndex: number) => {
     setSelectedTermIndex(termIndex);
     setPendingCourses(new Set()); // Reset pending courses when a new term is selected
+    setManuallyApprovedCourses(new Set()); // Reset manually approved courses as well
     if (termIndex < 5) {
         setIsGraduationCandidate(false);
     }
   };
   
-  const handlePendingToggle = (courseName: string, termIndex: number) => {
-    if (selectedTermIndex === -1 || termIndex >= selectedTermIndex) {
-        return; // Can only mark courses from previous terms as pending
+  const handleCourseStatusToggle = (courseName: string, termIndex: number) => {
+    // Logic for past terms: Toggle Pending Status
+    if (selectedTermIndex > -1 && termIndex < selectedTermIndex) {
+        setPendingCourses(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(courseName)) {
+                newSet.delete(courseName);
+            } else {
+                newSet.add(courseName);
+            }
+            return newSet;
+        });
+    } 
+    // Logic for current or future terms: Toggle Manually Approved Status
+    else if (selectedTermIndex > -1 && termIndex >= selectedTermIndex) {
+        setManuallyApprovedCourses(prev => {
+             const newSet = new Set(prev);
+            if (newSet.has(courseName)) {
+                newSet.delete(courseName);
+            } else {
+                newSet.add(courseName);
+            }
+            return newSet;
+        });
     }
-
-    setPendingCourses(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(courseName)) {
-        newSet.delete(courseName);
-      } else {
-        newSet.add(courseName);
-      }
-      return newSet;
-    });
   };
 
   const handleActiveTermToggle = (termName: string) => {
@@ -150,6 +163,7 @@ export function MapPlanner() {
             });
         }
     }
+    manuallyApprovedCourses.forEach(c => approved.add(c));
     pendingCourses.forEach(pc => approved.delete(pc));
     
     let recommendedLoad: CurriculumCourse[] = [];
@@ -176,17 +190,14 @@ export function MapPlanner() {
 
         // Priority 2: Courses from the current term
         const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
-            .filter(c => !c.isPlaceholder && !recommendedSet.has(c.name) && isCourseAvailable(c) && isPrerequisiteApproved(c.prerequisite, approved));
+            .filter(c => !c.isPlaceholder && !approved.has(c.name) && !recommendedSet.has(c.name) && isCourseAvailable(c) && isPrerequisiteApproved(c.prerequisite, approved));
         
         recommendedLoad.push(...targetTermCourses);
 
         // --- ADVANCE SUBJECTS LOGIC ---
         if (recommendedLoad.length < maxCourses) {
           const loadCourseNames = new Set(recommendedLoad.map(c => c.name));
-          const allPendingAndRecommendedPrereqs = new Set(
-            recommendedLoad.flatMap(c => courseMap.get(c.name)?.prerequisite).filter(Boolean)
-          );
-
+          
           // Find courses to advance
           const futureTerms = curriculum.slice(selectedTermIndex + 1);
           for (const term of futureTerms) {
@@ -200,7 +211,7 @@ export function MapPlanner() {
 
             for (const course of term.courses) {
               if (recommendedLoad.length >= maxCourses) break;
-              if (course.isPlaceholder || loadCourseNames.has(course.name)) continue;
+              if (course.isPlaceholder || loadCourseNames.has(course.name) || approved.has(course.name)) continue;
 
               const isCourseSeq = course.prerequisite && loadCourseNames.has(course.prerequisite);
               if (isCourseSeq) continue; // No Secuencia rule
@@ -255,7 +266,7 @@ export function MapPlanner() {
     }
 
     return { approvedCourses: approved, lockedCourses: locked, recommendedCourses: recommended };
-  }, [selectedTermIndex, pendingCourses, isPrerequisiteApproved, activeTerms, isGraduationCandidate]);
+  }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, isPrerequisiteApproved, activeTerms, isGraduationCandidate]);
 
   const gridStructure = useMemo(() => {
     const maxRows = Math.max(...curriculum.map(t => t.courses.length)) + 1; // +1 for header
@@ -314,7 +325,7 @@ export function MapPlanner() {
                 <li>Haz clic en el **título de un período (ej. 1°)** para simular el avance de un alumno.</li>
                 <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
                 <li>Las materias del período seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
-                <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> aprobada para marcarla como <span className="font-semibold text-red-700">pendiente</span> y ver cómo afecta el futuro.</li>
+                <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> para cambiar su estado (pendiente o aprobada manualmente).</li>
               </ol>
             </AlertDescription>
         </Alert>
@@ -384,7 +395,6 @@ export function MapPlanner() {
                         }
                       const state = getCourseState(course.name);
                       const isPending = pendingCourses.has(course.name);
-                      const canBePending = selectedTermIndex > -1 && termIndex < selectedTermIndex;
                       const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
                       
                       return (
@@ -405,11 +415,15 @@ export function MapPlanner() {
                               <Tooltip>
                                   <TooltipTrigger asChild>
                                       <div className="course-card">
-                                          {canBePending && (
+                                          {selectedTermIndex > -1 && (
                                               <div 
                                                 className="course-status-indicator" 
-                                                onClick={() => handlePendingToggle(course.name, termIndex)}
-                                                title={isPending ? 'Marcar como aprobada' : 'Marcar como pendiente'}
+                                                onClick={() => handleCourseStatusToggle(course.name, termIndex)}
+                                                title={
+                                                    termIndex < selectedTermIndex 
+                                                        ? (isPending ? 'Marcar como aprobada' : 'Marcar como pendiente')
+                                                        : (approvedCourses.has(course.name) ? 'Desmarcar como aprobada' : 'Marcar como aprobada manualmente')
+                                                }
                                               />
                                           )}
                                           {isFlex && <div className="course-flex-indicator">F</div>}
@@ -441,5 +455,3 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
-
-    
