@@ -244,7 +244,6 @@ export function MapPlanner() {
     // --- CASCADING LOCK LOGIC ---
     const locked = new Set<string>();
     let prevLockedSize = -1;
-
     // Repeat until no new courses are locked in a full pass
     while (locked.size !== prevLockedSize) {
         prevLockedSize = locked.size;
@@ -255,7 +254,8 @@ export function MapPlanner() {
             }
 
             const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-            const isTermActive = activeTerms.has(course.term);
+            const courseTermInfo = courseMap.get(course.name);
+            const isTermActive = courseTermInfo && activeTerms.has(courseTermInfo.term);
 
             const prereq = course.prerequisite;
             // A course is locked if its prerequisite is locked, or if its prerequisite is pending,
@@ -296,7 +296,7 @@ export function MapPlanner() {
             const endX = toNode.x;
             const endY = toNode.y + toNode.height / 2;
             
-            const isLocked = lockedCourses.has(courseName) || (course.prerequisite && lockedCourses.has(course.prerequisite));
+            const isLocked = lockedCourses.has(courseName);
             const isPending = pendingCourses.has(course.prerequisite);
 
             lines.push(

@@ -124,4 +124,12 @@
 .connector-line.locked,
 .connector-line.pending {
     stroke: hsl(var(--destructive) / 0.5);
+    stroke-dasharray: 4;
+    animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -20;
+  }
 }
