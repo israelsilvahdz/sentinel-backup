@@ -37,7 +37,7 @@ const legendFormatter = (value: string) => {
 }
 
 export function ChangeStats() {
-    const { studentHistory, allStudents, isLoading, hasData, setActiveView, setCaseType, setStudentHistory, setUploadHistory } = useDashboardFilters();
+    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType } = useDashboardFilters();
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
@@ -112,19 +112,22 @@ export function ChangeStats() {
         setStudentHistory(newHistory);
         return { processed: Object.keys(currentData).length, changes: changesCount };
     };
-
+    
     useEffect(() => {
         const runComparison = async () => {
-            if (!previousFile || !hasData) {
-                if (previousFile && !hasData) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Falta reporte actual',
-                        description: 'Por favor, carga primero el reporte diario general en la barra superior.',
-                    });
-                }
+            if (!previousFile) {
                 return;
             }
+            if (!hasCurrentData) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Falta reporte actual',
+                    description: 'Por favor, carga primero el reporte diario general en la barra superior.',
+                });
+                setPreviousFile(null);
+                return;
+            }
+
             setIsProcessing(true);
             setProgress(10);
             try {
@@ -167,14 +170,14 @@ export function ChangeStats() {
                 setTimeout(() => {
                     setIsProcessing(false);
                     setProgress(0);
-                    setPreviousFile(null); // Clear the file after processing
+                    setPreviousFile(null);
                 }, 500);
             }
         };
 
         runComparison();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [previousFile, hasData, allStudents]);
+    }, [previousFile, hasCurrentData, allStudents]);
 
 
     const { 
@@ -182,7 +185,7 @@ export function ChangeStats() {
         changesByLeader, changesByTutor, changesBySubject 
     } = useMemo(() => {
         const hasHistory = Object.keys(studentHistory).length > 0;
-        if (isLoading || !hasHistory || !hasData) {
+        if (!hasHistory) {
             return {
                 totalChanges: 0,
                 studentsWithChanges: 0,
@@ -243,7 +246,7 @@ export function ChangeStats() {
             changesBySubject: formatChartData(subjectCounts),
         };
 
-    }, [studentHistory, allStudents, isLoading, hasData]);
+    }, [studentHistory, allStudents]);
 
     const handleCaseClick = (caseType: 'changes') => {
         setCaseType(caseType);
@@ -262,7 +265,7 @@ export function ChangeStats() {
             <Card>
                 <CardHeader>
                     <CardTitle>Iniciar Comparación</CardTitle>
-                    <CardDescription>Carga el reporte del día anterior. Se comparará automáticamente con el reporte actual que ya tienes cargado.</CardDescription>
+                    <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
                     <FileUpload onFileSelect={setPreviousFile} selectedFile={previousFile} isLoading={isProcessing} label="Cargar Reporte Anterior" icon={<FileClock />} />
@@ -288,11 +291,11 @@ export function ChangeStats() {
 
             {hasComparisonData && (
                  <>
-                    {totalChanges === 0 && !isLoading ? (
+                    {totalChanges === 0 && !isProcessing ? (
                          <Card className="text-center p-12 mt-8">
                             <CardHeader>
                                 <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
-                                    <AlertCircle className="h-8 w-8 text-primary" />
+                                    <FileCheck2 className="h-8 w-8 text-primary" />
                                 </div>
                                 <CardTitle>No se Encontraron Cambios de Riesgo</CardTitle>
                             </CardHeader>
@@ -305,10 +308,10 @@ export function ChangeStats() {
                     ) : (
                         <>
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} color="blue" onClick={() => handleCaseClick('changes')} />
+                                <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} onClick={() => handleCaseClick('changes')} />
                                 <KpiCard title="Total de Cambios de Riesgo" value={totalChanges} icon={AlertTriangle} />
-                                <KpiCard title="Total de Faltas (nuevas)" value={totalNewAbsences} icon={FileWarning} color="yellow" />
-                                <KpiCard title="Total de NE (nuevas)" value={totalNewMissedAssignments} icon={BadgeAlert} color="red" />
+                                <KpiCard title="Total Faltas (nuevas)" value={totalNewAbsences} icon={FileWarning} color="yellow" />
+                                <KpiCard title="Total Tareas NE (nuevas)" value={totalNewMissedAssignments} icon={BadgeAlert} color="red" />
                             </div>
                             
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -374,9 +377,5 @@ export function ChangeStats() {
         </div>
     );
 }
-
-    
-
-    
 
     

@@ -10,7 +10,8 @@ interface FileUploadProps extends ButtonProps {
   onFileSelect: (file: File | null) => void;
   selectedFile: File | null;
   isLoading: boolean;
-  className?: string;
+  label?: string;
+  icon?: ReactNode;
 }
 
 export function FileUpload({ 
@@ -18,6 +19,8 @@ export function FileUpload({
   selectedFile, 
   isLoading, 
   className,
+  label = 'Cargar Reporte',
+  icon = <UploadCloud className="mr-2 h-4 w-4" />,
   ...props
 }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,6 +34,7 @@ export function FileUpload({
   };
 
   const handleButtonClick = () => {
+    if (isLoading) return;
     if (selectedFile) {
       onFileSelect(null);
     } else {
@@ -67,11 +71,13 @@ export function FileUpload({
           </>
         ) : (
           <>
-            <UploadCloud className="mr-2 h-4 w-4" />
-            <span>Cargar Reporte</span>
+            {icon}
+            <span>{label}</span>
           </>
         )}
       </Button>
     </>
   );
 }
+
+    

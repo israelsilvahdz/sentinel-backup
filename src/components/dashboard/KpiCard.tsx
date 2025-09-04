@@ -25,7 +25,7 @@ export function KpiCard({ title, value, icon: Icon, color, onClick }: KpiCardPro
   return (
     <Card 
       onClick={onClick}
-      className={cn(isClickable && "cursor-pointer hover:bg-muted/50 transition-colors")}
+      className={cn("h-full", isClickable && "cursor-pointer hover:bg-muted/50 transition-colors")}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -41,3 +41,5 @@ export function KpiCard({ title, value, icon: Icon, color, onClick }: KpiCardPro
     </Card>
   );
 }
+
+    
