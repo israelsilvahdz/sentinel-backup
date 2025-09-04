@@ -160,7 +160,7 @@ export function CoursePlanner() {
                         Ver Mapa Curricular
                     </Button>
                 </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-full md:w-3/4 lg:w-4/5 xl:w-5/6 p-0">
+                <SheetContent className="w-full sm:max-w-[90vw] p-0">
                     <SheetHeader className="p-4 border-b">
                         <SheetTitle>Mapa Curricular Interactivo</SheetTitle>
                     </SheetHeader>
