@@ -58,7 +58,7 @@ export function MapPlanner() {
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
   const [pendingCourses, setPendingCourses] = useState<Set<string>>(new Set());
   const [manuallyApprovedCourses, setManuallyApprovedCourses] = useState<Set<string>>(new Set());
-  const [activeTerms, setActiveTerms] = useState<Set<string>>(new Set());
+  const [activeTerms, setActiveTerms] = useState<Set<string>>(new Set(curriculum.map(term => term.name)));
   const [isGraduationCandidate, setIsGraduationCandidate] = useState(false);
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
   const gridRef = useRef<HTMLDivElement>(null);
@@ -469,3 +469,5 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
+
+    
