@@ -165,8 +165,10 @@ export function MapPlanner() {
                  
                  const isFlex = !HIGH_PRIORITY_COURSES.has(c.name);
                  const courseTermInfo = courseMap.get(c.name);
-                 const isTermActive = courseTermInfo ? activeTerms.has(courseTermInfo.term) : false;
-
+                 if (!courseTermInfo) return false;
+                 
+                 const isTermActive = activeTerms.has(courseTermInfo.term);
+                 
                  // A non-flex course can only be recommended if its term is active. Flex courses are always available.
                  return isFlex || isTermActive;
             });
@@ -203,25 +205,25 @@ export function MapPlanner() {
     for(const course of courseMap.values()){
         if(course.isPlaceholder) continue;
 
-        // If a term is selected, we apply locking logic
-        if (selectedTermIndex > -1) {
-            // Lock if it's a non-flex course in a non-active term.
-             const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-             const isTermActive = activeTerms.has(course.term);
-             if (!isFlex && !isTermActive) {
-                 locked.add(course.name);
-             }
+        const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+        const isTermActive = activeTerms.has(course.term);
 
-            // Lock if it's in a future term or the current term
-            if (course.termIndex >= selectedTermIndex) {
-                // If it's in the target term but not recommended, lock it
-                if(course.termIndex === selectedTermIndex && !recommended.has(course.name)) {
-                   if (!pendingCourses.has(course.name)) locked.add(course.name);
-                }
-            }
-            // Lock if prerequisite is not met
+        // **Primary Locking Rule**: If a course is not flex and its term is not active, it's locked.
+        if (!isFlex && !isTermActive) {
+            locked.add(course.name);
+        }
+        
+        // Lock if prerequisite is not met, but only for terms at or after selection
+        if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
             if (!isPrerequisiteApproved(course.prerequisite, approved)) {
                locked.add(course.name);
+            }
+        }
+
+        // Lock if in the target term but not recommended.
+        if (selectedTermIndex > -1 && course.termIndex === selectedTermIndex && !recommended.has(course.name)) {
+            if (!pendingCourses.has(course.name)) {
+                locked.add(course.name);
             }
         }
     }
@@ -259,8 +261,8 @@ export function MapPlanner() {
   }, []);
 
   const getCourseState = (courseName: string, termIndex: number) => {
-     if (recommendedCourses.has(courseName)) return 'recommended';
      if (lockedCourses.has(courseName)) return 'locked';
+     if (recommendedCourses.has(courseName)) return 'recommended';
      if (approvedCourses.has(courseName)) return 'approved';
      if (selectedTermIndex > -1 && termIndex < selectedTermIndex && !pendingCourses.has(courseName)) return 'approved';
      return 'default';
@@ -304,7 +306,7 @@ export function MapPlanner() {
             <AlertTitle className="text-blue-800">Planificador por Mapa Interactivo</AlertTitle>
             <AlertDescription className="text-blue-700">
               <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
-                <li>Selecciona los **períodos activos** para simular la oferta académica real.</li>
+                <li>Selecciona los **períodos activos** para simular la oferta académica real. Las materias no flexibles de períodos inactivos se bloquearán.</li>
                 <li>Haz clic en el **título de un período (ej. 1°)** para simular el avance de un alumno.</li>
                 <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
                 <li>Las materias del período seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
@@ -418,3 +420,5 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
+
+    
