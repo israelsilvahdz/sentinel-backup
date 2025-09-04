@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useDashboardFilters } from './DashboardClient';
 import { KpiCard } from './KpiCard';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2, Library } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2, Library, BadgeAlert, FileWarning } from 'lucide-react';
 import { type Change, type Student, type StudentData } from '@/types/student';
 import { FileUpload } from './FileUpload';
 import { Button } from '../ui/button';
@@ -177,12 +177,17 @@ export function ChangeStats() {
     }, [previousFile, hasData, allStudents]);
 
 
-    const { totalChanges, studentsWithChanges, changesByLeader, changesByTutor, changesBySubject } = useMemo(() => {
+    const { 
+        totalChanges, studentsWithChanges, totalNewAbsences, totalNewMissedAssignments, 
+        changesByLeader, changesByTutor, changesBySubject 
+    } = useMemo(() => {
         const hasHistory = Object.keys(studentHistory).length > 0;
         if (isLoading || !hasHistory || !hasData) {
             return {
                 totalChanges: 0,
                 studentsWithChanges: 0,
+                totalNewAbsences: 0,
+                totalNewMissedAssignments: 0,
                 changesByLeader: [],
                 changesByTutor: [],
                 changesBySubject: [],
@@ -192,28 +197,38 @@ export function ChangeStats() {
         const allChanges: Change[] = Object.values(studentHistory).flat();
         const studentsWithChangesSet = new Set(allChanges.map(c => c.studentId));
 
+        let newAbsences = 0;
+        let newMissedAssignments = 0;
+
         const leaderCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const tutorCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
 
         for (const change of allChanges) {
-            const student = allStudents.find(s => s.id === change.studentId);
-            if (!student) continue;
-
             const isRiskIncrement = change.fieldName === 'absences' || change.fieldName === 'missedAssignments';
             if (!isRiskIncrement) continue;
+
+            const increment = (change.newValue as number) - (change.oldValue as number);
+            if (change.fieldName === 'absences') newAbsences += increment;
+            if (change.fieldName === 'missedAssignments') newMissedAssignments += increment;
+            
+            const student = allStudents.find(s => s.id === change.studentId);
+            if (!student) continue;
 
             const subject = student.subjects?.find(s => s.id === change.subjectId);
             const subjectName = subject?.name || 'Desconocida';
 
             if (!leaderCounts[student.leader]) leaderCounts[student.leader] = { absences: 0, missedAssignments: 0 };
-            leaderCounts[student.leader][change.fieldName as 'absences' | 'missedAssignments']++;
+            if (change.fieldName === 'absences') leaderCounts[student.leader].absences += increment;
+            else leaderCounts[student.leader].missedAssignments += increment;
             
             if (!tutorCounts[student.tutor]) tutorCounts[student.tutor] = { absences: 0, missedAssignments: 0 };
-            tutorCounts[student.tutor][change.fieldName as 'absences' | 'missedAssignments']++;
-            
+            if (change.fieldName === 'absences') tutorCounts[student.tutor].absences += increment;
+            else tutorCounts[student.tutor].missedAssignments += increment;
+
             if (!subjectCounts[subjectName]) subjectCounts[subjectName] = { absences: 0, missedAssignments: 0 };
-            subjectCounts[subjectName][change.fieldName as 'absences' | 'missedAssignments']++;
+            if (change.fieldName === 'absences') subjectCounts[subjectName].absences += increment;
+            else subjectCounts[subjectName].missedAssignments += increment;
         }
 
         const formatChartData = (data: Record<string, any>) => Object.entries(data).map(([name, counts]) => ({ name, Faltas: counts.absences, 'Tareas (NE)': counts.missedAssignments })).sort((a,b) => (b.Faltas + b['Tareas (NE)']) - (a.Faltas + a['Tareas (NE)'])).slice(0, 10);
@@ -221,6 +236,8 @@ export function ChangeStats() {
         return {
             totalChanges: allChanges.filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments').length,
             studentsWithChanges: studentsWithChangesSet.size,
+            totalNewAbsences: newAbsences,
+            totalNewMissedAssignments: newMissedAssignments,
             changesByLeader: formatChartData(leaderCounts),
             changesByTutor: formatChartData(tutorCounts),
             changesBySubject: formatChartData(subjectCounts),
@@ -287,9 +304,11 @@ export function ChangeStats() {
                         </Card>
                     ) : (
                         <>
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-                                <KpiCard title="Total de Cambios de Riesgo" value={totalChanges} icon={AlertTriangle} color="yellow" />
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                                 <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} color="blue" onClick={() => handleCaseClick('changes')} />
+                                <KpiCard title="Total de Cambios de Riesgo" value={totalChanges} icon={AlertTriangle} />
+                                <KpiCard title="Total de Faltas (nuevas)" value={totalNewAbsences} icon={FileWarning} color="yellow" />
+                                <KpiCard title="Total de NE (nuevas)" value={totalNewMissedAssignments} icon={BadgeAlert} color="red" />
                             </div>
                             
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -355,6 +374,8 @@ export function ChangeStats() {
         </div>
     );
 }
+
+    
 
     
 
