@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState }from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Timeline, TimelineItem, TimelineConnector, TimelineHeader, TimelineIcon, TimelineTitle, TimelineBody } from '@/components/ui/timeline';
 import { useDashboardFilters } from './DashboardClient';
@@ -35,9 +35,11 @@ function formatFieldName(fieldName: string): string {
 }
 
 export function ChangeHistory({ studentId }: ChangeHistoryProps) {
-  const { getStudentChanges } = useDashboardFilters();
+  const { getStudentChanges, allStudents } = useDashboardFilters();
   const [history, setHistory] = useState<Change[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const student = allStudents.find(s => s.id === studentId);
 
   useEffect(() => {
     async function loadHistory() {
@@ -90,38 +92,41 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
       <CardContent>
         {history.length > 0 ? (
           <Timeline>
-            {history.map((change, index) => (
-              <TimelineItem key={index}>
-                <TimelineConnector />
-                <TimelineHeader>
-                    <TimelineIcon>
-                        {ICONS[change.fieldName] || <AlertTriangle />}
-                    </TimelineIcon>
-                  <TimelineTitle>{formatFieldName(change.fieldName)}</TimelineTitle>
-                </TimelineHeader>
-                <TimelineBody>
-                  <div className="font-mono text-sm text-muted-foreground mb-2">
-                     <p>
-                        <span className="font-semibold text-foreground">
-                            {change.oldValue}
-                        </span> → <span className="font-semibold text-primary">{change.newValue}</span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {format(new Date(change.date), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
+            {history.map((change, index) => {
+              const subjectName = student?.subjects?.find(s => s.id === change.subjectId)?.name;
+              return (
+                <TimelineItem key={index}>
+                  <TimelineConnector />
+                  <TimelineHeader>
+                      <TimelineIcon>
+                          {ICONS[change.fieldName] || <AlertTriangle />}
+                      </TimelineIcon>
+                    <TimelineTitle>{formatFieldName(change.fieldName)}</TimelineTitle>
+                  </TimelineHeader>
+                  <TimelineBody>
+                    <div className="font-mono text-sm text-muted-foreground mb-2">
+                       <p>
+                          <span className="font-semibold text-foreground">
+                              {change.oldValue}
+                          </span> → <span className="font-semibold text-primary">{change.newValue}</span>
+                      </p>
                     </div>
-                     {change.subjectId !== 'N/A' && (
-                        <div className="flex items-center gap-1">
-                            <BookOpenCheck className="h-3 w-3" />
-                            <span>{change.subjectId}</span>
-                        </div>
-                     )}
-                  </div>
-                </TimelineBody>
-              </TimelineItem>
-            ))}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(change.date), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
+                      </div>
+                       {subjectName && (
+                          <div className="flex items-center gap-1">
+                              <BookOpenCheck className="h-3 w-3" />
+                              <span>{subjectName} ({change.subjectId})</span>
+                          </div>
+                       )}
+                    </div>
+                  </TimelineBody>
+                </TimelineItem>
+              )
+            })}
           </Timeline>
         ) : (
           <p className="text-muted-foreground">No se encontraron cambios relevantes entre los dos reportes para este alumno.</p>
@@ -130,5 +135,3 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
     </Card>
   );
 }
-
-    
