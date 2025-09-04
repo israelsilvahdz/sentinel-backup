@@ -15,8 +15,8 @@ export const curriculum: CurriculumTerm[] = [
     name: 'Primer Tetramestre',
     courses: [
       { name: 'Matemáticas I: lenguaje de la ciencia' },
-      { name: 'El ser humano en sociedad' },
       { name: 'placeholder1', isPlaceholder: true },
+      { name: 'El ser humano en sociedad' },
       { name: 'Lectura y Redacción' },
       { name: 'Optativa de lengua adicional al español I' },
       { name: 'Ecología y Geografía' },
@@ -30,7 +30,7 @@ export const curriculum: CurriculumTerm[] = [
     courses: [
       { name: 'Matemáticas II: pensamiento matemático', prerequisite: 'Matemáticas I: lenguaje de la ciencia' },
       { name: 'placeholder3', isPlaceholder: true },
-      { name: 'Historia de México', prerequisite: 'El ser humano en sociedad' },
+      { name: 'Historia de México' },
       { name: 'Comunicación Integral', prerequisite: 'Lectura y Redacción' },
       { name: 'Optativa de lengua adicional al español II', prerequisite: 'Optativa de lengua adicional al español I' },
       { name: 'Transformación de la materia', prerequisite: 'Ecología y Geografía' },
@@ -86,8 +86,8 @@ export const curriculum: CurriculumTerm[] = [
     courses: [
       { name: 'Cálculo Integral', prerequisite: 'Cálculo Diferencial' },
       { name: 'placeholder11', isPlaceholder: true },
-      { name: 'Arte y cultura', prerequisite: 'El mundo contemporáneo' },
       { name: 'México en el siglo XXI', prerequisite: 'El mundo contemporáneo' },
+      { name: 'Arte y cultura', prerequisite: 'El mundo contemporáneo' },
       { name: 'Pensamiento científico', prerequisite: 'Cuidado del cuerpo humano' },
       { name: 'Optativa de módulo de formación' },
       { name: 'placeholder12', isPlaceholder: true },
