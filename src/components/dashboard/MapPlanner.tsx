@@ -144,39 +144,42 @@ export function MapPlanner() {
             });
         }
     }
-    
     pendingCourses.forEach(pc => approved.delete(pc));
     
-    let recommended = new Set<string>();
+    let recommendedLoad: CurriculumCourse[] = [];
     if (selectedTermIndex > -1) {
-        const isApproved = (prereq: string | undefined) => isPrerequisiteApproved(prereq, approved);
+        const isCourseAvailable = (course: CurriculumCourse) => {
+            if (!course || course.isPlaceholder || approved.has(course.name)) return false;
+            
+            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+            const courseTermInfo = courseMap.get(course.name);
+            if (!courseTermInfo) return false;
 
-        const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
-            .filter(c => {
-                 if(c.isPlaceholder || approved.has(c.name) || !isApproved(c.prerequisite)) return false;
-                 
-                 const isFlex = !HIGH_PRIORITY_COURSES.has(c.name);
-                 const courseTermInfo = courseMap.get(c.name);
-                 if (!courseTermInfo) return false;
-                 
-                 const isTermActive = activeTerms.has(courseTermInfo.term);
-                 
-                 return isFlex || isTermActive;
-            });
+            const isTermActive = activeTerms.has(courseTermInfo.term);
+            const canTake = isFlex || isTermActive;
+
+            return canTake && isPrerequisiteApproved(course.prerequisite, approved);
+        };
         
-        recommended = new Set(targetTermCourses.map(c => c.name));
+        // Priority 1: Pending courses that are available
+        const pendingToTake = Array.from(pendingCourses)
+            .map(name => courseMap.get(name)!)
+            .filter(isCourseAvailable);
+
+        recommendedLoad = [...pendingToTake];
+        const recommendedSet = new Set(recommendedLoad.map(c => c.name));
+
+        // Priority 2: Courses from the current term that are available
+        const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
+            .filter(c => !recommendedSet.has(c.name) && isCourseAvailable(c));
+        
+        recommendedLoad.push(...targetTermCourses);
     }
+    const recommended = new Set(recommendedLoad.map(c => c.name));
 
     const locked = new Set<string>();
     for(const course of courseMap.values()){
         if(course.isPlaceholder || approved.has(course.name) || recommended.has(course.name)) continue;
-
-        const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-        const isTermActive = activeTerms.has(course.term);
-
-        if (!isFlex && !isTermActive) {
-            locked.add(course.name);
-        }
         
         if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
             if (!isPrerequisiteApproved(course.prerequisite, approved)) {
@@ -216,14 +219,10 @@ export function MapPlanner() {
     }
   }, []);
 
-  const getCourseState = (courseName: string, termIndex: number) => {
-    // Priority 1: If it's in an already passed term and not pending, it's approved.
+  const getCourseState = (courseName: string) => {
      if (approvedCourses.has(courseName)) return 'approved';
-     
-     // Priority 2: Check for other states for current or future courses.
      if (lockedCourses.has(courseName)) return 'locked';
      if (recommendedCourses.has(courseName)) return 'recommended';
-
      return 'default';
   }
 
@@ -320,7 +319,7 @@ export function MapPlanner() {
                               <div key={`${term.name}-${course.name}-${courseIndex}`} style={{ gridColumn: termIndex + 1, gridRow: courseIndex + 2 }}></div>
                           );
                         }
-                      const state = getCourseState(course.name, termIndex);
+                      const state = getCourseState(course.name);
                       const isPending = pendingCourses.has(course.name);
                       const canBePending = selectedTermIndex > -1 && termIndex < selectedTermIndex;
                       const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
