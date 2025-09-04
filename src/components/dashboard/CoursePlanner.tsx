@@ -92,22 +92,20 @@ export function CoursePlanner() {
     
     const maxCourses = isGraduationCandidate && remaining <= 2 ? 9 : 7;
     
-    const pendingCoursesFromCurriculum = curriculum
+    const pendingFromCurriculum = curriculum
       .flatMap(term => term.courses)
       .filter(course => pendingCourses.has(course.name));
 
-    // Prioritize pending courses that have their prerequisites met
-    const pendingToTake = pendingCoursesFromCurriculum.filter(course => isPrerequisiteApproved(course.prerequisite));
+    // Highest priority: Pending courses that have their prerequisites met.
+    const pendingToTake = pendingFromCurriculum.filter(course => isPrerequisiteApproved(course.prerequisite));
 
     let load: CurriculumCourse[] = [...pendingToTake];
     
     const targetTermCourses = (curriculum[targetTermIndex]?.courses || [])
         .filter(c => !approvedCourses.has(c.name) && isPrerequisiteApproved(c.prerequisite));
     
-    const allAvailableCourses = [...targetTermCourses, ...pendingCoursesFromCurriculum.filter(c => !pendingToTake.includes(c))];
-
     // Sort target term courses by prioritizing high priority and then prerequisites for future terms
-    allAvailableCourses.sort((a, b) => {
+    targetTermCourses.sort((a, b) => {
       const aIsHighPriority = HIGH_PRIORITY_COURSES.has(a.name);
       const bIsHighPriority = HIGH_PRIORITY_COURSES.has(b.name);
       
@@ -126,8 +124,8 @@ export function CoursePlanner() {
     });
 
     let i = 0;
-    while (load.length < maxCourses && i < allAvailableCourses.length) {
-      const courseToAdd = allAvailableCourses[i];
+    while (load.length < maxCourses && i < targetTermCourses.length) {
+      const courseToAdd = targetTermCourses[i];
       if(!load.some(c => c.name === courseToAdd.name)) {
          load.push(courseToAdd);
       }
@@ -359,3 +357,5 @@ export function CoursePlanner() {
     </div>
   );
 }
+
+    

@@ -122,7 +122,6 @@ export function MapPlanner() {
     
     pendingCourses.forEach(pc => approved.delete(pc));
     
-    // --- Start Recommendation Logic ---
     let recommended = new Set<string>();
     if (selectedTermIndex > -1) {
         const isApproved = (prereq: string | undefined) => isPrerequisiteApproved(prereq, approved);
@@ -131,16 +130,14 @@ export function MapPlanner() {
             .flatMap(term => term.courses)
             .filter(course => pendingCourses.has(course.name));
             
+        // Highest priority: Pending courses that have their prerequisites met.
         const pendingToTake = pendingFromCurriculum.filter(course => isApproved(course.prerequisite));
-
         let load: CurriculumCourse[] = [...pendingToTake];
 
         const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
             .filter(c => !c.isPlaceholder && !approved.has(c.name) && isApproved(c.prerequisite));
-
-        const allAvailableCourses = [...targetTermCourses];
         
-        allAvailableCourses.sort((a, b) => {
+        targetTermCourses.sort((a, b) => {
             const aIsHighPriority = HIGH_PRIORITY_COURSES.has(a.name);
             const bIsHighPriority = HIGH_PRIORITY_COURSES.has(b.name);
             if (aIsHighPriority && !bIsHighPriority) return -1;
@@ -158,8 +155,8 @@ export function MapPlanner() {
         });
         
         let i = 0;
-        while (load.length < 7 && i < allAvailableCourses.length) {
-            const courseToAdd = allAvailableCourses[i];
+        while (load.length < 7 && i < targetTermCourses.length) {
+            const courseToAdd = targetTermCourses[i];
             if(!load.some(c => c.name === courseToAdd.name)) {
                 load.push(courseToAdd);
             }
@@ -167,18 +164,15 @@ export function MapPlanner() {
         }
         recommended = new Set(load.map(c => c.name));
     }
-    // --- End Recommendation Logic ---
 
     const locked = new Set<string>();
     for(const course of courseMap.values()){
         if(course.isPlaceholder) continue;
 
         if (selectedTermIndex > -1 && course.termIndex >= selectedTermIndex) {
-            // Lock if it's in the current or future term but not recommended and not already pending
             if(course.termIndex === selectedTermIndex && !recommended.has(course.name) && !pendingCourses.has(course.name)) {
                locked.add(course.name);
             }
-            // Lock if prerequisite is not met
             if (!isPrerequisiteApproved(course.prerequisite, approved)) {
                locked.add(course.name);
             }
@@ -217,7 +211,7 @@ export function MapPlanner() {
   }, []);
 
   const getCourseState = (courseName: string, termIndex: number) => {
-     if (recommendedCourses.has(courseName) && termIndex === selectedTermIndex) return 'recommended';
+     if (recommendedCourses.has(courseName)) return 'recommended';
      if (lockedCourses.has(courseName)) return 'locked';
      if (approvedCourses.has(courseName)) return 'approved';
      if (selectedTermIndex > -1 && termIndex < selectedTermIndex && !pendingCourses.has(courseName)) return 'approved';
