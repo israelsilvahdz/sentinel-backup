@@ -55,16 +55,24 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'inglés v': 'Optativa de lengua adicional al español V',
     'alemán v': 'Optativa de lengua adicional al español V',
     'francés v': 'Optativa de lengua adicional al español V',
-    'tecnologías de información i': 'Tecnologías de la Información II',
+    'tecnologías de información i': 'Tecnologías de la Información I',
+    'information technologies i': 'Tecnologías de la Información I',
     'tecnologías de información ii': 'Tecnologías de la Información II',
-    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V',
+    'information technologies ii': 'Tecnologías de la Información II',
+    'habilidades y valores v: lenguaje, emoción y cuerpo': 'Habilidades y valores V: lenguaje',
+    'habilidades y valores ii: ser crítico': 'Habilidades y valores II: pensamiento crítico',
+    'habilidades v: integración y toma de decisiones': 'Habilidades y valores V: lenguaje',
+    'habilidades vi: lenguaje, emoción y cuerpo': 'Habilidades y valores VI: toma de decisiones',
     'lectura y redacción': 'Lectura y Redacción',
     'ciencias de la vida': 'Ciencias de la Vida',
+    'life science': 'Ciencias de la Vida',
     'art and culture': 'Arte y cultura',
     'el carbono y sus compuestos': 'El carbono y sus componentes',
-    'el carbono y sus componentes': 'El carbono y sus componentes',
     'scientific thought': 'Pensamiento científico',
+    'mass and energy i': 'Materia y energía I',
     'mass and energy ii': 'Materia y energía II',
+    'ecology and geography': 'Ecología y Geografía',
+    'human body care': 'Cuidado del cuerpo humano',
     'urban dance': 'IGNORE',
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'
@@ -76,7 +84,11 @@ function normalizeSubjectName(name: string): string {
     
     if (cleanedName.startsWith('habilidades y valores')) {
         const parts = cleanedName.split(':');
-        cleanedName = parts[0].trim();
+        const mainPart = parts[0].trim();
+        // Specific normalizations for Habilidades
+        if (mainPart === 'habilidades y valores ii') return 'Habilidades y valores II: pensamiento crítico';
+        if (mainPart === 'habilidades y valores v') return 'Habilidades y valores V: lenguaje';
+        if (mainPart === 'habilidades y valores vi') return 'Habilidades y valores VI: toma de decisiones';
     }
     
     if (cleanedName.startsWith('antropología')) {

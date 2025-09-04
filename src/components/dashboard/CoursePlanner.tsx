@@ -10,9 +10,27 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Info, BookOpen } from 'lucide-react';
+import { Info, BookOpen, BrainCircuit } from 'lucide-react';
 import { curriculum, type CurriculumCourse } from '@/lib/curriculum';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
+const HIGH_PRIORITY_COURSES = new Set([
+  'Ecología y Geografía',
+  'Transformación de la materia',
+  'El carbono y sus componentes',
+  'Materia y energía I',
+  'Ciencias de la Vida',
+  'Materia y energía II',
+  'Cuidado del cuerpo humano',
+  'Tecnologías de la Información I',
+  'Tecnologías de la Información II',
+  'Habilidades y valores I: bienestar',
+  'Habilidades y valores II: pensamiento crítico',
+  'Habilidades y valores III: ser creativo',
+  'Habilidades y valores IV: plan de vida y carrera',
+  'Habilidades y valores V: lenguaje',
+  'Habilidades y valores VI: toma de decisiones',
+]);
 
 export function CoursePlanner() {
   const [targetTermName, setTargetTermName] = useState<string>('');
@@ -85,24 +103,33 @@ export function CoursePlanner() {
     
     const targetTermCourses = (curriculum[targetTermIndex]?.courses || [])
         .filter(c => !approvedCourses.has(c.name) && isPrerequisiteApproved(c.prerequisite));
+    
+    const allAvailableCourses = [...targetTermCourses, ...pendingCoursesFromCurriculum.filter(c => !pendingToTake.includes(c))];
 
-    // Sort target term courses by prioritizing those that are prerequisites for future terms
-    const futurePrerequisites = new Set(
-      curriculum.slice(targetTermIndex + 1).flatMap(t => t.courses.map(c => c.prerequisite).filter(Boolean))
-    );
+    // Sort target term courses by prioritizing high priority and then prerequisites for future terms
+    allAvailableCourses.sort((a, b) => {
+      const aIsHighPriority = HIGH_PRIORITY_COURSES.has(a.name);
+      const bIsHighPriority = HIGH_PRIORITY_COURSES.has(b.name);
+      
+      if (aIsHighPriority && !bIsHighPriority) return -1;
+      if (!aIsHighPriority && bIsHighPriority) return 1;
 
-    targetTermCourses.sort((a, b) => {
+      const futurePrerequisites = new Set(
+        curriculum.slice(targetTermIndex + 1).flatMap(t => t.courses.map(c => c.prerequisite).filter(Boolean))
+      );
       const aIsPrereq = futurePrerequisites.has(a.name);
       const bIsPrereq = futurePrerequisites.has(b.name);
       if (aIsPrereq && !bIsPrereq) return -1;
       if (!aIsPrereq && bIsPrereq) return 1;
+
       return 0;
     });
 
     let i = 0;
-    while (load.length < maxCourses && i < targetTermCourses.length) {
-      if(!load.some(c => c.name === targetTermCourses[i].name)) {
-         load.push(targetTermCourses[i]);
+    while (load.length < maxCourses && i < allAvailableCourses.length) {
+      const courseToAdd = allAvailableCourses[i];
+      if(!load.some(c => c.name === courseToAdd.name)) {
+         load.push(courseToAdd);
       }
       i++;
     }
@@ -113,7 +140,7 @@ export function CoursePlanner() {
     return { recommendedLoad: load, remainingCourses: remaining, availableButNotRecommended: notRecommended };
 
   }, [approvedCourses, pendingCourses, targetTermIndex, isGraduationCandidate, isPrerequisiteApproved]);
-
+  
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
       <header className="mb-8">
@@ -225,6 +252,19 @@ export function CoursePlanner() {
               </div>
             </CardContent>
           </Card>
+          
+          <Alert>
+            <BrainCircuit className="h-4 w-4" />
+            <AlertTitle>Lógica de Recomendación</AlertTitle>
+            <AlertDescription>
+              <ol className="list-decimal list-inside space-y-1 mt-2 text-xs">
+                  <li>**Prioridad 1:** Materias pendientes seleccionadas.</li>
+                  <li>**Prioridad 2:** Materias de alta prioridad (sin opción "flex").</li>
+                  <li>**Prioridad 3:** Materias que son prerrequisito para futuros tetramestres.</li>
+                  <li>**Prioridad 4:** Resto de materias del tetramestre actual.</li>
+              </ol>
+            </AlertDescription>
+          </Alert>
 
           <Card>
             <CardHeader>
@@ -246,11 +286,16 @@ export function CoursePlanner() {
                 <ul className="space-y-3">
                   {recommendedLoad.map(course => (
                     <li key={course.name} className="flex items-center justify-between p-3 bg-secondary rounded-md">
-                      <div className="flex flex-col">
+                      <div className="flex flex-col gap-y-1.5">
                         <span className="font-medium">{course.name}</span>
-                        {pendingCourses.has(course.name) && (
-                            <Badge variant="destructive" className="w-fit mt-1">Pendiente</Badge>
-                        )}
+                        <div className="flex gap-2">
+                           {pendingCourses.has(course.name) && (
+                                <Badge variant="destructive" className="w-fit">Pendiente</Badge>
+                           )}
+                           {HIGH_PRIORITY_COURSES.has(course.name) && (
+                                <Badge variant="outline" className="w-fit border-amber-500 text-amber-500">Sin Flex</Badge>
+                           )}
+                        </div>
                       </div>
                        <Badge variant="outline">Sugerida</Badge>
                     </li>
