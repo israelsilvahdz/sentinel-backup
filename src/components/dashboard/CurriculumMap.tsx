@@ -168,7 +168,7 @@ export function CurriculumMap() {
                         >
                              <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <div className="course-card">
+                                    <div className="course-card" onClick={() => handlePendingToggle(course.name)}>
                                         <p className="text-xs font-semibold leading-tight">{course.name}</p>
                                     </div>
                                 </TooltipTrigger>
@@ -185,19 +185,6 @@ export function CurriculumMap() {
 
                            {course.prerequisite && <div className="prereq-indicator" />}
                            {prerequisiteForMap.has(course.name) && <div className="postreq-indicator" />}
-                           
-                           <button
-                             onClick={() => handlePendingToggle(course.name)}
-                             className={cn("absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-white transition-all shadow-md", {
-                                 "bg-gray-300 hover:bg-gray-400": state === 'default',
-                                 "bg-red-500 hover:bg-red-600": state === 'pending',
-                                 "bg-gray-500 cursor-not-allowed": state === 'locked',
-                             })}
-                             disabled={state === 'locked'}
-                             aria-label={`Marcar ${course.name} como pendiente`}
-                           >
-                            {state === 'pending' ? <X size={12} /> : <Check size={12} />}
-                           </button>
                         </div>
                     );
                 })}
