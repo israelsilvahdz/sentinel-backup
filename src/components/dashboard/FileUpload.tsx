@@ -12,9 +12,10 @@ interface FileUploadProps {
   isLoading: boolean;
   label: string;
   icon: ReactNode;
+  className?: string;
 }
 
-export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon }: FileUploadProps) {
+export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon, className }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,7 +32,7 @@ export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon 
   }
 
   return (
-    <div className="w-full">
+    <div className={cn("w-full", className)}>
       <input
         type="file"
         ref={fileInputRef}
@@ -42,7 +43,7 @@ export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon 
       />
       <div 
         className={cn(
-            "relative w-full border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary transition-colors",
+            "relative w-full border-2 border-dashed rounded-lg p-3 flex flex-row items-center justify-center text-center cursor-pointer hover:border-primary transition-colors min-h-[60px]",
             isLoading && "cursor-not-allowed opacity-60",
             selectedFile && "border-solid border-primary bg-primary/5"
         )}
@@ -50,25 +51,29 @@ export function FileUpload({ onFileSelect, selectedFile, isLoading, label, icon 
       >
         {selectedFile ? (
             <>
-                <File className="h-8 w-8 text-primary" />
-                <p className="mt-2 text-sm font-semibold text-primary">{label}</p>
-                <p className="mt-1 text-xs text-muted-foreground truncate max-w-full px-4">{selectedFile.name}</p>
+                <File className="h-6 w-6 text-primary mr-3 shrink-0" />
+                <div className='text-left'>
+                    <p className="text-xs font-semibold text-primary">{label}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[150px]">{selectedFile.name}</p>
+                </div>
                 <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="absolute top-1 right-1 h-6 w-6 rounded-full"
+                    className="absolute top-1 right-1 h-5 w-5 rounded-full"
                     onClick={handleRemoveFile}
                     disabled={isLoading}
                 >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3" />
                     <span className="sr-only">Quitar archivo</span>
                 </Button>
             </>
         ) : (
             <>
-                <div className="text-muted-foreground">{icon}</div>
-                <p className="mt-2 text-sm font-semibold">{label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Haz clic para seleccionar un archivo .xlsx</p>
+                <div className="text-muted-foreground mr-3 shrink-0">{icon}</div>
+                <div className='text-left'>
+                  <p className="text-sm font-semibold">{label}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Seleccionar un .xlsx</p>
+                </div>
             </>
         )}
       </div>

@@ -29,7 +29,7 @@ import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
@@ -46,7 +46,10 @@ export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'm
 interface DashboardContextType {
   filteredStudents: Student[];
   allStudents: Student[];
+  setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   studentHistory: Record<string, Change[]>;
+  setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
+  setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
   isLoading: boolean;
   hasData: boolean;
   leaders: string[];
@@ -91,7 +94,6 @@ export function DashboardClient() {
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   
-  const [previousFile, setPreviousFile] = useState<File | null>(null);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -176,134 +178,71 @@ export function DashboardClient() {
     setCaseType(null);
   };
   
-  const processAndCompareData = (previousData: StudentData, currentData: StudentData) => {
-    const newHistory: Record<string, Change[]> = {};
-    let changesCount = 0;
-
-    const currentStudents = Object.values(currentData).map(currentStudent => {
-      const previousStudent = previousData[currentStudent.id];
-      
-      if (!newHistory[currentStudent.id]) {
-        newHistory[currentStudent.id] = [];
-      }
-      
-      if (previousStudent) {
-        // Compare Leader and Tutor
-        if (currentStudent.leader !== previousStudent.leader) {
-          newHistory[currentStudent.id].push({
-            date: new Date().toISOString(), studentId: currentStudent.id, subjectId: 'N/A',
-            fieldName: 'leader', oldValue: previousStudent.leader, newValue: currentStudent.leader
-          });
-          changesCount++;
-        }
-        if (currentStudent.tutor !== previousStudent.tutor) {
-          newHistory[currentStudent.id].push({
-            date: new Date().toISOString(), studentId: currentStudent.id, subjectId: 'N/A',
-            fieldName: 'tutor', oldValue: previousStudent.tutor, newValue: currentStudent.tutor
-          });
-          changesCount++;
-        }
-
-        // Compare Subjects
-        currentStudent.subjects?.forEach(currentSubject => {
-          const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
-
-          if (previousSubject) {
-            // Compare absences
-            if (currentSubject.absences > previousSubject.absences) {
-              newHistory[currentStudent.id].push({
-                date: new Date().toISOString(), studentId: currentStudent.id, subjectId: currentSubject.id,
-                fieldName: 'absences', oldValue: previousSubject.absences, newValue: currentSubject.absences,
-              });
-              changesCount++;
-            }
-            // Compare missed assignments
-            if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
-               newHistory[currentStudent.id].push({
-                date: new Date().toISOString(), studentId: currentStudent.id, subjectId: currentSubject.id,
-                fieldName: 'missedAssignments', oldValue: previousSubject.missedAssignments, newValue: currentSubject.missedAssignments,
-              });
-              changesCount++;
-            }
-            // Compare subject group
-            if (currentSubject.group !== previousSubject.group) {
-                newHistory[currentStudent.id].push({
-                    date: new Date().toISOString(), studentId: currentStudent.id, subjectId: currentSubject.id,
-                    fieldName: 'group', oldValue: previousSubject.group, newValue: currentSubject.group
-                });
-                changesCount++;
-            }
-          }
-        });
-      }
-      
-      return {
-        ...currentStudent,
-        subjectSummaries: (currentStudent.subjects || []).map(s => ({
+  const processSingleFile = (studentData: StudentData) => {
+    const studentsArray = Object.values(studentData).map(student => ({
+        ...student,
+        subjectSummaries: (student.subjects || []).map(s => ({
           id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
           missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
           grade: s.grade, finalGrade: s.finalGrade
         })),
-      };
-    });
-
-    setAllStudents(currentStudents);
-    setStudentHistory(newHistory);
-    return { processed: currentStudents.length, changes: changesCount };
-};
+    }));
+    setAllStudents(studentsArray);
+    return studentsArray.length;
+  };
 
 
-  const handleCompare = async () => {
-    if (!previousFile || !currentFile) {
+  const handleFileUpload = async () => {
+    if (!currentFile) {
         toast({
             variant: 'destructive',
-            title: 'Faltan archivos',
-            description: 'Por favor, carga ambos reportes (anterior y actual) para comparar.',
+            title: 'Falta archivo',
+            description: 'Por favor, carga el reporte actual.',
         });
         return;
     }
     setIsProcessing(true);
     setProgress(10);
     try {
-        const [previousData, currentData] = await Promise.all([
-            parseExcel(previousFile),
-            parseExcel(currentFile)
-        ]);
+        const studentData = await parseExcel(currentFile);
         setProgress(50);
         
-        if (!previousData || !currentData) {
+        if (!studentData) {
             toast({
               variant: 'destructive',
               title: 'Error de Formato',
-              description: 'Uno o ambos archivos Excel no tienen el formato esperado o están vacíos.',
+              description: 'El archivo Excel no tiene el formato esperado o está vacío.',
             });
             setIsProcessing(false);
             setProgress(0);
             return;
         }
 
-        const { processed, changes } = processAndCompareData(previousData, currentData);
+        const processedCount = processSingleFile(studentData);
         setProgress(90);
 
-        setUploadHistory(prev => [{ id: Date.now().toString(), fileName: `Anterior: ${previousFile.name} | Actual: ${currentFile.name}`, uploadedAt: new Date().toISOString() }, ...prev].slice(0, 10));
+        setUploadHistory(prev => [{ 
+            id: Date.now().toString(), 
+            fileName: currentFile.name, 
+            uploadedAt: new Date().toISOString() 
+        }, ...prev].slice(0, 10));
 
         toast({
             title: 'Éxito',
-            description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
+            description: `Se procesaron ${processedCount} alumnos del reporte actual.`,
         });
 
     } catch (error) {
        toast({
         variant: 'destructive',
         title: 'Error al procesar',
-        description: `Hubo un problema al procesar los archivos. Revisa la consola.`,
+        description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
       });
       console.error(error);
     } finally {
         setTimeout(() => {
             setIsProcessing(false);
             setProgress(0);
-            setActiveView('change-stats'); // Navigate to stats view after processing
         }, 500);
     }
   };
@@ -323,7 +262,6 @@ export function DashboardClient() {
       setAllStudents([]);
       setStudentHistory({});
       setUploadHistory([]);
-      setPreviousFile(null);
       setCurrentFile(null);
       
       setProgress(100);
@@ -397,7 +335,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, studentHistory,
+    filteredStudents, allStudents, setAllStudents, studentHistory, setStudentHistory, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects,
@@ -482,7 +420,7 @@ export function DashboardClient() {
             <SidebarSeparator />
             <SidebarGroup>
               <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-2 flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-                <CalendarClock size={16} /> Historial de Comparaciones
+                <CalendarClock size={16} /> Historial de Cargas
               </h3>
               {uploadHistory.length > 0 ? (
                 <ul className="space-y-1 px-2 text-sm group-data-[collapsible=icon]:hidden">
@@ -493,7 +431,7 @@ export function DashboardClient() {
                   ))}
                 </ul>
               ) : (
-                <p className="px-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">No hay comparaciones.</p>
+                <p className="px-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">No hay cargas recientes.</p>
               )}
             </SidebarGroup>
           </SidebarContent>
@@ -504,7 +442,12 @@ export function DashboardClient() {
                  <div className="flex-1 min-w-fit">
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
                  </div>
-                 <div className="flex items-center gap-4">
+                 <div className="flex items-center gap-2 flex-wrap">
+                    <FileUpload onFileSelect={setCurrentFile} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Diario General" icon={<FileCheck2 />} />
+                    <Button onClick={handleFileUpload} disabled={isProcessing || !currentFile}>
+                        <UploadCloud className="mr-2 h-4 w-4" />
+                        Cargar Reporte
+                    </Button>
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
                         <span className="sr-only">Recargar</span>
@@ -515,19 +458,6 @@ export function DashboardClient() {
                     </Button>
                 </div>
             </header>
-            
-            <div className="p-4 md:p-6">
-                <Card>
-                    <CardContent className="p-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
-                        <FileUpload onFileSelect={setPreviousFile} selectedFile={previousFile} isLoading={isProcessing} label="Reporte Anterior" icon={<FileClock />} />
-                        <FileUpload onFileSelect={setCurrentFile} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Actual" icon={<FileCheck2 />} />
-                        <Button onClick={handleCompare} disabled={isProcessing || !previousFile || !currentFile} className="w-full md:w-auto">
-                           <UploadCloud className="mr-2" />
-                           Analizar Cambios
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
 
             {(isProcessing || isLoading) && progress > 0 && <Progress value={progress} className="w-full h-1" />}
             
