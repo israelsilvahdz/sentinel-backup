@@ -155,73 +155,75 @@ export function MapPlanner() {
   }, [isGraduationCandidate, selectedTermIndex]);
 
   const { approvedCourses, lockedCourses, recommendedCourses } = useMemo(() => {
-    const approved = new Set<string>();
+    const baseApproved = new Set<string>();
     if (selectedTermIndex > -1) {
         for(let i = 0; i < selectedTermIndex; i++) {
             curriculum[i].courses.forEach(c => {
-                if(!c.isPlaceholder) approved.add(c.name);
+                if(!c.isPlaceholder) baseApproved.add(c.name);
             });
         }
     }
-    manuallyApprovedCourses.forEach(c => approved.add(c));
-    pendingCourses.forEach(pc => approved.delete(pc));
+    manuallyApprovedCourses.forEach(c => baseApproved.add(c));
+    pendingCourses.forEach(pc => baseApproved.delete(pc));
     
     let recommendedLoad: CurriculumCourse[] = [];
     const maxCourses = isGraduationCandidate && selectedTermIndex === 5 ? 9 : 7;
     
     if (selectedTermIndex > -1) {
-        const isCourseAvailable = (course: CurriculumCourse) => {
+        const isCourseAvailable = (course: CurriculumCourse, currentApproved: Set<string>) => {
             if (!course || course.isPlaceholder) return false;
             const courseTermInfo = courseMap.get(course.name);
             if (!courseTermInfo) return false;
+            if (!isPrerequisiteApproved(course.prerequisite, currentApproved)) return false;
 
             const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
             const isTermActive = activeTerms.has(courseTermInfo.term);
             return isFlex || isTermActive;
         };
 
-        // Priority 1: Pending courses that are available and prerequisites met
+        // Priority 1: Pending courses
         const pendingToTake = Array.from(pendingCourses)
             .map(name => courseMap.get(name)!)
-            .filter(course => isCourseAvailable(course) && isPrerequisiteApproved(course.prerequisite, approved));
+            .filter(course => isCourseAvailable(course, baseApproved));
         
         recommendedLoad = [...pendingToTake];
         let recommendedSet = new Set(recommendedLoad.map(c => c.name));
 
         // Priority 2: Courses from the current term
         const targetTermCourses = (curriculum[selectedTermIndex]?.courses || [])
-            .filter(c => !c.isPlaceholder && !approved.has(c.name) && !recommendedSet.has(c.name) && isCourseAvailable(c) && isPrerequisiteApproved(c.prerequisite, approved));
+            .filter(c => !c.isPlaceholder && !baseApproved.has(c.name) && !recommendedSet.has(c.name) && isCourseAvailable(c, baseApproved));
         
         recommendedLoad.push(...targetTermCourses);
+        recommendedSet = new Set(recommendedLoad.map(c => c.name));
 
         // --- ADVANCE SUBJECTS LOGIC ---
         if (recommendedLoad.length < maxCourses) {
-          const loadCourseNames = new Set(recommendedLoad.map(c => c.name));
+          const effectiveApproved = new Set([...baseApproved, ...recommendedSet]);
           
-          // Find courses to advance
           const futureTerms = curriculum.slice(selectedTermIndex + 1);
           for (const term of futureTerms) {
             if (recommendedLoad.length >= maxCourses) break;
 
             const termIndex = curriculum.indexOf(term);
             const prevTermCourses = curriculum[termIndex - 1]?.courses.filter(c => !c.isPlaceholder).map(c => c.name) ?? [];
-            const approvedInPrevTermCount = prevTermCourses.filter(c => approved.has(c)).length;
+            const approvedInPrevTermCount = prevTermCourses.filter(c => effectiveApproved.has(c)).length;
 
             if (approvedInPrevTermCount < 3) continue; // Base Academica rule
 
             for (const course of term.courses) {
               if (recommendedLoad.length >= maxCourses) break;
-              if (course.isPlaceholder || loadCourseNames.has(course.name) || approved.has(course.name)) continue;
+              if (course.isPlaceholder || effectiveApproved.has(course.name)) continue;
 
-              const isCourseSeq = course.prerequisite && loadCourseNames.has(course.prerequisite);
+              const isCourseSeq = course.prerequisite && recommendedSet.has(course.prerequisite);
               if (isCourseSeq) continue; // No Secuencia rule
               
               const isBlockedByPending = course.prerequisite && pendingCourses.has(course.prerequisite);
               if(isBlockedByPending) continue;
 
-              if (isCourseAvailable(course) && isPrerequisiteApproved(course.prerequisite, approved)) {
+              if (isCourseAvailable(course, effectiveApproved)) {
                 recommendedLoad.push(course);
-                loadCourseNames.add(course.name);
+                recommendedSet.add(course.name);
+                effectiveApproved.add(course.name);
               }
             }
           }
@@ -231,20 +233,21 @@ export function MapPlanner() {
     const recommended = new Set(recommendedLoad.map(c => c.name));
 
     const locked = new Set<string>();
+    const allApprovedAndRecommended = new Set([...baseApproved, ...recommended]);
+
     for(const course of courseMap.values()){
-        if(course.isPlaceholder || approved.has(course.name) || recommended.has(course.name)) continue;
+        if(course.isPlaceholder || allApprovedAndRecommended.has(course.name)) continue;
         
         const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
         const isTermActive = activeTerms.has(course.term);
 
-        if (!isPrerequisiteApproved(course.prerequisite, approved)) {
+        if (!isPrerequisiteApproved(course.prerequisite, allApprovedAndRecommended)) {
             locked.add(course.name);
         } else if (!isFlex && !isTermActive) {
             locked.add(course.name);
         }
     }
     
-    // Lock dependents
     const toCheck = new Set(locked);
     const checked = new Set<string>();
     while(toCheck.size > 0) {
@@ -265,7 +268,7 @@ export function MapPlanner() {
       }
     }
 
-    return { approvedCourses: approved, lockedCourses: locked, recommendedCourses: recommended };
+    return { approvedCourses: baseApproved, lockedCourses: locked, recommendedCourses: recommended };
   }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, isPrerequisiteApproved, activeTerms, isGraduationCandidate]);
 
   const gridStructure = useMemo(() => {
