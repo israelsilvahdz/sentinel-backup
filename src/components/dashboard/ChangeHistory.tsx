@@ -7,7 +7,7 @@ import { Timeline, TimelineItem, TimelineConnector, TimelineHeader, TimelineIcon
 import { useDashboardFilters } from './DashboardClient';
 import { type Change } from '@/types/student';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, BookOpenCheck, Calendar, FileWarning } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Calendar, FileWarning, UserCog, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -18,12 +18,18 @@ interface ChangeHistoryProps {
 const ICONS: Record<string, React.ReactElement> = {
     absences: <FileWarning />,
     missedAssignments: <AlertTriangle />,
+    leader: <UserCog />,
+    tutor: <UserCog />,
+    group: <Users />,
 };
 
 function formatFieldName(fieldName: string): string {
     const map: Record<string, string> = {
-        'absences': 'Falta registrada',
-        'missedAssignments': 'Tarea no entregada',
+        'absences': 'Nueva Falta Registrada',
+        'missedAssignments': 'Nueva Tarea No Entregada',
+        'leader': 'Cambio de Líder',
+        'tutor': 'Cambio de Tutor',
+        'group': 'Cambio de Grupo'
     };
     return map[fieldName] || fieldName;
 }
@@ -38,15 +44,19 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
       setIsLoading(true);
       const allChanges = await getStudentChanges(studentId);
       
-      // Filtrar solo para incrementos en faltas y tareas no entregadas
-      const relevantChanges = allChanges.filter(change => 
-        (change.fieldName === 'absences' || change.fieldName === 'missedAssignments') &&
+      const isIncrement = (change: Change) => 
         typeof change.newValue === 'number' &&
         typeof change.oldValue === 'number' &&
-        change.newValue > change.oldValue
+        change.newValue > change.oldValue;
+
+      const relevantChanges = allChanges.filter(change => 
+        (change.fieldName === 'absences' && isIncrement(change)) ||
+        (change.fieldName === 'missedAssignments' && isIncrement(change)) ||
+        change.fieldName === 'leader' ||
+        change.fieldName === 'tutor' ||
+        change.fieldName === 'group'
       );
       
-      // Ordenar por fecha, más reciente primero
       relevantChanges.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       setHistory(relevantChanges);
@@ -59,8 +69,8 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Registro de Faltas y Tareas</CardTitle>
-                <CardDescription>Línea de tiempo de los eventos de riesgo para este alumno.</CardDescription>
+                <CardTitle>Historial de Cambios</CardTitle>
+                <CardDescription>Línea de tiempo de los eventos de riesgo y cambios para este alumno.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <Skeleton className="h-16 w-full" />
@@ -74,8 +84,8 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Registro de Faltas y Tareas</CardTitle>
-         <CardDescription>Línea de tiempo de los eventos de riesgo para este alumno.</CardDescription>
+        <CardTitle>Historial de Cambios</CardTitle>
+         <CardDescription>Línea de tiempo de los eventos de riesgo y cambios para este alumno.</CardDescription>
       </CardHeader>
       <CardContent>
         {history.length > 0 ? (
@@ -93,8 +103,8 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
                   <div className="font-mono text-sm text-muted-foreground mb-2">
                      <p>
                         <span className="font-semibold text-foreground">
-                            {change.fieldName === 'absences' ? 'Faltas' : 'Tareas (NE)'}:
-                        </span> {change.oldValue} → {change.newValue}
+                            {change.oldValue}
+                        </span> → <span className="font-semibold text-primary">{change.newValue}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -102,19 +112,23 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
                         <Calendar className="h-3 w-3" />
                         {format(new Date(change.date), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
                     </div>
-                     <div className="flex items-center gap-1">
-                        <BookOpenCheck className="h-3 w-3" />
-                        <span>{change.subjectId}</span>
-                    </div>
+                     {change.subjectId !== 'N/A' && (
+                        <div className="flex items-center gap-1">
+                            <BookOpenCheck className="h-3 w-3" />
+                            <span>{change.subjectId}</span>
+                        </div>
+                     )}
                   </div>
                 </TimelineBody>
               </TimelineItem>
             ))}
           </Timeline>
         ) : (
-          <p className="text-muted-foreground">No se encontraron registros de faltas o tareas no entregadas para este alumno.</p>
+          <p className="text-muted-foreground">No se encontraron cambios relevantes entre los dos reportes para este alumno.</p>
         )}
       </CardContent>
     </Card>
   );
 }
+
+    

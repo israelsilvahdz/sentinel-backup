@@ -183,39 +183,55 @@ export function DashboardClient() {
     const currentStudents = Object.values(currentData).map(currentStudent => {
       const previousStudent = previousData[currentStudent.id];
       
-      // Initialize history for the student
       if (!newHistory[currentStudent.id]) {
         newHistory[currentStudent.id] = [];
       }
       
-      if (previousStudent && currentStudent.subjects) {
-        currentStudent.subjects.forEach(currentSubject => {
+      if (previousStudent) {
+        // Compare Leader and Tutor
+        if (currentStudent.leader !== previousStudent.leader) {
+          newHistory[currentStudent.id].push({
+            date: new Date().toISOString(), studentId: currentStudent.id, subjectId: 'N/A',
+            fieldName: 'leader', oldValue: previousStudent.leader, newValue: currentStudent.leader
+          });
+          changesCount++;
+        }
+        if (currentStudent.tutor !== previousStudent.tutor) {
+          newHistory[currentStudent.id].push({
+            date: new Date().toISOString(), studentId: currentStudent.id, subjectId: 'N/A',
+            fieldName: 'tutor', oldValue: previousStudent.tutor, newValue: currentStudent.tutor
+          });
+          changesCount++;
+        }
+
+        // Compare Subjects
+        currentStudent.subjects?.forEach(currentSubject => {
           const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
 
           if (previousSubject) {
             // Compare absences
             if (currentSubject.absences > previousSubject.absences) {
               newHistory[currentStudent.id].push({
-                date: new Date().toISOString(),
-                studentId: currentStudent.id,
-                subjectId: currentSubject.id,
-                fieldName: 'absences',
-                oldValue: previousSubject.absences,
-                newValue: currentSubject.absences,
+                date: new Date().toISOString(), studentId: currentStudent.id, subjectId: currentSubject.id,
+                fieldName: 'absences', oldValue: previousSubject.absences, newValue: currentSubject.absences,
               });
               changesCount++;
             }
             // Compare missed assignments
             if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
                newHistory[currentStudent.id].push({
-                date: new Date().toISOString(),
-                studentId: currentStudent.id,
-                subjectId: currentSubject.id,
-                fieldName: 'missedAssignments',
-                oldValue: previousSubject.missedAssignments,
-                newValue: currentSubject.missedAssignments,
+                date: new Date().toISOString(), studentId: currentStudent.id, subjectId: currentSubject.id,
+                fieldName: 'missedAssignments', oldValue: previousSubject.missedAssignments, newValue: currentSubject.missedAssignments,
               });
               changesCount++;
+            }
+            // Compare subject group
+            if (currentSubject.group !== previousSubject.group) {
+                newHistory[currentStudent.id].push({
+                    date: new Date().toISOString(), studentId: currentStudent.id, subjectId: currentSubject.id,
+                    fieldName: 'group', oldValue: previousSubject.group, newValue: currentSubject.group
+                });
+                changesCount++;
             }
           }
         });
@@ -524,3 +540,5 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
+    
