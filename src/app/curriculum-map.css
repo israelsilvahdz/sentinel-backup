@@ -46,6 +46,12 @@
     transform: scale(1.05);
 }
 
+.course-cell.recommended .course-card {
+    background-color: hsl(200 100% 50% / 0.1);
+    border-color: hsl(200 100% 50% / 0.5);
+    ring: 2px hsl(200 100% 50% / 0.5);
+}
+
 .course-cell.locked .course-card {
     background-color: hsl(var(--muted));
     border-color: hsl(var(--muted-foreground) / 0.3);
