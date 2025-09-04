@@ -35,16 +35,9 @@ export function DashboardFilters() {
   
   if (isLoading) {
       return (
-          <div className="space-y-4 p-2 group-data-[collapsible=icon]:hidden">
-              <div className="animate-pulse">
-                <div className="h-4 bg-muted rounded w-1/3 mb-4"></div>
-                <div className="space-y-2">
-                    <div className="h-4 bg-muted rounded w-1/2"></div>
-                    <div className="h-4 bg-muted rounded w-1/2"></div>
-                    <div className="h-4 bg-muted rounded w-1/2"></div>
-                </div>
-                <div className="h-8 bg-muted rounded w-full mt-4"></div>
-              </div>
+          <div className="flex items-center gap-4 animate-pulse">
+              <div className="h-4 bg-muted rounded w-24"></div>
+              <div className="h-8 bg-muted rounded w-48"></div>
           </div>
       );
   }
@@ -71,34 +64,30 @@ export function DashboardFilters() {
   const hasActiveComplexFilter = !!caseType || !!subjectRiskFilter;
 
   return (
-    <div className="space-y-4">
-        <div className="flex items-center gap-2 text-muted-foreground font-semibold px-2">
+    <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-2 text-muted-foreground font-semibold">
             <Filter size={16}/>
-            <span className="group-data-[collapsible=icon]:hidden">Filtros</span>
+            <span className="text-sm">Filtrar por:</span>
         </div>
         
-        <div className="px-2 group-data-[collapsible=icon]:hidden">
-            <label className="text-sm font-medium">Filtrar por</label>
-            <RadioGroup value={filterType} onValueChange={handleFilterTypeChange} className="mt-2">
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="leader" id="r-leader" />
-                    <Label htmlFor="r-leader">Líder</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="tutor" id="r-tutor" />
-                    <Label htmlFor="r-tutor">Tutor</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="subject" id="r-subject" />
-                    <Label htmlFor="r-subject">Materia</Label>
-                </div>
-            </RadioGroup>
-        </div>
+        <RadioGroup value={filterType} onValueChange={handleFilterTypeChange} className="flex gap-4">
+            <div className="flex items-center space-x-2">
+                <RadioGroupItem value="leader" id="r-leader" />
+                <Label htmlFor="r-leader" className="font-normal">Líder</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+                <RadioGroupItem value="tutor" id="r-tutor" />
+                <Label htmlFor="r-tutor" className="font-normal">Tutor</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+                <RadioGroupItem value="subject" id="r-subject" />
+                <Label htmlFor="r-subject" className="font-normal">Materia</Label>
+            </div>
+        </RadioGroup>
 
-        <div className="px-2 group-data-[collapsible=icon]:hidden">
-            <label className="text-sm font-medium">Seleccionar valor</label>
+        <div className="flex items-center gap-2 w-full md:w-auto">
              <Select onValueChange={handleValueChange} value={selectedValue || 'all'} disabled={hasActiveComplexFilter}>
-                <SelectTrigger className='w-full'>
+                <SelectTrigger className='w-full md:w-[200px]'>
                     <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -111,11 +100,13 @@ export function DashboardFilters() {
                 </SelectContent>
             </Select>
             {hasActiveComplexFilter && (
-                <Button variant="ghost" size="sm" className="mt-2 text-primary" onClick={() => { setCaseType(null); setSubjectRiskFilter(null); }}>
-                    Limpiar filtro de caso
+                <Button variant="ghost" size="sm" className="text-primary" onClick={() => { setCaseType(null); setSubjectRiskFilter(null); }}>
+                    Limpiar filtro
                 </Button>
             )}
         </div>
     </div>
   );
 }
+
+    

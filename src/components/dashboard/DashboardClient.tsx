@@ -426,10 +426,6 @@ export function DashboardClient() {
             </SidebarGroup>
             <SidebarSeparator />
             <SidebarGroup>
-              <DashboardFilters />
-            </SidebarGroup>
-            <SidebarSeparator />
-            <SidebarGroup>
               <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-2 flex items-center gap-2 group-data-[collapsible=icon]:hidden">
                 <CalendarClock size={16} /> Historial de Cargas
               </h3>
@@ -450,8 +446,11 @@ export function DashboardClient() {
         </Sidebar>
         <SidebarInset>
             <header className="flex h-auto md:h-14 items-center justify-between gap-4 border-b bg-card px-4 lg:px-6 sticky top-0 z-30 flex-wrap py-2">
-                 <div className="flex-1 min-w-fit">
+                 <div className="flex items-center gap-4 flex-1">
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
+                    <div className="hidden md:flex">
+                        <DashboardFilters />
+                    </div>
                  </div>
                  <div className="flex items-center gap-2 flex-wrap">
                     <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" />
@@ -463,6 +462,9 @@ export function DashboardClient() {
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Borrar Datos</span>
                     </Button>
+                </div>
+                <div className="md:hidden w-full pt-2">
+                    <DashboardFilters />
                 </div>
             </header>
 
@@ -477,3 +479,5 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
+    
