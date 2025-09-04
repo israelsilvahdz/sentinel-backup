@@ -191,7 +191,7 @@ export function DashboardClient() {
     return studentsArray.length;
   };
 
-  const handleFileUpload = useCallback(async (file: File | null) => {
+  const handleFileUpload = useCallback((file: File | null) => {
     if (!file) {
       return;
     }

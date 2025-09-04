@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useDashboardFilters } from './DashboardClient';
 import { KpiCard } from './KpiCard';
@@ -35,16 +35,21 @@ export function ChangeStats() {
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
-    const [currentFile, setCurrentFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
 
-    const processAndCompareData = (previousData: StudentData, currentData: StudentData) => {
+    const processAndCompareData = (previousData: StudentData, currentData: Student[]) => {
         const newHistory: Record<string, Change[]> = {};
         let changesCount = 0;
+        
+        const currentDataMap: StudentData = currentData.reduce((acc, student) => {
+            acc[student.id] = student;
+            return acc;
+        }, {} as StudentData);
 
-        for (const studentId in currentData) {
-            const currentStudent = currentData[studentId];
+
+        for (const studentId in currentDataMap) {
+            const currentStudent = currentDataMap[studentId];
             const previousStudent = previousData[studentId];
             
             if (!newHistory[studentId]) {
@@ -67,98 +72,103 @@ export function ChangeStats() {
                 });
                 changesCount++;
                 }
+                 if (currentStudent.subjects) {
+                    currentStudent.subjects.forEach(currentSubject => {
+                        const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
 
-                // Compare Subjects
-                currentStudent.subjects?.forEach(currentSubject => {
-                    const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
-
-                    if (previousSubject) {
-                        if (currentSubject.absences > previousSubject.absences) {
-                            newHistory[studentId].push({
-                                date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
-                                fieldName: 'absences', oldValue: previousSubject.absences, newValue: currentSubject.absences,
-                            });
-                            changesCount++;
+                        if (previousSubject) {
+                            if (currentSubject.absences > previousSubject.absences) {
+                                newHistory[studentId].push({
+                                    date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
+                                    fieldName: 'absences', oldValue: previousSubject.absences, newValue: currentSubject.absences,
+                                });
+                                changesCount++;
+                            }
+                            if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
+                                newHistory[studentId].push({
+                                    date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
+                                    fieldName: 'missedAssignments', oldValue: previousSubject.missedAssignments, newValue: currentSubject.missedAssignments,
+                                });
+                                changesCount++;
+                            }
+                            if (currentSubject.group !== previousSubject.group) {
+                                newHistory[studentId].push({
+                                    date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
+                                    fieldName: 'group', oldValue: previousSubject.group, newValue: currentSubject.group
+                                });
+                                changesCount++;
+                            }
                         }
-                        if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
-                            newHistory[studentId].push({
-                                date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
-                                fieldName: 'missedAssignments', oldValue: previousSubject.missedAssignments, newValue: currentSubject.missedAssignments,
-                            });
-                            changesCount++;
-                        }
-                        if (currentSubject.group !== previousSubject.group) {
-                            newHistory[studentId].push({
-                                date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
-                                fieldName: 'group', oldValue: previousSubject.group, newValue: currentSubject.group
-                            });
-                            changesCount++;
-                        }
-                    }
-                });
+                    });
+                }
             }
         }
         setStudentHistory(newHistory);
         return { processed: Object.keys(currentData).length, changes: changesCount };
     };
 
-    const handleCompare = async () => {
-        if (!previousFile || !currentFile) {
-            toast({
-                variant: 'destructive',
-                title: 'Faltan archivos',
-                description: 'Por favor, carga ambos reportes (anterior y actual) para comparar.',
-            });
-            return;
-        }
-        setIsProcessing(true);
-        setProgress(10);
-        try {
-            const [previousData, currentData] = await Promise.all([
-                parseExcel(previousFile),
-                parseExcel(currentFile)
-            ]);
-            setProgress(50);
-            
-            if (!previousData || !currentData) {
-                toast({
-                  variant: 'destructive',
-                  title: 'Error de Formato',
-                  description: 'Uno o ambos archivos Excel no tienen el formato esperado o están vacíos.',
-                });
-                setIsProcessing(false);
-                setProgress(0);
+    useEffect(() => {
+        const runComparison = async () => {
+            if (!previousFile || !hasData) {
+                if (previousFile) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Falta reporte actual',
+                        description: 'Por favor, carga primero el reporte diario general en la barra superior.',
+                    });
+                }
                 return;
             }
+            setIsProcessing(true);
+            setProgress(10);
+            try {
+                const previousData = await parseExcel(previousFile);
+                setProgress(50);
+                
+                if (!previousData) {
+                    toast({
+                      variant: 'destructive',
+                      title: 'Error de Formato',
+                      description: 'El archivo del reporte anterior no tiene el formato esperado o está vacío.',
+                    });
+                    setIsProcessing(false);
+                    setProgress(0);
+                    return;
+                }
 
-            const { processed, changes } = processAndCompareData(previousData, currentData);
-            setProgress(90);
+                const { processed, changes } = processAndCompareData(previousData, allStudents);
+                setProgress(90);
+                
+                const currentReportName = "Reporte Actual en Memoria";
+                setUploadHistory(prev => [{ 
+                    id: Date.now().toString(), 
+                    fileName: `COMPARE: ${previousFile.name} vs ${currentReportName}`, 
+                    uploadedAt: new Date().toISOString() 
+                }, ...prev].slice(0, 10));
 
-            setUploadHistory(prev => [{ 
-                id: Date.now().toString(), 
-                fileName: `COMPARE: ${previousFile.name} vs ${currentFile.name}`, 
-                uploadedAt: new Date().toISOString() 
-            }, ...prev].slice(0, 10));
+                toast({
+                    title: 'Éxito',
+                    description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
+                });
 
-            toast({
-                title: 'Éxito',
-                description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
-            });
+            } catch (error) {
+               toast({
+                variant: 'destructive',
+                title: 'Error al procesar',
+                description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
+              });
+              console.error(error);
+            } finally {
+                setTimeout(() => {
+                    setIsProcessing(false);
+                    setProgress(0);
+                    setPreviousFile(null); // Clear the file after processing
+                }, 500);
+            }
+        };
 
-        } catch (error) {
-           toast({
-            variant: 'destructive',
-            title: 'Error al procesar',
-            description: `Hubo un problema al procesar los archivos. Revisa la consola.`,
-          });
-          console.error(error);
-        } finally {
-            setTimeout(() => {
-                setIsProcessing(false);
-                setProgress(0);
-            }, 500);
-        }
-    };
+        runComparison();
+    }, [previousFile, hasData, allStudents]);
 
 
     const { totalChanges, studentsWithChanges, changesByLeader, changesByTutor, changesBySubject } = useMemo(() => {
@@ -223,20 +233,16 @@ export function ChangeStats() {
         <div className="space-y-8 p-4 md:p-8 pt-6">
             <header className="mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">Análisis de Cambios</h1>
-                <p className="text-muted-foreground">Compara dos reportes para detectar nuevas faltas, tareas no entregadas y cambios de grupo.</p>
+                <p className="text-muted-foreground">Compara el reporte diario actual con uno anterior para detectar nuevas faltas, tareas no entregadas y cambios de grupo.</p>
             </header>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Cargar Reportes para Comparación</CardTitle>
+                    <CardTitle>Iniciar Comparación</CardTitle>
+                    <CardDescription>Carga el reporte del día anterior. Se comparará automáticamente con el reporte actual que ya tienes cargado.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
-                    <FileUpload onFileSelect={setPreviousFile} selectedFile={previousFile} isLoading={isProcessing} label="Reporte Anterior" icon={<FileClock />} />
-                    <FileUpload onFileSelect={setCurrentFile} selectedFile={currentFile} isLoading={isProcessing} label="Reporte Actual" icon={<FileCheck2 />} />
-                    <Button onClick={handleCompare} disabled={isProcessing || !previousFile || !currentFile} className="w-full md:w-auto">
-                        <UploadCloud className="mr-2" />
-                        Analizar Cambios
-                    </Button>
+                    <FileUpload onFileSelect={setPreviousFile} selectedFile={previousFile} isLoading={isProcessing} label="Cargar Reporte Anterior" icon={<FileClock />} />
                 </CardContent>
                 {isProcessing && <Progress value={progress} className="w-full h-1 mt-2" />}
             </Card>
@@ -251,7 +257,7 @@ export function ChangeStats() {
                     </CardHeader>
                     <CardContent>
                         <p className="text-muted-foreground">
-                            Carga un reporte anterior y uno actual en la sección de arriba para generar y visualizar el análisis de cambios.
+                            Carga un reporte anterior para generar y visualizar el análisis de cambios. Asegúrate de haber cargado el reporte actual primero.
                         </p>
                     </CardContent>
                 </Card>
@@ -269,7 +275,7 @@ export function ChangeStats() {
                             </CardHeader>
                             <CardContent>
                                 <p className="text-muted-foreground">
-                                    No se detectaron nuevas faltas o tareas no entregadas entre los dos reportes cargados. Puede haber otros cambios (ej. de grupo).
+                                    No se detectaron nuevas faltas o tareas no entregadas entre los dos reportes. Puede haber otros cambios (ej. de grupo o tutor).
                                 </p>
                             </CardContent>
                         </Card>
