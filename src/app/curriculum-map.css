@@ -116,9 +116,11 @@
 }
 
 .connector-line {
-    stroke: hsl(var(--border));
+    stroke: hsl(var(--primary));
     stroke-width: 2px;
     transition: stroke 0.3s ease;
+    stroke-dasharray: 4;
+    animation: dash 3s linear infinite;
 }
 
 .connector-line.locked,
