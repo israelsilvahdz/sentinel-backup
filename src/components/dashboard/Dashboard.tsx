@@ -159,16 +159,21 @@ export function Dashboard() {
                 <CardHeader>
                     <CardTitle>Focos de Riesgo y Seguimiento</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                      <KpiCard title="Alumnos con NE en 'El Mundo Contemporáneo'" value={onlineRiskMundo.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('El mundo contemporáneo')} />
                      <KpiCard title="Alumnos con NE en 'Ciencias de la Vida'" value={onlineRiskVida.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('Ciencias de la Vida')} />
-                     <KpiCard title="Alumnos con Calificación Incompleta (SC)" value={incompleteGradeCases.length} icon={UserCog} color="blue" onClick={() => handleCaseClick('incompleteGrade')} />
                 </CardContent>
             </Card>
 
 
             {filteredStudents.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="lg:col-span-2">
+                        <RiskDistributionChart students={filteredStudents} />
+                    </div>
+                     <div className="lg:col-span-2">
+                        <RiskFocusChart students={filteredStudents} />
+                    </div>
                      <Card className="lg:col-span-2">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Grupos Pendientes de Calificar</CardTitle>
@@ -186,12 +191,6 @@ export function Dashboard() {
                             </ResponsiveContainer>
                         </CardContent>
                     </Card>
-                    <div className="lg:col-span-2">
-                        <RiskDistributionChart students={filteredStudents} />
-                    </div>
-                     <div className="lg:col-span-2">
-                        <RiskFocusChart students={filteredStudents} />
-                    </div>
                 </div>
             ) : (
             <Card className="text-center p-12">
@@ -213,3 +212,5 @@ export function Dashboard() {
     </div>
   );
 }
+
+    
