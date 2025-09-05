@@ -8,6 +8,52 @@ export interface AcademicEvent {
 }
 
 export const academicEventsTetra: AcademicEvent[] = [
+  // Tetramestre Sep-Dic 2025
+  { date: new Date(2025, 5, 16), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 17), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 18), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 19), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 20), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 23), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 24), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 25), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 26), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 5, 27), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 7, 22), title: 'Examen de Perfilamiento Académico', category: 'Exámenes' },
+  { date: new Date(2025, 6, 7), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 8), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 9), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 10), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 11), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 14), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 15), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 16), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 17), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 6, 18), title: 'Talleres de Nivelación Académica', category: 'Clases' },
+  { date: new Date(2025, 7, 25), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 7, 26), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 7, 27), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 7, 28), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 7, 29), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 8, 1), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 8, 2), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 8, 3), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 8, 4), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 8, 5), title: 'Curso de Inducción', category: 'Clases' },
+  { date: new Date(2025, 8, 8), title: '¡Primer Día de Clases!', category: 'Clases' },
+  { date: new Date(2025, 8, 16), title: 'Asueto', category: 'Asueto' },
+  { date: new Date(2025, 9, 20), title: 'Examen de medio término', category: 'Exámenes' },
+  { date: new Date(2025, 9, 21), title: 'Examen de medio término', category: 'Exámenes' },
+  { date: new Date(2025, 9, 22), title: 'Examen de medio término', category: 'Exámenes' },
+  { date: new Date(2025, 9, 23), title: 'Examen de medio término', category: 'Exámenes' },
+  { date: new Date(2025, 9, 24), title: 'Examen de medio término', category: 'Exámenes' },
+  { date: new Date(2025, 10, 17), title: 'Asueto', category: 'Asueto' },
+  { date: new Date(2025, 11, 9), title: 'Último día de clases', category: 'Clases' },
+  { date: new Date(2025, 11, 10), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 11), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 12), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 19), title: 'Exámenes Extraordinarios (fecha tentativa)', category: 'Extraordinario' },
+
   // Tetramestre 1: Enero – Abril
   { date: new Date(2026, 0, 6), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
   { date: new Date(2026, 0, 7), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
@@ -205,4 +251,5 @@ export const academicEventsSemestral: AcademicEvent[] = [
 ];
 
 
+    
     
