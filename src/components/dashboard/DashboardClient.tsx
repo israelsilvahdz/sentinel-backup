@@ -105,7 +105,7 @@ export function DashboardClient() {
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [activeView, setActiveView] = useState<ActiveView>('academic-calendar');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   // Load data from local storage on initial mount
