@@ -157,7 +157,27 @@ export const academicEventsSemestral: AcademicEvent[] = [
   { date: new Date(2026, 6, 30), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
   { date: new Date(2026, 6, 31), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
   
-  // Semestre 2: Agosto – Diciembre
+  // Semestre 2: Agosto – Diciembre 2025
+  { date: new Date(2025, 7, 11), title: '¡Primer Día de Clases!', category: 'Clases' },
+  { date: new Date(2025, 7, 22), title: 'Límite para cambio de grupo o materia', category: 'Límite' },
+  { date: new Date(2025, 8, 16), title: 'Asueto por el Día de la Independencia', category: 'Asueto' },
+  { date: new Date(2025, 8, 29), title: 'Semana de Exámenes Intermedios', category: 'Exámenes' },
+  { date: new Date(2025, 8, 30), title: 'Semana de Exámenes Intermedios', category: 'Exámenes' },
+  { date: new Date(2025, 9, 1), title: 'Semana de Exámenes Intermedios', category: 'Exámenes' },
+  { date: new Date(2025, 9, 2), title: 'Semana de Exámenes Intermedios', category: 'Exámenes' },
+  { date: new Date(2025, 9, 3), title: 'Semana de Exámenes Intermedios', category: 'Exámenes' },
+  { date: new Date(2025, 10, 17), title: 'Asueto por el Día de la Revolución Mexicana', category: 'Asueto' },
+  { date: new Date(2025, 11, 2), title: 'Último día de clases del semestre', category: 'Clases' },
+  { date: new Date(2025, 11, 3), title: 'Semana de Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 4), title: 'Semana de Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 5), title: 'Semana de Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 8), title: 'Semana de Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 9), title: 'Semana de Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2025, 11, 16), title: 'Aplicación de Exámenes Extraordinarios', category: 'Extraordinario' },
+  { date: new Date(2025, 11, 17), title: 'Aplicación de Exámenes Extraordinarios', category: 'Extraordinario' },
+
+
+  // Semestre 2: Agosto – Diciembre 2026 (Existing)
   { date: new Date(2026, 7, 1), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
   { date: new Date(2026, 7, 10), title: '¡Primer día de clases!', category: 'Clases' },
   { date: new Date(2026, 7, 24), title: 'Límite para cambio de grupo/materia', category: 'Límite' },
@@ -183,3 +203,6 @@ export const academicEventsSemestral: AcademicEvent[] = [
   { date: new Date(2026, 11, 15), title: 'Aplicación de Examen Extraordinario', category: 'Extraordinario' },
   { date: new Date(2026, 11, 16), title: 'Límite envío de resultados de Examen Extraordinario', category: 'Extraordinario' },
 ];
+
+
+    
