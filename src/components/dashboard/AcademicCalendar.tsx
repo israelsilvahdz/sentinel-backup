@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar, type CalendarProps } from '@/components/ui/calendar';
+import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { academicEvents, type AcademicEventCategory } from '@/lib/calendarEvents';
 import { format, isSameDay } from 'date-fns';
@@ -11,7 +11,7 @@ import { es } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarDays, Coffee, FilePen, GraduationCap, Hand, Lock, Pencil, School, TestTube, UserRoundX } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DayPicker, type DayProps } from 'react-day-picker';
+import { type DayProps, DayPicker } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 
 
@@ -62,20 +62,20 @@ const eventsByDate = academicEvents.reduce((acc, event) => {
 }, {} as Record<string, typeof academicEvents>);
 
 function DayWithTooltip(props: DayProps) {
-    const dateKey = format(props.date, 'yyyy-M-dd');
-    const events = eventsByDate[dateKey] || [];
-
-    if (events.length === 0) {
+    const dateKey = format(props.date, 'yyyy-MM-dd');
+    const eventsForDay = eventsByDate[dateKey] || [];
+    
+    if (eventsForDay.length === 0) {
         return <DayPicker.Day {...props} />;
     }
-    
+
     return (
         <Tooltip>
             <TooltipTrigger asChild>
                 <div className="relative">
                     <DayPicker.Day {...props} />
                     <div className="event-dots-container">
-                        {events.slice(0, 4).map((event, i) => (
+                        {eventsForDay.slice(0, 4).map((event, i) => (
                              <div key={i} className={cn('event-dot', CATEGORY_COLORS[event.category])} />
                         ))}
                     </div>
@@ -83,7 +83,7 @@ function DayWithTooltip(props: DayProps) {
             </TooltipTrigger>
             <TooltipContent>
                 <ul className="space-y-1">
-                    {events.map((event, i) => (
+                    {eventsForDay.map((event, i) => (
                         <li key={i} className="text-sm font-semibold">{event.title}</li>
                     ))}
                 </ul>
