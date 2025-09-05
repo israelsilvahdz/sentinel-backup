@@ -175,8 +175,15 @@ export function MapPlanner() {
           for (const course of courseMap.values()) {
               if (course.isPlaceholder || locked.has(course.name)) continue;
 
+              // Rule 1: Lock if prerequisite is pending or locked
               const prereq = course.prerequisite;
               if (prereq && (pendingCourses.has(prereq) || locked.has(prereq))) {
+                  locked.add(course.name);
+              }
+
+              // Rule 2: Lock if non-flexible and its term is inactive
+              const isNonFlexible = HIGH_PRIORITY_COURSES.has(course.name);
+              if (isNonFlexible && !activeTerms.has(course.term)) {
                   locked.add(course.name);
               }
           }
@@ -460,5 +467,3 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
-
-    
