@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useDashboardFilters } from './DashboardClient';
 import { KpiCard } from './KpiCard';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2, Library, BadgeAlert, FileWarning } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2, Library, BadgeAlert, FileWarning, BookX } from 'lucide-react';
 import { type Change, type Student, type StudentData } from '@/types/student';
 import { FileUpload } from './FileUpload';
 import { Button } from '../ui/button';
@@ -182,7 +182,7 @@ export function ChangeStats() {
 
     const { 
         totalChanges, studentsWithChanges, totalNewAbsences, totalNewMissedAssignments, 
-        changesByLeader, changesByTutor, changesBySubject 
+        changesByLeader, changesByTutor, changesBySubject, onlineSubjectChanges
     } = useMemo(() => {
         const hasHistory = Object.keys(studentHistory).length > 0;
         if (!hasHistory) {
@@ -194,6 +194,7 @@ export function ChangeStats() {
                 changesByLeader: [],
                 changesByTutor: [],
                 changesBySubject: [],
+                onlineSubjectChanges: []
             };
         }
 
@@ -207,6 +208,7 @@ export function ChangeStats() {
         const leaderCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const tutorCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
+        const onlineCounts: Record<string, number> = { 'El mundo contemporáneo': 0, 'Ciencias de la Vida': 0 };
 
         for (const change of riskChanges) {
             const isRiskIncrement = change.fieldName === 'absences' || change.fieldName === 'missedAssignments';
@@ -221,6 +223,10 @@ export function ChangeStats() {
 
             const subject = student.subjects?.find(s => s.id === change.subjectId);
             const subjectName = subject?.name || 'Desconocida';
+            
+            if (subjectName in onlineCounts && change.fieldName === 'missedAssignments') {
+                onlineCounts[subjectName] += increment;
+            }
 
             if (!leaderCounts[student.leader]) leaderCounts[student.leader] = { absences: 0, missedAssignments: 0 };
             if (change.fieldName === 'absences') leaderCounts[student.leader].absences += increment;
@@ -236,6 +242,7 @@ export function ChangeStats() {
         }
 
         const formatChartData = (data: Record<string, any>) => Object.entries(data).map(([name, counts]) => ({ name, Faltas: counts.absences, 'Tareas (NE)': counts.missedAssignments })).sort((a,b) => (b.Faltas + b['Tareas (NE)']) - (a.Faltas + a['Tareas (NE)'])).slice(0, 10);
+        const onlineChartData = Object.entries(onlineCounts).map(([name, value]) => ({ name, value }));
 
         return {
             totalChanges: riskChanges.length,
@@ -245,6 +252,7 @@ export function ChangeStats() {
             changesByLeader: formatChartData(leaderCounts),
             changesByTutor: formatChartData(tutorCounts),
             changesBySubject: formatChartData(subjectCounts),
+            onlineSubjectChanges: onlineChartData
         };
 
     }, [studentHistory, allStudents]);
@@ -318,6 +326,22 @@ export function ChangeStats() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <Card>
                                     <CardHeader>
+                                        <CardTitle className="flex items-center gap-2"><BookX/>Nuevas Tareas NE en Materias Online</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ResponsiveContainer width="100%" height={300}>
+                                             <BarChart data={onlineSubjectChanges} layout="horizontal" margin={{ top: 20 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis type="category" dataKey="name" />
+                                                <YAxis allowDecimals={false} />
+                                                <Tooltip content={<CustomTooltip />} />
+                                                <Bar dataKey="value" name="Nuevas Tareas (NE)" fill="hsl(var(--chart-3))" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader>
                                         <CardTitle>Cambios por Líder de Campus</CardTitle>
                                     </CardHeader>
                                     <CardContent>
@@ -334,6 +358,8 @@ export function ChangeStats() {
                                         </ResponsiveContainer>
                                     </CardContent>
                                 </Card>
+                            </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Cambios por Tutor</CardTitle>
@@ -352,25 +378,25 @@ export function ChangeStats() {
                                         </ResponsiveContainer>
                                     </CardContent>
                                 </Card>
+                                 <Card>
+                                    <CardHeader>
+                                        <CardTitle>Cambios por Materia</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ResponsiveContainer width="100%" height={300}>
+                                            <BarChart data={changesBySubject} layout="vertical" margin={{ left: 150 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis type="number" />
+                                                <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
+                                                <Tooltip content={<CustomTooltip />} />
+                                                <Legend formatter={legendFormatter} />
+                                                <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
+                                                <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </CardContent>
+                                </Card>
                             </div>
-                             <Card>
-                                <CardHeader>
-                                    <CardTitle>Cambios por Materia</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart data={changesBySubject} layout="vertical" margin={{ left: 150 }}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis type="number" />
-                                            <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} />
-                                            <Tooltip content={<CustomTooltip />} />
-                                            <Legend formatter={legendFormatter} />
-                                            <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
-                                            <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </CardContent>
-                            </Card>
                         </>
                     )}
                 </>

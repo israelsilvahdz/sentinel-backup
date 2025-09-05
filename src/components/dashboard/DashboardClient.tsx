@@ -36,10 +36,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { findExtraordinaryCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
+import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 
-type FilterType = 'leader' | 'tutor' | 'subject';
-export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes';
+type FilterType = 'leader' | 'tutor' | 'subject' | 'professor';
+export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade';
 export type ActiveView = 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
@@ -56,6 +56,7 @@ interface DashboardContextType {
   leaders: string[];
   tutors: string[];
   subjects: string[];
+  professors: string[];
   filterType: FilterType;
   setFilterType: (type: FilterType) => void;
   selectedValue: string | null;
@@ -292,6 +293,10 @@ export function DashboardClient() {
   
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
   const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))], [allStudents]);
+  const professors = useMemo(() => {
+    const allProfessors = allStudents.flatMap(s => s.subjects?.map(sub => sub.professorName) || []);
+    return [...new Set(allProfessors.filter(Boolean))];
+  }, [allStudents]);
   
   const subjects = useMemo(() => {
       const allSubjects = allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []);
@@ -306,6 +311,7 @@ export function DashboardClient() {
       if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
       if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
       if (filterType === 'subject') students = students.filter(s => s.subjectSummaries?.some(sub => sub.name === selectedValue));
+      if (filterType === 'professor') students = students.filter(s => s.subjects?.some(sub => sub.professorName === selectedValue));
     }
     
     if (caseType) {
@@ -321,6 +327,8 @@ export function DashboardClient() {
         }
         if(caseType === 'lost') return findLostCases(students);
         if(caseType === 'extraordinary') return findExtraordinaryCases(students);
+        if(caseType === 'incompleteGrade') return findIncompleteGradeCases(students);
+
         const lostCaseIds = new Set(findLostCases(students).map(s => s.id));
         if (caseType === 'urgent') return findUrgentCases(students, lostCaseIds);
         if (caseType === 'observation') {
@@ -350,7 +358,7 @@ export function DashboardClient() {
     filteredStudents, allStudents, setAllStudents, studentHistory, setStudentHistory, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
-    leaders, tutors, subjects,
+    leaders, tutors, subjects, professors,
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
     caseType, setCaseType: handleSetCaseType,
@@ -491,3 +499,4 @@ export function DashboardClient() {
     
 
     
+

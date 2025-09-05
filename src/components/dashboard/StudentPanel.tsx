@@ -3,7 +3,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Loader2, X, ArrowRightCircle } from 'lucide-react';
+import { Users, Loader2, X, ArrowRightCircle, BookX } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -40,6 +40,7 @@ export function StudentPanel() {
     observation: 'Alumnos en Observación',
     extraordinary: 'Alumnos con derecho a extraordinario',
     changes: 'Alumnos con Cambios Detectados',
+    incompleteGrade: 'Alumnos con Calificaciones Incompletas (SC)',
   };
 
   const getPanelTitle = () => {

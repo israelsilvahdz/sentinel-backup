@@ -163,3 +163,14 @@ export function findRiskCasesBySubject(students: Student[], subjectName: string,
         }
     });
 }
+
+
+/**
+ * Criterio: Alumnos con calificación final en "null".
+ */
+export function findIncompleteGradeCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        return student.subjectSummaries.some(subject => subject.finalGrade === null);
+    });
+}

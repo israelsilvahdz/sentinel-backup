@@ -19,6 +19,7 @@ export function DashboardFilters() {
     leaders,
     tutors,
     subjects,
+    professors,
     filterType,
     setFilterType,
     selectedValue,
@@ -46,6 +47,7 @@ export function DashboardFilters() {
     leader: leaders,
     tutor: tutors,
     subject: subjects,
+    professor: professors
   }[filterType] || [];
 
   const handleValueChange = (value: string | null) => {
@@ -78,6 +80,10 @@ export function DashboardFilters() {
             <div className="flex items-center space-x-2">
                 <RadioGroupItem value="tutor" id="r-tutor" />
                 <Label htmlFor="r-tutor" className="font-normal">Tutor</Label>
+            </div>
+             <div className="flex items-center space-x-2">
+                <RadioGroupItem value="professor" id="r-professor" />
+                <Label htmlFor="r-professor" className="font-normal">Profesor</Label>
             </div>
             <div className="flex items-center space-x-2">
                 <RadioGroupItem value="subject" id="r-subject" />
