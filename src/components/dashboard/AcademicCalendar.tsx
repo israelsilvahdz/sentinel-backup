@@ -5,7 +5,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
-import { academicEvents, type AcademicEventCategory } from '@/lib/calendarEvents';
+import { academicEventsTetra, academicEventsSemestral, type AcademicEventCategory, type AcademicEvent } from '@/lib/calendarEvents';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,7 +13,10 @@ import { CalendarDays, Coffee, FilePen, GraduationCap, Hand, Lock, Pencil, Schoo
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Day, type DayProps } from 'react-day-picker';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
+
+type CalendarType = 'tetra' | 'semestral';
 
 const ICONS: Record<AcademicEventCategory, React.ReactElement> = {
     'Inscripciones': <Pencil className="h-4 w-4" />,
@@ -51,17 +54,32 @@ const CATEGORY_BG_TEXT_COLORS: Record<AcademicEventCategory, string> = {
     'Bajas': 'bg-pink-100 text-pink-800',
 };
 
+export function AcademicCalendar() {
+  const [date, setDate] = useState<Date | undefined>(new Date(2026, 0, 12));
+  const [calendarType, setCalendarType] = useState<CalendarType>('tetra');
 
-const eventsByDate = academicEvents.reduce((acc, event) => {
-    const dateKey = format(event.date, 'yyyy-MM-dd');
-    if (!acc[dateKey]) {
-        acc[dateKey] = [];
-    }
-    acc[dateKey].push(event);
-    return acc;
-}, {} as Record<string, typeof academicEvents>);
+  const { eventsByDate, currentEvents } = useMemo(() => {
+    const events = calendarType === 'tetra' ? academicEventsTetra : academicEventsSemestral;
+    const mapped = events.reduce((acc, event) => {
+        const dateKey = format(event.date, 'yyyy-MM-dd');
+        if (!acc[dateKey]) {
+            acc[dateKey] = [];
+        }
+        acc[dateKey].push(event);
+        return acc;
+    }, {} as Record<string, typeof academicEventsTetra>);
+    return { eventsByDate: mapped, currentEvents: events };
+  }, [calendarType]);
 
-function DayWithTooltip(props: DayProps) {
+
+  const eventsByDay = useMemo(() => {
+    if (!date) return [];
+    const dateKey = format(date, 'yyyy-MM-dd');
+    return eventsByDate[dateKey] || [];
+  }, [date, eventsByDate]);
+
+
+  function DayWithTooltip(props: DayProps) {
     const dateKey = format(props.date, 'yyyy-MM-dd');
     const eventsForDay = eventsByDate[dateKey] || [];
     
@@ -90,15 +108,12 @@ function DayWithTooltip(props: DayProps) {
             </TooltipContent>
         </Tooltip>
     );
-}
+  }
 
-export function AcademicCalendar() {
-  const [date, setDate] = useState<Date | undefined>(new Date(2026, 0, 12));
-
-  const eventsByDay = useMemo(() => {
-    if (!date) return [];
-    return academicEvents.filter(event => isSameDay(event.date, date));
-  }, [date]);
+  const defaultMonth = useMemo(() => {
+    const firstEventDate = currentEvents.length > 0 ? currentEvents[0].date : new Date(2026, 0, 1);
+    return firstEventDate;
+  }, [currentEvents]);
 
 
   return (
@@ -110,7 +125,15 @@ export function AcademicCalendar() {
           Consulta las fechas importantes del ciclo escolar. Selecciona un día para ver los detalles.
         </p>
       </header>
-       <Card>
+
+      <Tabs value={calendarType} onValueChange={(value) => setCalendarType(value as CalendarType)}>
+        <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="tetra">Tetramestral</TabsTrigger>
+            <TabsTrigger value="semestral">Semestral</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <Card>
         <CardHeader>
           <CardTitle>Código de Colores</CardTitle>
         </CardHeader>
@@ -134,7 +157,7 @@ export function AcademicCalendar() {
               className="rounded-md border"
               locale={es}
               numberOfMonths={2}
-              defaultMonth={new Date(2026, 0, 1)}
+              defaultMonth={defaultMonth}
               components={{ Day: DayWithTooltip }}
             />
           </div>

@@ -7,7 +7,7 @@ export interface AcademicEvent {
   category: AcademicEventCategory;
 }
 
-export const academicEvents: AcademicEvent[] = [
+export const academicEventsTetra: AcademicEvent[] = [
   // Tetramestre 1: Enero – Abril
   { date: new Date(2026, 0, 6), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
   { date: new Date(2026, 0, 7), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
@@ -102,4 +102,84 @@ export const academicEvents: AcademicEvent[] = [
   { date: new Date(2026, 11, 18), title: 'EXTRA Aplicación y envío de resultados de Examen Extraordinario', category: 'Extraordinario' },
 ];
 
-    
+
+export const academicEventsSemestral: AcademicEvent[] = [
+  // Semestre 1: Enero – Mayo
+  { date: new Date(2026, 0, 12), title: '¡Primer día de clases!', category: 'Clases' },
+  { date: new Date(2026, 0, 26), title: 'Límite para cambio de grupo/materia', category: 'Límite' },
+  { date: new Date(2026, 1, 2), title: 'Asueto (Día de la Constitución)', category: 'Asueto' },
+  { date: new Date(2026, 2, 9), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 2, 10), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 2, 11), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 2, 12), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 2, 13), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 2, 16), title: 'Asueto (Natalicio de Benito Juárez)', category: 'Asueto' },
+  { date: new Date(2026, 2, 30), title: 'Receso Académico (Semana Santa)', category: 'Receso' },
+  { date: new Date(2026, 2, 31), title: 'Receso Académico (Semana Santa)', category: 'Receso' },
+  { date: new Date(2026, 3, 1), title: 'Receso Académico (Semana Santa)', category: 'Receso' },
+  { date: new Date(2026, 3, 2), title: 'Receso Académico (Semana Santa)', category: 'Receso' },
+  { date: new Date(2026, 3, 3), title: 'Receso Académico (Semana Santa)', category: 'Receso' },
+  { date: new Date(2026, 3, 6), title: 'Límite para baja de materias (parcial y total)', category: 'Bajas' },
+  { date: new Date(2026, 3, 20), title: 'Límite para cambio de carrera', category: 'Límite' },
+  { date: new Date(2026, 4, 1), title: 'Asueto (Día del Trabajo)', category: 'Asueto' },
+  { date: new Date(2026, 4, 11), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 4, 12), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 4, 13), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 4, 14), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 4, 15), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 4, 20), title: 'Límite de captura de calificaciones', category: 'Cierre' },
+  { date: new Date(2026, 4, 21), title: 'Cierre de Periodo', category: 'Cierre' },
+  { date: new Date(2026, 4, 22), title: 'Ejecución de CAPPY y Proyecciones', category: 'Cierre' },
+  { date: new Date(2026, 4, 25), title: 'Límite MC', category: 'Cierre' },
+  { date: new Date(2026, 4, 26), title: 'Aplicación de Examen Extraordinario', category: 'Extraordinario' },
+  { date: new Date(2026, 4, 27), title: 'Límite envío de resultados de Examen Extraordinario', category: 'Extraordinario' },
+
+  // Verano
+  { date: new Date(2026, 5, 1), title: 'Inscripciones de Verano', category: 'Inscripciones' },
+  { date: new Date(2026, 5, 2), title: 'Inscripciones de Verano', category: 'Inscripciones' },
+  { date: new Date(2026, 5, 3), title: 'Inscripciones de Verano', category: 'Inscripciones' },
+  { date: new Date(2026, 5, 4), title: 'Inscripciones de Verano', category: 'Inscripciones' },
+  { date: new Date(2026, 5, 5), title: 'Inscripciones de Verano', category: 'Inscripciones' },
+  { date: new Date(2026, 5, 6), title: 'Inscripciones de Verano', category: 'Inscripciones' },
+  { date: new Date(2026, 5, 8), title: '¡Inicio de clases de Verano!', category: 'Clases' },
+  { date: new Date(2026, 5, 15), title: 'Límite para cambio de grupo/materia', category: 'Límite' },
+  { date: new Date(2026, 6, 10), title: 'Límite para baja de materias', category: 'Bajas' },
+  { date: new Date(2026, 6, 17), title: 'Último día de clases de Verano', category: 'Clases' },
+  { date: new Date(2026, 6, 20), title: 'Exámenes Finales de Verano', category: 'Exámenes' },
+  { date: new Date(2026, 6, 21), title: 'Exámenes Finales de Verano', category: 'Exámenes' },
+  { date: new Date(2026, 6, 22), title: 'Límite de captura de calificaciones', category: 'Cierre' },
+  { date: new Date(2026, 6, 23), title: 'Cierre de Periodo de Verano', category: 'Cierre' },
+  { date: new Date(2026, 6, 24), title: 'Ejecución de CAPPY y Proyecciones', category: 'Cierre' },
+  { date: new Date(2026, 6, 27), title: 'Límite MC y envío de resultados de Examen Extraordinario', category: 'Cierre' },
+  { date: new Date(2026, 6, 27), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
+  { date: new Date(2026, 6, 28), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
+  { date: new Date(2026, 6, 29), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
+  { date: new Date(2026, 6, 30), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
+  { date: new Date(2026, 6, 31), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
+  
+  // Semestre 2: Agosto – Diciembre
+  { date: new Date(2026, 7, 1), title: 'Inscripciones de reingreso', category: 'Inscripciones' },
+  { date: new Date(2026, 7, 10), title: '¡Primer día de clases!', category: 'Clases' },
+  { date: new Date(2026, 7, 24), title: 'Límite para cambio de grupo/materia', category: 'Límite' },
+  { date: new Date(2026, 8, 16), title: 'Asueto (Día de la Independencia)', category: 'Asueto' },
+  { date: new Date(2026, 8, 28), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 8, 29), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 8, 30), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 9, 1), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 9, 2), title: 'Exámenes Parciales', category: 'Exámenes' },
+  { date: new Date(2026, 9, 26), title: 'Límite para baja de materias (parcial y total)', category: 'Bajas' },
+  { date: new Date(2026, 10, 2), title: 'Asueto (Día de Muertos)', category: 'Asueto' },
+  { date: new Date(2026, 10, 9), title: 'Límite para cambio de carrera', category: 'Límite' },
+  { date: new Date(2026, 10, 16), title: 'Asueto (Revolución Mexicana)', category: 'Asueto' },
+  { date: new Date(2026, 10, 30), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 11, 1), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 11, 2), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 11, 3), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 11, 4), title: 'Exámenes Finales', category: 'Exámenes' },
+  { date: new Date(2026, 11, 9), title: 'Límite de captura de calificaciones', category: 'Cierre' },
+  { date: new Date(2026, 11, 10), title: 'Cierre de Periodo', category: 'Cierre' },
+  { date: new Date(2026, 11, 11), title: 'Ejecución de CAP y Proyecciones', category: 'Cierre' },
+  { date: new Date(2026, 11, 14), title: 'Límite MC', category: 'Cierre' },
+  { date: new Date(2026, 11, 15), title: 'Aplicación de Examen Extraordinario', category: 'Extraordinario' },
+  { date: new Date(2026, 11, 16), title: 'Límite envío de resultados de Examen Extraordinario', category: 'Extraordinario' },
+];
