@@ -110,6 +110,19 @@ export function AcademicCalendar() {
           Consulta las fechas importantes del ciclo escolar. Selecciona un día para ver los detalles.
         </p>
       </header>
+       <Card>
+        <CardHeader>
+          <CardTitle>Código de Colores</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-x-6 gap-y-3">
+          {Object.entries(CATEGORY_COLORS).map(([category, colorClass]) => (
+            <div key={category} className="flex items-center gap-2">
+              <div className={cn("h-4 w-4 rounded-full", colorClass)} />
+              <span className="text-sm font-medium">{category}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -163,19 +176,6 @@ export function AcademicCalendar() {
         </CardContent>
       </Card>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Leyenda de Iconos</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          {Object.entries(ICONS).map(([category, icon]) => (
-            <div key={category} className="flex items-center gap-2">
-              <span className={`p-2 rounded-full ${CATEGORY_BG_TEXT_COLORS[category as AcademicEventCategory]}`}>{icon}</span>
-              <span className="text-sm font-medium">{category}</span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
     </TooltipProvider>
   );
