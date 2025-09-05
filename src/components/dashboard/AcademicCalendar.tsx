@@ -120,6 +120,7 @@ export function AcademicCalendar() {
               onSelect={setDate}
               className="rounded-md border"
               locale={es}
+              numberOfMonths={2}
               defaultMonth={new Date(2026, 0, 1)}
               components={{ Day: DayWithTooltip }}
             />
