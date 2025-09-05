@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Lightbulb, Users } from 'lucide-react';
+import { Lightbulb, Users, AlertTriangle } from 'lucide-react';
 
 const courseMap = new Map(curriculum.flatMap((term, termIndex) => term.courses.map(course => [course.name, { ...course, term: term.name, termIndex }])));
 
@@ -53,6 +53,28 @@ const ORDINAL_MAP: Record<string, string> = {
     'Quinto Tetramestre': '5°',
     'Sexto Tetramestre': '6°',
 };
+
+const getCriticalCourses = (currentTermIndex: number, activeTerms: Set<string>): Set<string> => {
+    const critical = new Set<string>();
+    if (currentTermIndex < 0 || currentTermIndex >= curriculum.length) return critical;
+
+    // A term is critical if there's no "cushion" generation (N-1) active
+    const previousTermIndex = currentTermIndex - 1;
+    if (previousTermIndex >= 0) {
+        const previousTerm = curriculum[previousTermIndex];
+        if (!activeTerms.has(previousTerm.name)) {
+            // This means there's no active generation that will be in the currentTermIndex next period
+            const currentTermCourses = curriculum[currentTermIndex].courses;
+            currentTermCourses.forEach(course => {
+                if (HIGH_PRIORITY_COURSES.has(course.name)) {
+                    critical.add(course.name);
+                }
+            });
+        }
+    }
+    return critical;
+};
+
 
 export function MapPlanner() {
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
@@ -101,16 +123,12 @@ export function MapPlanner() {
   
   const handleTermClick = (termIndex: number) => {
     setSelectedTermIndex(termIndex);
-    // Resetting states might not be desired if we want to keep the simulation persistent
-    // setPendingCourses(new Set());
-    // setManuallyApprovedCourses(new Set()); 
     if (termIndex < 5) {
         setIsGraduationCandidate(false);
     }
   };
   
   const handleCourseStatusToggle = (courseName: string, termIndex: number) => {
-    // Logic for past terms: Toggle Pending Status
     if (selectedTermIndex > -1 && termIndex < selectedTermIndex) {
         setPendingCourses(prev => {
             const newSet = new Set(prev);
@@ -122,7 +140,6 @@ export function MapPlanner() {
             return newSet;
         });
     } 
-    // Logic for current or future terms: Toggle Manually Approved Status
     else if (selectedTermIndex > -1 && termIndex >= selectedTermIndex) {
         setManuallyApprovedCourses(prev => {
              const newSet = new Set(prev);
@@ -148,7 +165,8 @@ export function MapPlanner() {
       })
   }
 
-  const { approvedCourses, lockedCourses, recommendedCourses } = useMemo(() => {
+  const { approvedCourses, lockedCourses, recommendedCourses, criticalCourses } = useMemo(() => {
+    // START OF REVISED LOGIC
     // 1. Determine Locked Courses first (Cascading effect)
     const locked = new Set<string>();
     let prevLockedSize = -1;
@@ -159,15 +177,10 @@ export function MapPlanner() {
         for (const course of courseMap.values()) {
             if (course.isPlaceholder || locked.has(course.name)) continue;
 
-            const courseTermInfo = courseMap.get(course.name);
-            const isTermActive = courseTermInfo && activeTerms.has(courseTermInfo.term);
-            const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+            const isPrereqPending = course.prerequisite ? pendingCourses.has(course.prerequisite) : false;
+            const isPrereqLocked = course.prerequisite ? locked.has(course.prerequisite) : false;
 
-            // A course is locked if its prerequisite is pending or locked itself.
-            const prereq = course.prerequisite;
-            const isPrereqLocked = prereq ? pendingCourses.has(prereq) || locked.has(prereq) : false;
-            
-            if (isPrereqLocked || (!isFlex && !isTermActive)) {
+            if (isPrereqPending || isPrereqLocked) {
                 locked.add(course.name);
             }
         }
@@ -178,7 +191,6 @@ export function MapPlanner() {
     if (selectedTermIndex > -1) {
       for (let i = 0; i < selectedTermIndex; i++) {
         curriculum[i].courses.forEach(c => {
-          // A course from a past term is approved only if it's not pending and not locked.
           if (!c.isPlaceholder && !pendingCourses.has(c.name) && !locked.has(c.name)) {
             approved.add(c.name);
           }
@@ -192,7 +204,8 @@ export function MapPlanner() {
         }
     });
 
-    // 3. Determine Recommended Courses for the current term
+    // 3. Determine Recommended and Critical Courses
+    const critical = getCriticalCourses(selectedTermIndex, activeTerms);
     const recommended = new Set<string>();
     if (selectedTermIndex > -1) {
         const currentTermCourses = curriculum[selectedTermIndex].courses;
@@ -201,25 +214,21 @@ export function MapPlanner() {
             const prereq = course.prerequisite;
             const prereqMet = prereq ? approved.has(prereq) : true;
             if (prereqMet && !locked.has(course.name) && !approved.has(course.name)) {
+                // A course is recommended if its prereqs are met and it's not locked or already approved.
+                // Critical courses are a subset of recommended courses, so they are not mutually exclusive here.
                 recommended.add(course.name);
-            }
-        });
-
-        // Add pending courses from past terms if they can now be taken
-        pendingCourses.forEach(pendingCourseName => {
-            const course = courseMap.get(pendingCourseName);
-            if (course && course.termIndex < selectedTermIndex) {
-                 const prereq = course.prerequisite;
-                 const prereqMet = prereq ? approved.has(prereq) : true;
-                 if (prereqMet && !locked.has(course.name)) {
-                     recommended.add(course.name);
-                 }
             }
         });
     }
 
-    return { approvedCourses: approved, lockedCourses: locked, recommendedCourses: recommended };
-  }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, activeTerms, isGraduationCandidate]);
+    return { 
+        approvedCourses: approved, 
+        lockedCourses: locked, 
+        recommendedCourses: recommended,
+        criticalCourses: critical 
+    };
+    // END OF REVISED LOGIC
+  }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, activeTerms]);
 
 
   const gridStructure = useMemo(() => {
@@ -232,6 +241,7 @@ export function MapPlanner() {
 
   const getCourseState = (courseName: string) => {
      if (lockedCourses.has(courseName)) return 'locked';
+     if (criticalCourses.has(courseName)) return 'critical';
      if (approvedCourses.has(courseName)) return 'approved';
      if (recommendedCourses.has(courseName)) return 'recommended';
      return 'default';
@@ -276,7 +286,7 @@ export function MapPlanner() {
                 <li>Selecciona los **períodos activos** para simular la oferta académica real. Las materias no flexibles de períodos inactivos se bloquearán.</li>
                 <li>Haz clic en el **título de un período (ej. 1°)** para simular el avance de un alumno.</li>
                 <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
-                <li>Las materias del período seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
+                <li>Las materias del período seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> o <span className="font-semibold text-red-700">críticas</span> para cursar.</li>
                 <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> para cambiar su estado (pendiente o aprobada manually).</li>
               </ol>
             </AlertDescription>
@@ -358,6 +368,7 @@ export function MapPlanner() {
                                   'pending': isPending,
                                   'approved': state === 'approved',
                                   'recommended': state === 'recommended',
+                                  'critical': state === 'critical',
                               })}
                               style={{ 
                                   gridColumn: termIndex + 1,
@@ -384,6 +395,12 @@ export function MapPlanner() {
                                   </TooltipTrigger>
                                   <TooltipContent>
                                       <p className="font-bold">{course.name}</p>
+                                      {state === 'critical' && (
+                                        <p className="text-xs text-destructive font-semibold flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            ¡Crítica! Si no la cursas ahora, te atrasarás un ciclo.
+                                        </p>
+                                      )}
                                       <div className='flex gap-2 items-center'>
                                         <p className="text-xs text-muted-foreground capitalize">Estado: {state}</p>
                                         {isPending && <p className="text-xs text-red-500 font-semibold">Pendiente</p>}

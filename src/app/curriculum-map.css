@@ -59,6 +59,20 @@
     opacity: 0.7;
 }
 
+.course-cell.critical .course-card {
+    background-color: hsl(var(--destructive) / 0.1);
+    border-color: hsl(var(--destructive));
+    box-shadow: 0 0 10px hsl(var(--destructive) / 0.4);
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0.4); }
+  70% { box-shadow: 0 0 0 10px hsl(var(--destructive) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0); }
+}
+
+
 /* --- New Status Indicator Styles --- */
 .course-status-indicator {
   position: absolute;
