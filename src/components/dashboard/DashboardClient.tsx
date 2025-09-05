@@ -27,9 +27,10 @@ import { PonderacionesDashboard } from './PonderacionesDashboard';
 import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
 import { MapPlanner } from './MapPlanner';
 import { AcademicCalendar } from './AcademicCalendar';
+import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -41,7 +42,7 @@ import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findOb
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade';
-export type ActiveView = 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -110,7 +111,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('academic-calendar');
+  const [activeView, setActiveView] = useState<ActiveView>('welcome');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   // Load data from local storage on initial mount
@@ -386,6 +387,7 @@ export function DashboardClient() {
 
   const renderActiveView = () => {
     switch (activeView) {
+        case 'welcome': return <WelcomeDashboard />;
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'history': return <StudentHistoryPanel />;
@@ -394,7 +396,7 @@ export function DashboardClient() {
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
-        default: return <Dashboard />;
+        default: return <WelcomeDashboard />;
     }
   }
 
@@ -411,6 +413,12 @@ export function DashboardClient() {
           <SidebarContent>
             <SidebarGroup>
               <SidebarMenu>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')}>
+                    <Home />
+                    <span>Inicio</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                  <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Calendario Académico" isActive={activeView === 'academic-calendar'} onClick={() => handleSetActiveView('academic-calendar')}>
                     <CalendarDays />
