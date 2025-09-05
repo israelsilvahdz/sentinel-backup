@@ -403,7 +403,7 @@ export function DashboardClient() {
       <SidebarProvider defaultOpen={false}>
         <Sidebar>
           <SidebarHeader>
-             <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:justify-center">
+             <div className="flex items-center gap-2 px-4 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
                 <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={26} height={26} className="h-6 w-auto" />
                 <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">TECMILENIO</span>
              </div>
@@ -510,3 +510,5 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
+    
