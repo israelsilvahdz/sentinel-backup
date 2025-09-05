@@ -63,7 +63,7 @@ export const curriculum: CurriculumTerm[] = [
       { name: 'Materia y energía I', prerequisite: 'Matemáticas II: pensamiento matemático' },
       { name: 'Antropología', prerequisite: 'El ser humano en sociedad' },
       { name: 'placeholder1', isPlaceholder: true },
-      { name: 'Expresión Literaria' },
+      { name: 'Expresión Literaria', prerequisite: 'Los grandes escritores universales' },
       { name: 'Optativa de lengua adicional al español IV', prerequisite: 'Optativa de lengua adicional al español III' },
       { name: 'placeholder2', isPlaceholder: true },
       { name: 'Ciencias de la Vida' },
