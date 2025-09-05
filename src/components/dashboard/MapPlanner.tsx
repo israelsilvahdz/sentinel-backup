@@ -166,7 +166,6 @@ export function MapPlanner() {
   }
 
   const { approvedCourses, lockedCourses, recommendedCourses, criticalCourses } = useMemo(() => {
-    // START OF REVISED LOGIC
     // 1. Determine Locked Courses first (Cascading effect)
     const locked = new Set<string>();
     let prevLockedSize = -1;
@@ -191,6 +190,7 @@ export function MapPlanner() {
     if (selectedTermIndex > -1) {
       for (let i = 0; i < selectedTermIndex; i++) {
         curriculum[i].courses.forEach(c => {
+          // A past course is approved ONLY if it's not pending and not locked
           if (!c.isPlaceholder && !pendingCourses.has(c.name) && !locked.has(c.name)) {
             approved.add(c.name);
           }
@@ -207,15 +207,22 @@ export function MapPlanner() {
     // 3. Determine Recommended and Critical Courses
     const critical = getCriticalCourses(selectedTermIndex, activeTerms);
     const recommended = new Set<string>();
+
     if (selectedTermIndex > -1) {
+        // Rule 1: Recommend all PENDING courses that are not locked
+        pendingCourses.forEach(pendingCourse => {
+            if (!locked.has(pendingCourse)) {
+                recommended.add(pendingCourse);
+            }
+        });
+
+        // Rule 2: Recommend courses from the current term
         const currentTermCourses = curriculum[selectedTermIndex].courses;
         currentTermCourses.forEach(course => {
             if (course.isPlaceholder) return;
             const prereq = course.prerequisite;
             const prereqMet = prereq ? approved.has(prereq) : true;
             if (prereqMet && !locked.has(course.name) && !approved.has(course.name)) {
-                // A course is recommended if its prereqs are met and it's not locked or already approved.
-                // Critical courses are a subset of recommended courses, so they are not mutually exclusive here.
                 recommended.add(course.name);
             }
         });
@@ -227,7 +234,6 @@ export function MapPlanner() {
         recommendedCourses: recommended,
         criticalCourses: critical 
     };
-    // END OF REVISED LOGIC
   }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, activeTerms]);
 
 
@@ -239,10 +245,11 @@ export function MapPlanner() {
     }
   }, []);
 
-  const getCourseState = (courseName: string) => {
+  const getCourseState = (courseName: string, isPending: boolean) => {
      if (lockedCourses.has(courseName)) return 'locked';
      if (criticalCourses.has(courseName)) return 'critical';
      if (approvedCourses.has(courseName)) return 'approved';
+     // A pending course is now also recommended, the 'pending' class will handle the indicator
      if (recommendedCourses.has(courseName)) return 'recommended';
      return 'default';
   }
@@ -285,9 +292,9 @@ export function MapPlanner() {
               <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
                 <li>Selecciona los **períodos activos** para simular la oferta académica real. Las materias no flexibles de períodos inactivos se bloquearán.</li>
                 <li>Haz clic en el **título de un período (ej. 1°)** para simular el avance de un alumno.</li>
-                <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>.</li>
+                <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>. Las materias reprobadas de periodos anteriores se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
                 <li>Las materias del período seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> o <span className="font-semibold text-red-700">críticas</span> para cursar.</li>
-                <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> para cambiar su estado (pendiente o aprobada manually).</li>
+                <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> para cambiar su estado (pendiente o aprobada manualmente).</li>
               </ol>
             </AlertDescription>
         </Alert>
@@ -355,8 +362,8 @@ export function MapPlanner() {
                               <div key={`${term.name}-${course.name}-${courseIndex}`} style={{ gridColumn: termIndex + 1, gridRow: courseIndex + 2 }}></div>
                           );
                         }
-                      const state = getCourseState(course.name);
                       const isPending = pendingCourses.has(course.name);
+                      const state = getCourseState(course.name, isPending);
                       const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
                       
                       return (
