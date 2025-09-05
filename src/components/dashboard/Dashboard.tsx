@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useMemo } from 'react';
@@ -20,7 +21,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="rounded-lg border bg-background p-2 shadow-sm">
           <p className="font-bold text-base">{label}</p>
           <p className="text-sm" style={{ color: payload[0].fill }}>
-            Materias Pendientes: {data.value}
+            Materias con SC: {data.value}
           </p>
         </div>
       );
@@ -67,25 +68,24 @@ export function Dashboard() {
 
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
-            const professorName = subject.professorName || 'Sin Asignar';
-            let hasPendingActivity = false;
+            if (!subject.professorName) return;
 
+            let hasPendingActivity = false;
             if (subject.activities) {
                 for (const activityKey in subject.activities) {
                     if (subject.activities[activityKey] === 'SC') {
                         hasPendingActivity = true;
-                        break; 
+                        break;
                     }
                 }
             }
 
             if (hasPendingActivity) {
-                if (!professorPendingSubjects[professorName]) {
-                    professorPendingSubjects[professorName] = new Set();
+                if (!professorPendingSubjects[subject.professorName]) {
+                    professorPendingSubjects[subject.professorName] = new Set();
                 }
-                // Contar por materia única, no por grupo
                 const subjectIdentifier = subject.name;
-                professorPendingSubjects[professorName].add(subjectIdentifier);
+                professorPendingSubjects[subject.professorName].add(subjectIdentifier);
             }
         });
     });
@@ -172,7 +172,7 @@ export function Dashboard() {
                 <CardHeader>
                     <CardTitle>Focos de Riesgo y Seguimiento</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                      <KpiCard title="Alumnos con NE en 'El Mundo Contemporáneo'" value={onlineRiskMundo.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('El mundo contemporáneo')} />
                      <KpiCard title="Alumnos con NE en 'Ciencias de la Vida'" value={onlineRiskVida.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('Ciencias de la Vida')} />
                      <KpiCard title="Alumnos con Calificaciones Incompletas (SC)" value={incompleteGradeCases.length} icon={FileText} onClick={() => handleCaseClick('incompleteGrade')} />
@@ -208,8 +208,8 @@ export function Dashboard() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Materias Pendientes de Calificar</CardTitle>
-                    <CardDescription>Profesores con la mayor cantidad de materias únicas con una o más actividades 'SC'. Haz clic para ver sus alumnos.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Materias con Actividades 'SC'</CardTitle>
+                    <CardDescription>Profesores con la mayor cantidad de materias únicas que tienen una o más actividades 'SC'. Haz clic para ver sus alumnos.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -218,7 +218,7 @@ export function Dashboard() {
                             <XAxis type="number" allowDecimals={false} />
                             <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                            <Bar dataKey="value" name="Materias Pendientes" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
+                            <Bar dataKey="value" name="Materias con SC" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
                         </BarChart>
                     </ResponsiveContainer>
                 </CardContent>
@@ -228,3 +228,4 @@ export function Dashboard() {
     </div>
   );
 }
+
