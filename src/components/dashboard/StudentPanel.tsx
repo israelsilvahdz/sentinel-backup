@@ -20,8 +20,6 @@ export function StudentPanel() {
     setSelectedStudentId,
     subjectRiskFilter,
     setSubjectRiskFilter,
-    groupId,
-    setGroupId
   } = useDashboardFilters();
 
   if (isLoading) {
@@ -48,11 +46,7 @@ export function StudentPanel() {
 
   const getPanelTitle = () => {
     if (caseType) {
-        let title = `Mostrando: ${caseTypeMap[caseType]}`;
-        if (caseType === 'incompleteGrade' && groupId) {
-          title += ` (Grupo: ${groupId})`
-        }
-        return <p className="text-muted-foreground">{title}</p>;
+        return <p className="text-muted-foreground">Mostrando: {caseTypeMap[caseType]}</p>;
     }
     if (subjectRiskFilter) {
         const riskTypeText = subjectRiskFilter.riskType === 'absences' ? 'Faltas' : 'Tareas (NE)';
@@ -64,7 +58,6 @@ export function StudentPanel() {
   const handleClearFilter = () => {
     setCaseType(null);
     setSubjectRiskFilter(null);
-    setGroupId(null);
   };
   
   const hasActiveFilter = !!caseType || !!subjectRiskFilter;

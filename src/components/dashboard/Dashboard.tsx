@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { KpiCard } from './KpiCard';
 import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group } from 'lucide-react';
+import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group, UserSquare } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { calculateKpis, findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases, findIncompleteGradeCases, findRiskCasesBySubject } from '@/lib/dataProcessor';
@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="rounded-lg border bg-background p-2 shadow-sm">
           <p className="font-bold text-base">{label}</p>
           <p className="text-sm" style={{ color: payload[0].fill }}>
-            {data.value} alumnos
+            {data.value} grupos pendientes
           </p>
         </div>
       );
@@ -29,9 +29,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function Dashboard() {
-  const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
+  const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue } = useDashboardFilters();
 
-  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, onlineRiskMundo, onlineRiskVida, scBySubject, scByGroup } = useMemo(() => {
+  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, onlineRiskMundo, onlineRiskVida, scByProfessor } = useMemo(() => {
     if (isLoading || !hasData) {
         return { 
             kpis: { totalStudents: 0 },
@@ -42,8 +42,7 @@ export function Dashboard() {
             incompleteGradeCases: [],
             onlineRiskMundo: [],
             onlineRiskVida: [],
-            scBySubject: [],
-            scByGroup: [],
+            scByProfessor: [],
         };
     }
     const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
@@ -63,35 +62,26 @@ export function Dashboard() {
     const riskMundo = findRiskCasesBySubject(studentSource, 'El mundo contemporáneo', 'missedAssignments');
     const riskVida = findRiskCasesBySubject(studentSource, 'Ciencias de la Vida', 'missedAssignments');
     
-    const scSubjectCounts: Record<string, number> = {};
-    const scGroupCounts: Record<string, { value: number, subjectName: string, groupNumber: string }> = {};
+    const scProfessorCounts: Record<string, { pendingGroups: Set<string> }> = {};
 
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
             if(subject.finalGrade === null) {
-                if(!scSubjectCounts[subject.name]) {
-                    scSubjectCounts[subject.name] = 0;
+                const professorName = subject.professorName || 'Sin Asignar';
+                if(!scProfessorCounts[professorName]) {
+                    scProfessorCounts[professorName] = { pendingGroups: new Set() };
                 }
-                scSubjectCounts[subject.name]++;
-                
-                const groupIdentifier = `${subject.name} - ${subject.group}`;
-                if(!scGroupCounts[groupIdentifier]) {
-                    scGroupCounts[groupIdentifier] = { value: 0, subjectName: subject.name, groupNumber: subject.group };
-                }
-                scGroupCounts[groupIdentifier].value++;
+                const groupIdentifier = `${subject.name}-${subject.group}`;
+                scProfessorCounts[professorName].pendingGroups.add(groupIdentifier);
             }
         });
     });
 
-    const subjectChartData = Object.entries(scSubjectCounts)
-        .map(([name, value]) => ({ name, value }))
+    const professorChartData = Object.entries(scProfessorCounts)
+        .map(([name, data]) => ({ name, value: data.pendingGroups.size }))
         .sort((a,b) => b.value - a.value)
         .slice(0,10);
     
-    const groupChartData = Object.entries(scGroupCounts)
-        .map(([name, data]) => ({ ...data, name }))
-        .sort((a,b) => b.value - a.value)
-        .slice(0,10);
 
     return {
       kpis: { totalStudents: studentSource.length },
@@ -102,8 +92,7 @@ export function Dashboard() {
       incompleteGradeCases: incompleteCases,
       onlineRiskMundo: riskMundo,
       onlineRiskVida: riskVida,
-      scBySubject: subjectChartData,
-      scByGroup: groupChartData
+      scByProfessor: professorChartData,
     };
   }, [filteredStudents, allStudents, isLoading, hasData]);
 
@@ -116,22 +105,12 @@ export function Dashboard() {
     setActiveView('students');
     setFilterType('subject');
     setSelectedValue(subjectName);
-    setGroupId(null);
   }
 
-  const handleSubjectClick = (subjectName: string) => {
-    setCaseType('incompleteGrade');
-    setFilterType('subject');
-    setSelectedValue(subjectName);
-    setGroupId(null);
-    setActiveView('students');
-  };
-  
-  const handleGroupClick = (data: { subjectName: string, groupNumber: string }) => {
-    setCaseType('incompleteGrade');
-    setFilterType('subject');
-    setSelectedValue(data.subjectName);
-    setGroupId(data.groupNumber);
+  const handleProfessorClick = (professorName: string) => {
+    setCaseType(null); // Clear other filters
+    setFilterType('professor');
+    setSelectedValue(professorName);
     setActiveView('students');
   };
 
@@ -190,36 +169,19 @@ export function Dashboard() {
 
             {filteredStudents.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                     <Card>
+                     <Card className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><Library className="h-5 w-5" />Top 10 Materias con Alumnos SC</CardTitle>
-                            <CardDescription>Materias con más alumnos sin calificación final. Haz clic en una barra para ver los detalles.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Grupos Pendientes de Calificar</CardTitle>
+                            <CardDescription>Profesores con la mayor cantidad de grupos únicos sin calificación final. Haz clic en una barra para ver sus alumnos.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={scBySubject} layout="vertical" margin={{ left: 150 }}>
+                                <BarChart data={scByProfessor} layout="vertical" margin={{ left: 150 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" allowDecimals={false} />
                                     <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                                    <Bar dataKey="value" name="Alumnos SC" fill="hsl(var(--chart-5))" onClick={(data) => handleSubjectClick(data.name)} className="cursor-pointer"/>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                             <CardTitle className="flex items-center gap-2"><Group className="h-5 w-5" />Top 10 Grupos con Alumnos SC</CardTitle>
-                            <CardDescription>Grupos específicos con más alumnos sin calificación final. Haz clic en una barra para ver los detalles.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={scByGroup} layout="vertical" margin={{ left: 150 }}>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                    <XAxis type="number" allowDecimals={false} />
-                                    <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
-                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                                    <Bar dataKey="value" name="Alumnos SC" fill="hsl(var(--chart-1))" onClick={(data) => handleGroupClick(data)} className="cursor-pointer"/>
+                                    <Bar dataKey="value" name="Grupos Pendientes" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
                                 </BarChart>
                             </ResponsiveContainer>
                         </CardContent>

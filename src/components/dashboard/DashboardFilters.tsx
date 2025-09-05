@@ -31,7 +31,6 @@ export function DashboardFilters() {
     isLoading,
     subjectRiskFilter,
     setSubjectRiskFilter,
-    setGroupId,
   } = useDashboardFilters();
 
   if (!hasData && !isLoading) return null;
@@ -49,14 +48,13 @@ export function DashboardFilters() {
     leader: leaders,
     tutor: tutors,
     subject: subjects,
-    professor: professors
+    professor: professors,
   }[filterType] || [];
 
   const handleValueChange = (value: string | null) => {
     setSelectedValue(value === 'all' ? null : value);
     setCaseType(null); // Clear case type when selecting a new value
     setSubjectRiskFilter(null);
-    setGroupId(null);
   };
 
   const handleFilterTypeChange = (val: string) => {
@@ -64,7 +62,6 @@ export function DashboardFilters() {
     setSelectedValue(null);
     setCaseType(null); // Also clear case type here
     setSubjectRiskFilter(null);
-    setGroupId(null);
   }
   
   const hasActiveComplexFilter = !!caseType || !!subjectRiskFilter;
@@ -72,7 +69,6 @@ export function DashboardFilters() {
   const clearComplexFilters = () => {
     setCaseType(null);
     setSubjectRiskFilter(null);
-    setGroupId(null);
   }
 
   return (
@@ -126,4 +122,3 @@ export function DashboardFilters() {
 }
 
     
-
