@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="rounded-lg border bg-background p-2 shadow-sm">
           <p className="font-bold text-base">{label}</p>
           <p className="text-sm" style={{ color: payload[0].fill }}>
-            Grupos Pendientes: {data.value}
+            Materias Pendientes: {data.value}
           </p>
         </div>
       );
@@ -63,8 +63,7 @@ export function Dashboard() {
     const riskMundo = findRiskCasesBySubject(studentSource, 'El mundo contemporáneo', 'missedAssignments');
     const riskVida = findRiskCasesBySubject(studentSource, 'Ciencias de la Vida', 'missedAssignments');
     
-    // --- Lógica para contar grupos únicos con SC por profesor ---
-    const professorPendingGroups: Record<string, Set<string>> = {};
+    const professorPendingSubjects: Record<string, Set<string>> = {};
 
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
@@ -81,17 +80,18 @@ export function Dashboard() {
             }
 
             if (hasPendingActivity) {
-                if (!professorPendingGroups[professorName]) {
-                    professorPendingGroups[professorName] = new Set();
+                if (!professorPendingSubjects[professorName]) {
+                    professorPendingSubjects[professorName] = new Set();
                 }
-                const groupIdentifier = `${subject.name}-${subject.group}`;
-                professorPendingGroups[professorName].add(groupIdentifier);
+                // Contar por materia única, no por grupo
+                const subjectIdentifier = subject.name;
+                professorPendingSubjects[professorName].add(subjectIdentifier);
             }
         });
     });
     
-    const professorChartData = Object.entries(professorPendingGroups)
-        .map(([name, groups]) => ({ name, value: groups.size }))
+    const professorChartData = Object.entries(professorPendingSubjects)
+        .map(([name, subjects]) => ({ name, value: subjects.size }))
         .filter(item => item.value > 0)
         .sort((a,b) => b.value - a.value)
         .slice(0,10);
@@ -208,8 +208,8 @@ export function Dashboard() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Grupos Pendientes de Calificar</CardTitle>
-                    <CardDescription>Profesores con la mayor cantidad de grupos únicos con una o más actividades 'SC'. Haz clic para ver sus alumnos.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Materias Pendientes de Calificar</CardTitle>
+                    <CardDescription>Profesores con la mayor cantidad de materias únicas con una o más actividades 'SC'. Haz clic para ver sus alumnos.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -218,7 +218,7 @@ export function Dashboard() {
                             <XAxis type="number" allowDecimals={false} />
                             <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                            <Bar dataKey="value" name="Grupos Pendientes" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
+                            <Bar dataKey="value" name="Materias Pendientes" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
                         </BarChart>
                     </ResponsiveContainer>
                 </CardContent>
