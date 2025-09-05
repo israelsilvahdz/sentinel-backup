@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { KpiCard } from './KpiCard';
 import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group, UserSquare, CheckCircle, Clock } from 'lucide-react';
+import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group, UserSquare, CheckCircle, Clock, FileWarning } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 import { calculateKpis, findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases, findIncompleteGradeCases, findRiskCasesBySubject } from '@/lib/dataProcessor';
@@ -20,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="rounded-lg border bg-background p-2 shadow-sm">
           <p className="font-bold text-base">{label}</p>
           <p className="text-sm" style={{ color: payload[0].fill }}>
-            {data.value} grupos pendientes
+            {payload[0].name}: {data.value}
           </p>
         </div>
       );
@@ -35,13 +35,7 @@ const ProfessorProgressTooltip = ({ active, payload, label }: any) => {
         <div className="rounded-lg border bg-background p-2 shadow-sm">
           <p className="font-bold text-base">{label}</p>
           <p className="text-sm" style={{ color: 'hsl(var(--chart-3))' }}>
-            Pendientes: {data.scSubjects}
-          </p>
-           <p className="text-sm" style={{ color: 'hsl(var(--chart-2))' }}>
-            Calificadas: {data.completedSubjects}
-          </p>
-           <p className="text-xs text-muted-foreground mt-1">
-            Total Materias: {data.totalSubjects}
+            Actividades Pendientes (SC): {data.scActivities}
           </p>
         </div>
       );
@@ -53,7 +47,7 @@ const ProfessorProgressTooltip = ({ active, payload, label }: any) => {
 export function Dashboard() {
   const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue } = useDashboardFilters();
 
-  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, onlineRiskMundo, onlineRiskVida, scByProfessor, professorSubjectProgress } = useMemo(() => {
+  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, onlineRiskMundo, onlineRiskVida, scByProfessor, professorActivityProgress } = useMemo(() => {
     if (isLoading || !hasData) {
         return { 
             kpis: { totalStudents: 0 },
@@ -65,7 +59,7 @@ export function Dashboard() {
             onlineRiskMundo: [],
             onlineRiskVida: [],
             scByProfessor: [],
-            professorSubjectProgress: [],
+            professorActivityProgress: [],
         };
     }
     const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
@@ -85,21 +79,27 @@ export function Dashboard() {
     const riskMundo = findRiskCasesBySubject(studentSource, 'El mundo contemporáneo', 'missedAssignments');
     const riskVida = findRiskCasesBySubject(studentSource, 'Ciencias de la Vida', 'missedAssignments');
     
-    const scProfessorCounts: Record<string, { pendingGroups: Set<string>, scSubjects: Set<string>, totalSubjects: Set<string> }> = {};
+    const scProfessorCounts: Record<string, { pendingGroups: Set<string>, scActivities: number }> = {};
 
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
             const professorName = subject.professorName || 'Sin Asignar';
             if(!scProfessorCounts[professorName]) {
-                scProfessorCounts[professorName] = { pendingGroups: new Set(), scSubjects: new Set(), totalSubjects: new Set() };
+                scProfessorCounts[professorName] = { pendingGroups: new Set(), scActivities: 0 };
             }
             
             const groupIdentifier = `${subject.name}-${subject.group}`;
-            scProfessorCounts[professorName].totalSubjects.add(subject.name);
 
             if(subject.finalGrade === null) {
                 scProfessorCounts[professorName].pendingGroups.add(groupIdentifier);
-                scProfessorCounts[professorName].scSubjects.add(subject.name);
+            }
+            
+            if (subject.activities) {
+                for (const activityKey in subject.activities) {
+                    if (subject.activities[activityKey] === 'SC') {
+                        scProfessorCounts[professorName].scActivities += 1;
+                    }
+                }
             }
         });
     });
@@ -110,16 +110,15 @@ export function Dashboard() {
         .sort((a,b) => b.value - a.value)
         .slice(0,10);
     
-    const professorProgressData = Object.entries(scProfessorCounts)
+    const professorActivityData = Object.entries(scProfessorCounts)
         .map(([name, data]) => ({
             name,
-            scSubjects: data.scSubjects.size,
-            totalSubjects: data.totalSubjects.size,
-            completedSubjects: data.totalSubjects.size - data.scSubjects.size
+            scActivities: data.scActivities
         }))
-        .filter(item => item.totalSubjects > 0)
-        .sort((a,b) => b.scSubjects - a.scSubjects || b.totalSubjects - a.totalSubjects)
+        .filter(item => item.scActivities > 0)
+        .sort((a,b) => b.scActivities - a.scActivities)
         .slice(0,10);
+
 
     return {
       kpis: { totalStudents: studentSource.length },
@@ -131,7 +130,7 @@ export function Dashboard() {
       onlineRiskMundo: riskMundo,
       onlineRiskVida: riskVida,
       scByProfessor: professorChartData,
-      professorSubjectProgress: professorProgressData,
+      professorActivityProgress: professorActivityData,
     };
   }, [filteredStudents, allStudents, isLoading, hasData]);
 
@@ -251,24 +250,17 @@ export function Dashboard() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Library className="h-5 w-5" />Progreso de Calificación por Profesor (Materias)</CardTitle>
-                    <CardDescription>Materias con calificaciones pendientes vs. calificadas por profesor. Haz clic para ver detalles del profesor.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><FileWarning className="h-5 w-5" />Top 10 Profesores con más Actividades Pendientes (SC)</CardTitle>
+                    <CardDescription>Profesores con la mayor cantidad de actividades individuales marcadas como 'SC'.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={professorSubjectProgress} layout="vertical" stackOffset="expand" margin={{ left: 150 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" hide={true} domain={[0, 1]} />
-                            <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0} />
-                            <Tooltip content={<ProfessorProgressTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                             <Legend
-                                iconSize={10}
-                                formatter={(value) => (
-                                    <span className="text-muted-foreground">{value}</span>
-                                )}
-                            />
-                            <Bar dataKey="completedSubjects" name="Calificadas" fill="hsl(var(--chart-2))" stackId="a" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer" />
-                            <Bar dataKey="scSubjects" name="Pendientes" fill="hsl(var(--chart-3))" stackId="a" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer" />
+                     <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={professorActivityProgress} layout="vertical" margin={{ left: 150 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" allowDecimals={false} />
+                            <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
+                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
+                            <Bar dataKey="scActivities" name="Actividades SC" fill="hsl(var(--chart-3))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
                         </BarChart>
                     </ResponsiveContainer>
                 </CardContent>
