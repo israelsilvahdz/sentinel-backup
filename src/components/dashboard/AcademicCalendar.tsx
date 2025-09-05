@@ -11,7 +11,7 @@ import { es } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarDays, Coffee, FilePen, GraduationCap, Hand, Lock, Pencil, School, TestTube, UserRoundX } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { type DayProps, DayPicker } from 'react-day-picker';
+import { DayPicker, type DayProps } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 
 
