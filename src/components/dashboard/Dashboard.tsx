@@ -79,41 +79,45 @@ export function Dashboard() {
     const riskMundo = findRiskCasesBySubject(studentSource, 'El mundo contemporáneo', 'missedAssignments');
     const riskVida = findRiskCasesBySubject(studentSource, 'Ciencias de la Vida', 'missedAssignments');
     
-    const scProfessorCounts: Record<string, { pendingGroups: Set<string>, scActivities: number }> = {};
+    const scProfessorGroupCounts: Record<string, Set<string>> = {};
+    const scProfessorActivityCounts: Record<string, Set<string>> = {};
 
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
             const professorName = subject.professorName || 'Sin Asignar';
-            if(!scProfessorCounts[professorName]) {
-                scProfessorCounts[professorName] = { pendingGroups: new Set(), scActivities: 0 };
+            if(!scProfessorGroupCounts[professorName]) {
+                scProfessorGroupCounts[professorName] = new Set();
             }
-            
-            const groupIdentifier = `${subject.name}-${subject.group}`;
+             if(!scProfessorActivityCounts[professorName]) {
+                scProfessorActivityCounts[professorName] = new Set();
+            }
 
+            const groupIdentifier = `${subject.name}-${subject.group}`;
             if(subject.finalGrade === null) {
-                scProfessorCounts[professorName].pendingGroups.add(groupIdentifier);
+                scProfessorGroupCounts[professorName].add(groupIdentifier);
             }
             
             if (subject.activities) {
                 for (const activityKey in subject.activities) {
                     if (subject.activities[activityKey] === 'SC') {
-                        scProfessorCounts[professorName].scActivities += 1;
+                        const activityIdentifier = `${professorName}-${subject.name}-${subject.group}-${activityKey}`;
+                        scProfessorActivityCounts[professorName].add(activityIdentifier);
                     }
                 }
             }
         });
     });
-
-    const professorChartData = Object.entries(scProfessorCounts)
-        .map(([name, data]) => ({ name, value: data.pendingGroups.size }))
+    
+    const professorGroupChartData = Object.entries(scProfessorGroupCounts)
+        .map(([name, groups]) => ({ name, value: groups.size }))
         .filter(item => item.value > 0)
         .sort((a,b) => b.value - a.value)
         .slice(0,10);
     
-    const professorActivityData = Object.entries(scProfessorCounts)
-        .map(([name, data]) => ({
+    const professorActivityData = Object.entries(scProfessorActivityCounts)
+        .map(([name, activities]) => ({
             name,
-            scActivities: data.scActivities
+            scActivities: activities.size
         }))
         .filter(item => item.scActivities > 0)
         .sort((a,b) => b.scActivities - a.scActivities)
@@ -129,7 +133,7 @@ export function Dashboard() {
       incompleteGradeCases: incompleteCases,
       onlineRiskMundo: riskMundo,
       onlineRiskVida: riskVida,
-      scByProfessor: professorChartData,
+      scByProfessor: professorGroupChartData,
       professorActivityProgress: professorActivityData,
     };
   }, [filteredStudents, allStudents, isLoading, hasData]);
@@ -251,7 +255,7 @@ export function Dashboard() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><FileWarning className="h-5 w-5" />Top 10 Profesores con más Actividades Pendientes (SC)</CardTitle>
-                    <CardDescription>Profesores con la mayor cantidad de actividades individuales marcadas como 'SC'.</CardDescription>
+                    <CardDescription>Profesores con la mayor cantidad de actividades individuales únicas marcadas como 'SC'. Cada actividad por grupo cuenta como una.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <ResponsiveContainer width="100%" height={300}>
@@ -259,7 +263,7 @@ export function Dashboard() {
                             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                             <XAxis type="number" allowDecimals={false} />
                             <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
-                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
+                            <Tooltip content={<ProfessorProgressTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
                             <Bar dataKey="scActivities" name="Actividades SC" fill="hsl(var(--chart-3))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
                         </BarChart>
                     </ResponsiveContainer>

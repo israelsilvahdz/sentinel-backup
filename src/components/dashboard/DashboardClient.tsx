@@ -110,7 +110,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [activeView, setActiveView] = useState<ActiveView>('academic-calendar');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   // Load data from local storage on initial mount
@@ -411,6 +411,12 @@ export function DashboardClient() {
           <SidebarContent>
             <SidebarGroup>
               <SidebarMenu>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Calendario Académico" isActive={activeView === 'academic-calendar'} onClick={() => handleSetActiveView('academic-calendar')}>
+                    <CalendarDays />
+                    <span>Calendario Académico</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Progreso Estudiantil" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
                     <LayoutDashboard />
@@ -433,12 +439,6 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Planificador por Mapa" isActive={activeView === 'map-planner'} onClick={() => handleSetActiveView('map-planner')}>
                     <Map />
                     <span>Planificador por Mapa</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Calendario Académico" isActive={activeView === 'academic-calendar'} onClick={() => handleSetActiveView('academic-calendar')}>
-                    <CalendarDays />
-                    <span>Calendario Académico</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
@@ -510,9 +510,3 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
-
-    
-
-    
-
-
