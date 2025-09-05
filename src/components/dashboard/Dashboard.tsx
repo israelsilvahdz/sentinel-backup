@@ -21,7 +21,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <div className="rounded-lg border bg-background p-2 shadow-sm">
           <p className="font-bold text-base">{label}</p>
           <p className="text-sm" style={{ color: payload[0].fill }}>
-            Materias con SC: {data.value}
+            Actividades SC (únicas por materia): {data.value}
           </p>
         </div>
       );
@@ -64,34 +64,28 @@ export function Dashboard() {
     const riskMundo = findRiskCasesBySubject(studentSource, 'El mundo contemporáneo', 'missedAssignments');
     const riskVida = findRiskCasesBySubject(studentSource, 'Ciencias de la Vida', 'missedAssignments');
     
-    const professorPendingSubjects: Record<string, Set<string>> = {};
+    const professorPendingActivities = new Map<string, Set<string>>();
 
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
             if (!subject.professorName) return;
 
             let hasPendingActivity = false;
-            if (subject.activities) {
-                for (const activityKey in subject.activities) {
-                    if (subject.activities[activityKey] === 'SC') {
-                        hasPendingActivity = true;
-                        break;
+            for (const activityKey in subject.activities) {
+                if (subject.activities[activityKey] === 'SC') {
+                    if (!professorPendingActivities.has(subject.professorName)) {
+                        professorPendingActivities.set(subject.professorName, new Set());
                     }
+                    // Contar cada actividad (A1, A2...) una sola vez POR MATERIA para ese profesor
+                    const uniqueActivityIdentifier = `${subject.professorName}-${subject.name}-${activityKey}`;
+                    professorPendingActivities.get(subject.professorName)!.add(uniqueActivityIdentifier);
                 }
-            }
-
-            if (hasPendingActivity) {
-                if (!professorPendingSubjects[subject.professorName]) {
-                    professorPendingSubjects[subject.professorName] = new Set();
-                }
-                const subjectIdentifier = subject.name;
-                professorPendingSubjects[subject.professorName].add(subjectIdentifier);
             }
         });
     });
     
-    const professorChartData = Object.entries(professorPendingSubjects)
-        .map(([name, subjects]) => ({ name, value: subjects.size }))
+    const professorChartData = Array.from(professorPendingActivities.entries())
+        .map(([name, activities]) => ({ name, value: activities.size }))
         .filter(item => item.value > 0)
         .sort((a,b) => b.value - a.value)
         .slice(0,10);
@@ -208,8 +202,8 @@ export function Dashboard() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Materias con Actividades 'SC'</CardTitle>
-                    <CardDescription>Profesores con la mayor cantidad de materias únicas que tienen una o más actividades 'SC'. Haz clic para ver sus alumnos.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><UserSquare className="h-5 w-5" />Top 10 Profesores con más Actividades 'SC' (únicas por materia)</CardTitle>
+                    <CardDescription>Profesores con la mayor cantidad de actividades únicas sin calificar. Una actividad 'SC' se cuenta una sola vez por materia, sin importar el número de alumnos o grupos. Haz clic para ver los alumnos del profesor.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -218,7 +212,7 @@ export function Dashboard() {
                             <XAxis type="number" allowDecimals={false} />
                             <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                            <Bar dataKey="value" name="Materias con SC" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
+                            <Bar dataKey="value" name="Actividades SC (únicas por materia)" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
                         </BarChart>
                     </ResponsiveContainer>
                 </CardContent>
@@ -228,4 +222,5 @@ export function Dashboard() {
     </div>
   );
 }
+
 
