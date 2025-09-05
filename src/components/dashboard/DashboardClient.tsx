@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -61,6 +62,8 @@ interface DashboardContextType {
   setFilterType: (type: FilterType) => void;
   selectedValue: string | null;
   setSelectedValue: (value: string | null) => void;
+  groupId: string | null;
+  setGroupId: (id: string | null) => void;
   caseType: CaseType | null;
   setCaseType: (caseType: CaseType | null) => void;
   subjectRiskFilter: SubjectRiskFilter | null;
@@ -104,9 +107,10 @@ export function DashboardClient() {
 
   const [filterType, setFilterType] = useState<FilterType>('leader');
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('academic-calendar');
+  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   // Load data from local storage on initial mount
@@ -157,6 +161,7 @@ export function DashboardClient() {
     setSelectedValue(null);
     setCaseType(null);
     setSubjectRiskFilter(null);
+    setGroupId(null);
   };
 
   const handleSetActiveView = (view: ActiveView) => {
@@ -164,6 +169,7 @@ export function DashboardClient() {
     if (view !== 'students') {
       setCaseType(null);
       setSubjectRiskFilter(null);
+      setGroupId(null);
     }
      if (view !== 'history') {
         setSelectedStudentId(null);
@@ -173,11 +179,13 @@ export function DashboardClient() {
   const handleSetCaseType = (type: CaseType | null) => {
     setCaseType(type);
     setSubjectRiskFilter(null);
+    setGroupId(null);
   };
 
   const handleSetSubjectRiskFilter = (filter: SubjectRiskFilter | null) => {
     setSubjectRiskFilter(filter);
     setCaseType(null);
+    setGroupId(null);
   };
   
   const processSingleFile = (studentData: StudentData) => {
@@ -186,7 +194,7 @@ export function DashboardClient() {
         subjectSummaries: (student.subjects || []).map(s => ({
           id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
           missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-          grade: s.grade, finalGrade: s.finalGrade
+          grade: s.grade, finalGrade: s.finalGrade, group: s.group
         })),
     }));
     setAllStudents(studentsArray);
@@ -308,10 +316,16 @@ export function DashboardClient() {
     let students = allStudents;
 
     if (selectedValue) {
-      if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
-      if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
-      if (filterType === 'subject') students = students.filter(s => s.subjectSummaries?.some(sub => sub.name === selectedValue));
-      if (filterType === 'professor') students = students.filter(s => s.subjects?.some(sub => sub.professorName === selectedValue));
+        if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
+        if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
+        if (filterType === 'professor') students = students.filter(s => s.subjects?.some(sub => sub.professorName === selectedValue));
+        if (filterType === 'subject') {
+            students = students.filter(s => s.subjectSummaries?.some(sub => {
+                const subjectMatch = sub.name === selectedValue;
+                const groupMatch = groupId ? sub.group === groupId : true;
+                return subjectMatch && groupMatch;
+            }));
+        }
     }
     
     if (caseType) {
@@ -343,7 +357,7 @@ export function DashboardClient() {
     }
 
     return students;
-  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, studentHistory]);
+  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, studentHistory, groupId]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     const student = allStudents.find(s => s.id === studentId);
@@ -361,6 +375,7 @@ export function DashboardClient() {
     leaders, tutors, subjects, professors,
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
+    groupId, setGroupId,
     caseType, setCaseType: handleSetCaseType,
     subjectRiskFilter, setSubjectRiskFilter: handleSetSubjectRiskFilter,
     loadStudentSubjects: loadStudentSubjectsWrapper,
@@ -499,4 +514,5 @@ export function DashboardClient() {
     
 
     
+
 

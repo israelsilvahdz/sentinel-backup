@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,7 +19,9 @@ export function StudentPanel() {
     setActiveView, 
     setSelectedStudentId,
     subjectRiskFilter,
-    setSubjectRiskFilter 
+    setSubjectRiskFilter,
+    groupId,
+    setGroupId
   } = useDashboardFilters();
 
   if (isLoading) {
@@ -45,18 +48,23 @@ export function StudentPanel() {
 
   const getPanelTitle = () => {
     if (caseType) {
-        return <>Mostrando: <span className="font-semibold text-primary">{caseTypeMap[caseType]}</span></>;
+        let title = `Mostrando: ${caseTypeMap[caseType]}`;
+        if (caseType === 'incompleteGrade' && groupId) {
+          title += ` (Grupo: ${groupId})`
+        }
+        return <p className="text-muted-foreground">{title}</p>;
     }
     if (subjectRiskFilter) {
         const riskTypeText = subjectRiskFilter.riskType === 'absences' ? 'Faltas' : 'Tareas (NE)';
-        return <>Mostrando: Alumnos en riesgo por <span className="font-semibold text-primary">{riskTypeText}</span> en <span className="font-semibold text-primary">{subjectRiskFilter.subjectName}</span></>;
+        return <p className="text-muted-foreground">Mostrando: Alumnos en riesgo por <span className="font-semibold text-primary">{riskTypeText}</span> en <span className="font-semibold text-primary">{subjectRiskFilter.subjectName}</span></p>;
     }
-    return 'Explora y monitorea los casos individuales de cada alumno.';
+    return <p className="text-muted-foreground">Explora y monitorea los casos individuales de cada alumno.</p>;
   };
 
   const handleClearFilter = () => {
     setCaseType(null);
     setSubjectRiskFilter(null);
+    setGroupId(null);
   };
   
   const hasActiveFilter = !!caseType || !!subjectRiskFilter;
@@ -66,9 +74,7 @@ export function StudentPanel() {
        <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Panel de Alumnos</h1>
          <div className="flex items-center gap-2 mt-2">
-             <p className="text-muted-foreground">
-                {getPanelTitle()}
-            </p>
+             {getPanelTitle()}
             {hasActiveFilter && (
                  <Button variant="ghost" size="sm" onClick={handleClearFilter}>
                    <X className="mr-2 h-4 w-4"/>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { KpiCard } from './KpiCard';
 import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog } from 'lucide-react';
+import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { calculateKpis, findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases, findIncompleteGradeCases, findRiskCasesBySubject } from '@/lib/dataProcessor';
@@ -29,9 +29,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function Dashboard() {
-  const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue } = useDashboardFilters();
+  const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
 
-  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, onlineRiskMundo, onlineRiskVida, scByProfessor } = useMemo(() => {
+  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, onlineRiskMundo, onlineRiskVida, scBySubject, scByGroup } = useMemo(() => {
     if (isLoading || !hasData) {
         return { 
             kpis: { totalStudents: 0 },
@@ -42,7 +42,8 @@ export function Dashboard() {
             incompleteGradeCases: [],
             onlineRiskMundo: [],
             onlineRiskVida: [],
-            scByProfessor: [],
+            scBySubject: [],
+            scByGroup: [],
         };
     }
     const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
@@ -62,23 +63,35 @@ export function Dashboard() {
     const riskMundo = findRiskCasesBySubject(studentSource, 'El mundo contemporáneo', 'missedAssignments');
     const riskVida = findRiskCasesBySubject(studentSource, 'Ciencias de la Vida', 'missedAssignments');
     
-    const scCounts: Record<string, number> = {};
+    const scSubjectCounts: Record<string, number> = {};
+    const scGroupCounts: Record<string, { value: number, subjectName: string, groupNumber: string }> = {};
+
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
             if(subject.finalGrade === null) {
-                if(!scCounts[subject.professorName]) {
-                    scCounts[subject.professorName] = 0;
+                if(!scSubjectCounts[subject.name]) {
+                    scSubjectCounts[subject.name] = 0;
                 }
-                scCounts[subject.professorName]++;
+                scSubjectCounts[subject.name]++;
+                
+                const groupIdentifier = `${subject.name} - ${subject.group}`;
+                if(!scGroupCounts[groupIdentifier]) {
+                    scGroupCounts[groupIdentifier] = { value: 0, subjectName: subject.name, groupNumber: subject.group };
+                }
+                scGroupCounts[groupIdentifier].value++;
             }
         });
     });
 
-    const professorChartData = Object.entries(scCounts)
+    const subjectChartData = Object.entries(scSubjectCounts)
         .map(([name, value]) => ({ name, value }))
         .sort((a,b) => b.value - a.value)
         .slice(0,10);
-
+    
+    const groupChartData = Object.entries(scGroupCounts)
+        .map(([name, data]) => ({ ...data, name }))
+        .sort((a,b) => b.value - a.value)
+        .slice(0,10);
 
     return {
       kpis: { totalStudents: studentSource.length },
@@ -89,7 +102,8 @@ export function Dashboard() {
       incompleteGradeCases: incompleteCases,
       onlineRiskMundo: riskMundo,
       onlineRiskVida: riskVida,
-      scByProfessor: professorChartData
+      scBySubject: subjectChartData,
+      scByGroup: groupChartData
     };
   }, [filteredStudents, allStudents, isLoading, hasData]);
 
@@ -102,14 +116,25 @@ export function Dashboard() {
     setActiveView('students');
     setFilterType('subject');
     setSelectedValue(subjectName);
+    setGroupId(null);
   }
 
-  const handleProfessorClick = (professorName: string) => {
+  const handleSubjectClick = (subjectName: string) => {
     setCaseType('incompleteGrade');
-    setFilterType('professor');
-    setSelectedValue(professorName);
+    setFilterType('subject');
+    setSelectedValue(subjectName);
+    setGroupId(null);
     setActiveView('students');
   };
+  
+  const handleGroupClick = (data: { subjectName: string, groupNumber: string }) => {
+    setCaseType('incompleteGrade');
+    setFilterType('subject');
+    setSelectedValue(data.subjectName);
+    setGroupId(data.groupNumber);
+    setActiveView('students');
+  };
+
 
   if (isLoading) {
     return (
@@ -153,7 +178,7 @@ export function Dashboard() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Focos de Riesgo</CardTitle>
+                    <CardTitle>Focos de Riesgo y Seguimiento</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                      <KpiCard title="Alumnos con NE en 'El Mundo Contemporáneo'" value={onlineRiskMundo.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('El mundo contemporáneo')} />
@@ -164,26 +189,47 @@ export function Dashboard() {
 
 
             {filteredStudents.length > 0 ? (
-                <div className="grid grid-cols-1 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                      <Card>
                         <CardHeader>
-                            <CardTitle>Top 10 Profesores con Alumnos SC</CardTitle>
-                            <CardDescription>Profesores con más alumnos sin calificación final. Haz clic para ver los alumnos.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Library className="h-5 w-5" />Top 10 Materias con Alumnos SC</CardTitle>
+                            <CardDescription>Materias con más alumnos sin calificación final. Haz clic en una barra para ver los detalles.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={scByProfessor} layout="vertical" margin={{ left: 150 }}>
+                                <BarChart data={scBySubject} layout="vertical" margin={{ left: 150 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" allowDecimals={false} />
                                     <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
                                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
-                                    <Bar dataKey="value" fill="hsl(var(--chart-5))" onClick={(data) => handleProfessorClick(data.name)} className="cursor-pointer"/>
+                                    <Bar dataKey="value" name="Alumnos SC" fill="hsl(var(--chart-5))" onClick={(data) => handleSubjectClick(data.name)} className="cursor-pointer"/>
                                 </BarChart>
                             </ResponsiveContainer>
                         </CardContent>
                     </Card>
-                    <RiskDistributionChart students={filteredStudents} />
-                    <RiskFocusChart students={filteredStudents} />
+                    <Card>
+                        <CardHeader>
+                             <CardTitle className="flex items-center gap-2"><Group className="h-5 w-5" />Top 10 Grupos con Alumnos SC</CardTitle>
+                            <CardDescription>Grupos específicos con más alumnos sin calificación final. Haz clic en una barra para ver los detalles.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={scByGroup} layout="vertical" margin={{ left: 150 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" allowDecimals={false} />
+                                    <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 12 }} interval={0}/>
+                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))' }} />
+                                    <Bar dataKey="value" name="Alumnos SC" fill="hsl(var(--chart-1))" onClick={(data) => handleGroupClick(data)} className="cursor-pointer"/>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                    <div className="lg:col-span-2">
+                        <RiskDistributionChart students={filteredStudents} />
+                    </div>
+                     <div className="lg:col-span-2">
+                        <RiskFocusChart students={filteredStudents} />
+                    </div>
                 </div>
             ) : (
             <Card className="text-center p-12">

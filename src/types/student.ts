@@ -19,6 +19,7 @@ export interface Subject {
 export interface SubjectSummary {
   id: string; // CRN
   name: string;
+  group: string;
   absences: number;
   absenceLimit: number;
   missedAssignments: number;

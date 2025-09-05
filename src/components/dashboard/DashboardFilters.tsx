@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useDashboardFilters } from './DashboardClient';
@@ -30,6 +31,7 @@ export function DashboardFilters() {
     isLoading,
     subjectRiskFilter,
     setSubjectRiskFilter,
+    setGroupId,
   } = useDashboardFilters();
 
   if (!hasData && !isLoading) return null;
@@ -54,6 +56,7 @@ export function DashboardFilters() {
     setSelectedValue(value === 'all' ? null : value);
     setCaseType(null); // Clear case type when selecting a new value
     setSubjectRiskFilter(null);
+    setGroupId(null);
   };
 
   const handleFilterTypeChange = (val: string) => {
@@ -61,9 +64,16 @@ export function DashboardFilters() {
     setSelectedValue(null);
     setCaseType(null); // Also clear case type here
     setSubjectRiskFilter(null);
+    setGroupId(null);
   }
   
   const hasActiveComplexFilter = !!caseType || !!subjectRiskFilter;
+
+  const clearComplexFilters = () => {
+    setCaseType(null);
+    setSubjectRiskFilter(null);
+    setGroupId(null);
+  }
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4">
@@ -106,7 +116,7 @@ export function DashboardFilters() {
                 </SelectContent>
             </Select>
             {hasActiveComplexFilter && (
-                <Button variant="ghost" size="sm" className="text-primary" onClick={() => { setCaseType(null); setSubjectRiskFilter(null); }}>
+                <Button variant="ghost" size="sm" className="text-primary" onClick={clearComplexFilters}>
                     Limpiar filtro
                 </Button>
             )}
@@ -116,3 +126,4 @@ export function DashboardFilters() {
 }
 
     
+
