@@ -149,3 +149,26 @@
     stroke-dashoffset: -20;
   }
 }
+
+
+/* --- Calendar Event Indicator Styles --- */
+.day-with-events {
+  position: relative;
+}
+
+.event-dots-container {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: none; /* So it doesn't interfere with date selection */
+}
+
+.event-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+}

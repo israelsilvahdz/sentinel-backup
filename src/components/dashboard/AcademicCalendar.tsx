@@ -3,13 +3,16 @@
 
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
+import { Calendar, type CalendarProps } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { academicEvents, type AcademicEventCategory } from '@/lib/calendarEvents';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarDays, Coffee, FilePen, GraduationCap, Hand, Lock, Pencil, School, TestTube, UserRoundX } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DayPicker, DayProps } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 
 const ICONS: Record<AcademicEventCategory, React.ReactElement> = {
@@ -25,6 +28,18 @@ const ICONS: Record<AcademicEventCategory, React.ReactElement> = {
 };
 
 const CATEGORY_COLORS: Record<AcademicEventCategory, string> = {
+    'Inscripciones': 'bg-blue-500',
+    'Clases': 'bg-green-500',
+    'Límite': 'bg-red-500',
+    'Asueto': 'bg-purple-500',
+    'Exámenes': 'bg-yellow-500',
+    'Receso': 'bg-indigo-500',
+    'Cierre': 'bg-gray-500',
+    'Extraordinario': 'bg-orange-500',
+    'Bajas': 'bg-pink-500',
+};
+
+const CATEGORY_BG_TEXT_COLORS: Record<AcademicEventCategory, string> = {
     'Inscripciones': 'bg-blue-100 text-blue-800',
     'Clases': 'bg-green-100 text-green-800',
     'Límite': 'bg-red-100 text-red-800',
@@ -34,6 +49,47 @@ const CATEGORY_COLORS: Record<AcademicEventCategory, string> = {
     'Cierre': 'bg-gray-100 text-gray-800',
     'Extraordinario': 'bg-orange-100 text-orange-800',
     'Bajas': 'bg-pink-100 text-pink-800',
+};
+
+
+const eventsByDate = academicEvents.reduce((acc, event) => {
+    const dateKey = format(event.date, 'yyyy-MM-dd');
+    if (!acc[dateKey]) {
+        acc[dateKey] = [];
+    }
+    acc[dateKey].push(event);
+    return acc;
+}, {} as Record<string, typeof academicEvents>);
+
+function DayWithTooltip(props: DayProps) {
+    const dateKey = format(props.date, 'yyyy-MM-dd');
+    const events = eventsByDate[dateKey] || [];
+
+    if (events.length === 0) {
+        return <DayPicker.Day {...props} />;
+    }
+    
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <div className="relative">
+                    <DayPicker.Day {...props} />
+                    <div className="event-dots-container">
+                        {events.slice(0, 4).map((event, i) => (
+                             <div key={i} className={cn('event-dot', CATEGORY_COLORS[event.category])} />
+                        ))}
+                    </div>
+                </div>
+            </TooltipTrigger>
+            <TooltipContent>
+                <ul className="space-y-1">
+                    {events.map((event, i) => (
+                        <li key={i} className="text-sm font-semibold">{event.title}</li>
+                    ))}
+                </ul>
+            </TooltipContent>
+        </Tooltip>
+    );
 }
 
 export function AcademicCalendar() {
@@ -44,11 +100,9 @@ export function AcademicCalendar() {
     return academicEvents.filter(event => isSameDay(event.date, date));
   }, [date]);
 
-  const eventDays = useMemo(() => {
-    return academicEvents.map(event => event.date);
-  }, []);
 
   return (
+   <TooltipProvider>
     <div className="space-y-8 p-4 md:p-8 pt-6">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Calendario Académico 2026</h1>
@@ -67,15 +121,7 @@ export function AcademicCalendar() {
               className="rounded-md border"
               locale={es}
               defaultMonth={new Date(2026, 0, 1)}
-              modifiers={{
-                events: eventDays
-              }}
-              modifiersStyles={{
-                events: {
-                    fontWeight: 'bold',
-                    color: 'hsl(var(--primary))'
-                }
-              }}
+              components={{ Day: DayWithTooltip }}
             />
           </div>
 
@@ -96,12 +142,12 @@ export function AcademicCalendar() {
                             <ul className="space-y-3">
                             {eventsByDay.map((event, index) => (
                                 <li key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                                    <span className={`p-2 rounded-full ${CATEGORY_COLORS[event.category]}`}>
+                                    <span className={`p-2 rounded-full ${CATEGORY_BG_TEXT_COLORS[event.category]}`}>
                                         {ICONS[event.category]}
                                     </span>
                                     <div>
                                         <p className="font-semibold">{event.title}</p>
-                                        <Badge variant="secondary" className={CATEGORY_COLORS[event.category]}>{event.category}</Badge>
+                                        <Badge variant="secondary" className={CATEGORY_BG_TEXT_COLORS[event.category]}>{event.category}</Badge>
                                     </div>
                                 </li>
                             ))}
@@ -123,14 +169,13 @@ export function AcademicCalendar() {
         <CardContent className="flex flex-wrap gap-4">
           {Object.entries(ICONS).map(([category, icon]) => (
             <div key={category} className="flex items-center gap-2">
-              <span className={`p-2 rounded-full ${CATEGORY_COLORS[category as AcademicEventCategory]}`}>{icon}</span>
+              <span className={`p-2 rounded-full ${CATEGORY_BG_TEXT_COLORS[category as AcademicEventCategory]}`}>{icon}</span>
               <span className="text-sm font-medium">{category}</span>
             </div>
           ))}
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 }
-
-    
