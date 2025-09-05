@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Lightbulb, Users, AlertTriangle } from 'lucide-react';
+import { Lightbulb, Users, AlertTriangle, BadgeAlert } from 'lucide-react';
 
 const courseMap = new Map(curriculum.flatMap((term, termIndex) => term.courses.map(course => [course.name, { ...course, term: term.name, termIndex }])));
 
@@ -166,75 +166,76 @@ export function MapPlanner() {
   }
 
   const { approvedCourses, lockedCourses, recommendedCourses, criticalCourses } = useMemo(() => {
-    // 1. Determine Locked Courses first (Cascading effect)
-    const locked = new Set<string>();
-    let prevLockedSize = -1;
-    
-    // This loop ensures that the blocking cascades through all dependencies.
-    while (locked.size > prevLockedSize) {
-        prevLockedSize = locked.size;
-        for (const course of courseMap.values()) {
-            if (course.isPlaceholder || locked.has(course.name)) continue;
+      // 1. Determine Locked Courses first (Cascading effect)
+      const locked = new Set<string>();
+      let prevLockedSize = -1;
+      
+      while (locked.size !== prevLockedSize) {
+          prevLockedSize = locked.size;
+          for (const course of courseMap.values()) {
+              if (course.isPlaceholder || locked.has(course.name)) continue;
 
-            const isPrereqPending = course.prerequisite ? pendingCourses.has(course.prerequisite) : false;
-            const isPrereqLocked = course.prerequisite ? locked.has(course.prerequisite) : false;
-
-            if (isPrereqPending || isPrereqLocked) {
-                locked.add(course.name);
-            }
-        }
-    }
-
-    // 2. Determine Approved Courses
-    const approved = new Set<string>();
-    if (selectedTermIndex > -1) {
-      for (let i = 0; i < selectedTermIndex; i++) {
-        curriculum[i].courses.forEach(c => {
-          // A past course is approved ONLY if it's not pending and not locked
-          if (!c.isPlaceholder && !pendingCourses.has(c.name) && !locked.has(c.name)) {
-            approved.add(c.name);
+              const prereq = course.prerequisite;
+              if (prereq && (pendingCourses.has(prereq) || locked.has(prereq))) {
+                  locked.add(course.name);
+              }
           }
-        });
       }
-    }
-    // Add manually approved courses, but only if they are not locked.
-    manuallyApprovedCourses.forEach(c => {
-        if (!locked.has(c)) {
-            approved.add(c);
-        }
-    });
 
-    // 3. Determine Recommended and Critical Courses
-    const critical = getCriticalCourses(selectedTermIndex, activeTerms);
-    const recommended = new Set<string>();
+      // 2. Determine Approved Courses
+      const approved = new Set<string>();
+      if (selectedTermIndex > -1) {
+          for (let i = 0; i < selectedTermIndex; i++) {
+              curriculum[i].courses.forEach(c => {
+                  if (!c.isPlaceholder && !pendingCourses.has(c.name)) {
+                      approved.add(c.name);
+                  }
+              });
+          }
+      }
+      manuallyApprovedCourses.forEach(c => approved.add(c));
+      
+      // Ensure nothing locked is ever considered approved.
+      locked.forEach(c => approved.delete(c));
 
-    if (selectedTermIndex > -1) {
-        // Rule 1: Recommend all PENDING courses that are not locked
-        pendingCourses.forEach(pendingCourse => {
-            if (!locked.has(pendingCourse)) {
-                recommended.add(pendingCourse);
-            }
-        });
+      // 3. Determine Recommended and Critical Courses
+      const critical = getCriticalCourses(selectedTermIndex, activeTerms);
+      const recommendedSet = new Set<string>();
 
-        // Rule 2: Recommend courses from the current term
-        const currentTermCourses = curriculum[selectedTermIndex].courses;
-        currentTermCourses.forEach(course => {
-            if (course.isPlaceholder) return;
-            const prereq = course.prerequisite;
-            const prereqMet = prereq ? approved.has(prereq) : true;
-            if (prereqMet && !locked.has(course.name) && !approved.has(course.name)) {
-                recommended.add(course.name);
-            }
-        });
-    }
+      if (selectedTermIndex > -1) {
+          // Rule 1: Recommend all PENDING courses that are not locked
+          pendingCourses.forEach(pendingCourse => {
+              if (!locked.has(pendingCourse)) {
+                  recommendedSet.add(pendingCourse);
+              }
+          });
 
-    return { 
-        approvedCourses: approved, 
-        lockedCourses: locked, 
-        recommendedCourses: recommended,
-        criticalCourses: critical 
-    };
-  }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, activeTerms]);
+          // Rule 2: Recommend courses from the current term
+          const currentTermCourses = curriculum[selectedTermIndex].courses;
+          currentTermCourses.forEach(course => {
+              if (course.isPlaceholder || locked.has(course.name) || approved.has(course.name)) return;
+              
+              const prereq = course.prerequisite;
+              const prereqMet = prereq ? approved.has(prereq) : true;
+              if (prereqMet) {
+                  recommendedSet.add(course.name);
+              }
+          });
+      }
+      
+      let finalRecommendations = Array.from(recommendedSet);
+
+      if (!isGraduationCandidate && finalRecommendations.length > 7) {
+          finalRecommendations = finalRecommendations.slice(0, 7);
+      }
+
+      return { 
+          approvedCourses: approved, 
+          lockedCourses: locked, 
+          recommendedCourses: new Set(finalRecommendations),
+          criticalCourses: critical 
+      };
+  }, [selectedTermIndex, pendingCourses, manuallyApprovedCourses, activeTerms, isGraduationCandidate]);
 
 
   const gridStructure = useMemo(() => {
@@ -249,7 +250,6 @@ export function MapPlanner() {
      if (lockedCourses.has(courseName)) return 'locked';
      if (criticalCourses.has(courseName)) return 'critical';
      if (approvedCourses.has(courseName)) return 'approved';
-     // A pending course is now also recommended, the 'pending' class will handle the indicator
      if (recommendedCourses.has(courseName)) return 'recommended';
      return 'default';
   }
@@ -273,7 +273,7 @@ export function MapPlanner() {
                  <path
                     key={`${course.prerequisite}-${courseName}`}
                     d={`M ${startX},${startY} C ${startX + 30},${startY} ${endX - 30},${endY} ${endX},${endY}`}
-                    className={cn('connector-line', { 'pending': isSourcePending || isTargetLocked })}
+                    className={cn('connector-line', { 'locked': isSourcePending || isTargetLocked })}
                     fill="none"
                 />
             );
@@ -281,6 +281,23 @@ export function MapPlanner() {
     }
     return lines;
   }, [nodePositions, lockedCourses, pendingCourses]);
+
+  const showRecommendationLimitWarning = useMemo(() => {
+      const allPossibleRecommendations = new Set<string>();
+       if (selectedTermIndex > -1) {
+          pendingCourses.forEach(pendingCourse => {
+              if (!lockedCourses.has(pendingCourse)) allPossibleRecommendations.add(pendingCourse);
+          });
+          const currentTermCourses = curriculum[selectedTermIndex].courses;
+          currentTermCourses.forEach(course => {
+              if (course.isPlaceholder || lockedCourses.has(course.name) || approvedCourses.has(course.name)) return;
+              const prereq = course.prerequisite;
+              const prereqMet = prereq ? approvedCourses.has(prereq) : true;
+              if (prereqMet) allPossibleRecommendations.add(course.name);
+          });
+      }
+      return !isGraduationCandidate && allPossibleRecommendations.size > 7;
+  }, [selectedTermIndex, pendingCourses, lockedCourses, approvedCourses, isGraduationCandidate]);
 
   return (
     <TooltipProvider>
@@ -334,6 +351,18 @@ export function MapPlanner() {
                  )}
             </CardContent>
          </Card>
+        
+        {showRecommendationLimitWarning && (
+             <Alert variant="destructive" className="mb-6">
+                <BadgeAlert className="h-4 w-4" />
+                <AlertTitle>Límite de Carga Académica Excedido</AlertTitle>
+                <AlertDescription>
+                   Se recomiendan más de 7 materias. El mapa solo muestra 7, priorizando las pendientes. 
+                   Se aconseja al alumno priorizar las materias críticas y pendientes para evitar retrasos.
+                </AlertDescription>
+            </Alert>
+        )}
+
         <main className="flex-1 overflow-x-auto">
             <div
                 ref={gridRef}
@@ -431,3 +460,5 @@ export function MapPlanner() {
     </TooltipProvider>
   );
 }
+
+    
