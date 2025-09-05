@@ -11,7 +11,7 @@ import { es } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarDays, Coffee, FilePen, GraduationCap, Hand, Lock, Pencil, School, TestTube, UserRoundX } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { DayPicker, DayProps } from 'react-day-picker';
+import { DayPicker, type DayProps } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 
 
@@ -62,7 +62,7 @@ const eventsByDate = academicEvents.reduce((acc, event) => {
 }, {} as Record<string, typeof academicEvents>);
 
 function DayWithTooltip(props: DayProps) {
-    const dateKey = format(props.date, 'yyyy-MM-dd');
+    const dateKey = format(props.date, 'yyyy-M-dd');
     const events = eventsByDate[dateKey] || [];
 
     if (events.length === 0) {
