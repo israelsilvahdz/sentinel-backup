@@ -518,5 +518,3 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
-
-    
