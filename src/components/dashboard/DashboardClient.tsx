@@ -35,7 +35,7 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
@@ -59,6 +59,7 @@ interface DashboardContextType {
   tutors: string[];
   subjects: string[];
   professors: string[];
+  groupsForSubject: (subjectName: string | null) => string[];
   filterType: FilterType;
   setFilterType: (type: FilterType) => void;
   selectedValue: string | null;
@@ -312,6 +313,19 @@ export function DashboardClient() {
       return [...new Set(allSubjects.filter(Boolean))];
   }, [allStudents]);
 
+  const groupsForSubject = useCallback((subjectName: string | null): string[] => {
+    if (!subjectName) return [];
+    const groups = new Set<string>();
+    allStudents.forEach(student => {
+        student.subjectSummaries?.forEach(subject => {
+            if (subject.name === subjectName && subject.group) {
+                groups.add(subject.group);
+            }
+        });
+    });
+    return Array.from(groups).sort();
+  }, [allStudents]);
+
 
   const filteredStudents = useMemo(() => {
     let students = allStudents;
@@ -373,7 +387,7 @@ export function DashboardClient() {
     filteredStudents, allStudents, setAllStudents, studentHistory, setStudentHistory, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
-    leaders, tutors, subjects, professors,
+    leaders, tutors, subjects, professors, groupsForSubject,
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
     groupId, setGroupId,

@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Filter } from 'lucide-react';
+import { Filter, Group } from 'lucide-react';
 import { Button } from '../ui/button';
+import { useMemo } from 'react';
 
 export function DashboardFilters() {
   const {
@@ -21,10 +22,13 @@ export function DashboardFilters() {
     tutors,
     subjects,
     professors,
+    groupsForSubject,
     filterType,
     setFilterType,
     selectedValue,
     setSelectedValue,
+    groupId,
+    setGroupId,
     caseType,
     setCaseType,
     hasData,
@@ -51,17 +55,26 @@ export function DashboardFilters() {
     professor: professors,
   }[filterType] || [];
 
+  const groupOptions = useMemo(() => groupsForSubject(selectedValue), [selectedValue, groupsForSubject]);
+
+
   const handleValueChange = (value: string | null) => {
     setSelectedValue(value === 'all' ? null : value);
-    setCaseType(null); // Clear case type when selecting a new value
+    setCaseType(null);
     setSubjectRiskFilter(null);
+    setGroupId(null); // Reset group when main selection changes
+  };
+
+  const handleGroupChange = (value: string | null) => {
+    setGroupId(value === 'all' ? null : value);
   };
 
   const handleFilterTypeChange = (val: string) => {
     setFilterType(val as any);
     setSelectedValue(null);
-    setCaseType(null); // Also clear case type here
+    setCaseType(null); 
     setSubjectRiskFilter(null);
+    setGroupId(null);
   }
   
   const hasActiveComplexFilter = !!caseType || !!subjectRiskFilter;
@@ -111,6 +124,22 @@ export function DashboardFilters() {
                     ))}
                 </SelectContent>
             </Select>
+
+            {filterType === 'subject' && selectedValue && groupOptions.length > 0 && (
+                <Select onValueChange={handleGroupChange} value={groupId || 'all'}>
+                    <SelectTrigger className="w-full md:w-[120px]">
+                        <Group className="h-4 w-4 mr-1 text-muted-foreground" />
+                        <SelectValue placeholder="Grupo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {groupOptions.map(group => (
+                            <SelectItem key={group} value={group}>{group}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
+
             {hasActiveComplexFilter && (
                 <Button variant="ghost" size="sm" className="text-primary" onClick={clearComplexFilters}>
                     Limpiar filtro
@@ -120,5 +149,3 @@ export function DashboardFilters() {
     </div>
   );
 }
-
-    
