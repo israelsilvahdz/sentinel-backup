@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -52,7 +53,7 @@ function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (
 }
 
 function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
-    const { loadStudentSubjects } = useDashboardFilters();
+    const { loadStudentSubjects, setSelectedStudentId, setActiveView } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -81,12 +82,18 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
        return <p className="text-muted-foreground text-sm px-6 pb-4">No se encontraron materias para este alumno.</p>
     }
 
+    const handleHistoryClick = () => {
+      setSelectedStudentId(student.id);
+      setActiveView('history');
+    }
+
     return (
-        <div className="overflow-x-auto px-6 pb-4">
+        <div className="overflow-x-auto">
             <Table>
                 <TableHeader>
                     <TableRow>
                     <TableHead>Materia</TableHead>
+                    <TableHead>Profesor</TableHead>
                     <TableHead className="text-center">Faltas</TableHead>
                     <TableHead className="text-center">Tareas (NE)</TableHead>
                     <TableHead className="text-right">Calif. Reporte</TableHead>
@@ -97,6 +104,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                     {subjects.map((subject) => (
                     <TableRow key={subject.id}>
                         <TableCell className="font-medium">{subject.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{subject.professorName}</TableCell>
                         <TableCell className="text-center">
                             <div className='inline-block'>
                                 <RiskCell value={subject.absences} limit={subject.absenceLimit} />
@@ -117,6 +125,9 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                     ))}
                 </TableBody>
             </Table>
+            <div className="px-6 py-4 border-t">
+              <Button variant="outline" size="sm" onClick={handleHistoryClick}>Ver Historial de Cambios</Button>
+            </div>
         </div>
     );
 }

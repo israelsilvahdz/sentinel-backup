@@ -1,17 +1,20 @@
 
 
-
 "use client";
 
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Loader2, X, ArrowRightCircle, BookX } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Users, Loader2, X, Search } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
+import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import type { Student } from '@/types/student';
 
 export function StudentPanel() {
   const { 
-    filteredStudents, 
+    filteredStudents: initialFilteredStudents, 
     hasData, 
     isLoading, 
     caseType, 
@@ -21,6 +24,20 @@ export function StudentPanel() {
     subjectRiskFilter,
     setSubjectRiskFilter,
   } = useDashboardFilters();
+
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredStudents = useMemo(() => {
+    if (!searchTerm) {
+      return initialFilteredStudents;
+    }
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return initialFilteredStudents.filter((student: Student) => 
+      student.name.toLowerCase().includes(lowercasedFilter) ||
+      student.id.toLowerCase().includes(lowercasedFilter)
+    );
+  }, [searchTerm, initialFilteredStudents]);
+
 
   if (isLoading) {
     return (
@@ -79,38 +96,29 @@ export function StudentPanel() {
 
       {hasData && (
         <>
+          <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                  type="text"
+                  placeholder="Buscar alumno por nombre o matrícula..."
+                  className="pl-10 w-full"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+              />
+          </div>
+
           {filteredStudents.length > 0 ? (
             <div className="space-y-4">
-                {filteredStudents.map(student => {
-                  const extraordinarySubjects = caseType === 'extraordinary'
-                    ? student.subjectSummaries?.filter(s => s.finalGrade && s.finalGrade >= 50 && s.finalGrade <= 69)
-                    : [];
-
-                  return (
-                    <Card key={student.id}>
-                      <CardContent className="p-4 flex items-center justify-between">
-                          <div className="flex-1">
-                              <p className="font-semibold">{student.name}</p>
-                              <p className="text-sm text-muted-foreground">Matrícula: {student.id}</p>
-                              {extraordinarySubjects && extraordinarySubjects.length > 0 && (
-                                <div className="mt-2">
-                                  <p className="text-xs font-semibold text-muted-foreground mb-1">Materias para Extraordinario:</p>
-                                  <div className="flex flex-wrap gap-1">
-                                    {extraordinarySubjects.map(sub => (
-                                      <Badge key={sub.id} variant="secondary">{sub.name}</Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => handleStudentClick(student.id)}>
-                              <ArrowRightCircle className="mr-2 h-4 w-4"/>
-                              Ver Detalles
-                          </Button>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+                <div className="text-sm text-muted-foreground font-medium">
+                  Mostrando {filteredStudents.length} de {initialFilteredStudents.length} alumnos.
+                </div>
+                {filteredStudents.map(student => (
+                  <StudentCard 
+                    key={student.id} 
+                    student={student} 
+                    startOpen={false} 
+                  />
+                ))}
             </div>
           ) : (
             <Card className="text-center p-12">
@@ -118,11 +126,11 @@ export function StudentPanel() {
                     <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
                         <Users className="h-8 w-8 text-primary" />
                     </div>
-                    <CardTitle>No hay alumnos para mostrar</CardTitle>
+                    <CardTitle>No se encontraron alumnos</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                      No se encontraron alumnos con los filtros seleccionados.
+                      No se encontraron alumnos con los filtros o término de búsqueda seleccionados.
                     </p>
                 </CardContent>
             </Card>
