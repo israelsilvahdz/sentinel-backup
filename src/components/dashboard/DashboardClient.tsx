@@ -30,7 +30,7 @@ import { AcademicCalendar } from './AcademicCalendar';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home, TestTube } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -209,6 +209,50 @@ export function DashboardClient() {
     }
     setCurrentFile(file);
   }, []);
+
+  const loadTestData = () => {
+    const testStudent: Student = {
+        id: "A01234567",
+        name: "Acevedo Nava Ricardo (Prueba)",
+        leader: "Líder de Prueba",
+        tutor: "Tutor de Prueba",
+        isGraduationCandidate: false,
+        subjects: [
+            {
+                id: '101', key: 'SUBJ1', name: 'Habilidades y valores IV: plan de vida y carrera', group: '1', professorName: 'Prof. Habilidades',
+                statusDescription: 'Inscrito', absences: 0, absenceLimit: 8, missedAssignments: 0, missedAssignmentLimit: 5,
+                grade: 90, finalGrade: 90, finalGradeReason: null, activities: {},
+                schedule: { days: ['LUN', 'MIÉ', 'VIE'], startTime: '07:00', endTime: '08:59' }
+            },
+            {
+                id: '102', key: 'SUBJ2', name: 'Materia y energía I', group: '2', professorName: 'Prof. Ciencias',
+                statusDescription: 'Inscrito', absences: 1, absenceLimit: 8, missedAssignments: 0, missedAssignmentLimit: 5,
+                grade: 85, finalGrade: 85, finalGradeReason: null, activities: {},
+                schedule: { days: ['LUN', 'MIÉ', 'VIE'], startTime: '09:00', endTime: '10:59' }
+            },
+            {
+                id: '103', key: 'SUBJ3', name: 'Matemáticas IV: modelos matemáticos', group: '3', professorName: 'Prof. Mates',
+                statusDescription: 'Inscrito', absences: 2, absenceLimit: 8, missedAssignments: 1, missedAssignmentLimit: 5,
+                grade: 75, finalGrade: 75, finalGradeReason: null, activities: {},
+                schedule: { days: ['LUN', 'MIÉ', 'VIE'], startTime: '11:30', endTime: '13:29' }
+            }
+        ]
+    };
+     const studentsArray = [testStudent].map(student => ({
+        ...student,
+        subjectSummaries: (student.subjects || []).map(s => ({
+          id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+          missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+          grade: s.grade, finalGrade: s.finalGrade, group: s.group
+        })),
+    }));
+
+    setAllStudents(studentsArray);
+    toast({
+        title: 'Datos de Prueba Cargados',
+        description: `Se cargó el alumno de prueba "Acevedo Nava Ricardo". Ve al panel de alumnos para verlo.`,
+    });
+  };
 
   useEffect(() => {
     const processFile = async () => {
@@ -506,6 +550,10 @@ export function DashboardClient() {
                     </div>
                  </div>
                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={loadTestData} disabled={isLoading || isProcessing} title="Cargar datos de prueba">
+                        <TestTube className="h-4 w-4 mr-2" />
+                        Cargar Prueba de Horario
+                    </Button>
                     <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" />
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
