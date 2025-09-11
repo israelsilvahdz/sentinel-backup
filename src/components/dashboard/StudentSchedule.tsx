@@ -20,7 +20,7 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
     );
   }
 
-  const hasScheduleData = subjects.some(s => s.schedule && s.schedule.days.length > 0);
+  const hasScheduleData = subjects.some(s => s.schedule && s.schedule.days.length > 0 && s.schedule.startTime && s.schedule.endTime);
 
   return (
     <div className="p-6 bg-muted/20 rounded-lg">
@@ -29,7 +29,7 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
              <p className="font-sans text-muted-foreground">No se encontró información de días u horas en el reporte para estas materias.</p>
         ) : (
             <div className="font-mono text-sm space-y-4">
-                {subjects.map((subject) => (
+                {subjects.filter(s => s.schedule && s.schedule.days.length > 0).map((subject) => (
                     <div key={subject.id} className="p-3 bg-background rounded-md shadow-sm">
                         <p className="font-bold text-primary">{subject.name} (CRN: {subject.id})</p>
                         <p><span className="text-muted-foreground">Días:</span> {subject.schedule?.days.join(', ') || 'No especificado'}</p>
