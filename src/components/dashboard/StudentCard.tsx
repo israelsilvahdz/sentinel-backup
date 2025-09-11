@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
-import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface StudentCardProps {
   student: Student;
@@ -53,11 +53,11 @@ function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (
     return <Badge variant="outline" className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
 }
 
-function CopyButton({ textToCopy }: { textToCopy: string }) {
+function CopyButton({ textToCopy, tooltipText = 'Copiar' }: { textToCopy: string, tooltipText?: string }) {
     const [isCopied, setIsCopied] = useState(false);
 
     const handleCopy = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevenir que el clic en el botón expanda/colapse el card
+        e.stopPropagation(); 
         navigator.clipboard.writeText(textToCopy).then(() => {
             setIsCopied(true);
             setTimeout(() => setIsCopied(false), 2000);
@@ -68,20 +68,25 @@ function CopyButton({ textToCopy }: { textToCopy: string }) {
         <TooltipProvider>
             <Tooltip open={isCopied}>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-2" onClick={handleCopy}>
+                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopy}>
                         {isCopied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-                        <span className="sr-only">Copy</span>
+                        <span className="sr-only">Copiar</span>
                     </Button>
                 </TooltipTrigger>
+                <TooltipContent>
+                    <p>{isCopied ? 'Copiado!' : tooltipText}</p>
+                </TooltipContent>
             </Tooltip>
         </TooltipProvider>
     );
 }
 
+
 function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
     const { loadStudentSubjects, setSelectedStudentId, setActiveView } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isAllCopied, setIsAllCopied] = useState(false);
 
     useEffect(() => {
         async function loadSubjects() {
@@ -113,13 +118,45 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
       setActiveView('history');
     }
 
+    const handleCopyAllTeachers = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const teacherNames = subjects
+            .map(s => s.professorName)
+            .filter(Boolean) // Remove empty names
+            .join('\n');
+        
+        if (teacherNames) {
+            navigator.clipboard.writeText(teacherNames).then(() => {
+                setIsAllCopied(true);
+                setTimeout(() => setIsAllCopied(false), 2000);
+            });
+        }
+    };
+
     return (
         <div className="overflow-x-auto">
             <Table>
                 <TableHeader>
                     <TableRow>
                     <TableHead>Materia</TableHead>
-                    <TableHead>Profesor</TableHead>
+                    <TableHead>
+                        <div className="flex items-center gap-2">
+                            Profesor
+                            <TooltipProvider>
+                                <Tooltip open={isAllCopied}>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyAllTeachers}>
+                                            {isAllCopied ? <Check className="h-4 w-4 text-primary" /> : <ClipboardCopy className="h-4 w-4" />}
+                                            <span className="sr-only">Copiar todos los profesores</span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                     <TooltipContent>
+                                        <p>{isAllCopied ? '¡Copiado!' : 'Copiar todos los profesores'}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                    </TableHead>
                     <TableHead className="text-center">Faltas</TableHead>
                     <TableHead className="text-center">Tareas (NE)</TableHead>
                     <TableHead className="text-right">Calif. Reporte</TableHead>
@@ -134,9 +171,9 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                           <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                            <div className="flex items-center">
+                            <div className="flex items-center gap-1">
                                 <span>{subject.professorName}</span>
-                                {subject.professorName && <CopyButton textToCopy={subject.professorName} />}
+                                {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
                             </div>
                         </TableCell>
                         <TableCell className="text-center">
