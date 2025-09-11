@@ -10,6 +10,31 @@ interface StudentScheduleProps {
   subjects: Subject[];
 }
 
+const DAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE'];
+const DAY_MAP: Record<string, string> = {
+    'LUN': 'Lunes',
+    'MAR': 'Martes',
+    'MIÉ': 'Miércoles',
+    'JUE': 'Jueves',
+    'VIE': 'Viernes',
+}
+const START_HOUR = 7;
+const END_HOUR = 22;
+
+const timeToMinutes = (time: string): number => {
+    if (!time || !time.includes(':')) return 0;
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+};
+
+const generateTimeSlots = () => {
+    const slots = [];
+    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+        slots.push(`${String(hour).padStart(2, '0')}:00`);
+    }
+    return slots;
+};
+
 export function StudentSchedule({ subjects }: StudentScheduleProps) {
 
   if (!subjects || subjects.length === 0) {
@@ -22,14 +47,39 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
 
   const hasScheduleData = subjects.some(s => s.schedule && s.schedule.days.length > 0 && s.schedule.startTime && s.schedule.endTime);
 
-  return (
-    <div className="p-6 bg-muted/20 rounded-lg">
-        <h3 className="font-sans font-bold text-lg mb-4">Datos del Horario (Modo Verificación)</h3>
-        {!hasScheduleData ? (
-             <p className="font-sans text-muted-foreground">No se encontró información de días u horas en el reporte para estas materias.</p>
-        ) : (
+  const timeSlots = generateTimeSlots();
+  const minuteHeight = 1.5; // Height per minute in px
+
+  const scheduleEvents = subjects.flatMap(subject => {
+      if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return [];
+      
+      const startMinutes = timeToMinutes(subject.schedule.startTime);
+      const endMinutes = timeToMinutes(subject.schedule.endTime);
+      const duration = endMinutes - startMinutes;
+      
+      if (duration <= 0) return [];
+      
+      return subject.schedule.days.map(day => {
+          const dayIndex = DAYS.indexOf(day);
+          if (dayIndex === -1) return null;
+          
+          return {
+              id: `${subject.id}-${day}`,
+              dayIndex,
+              startMinutes,
+              duration,
+              subject,
+          };
+      }).filter(Boolean);
+  });
+  
+
+  if (!hasScheduleData) {
+     return (
+        <div className="p-6 bg-muted/20 rounded-lg">
+            <h3 className="font-sans font-bold text-lg mb-4">Datos del Horario (Modo Verificación)</h3>
             <div className="font-mono text-sm space-y-4">
-                {subjects.filter(s => s.schedule && s.schedule.days.length > 0).map((subject) => (
+                {subjects.filter(s => s.schedule).map((subject) => (
                     <div key={subject.id} className="p-3 bg-background rounded-md shadow-sm">
                         <p className="font-bold text-primary">{subject.name} (CRN: {subject.id})</p>
                         <p><span className="text-muted-foreground">Días:</span> {subject.schedule?.days.join(', ') || 'No especificado'}</p>
@@ -37,7 +87,68 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
                     </div>
                 ))}
             </div>
-        )}
+        </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-muted/5 rounded-lg">
+        <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * 60 * minuteHeight}px` }}>
+            {/* Grid background */}
+            <div className="absolute inset-0 grid grid-cols-6 h-full">
+                <div className="col-span-1 border-r border-border/50"></div>
+                {DAYS.map((_, index) => (
+                     <div key={index} className={cn("col-span-1", index < DAYS.length - 1 && "border-r border-border/50")}></div>
+                ))}
+                {timeSlots.slice(1).map((_, index) => (
+                     <div key={index} className="col-span-6 border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
+                ))}
+            </div>
+
+            {/* Time labels */}
+            <div className="absolute -left-14 top-0 w-12 text-right">
+                 {timeSlots.map(time => (
+                    <div key={time} className="text-xs text-muted-foreground" style={{ height: `${60 * minuteHeight}px`}}>
+                        {time}
+                    </div>
+                 ))}
+            </div>
+
+            {/* Day headers */}
+            <div className="sticky top-0 z-10 grid grid-cols-6 h-10 bg-muted/20 backdrop-blur-sm">
+                <div className="col-span-1"></div>
+                {DAYS.map(day => (
+                    <div key={day} className="col-span-1 text-center font-semibold text-foreground">
+                        {DAY_MAP[day]}
+                    </div>
+                ))}
+            </div>
+            
+            {/* Events */}
+            <div className="absolute inset-0 grid grid-cols-6">
+                <div className="col-span-1"></div>
+                {scheduleEvents.map(event => (
+                    event && (
+                        <div
+                            key={event.id}
+                            className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 text-primary-foreground overflow-hidden"
+                            style={{
+                                left: `${(event.dayIndex + 1) * (100 / 6)}%`,
+                                top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight}px`,
+                                height: `${event.duration * minuteHeight}px`,
+                                width: `calc(${(100 / 6)}% - 4px)`,
+                                marginLeft: '2px',
+                                marginRight: '2px'
+                            }}
+                        >
+                            <p className="font-bold text-xs leading-tight text-primary">{event.subject.name}</p>
+                            <p className="text-[10px] text-primary/80">{event.subject.schedule?.startTime} - {event.subject.schedule?.endTime}</p>
+                            <p className="text-[10px] text-primary/70 truncate">{event.subject.professorName}</p>
+                        </div>
+                    )
+                ))}
+            </div>
+        </div>
     </div>
   );
 }
