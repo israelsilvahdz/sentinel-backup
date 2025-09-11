@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
@@ -15,6 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { StudentSchedule } from './StudentSchedule';
 
 interface StudentCardProps {
   student: Student;
@@ -134,72 +136,85 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     };
 
     return (
-        <div className="overflow-x-auto">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead>Materia</TableHead>
-                    <TableHead>
-                        <div className="flex items-center gap-2">
-                            Profesor
-                            <TooltipProvider>
-                                <Tooltip open={isAllCopied}>
-                                    <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyAllTeachers}>
-                                            {isAllCopied ? <Check className="h-4 w-4 text-primary" /> : <ClipboardCopy className="h-4 w-4" />}
-                                            <span className="sr-only">Copiar todos los profesores</span>
-                                        </Button>
-                                    </TooltipTrigger>
-                                     <TooltipContent>
-                                        <p>{isAllCopied ? '¡Copiado!' : 'Copiar todos los profesores'}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                    </TableHead>
-                    <TableHead className="text-center">Faltas</TableHead>
-                    <TableHead className="text-center">Tareas (NE)</TableHead>
-                    <TableHead className="text-right">Calif. Reporte</TableHead>
-                    <TableHead className="text-right">Calif. Calculada</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {subjects.map((subject) => (
-                    <TableRow key={subject.id}>
-                        <TableCell className="font-medium">
-                          {subject.name}
-                          <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                                <span>{subject.professorName}</span>
-                                {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                            <div className='inline-block'>
-                                <RiskCell value={subject.absences} limit={subject.absenceLimit} />
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                            <div className='inline-block'>
-                                <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                            {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-primary">
-                            {calculateFinalGrade(subject).toFixed(2)}
-                        </TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-            <div className="px-6 py-4 border-t">
-              <Button variant="outline" size="sm" onClick={handleHistoryClick}>Ver Historial de Cambios</Button>
-            </div>
+      <Tabs defaultValue="materias" className="w-full">
+        <div className="px-6">
+          <TabsList>
+            <TabsTrigger value="materias">Materias</TabsTrigger>
+            <TabsTrigger value="horario">Horario</TabsTrigger>
+          </TabsList>
         </div>
+        <TabsContent value="materias">
+          <div className="overflow-x-auto">
+              <Table>
+                  <TableHeader>
+                      <TableRow>
+                      <TableHead>Materia</TableHead>
+                      <TableHead>
+                          <div className="flex items-center gap-2">
+                              Profesor
+                              <TooltipProvider>
+                                  <Tooltip open={isAllCopied}>
+                                      <TooltipTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyAllTeachers}>
+                                              {isAllCopied ? <Check className="h-4 w-4 text-primary" /> : <ClipboardCopy className="h-4 w-4" />}
+                                              <span className="sr-only">Copiar todos los profesores</span>
+                                          </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                          <p>{isAllCopied ? '¡Copiado!' : 'Copiar todos los profesores'}</p>
+                                      </TooltipContent>
+                                  </Tooltip>
+                              </TooltipProvider>
+                          </div>
+                      </TableHead>
+                      <TableHead className="text-center">Faltas</TableHead>
+                      <TableHead className="text-center">Tareas (NE)</TableHead>
+                      <TableHead className="text-right">Calif. Reporte</TableHead>
+                      <TableHead className="text-right">Calif. Calculada</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {subjects.map((subject) => (
+                      <TableRow key={subject.id}>
+                          <TableCell className="font-medium">
+                            {subject.name}
+                            <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                  <span>{subject.professorName}</span>
+                                  {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                              <div className='inline-block'>
+                                  <RiskCell value={subject.absences} limit={subject.absenceLimit} />
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                              <div className='inline-block'>
+                                  <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                              {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-primary">
+                              {calculateFinalGrade(subject).toFixed(2)}
+                          </TableCell>
+                      </TableRow>
+                      ))}
+                  </TableBody>
+              </Table>
+              <div className="px-6 py-4 border-t">
+                <Button variant="outline" size="sm" onClick={handleHistoryClick}>Ver Historial de Cambios</Button>
+              </div>
+          </div>
+        </TabsContent>
+        <TabsContent value="horario">
+          <StudentSchedule subjects={subjects} />
+        </TabsContent>
+      </Tabs>
     );
 }
 

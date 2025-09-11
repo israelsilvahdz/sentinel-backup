@@ -13,6 +13,11 @@ export interface Subject {
   finalGrade: number | null;
   finalGradeReason: string | null;
   activities: Record<string, number | string>; // para A1, A2...
+  schedule?: {
+    days: string[];
+    startTime: string;
+    endTime: string;
+  };
 }
 
 // Summary of subjects to be sent with the student list for performance

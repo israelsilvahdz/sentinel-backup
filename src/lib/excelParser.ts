@@ -24,6 +24,13 @@ const COLUMNS = {
   GRADE: 'Ponderado',
   FINAL_GRADE: 'Calificación final actual',
   FINAL_GRADE_REASON: 'Motivo cf',
+  LUN: 'LUN',
+  MAR: 'MAR',
+  MIÉ: 'MIÉ',
+  JUE: 'JUE',
+  VIE: 'VIE',
+  START_TIME: 'INICIO',
+  END_TIME: 'FIN',
 };
 
 const ACTIVITY_REGEX = /^A\d+$/;
@@ -141,6 +148,10 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 
         const requiredCols = [COLUMNS.STUDENT_ID, COLUMNS.STUDENT_NAME, COLUMNS.SUBJECT_CRN, COLUMNS.SUBJECT_NAME];
         for (const col of requiredCols) {
+            // Check for MIER or MIÉ
+            if (col === COLUMNS.MIÉ && headerMap[col] === undefined && headerMap['MIER'] !== undefined) {
+              headerMap[COLUMNS.MIÉ] = headerMap['MIER'];
+            }
             if (headerMap[col] === undefined) {
                 console.error(`Error de formato: Falta la columna requerida '${col}'.`);
                 resolve(null);
@@ -183,6 +194,13 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                 }
             }
 
+            const scheduleDays: string[] = [];
+            if (String(row[headerMap[COLUMNS.LUN]] || '').toLowerCase() === 'sí') scheduleDays.push('LUN');
+            if (String(row[headerMap[COLUMNS.MAR]] || '').toLowerCase() === 'sí') scheduleDays.push('MAR');
+            if (String(row[headerMap[COLUMNS.MIÉ]] || '').toLowerCase() === 'sí') scheduleDays.push('MIÉ');
+            if (String(row[headerMap[COLUMNS.JUE]] || '').toLowerCase() === 'sí') scheduleDays.push('JUE');
+            if (String(row[headerMap[COLUMNS.VIE]] || '').toLowerCase() === 'sí') scheduleDays.push('VIE');
+
             const subject: Subject = {
                 id: String(row[headerMap[COLUMNS.SUBJECT_CRN]] || 'N/A').trim(),
                 key: String(row[headerMap[COLUMNS.SUBJECT_KEY]] || 'N/A').trim(),
@@ -198,6 +216,11 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                 finalGrade: parseFloat(String(row[headerMap[COLUMNS.FINAL_GRADE]])) || null,
                 finalGradeReason: String(row[headerMap[COLUMNS.FINAL_GRADE_REASON]] || '').trim() || null,
                 activities,
+                schedule: {
+                  days: scheduleDays,
+                  startTime: String(row[headerMap[COLUMNS.START_TIME]] || '00:00').trim(),
+                  endTime: String(row[headerMap[COLUMNS.END_TIME]] || '00:00').trim()
+                }
             };
             
             studentData[studentId].subjects?.push(subject);
