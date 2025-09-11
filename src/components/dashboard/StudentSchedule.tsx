@@ -5,6 +5,8 @@ import React from 'react';
 import { type Subject } from '@/types/student';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -92,63 +94,71 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
   }
 
   return (
-    <div className="p-4 bg-muted/5 rounded-lg">
-        <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * 60 * minuteHeight}px` }}>
-            {/* Grid background */}
-            <div className="absolute inset-0 grid grid-cols-6 h-full">
-                <div className="col-span-1 border-r border-border/50"></div>
-                {DAYS.map((_, index) => (
-                     <div key={index} className={cn("col-span-1", index < DAYS.length - 1 && "border-r border-border/50")}></div>
-                ))}
-                {timeSlots.slice(1).map((_, index) => (
-                     <div key={index} className="col-span-6 border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
-                ))}
-            </div>
+    <TooltipProvider>
+      <div className="p-4 bg-muted/5 rounded-lg">
+          <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * 60 * minuteHeight}px` }}>
+              {/* Grid background */}
+              <div className="absolute inset-0 grid grid-cols-6 h-full">
+                  <div className="col-span-1 border-r border-border/50"></div>
+                  {DAYS.map((_, index) => (
+                      <div key={index} className={cn("col-span-1", index < DAYS.length - 1 && "border-r border-border/50")}></div>
+                  ))}
+                  {timeSlots.slice(1).map((_, index) => (
+                      <div key={index} className="col-span-6 border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
+                  ))}
+              </div>
 
-            {/* Time labels */}
-            <div className="absolute -left-14 top-0 w-12 text-right">
-                 {timeSlots.map(time => (
-                    <div key={time} className="text-xs text-muted-foreground" style={{ height: `${60 * minuteHeight}px`}}>
-                        {time}
-                    </div>
-                 ))}
-            </div>
+              {/* Time labels */}
+              <div className="absolute -left-14 top-0 w-12 text-right">
+                  {timeSlots.map(time => (
+                      <div key={time} className="text-xs text-muted-foreground" style={{ height: `${60 * minuteHeight}px`}}>
+                          {time}
+                      </div>
+                  ))}
+              </div>
 
-            {/* Day headers */}
-            <div className="sticky top-0 z-10 grid grid-cols-6 h-10 bg-muted/20 backdrop-blur-sm">
-                <div className="col-span-1"></div>
-                {DAYS.map(day => (
-                    <div key={day} className="col-span-1 text-center font-semibold text-foreground">
-                        {DAY_MAP[day]}
-                    </div>
-                ))}
-            </div>
-            
-            {/* Events */}
-            <div className="absolute inset-0 grid grid-cols-6">
-                <div className="col-span-1"></div>
-                {scheduleEvents.map(event => (
-                    event && (
-                        <div
-                            key={event.id}
-                            className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 text-primary-foreground overflow-hidden"
-                            style={{
-                                left: `${(event.dayIndex + 1) * (100 / 6)}%`,
-                                top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight}px`,
-                                height: `${event.duration * minuteHeight}px`,
-                                width: `calc(${(100 / 6)}% - 4px)`,
-                                marginLeft: '2px',
-                                marginRight: '2px'
-                            }}
-                        >
-                            <p className="font-bold text-xs leading-tight text-primary">{event.subject.name}</p>
-                            <p className="text-[10px] text-primary/80">{event.subject.schedule?.startTime} - {event.subject.schedule?.endTime}</p>
-                            <p className="text-[10px] text-primary/70 truncate">{event.subject.professorName}</p>
-                        </div>
-                    )
-                ))}
-            </div>
-        </div>
-    </div>
+              {/* Day headers */}
+              <div className="sticky top-0 z-10 grid grid-cols-6 h-10 bg-muted/20 backdrop-blur-sm">
+                  <div className="col-span-1"></div>
+                  {DAYS.map(day => (
+                      <div key={day} className="col-span-1 text-center font-semibold text-foreground">
+                          {DAY_MAP[day]}
+                      </div>
+                  ))}
+              </div>
+              
+              {/* Events */}
+              <div className="absolute inset-0 grid grid-cols-6">
+                  <div className="col-span-1"></div>
+                  {scheduleEvents.map(event => (
+                      event && (
+                        <Tooltip key={event.id}>
+                          <TooltipTrigger asChild>
+                            <div
+                                className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 text-primary-foreground overflow-hidden cursor-pointer"
+                                style={{
+                                    left: `${(event.dayIndex + 1) * (100 / 6)}%`,
+                                    top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight}px`,
+                                    height: `${event.duration * minuteHeight}px`,
+                                    width: `calc(${(100 / 6)}% - 4px)`,
+                                    marginLeft: '2px',
+                                    marginRight: '2px'
+                                }}
+                            >
+                                <p className="font-bold text-xs leading-tight text-primary">{event.subject.name}</p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="font-bold">{event.subject.name}</p>
+                            <p className="text-sm text-muted-foreground">{event.subject.schedule?.startTime} - {event.subject.schedule?.endTime}</p>
+                            <p className="text-sm text-muted-foreground">{event.subject.professorName}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )
+                  ))}
+              </div>
+          </div>
+      </div>
+    </TooltipProvider>
   );
 }
