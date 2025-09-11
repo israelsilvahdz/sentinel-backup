@@ -33,6 +33,16 @@ const COLUMNS = {
   END_TIME: 'FIN',
 };
 
+// Mapa para normalizar los nombres de las columnas de días
+const DAY_COLUMN_MAP: Record<string, string> = {
+    'LUN': 'LUN',
+    'MAR': 'MAR',
+    'MIÉ': 'MIÉ',
+    'MIER': 'MIÉ', // Handle variation
+    'JUE': 'JUE',
+    'VIE': 'VIE',
+};
+
 const ACTIVITY_REGEX = /^A\d+$/;
 
 // --- Data Normalization ---
@@ -140,20 +150,16 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             return;
         }
         
-        const headers: string[] = jsonData[0].map((h: any) => String(h).trim());
+        const headers: string[] = jsonData[0].map((h: any) => String(h).trim().toUpperCase());
         const headerMap: Record<string, number> = {};
         headers.forEach((header, index) => {
-            // Handle MIER vs MIÉ case
-            if (header.toUpperCase() === 'MIER') {
-                headerMap[COLUMNS.MIÉ] = index;
-            } else {
-                headerMap[header] = index;
-            }
+            headerMap[header] = index;
         });
 
         const requiredCols = [COLUMNS.STUDENT_ID, COLUMNS.STUDENT_NAME, COLUMNS.SUBJECT_CRN, COLUMNS.SUBJECT_NAME];
         for (const col of requiredCols) {
-            if (headerMap[col] === undefined) {
+            const mappedKey = Object.keys(headerMap).find(key => key.toUpperCase() === col.toUpperCase());
+            if (!mappedKey) {
                 console.error(`Error de formato: Falta la columna requerida '${col}'.`);
                 resolve(null);
                 return;
@@ -164,26 +170,26 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         const dataRows = jsonData.slice(1);
 
         for (const row of dataRows) {
-            if (!row || row.length === 0 || !row[headerMap[COLUMNS.STUDENT_ID]]) {
+            if (!row || row.length === 0 || !row[headerMap[COLUMNS.STUDENT_ID.toUpperCase()]]) {
                 continue; 
             }
             
-            const rawSubjectName = String(row[headerMap[COLUMNS.SUBJECT_NAME]] || 'N/A').trim();
+            const rawSubjectName = String(row[headerMap[COLUMNS.SUBJECT_NAME.toUpperCase()]] || 'N/A').trim();
             const normalizedSubjectName = normalizeSubjectName(rawSubjectName);
 
             if (normalizedSubjectName === 'IGNORE') {
                 continue; // Saltar materias extracurriculares
             }
 
-            const studentId = String(row[headerMap[COLUMNS.STUDENT_ID]]).trim();
+            const studentId = String(row[headerMap[COLUMNS.STUDENT_ID.toUpperCase()]]).trim();
 
             if (!studentData[studentId]) {
                 studentData[studentId] = {
                     id: studentId,
-                    name: String(row[headerMap[COLUMNS.STUDENT_NAME]] || 'N/A').trim(),
-                    leader: String(row[headerMap[COLUMNS.LEADER]] || 'N/A').trim(),
-                    tutor: String(row[headerMap[COLUMNS.TUTOR]] || 'N/A').trim(),
-                    isGraduationCandidate: String(row[headerMap[COLUMNS.IS_GRADUATION_CANDIDATE]] || 'No').trim().toLowerCase() === 'si',
+                    name: String(row[headerMap[COLUMNS.STUDENT_NAME.toUpperCase()]] || 'N/A').trim(),
+                    leader: String(row[headerMap[COLUMNS.LEADER.toUpperCase()]] || 'N/A').trim(),
+                    tutor: String(row[headerMap[COLUMNS.TUTOR.toUpperCase()]] || 'N/A').trim(),
+                    isGraduationCandidate: String(row[headerMap[COLUMNS.IS_GRADUATION_CANDIDATE.toUpperCase()]] || 'No').trim().toLowerCase() === 'si',
                     subjects: [],
                 };
             }
@@ -196,34 +202,39 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             }
 
             const scheduleDays: string[] = [];
-            const dayColumns = [COLUMNS.LUN, COLUMNS.MAR, COLUMNS.MIÉ, COLUMNS.JUE, COLUMNS.VIE];
-            dayColumns.forEach(day => {
-                const dayIndex = headerMap[day];
-                if (dayIndex !== undefined && String(row[dayIndex] || '').trim()) {
-                     scheduleDays.push(day);
+            for (const key in DAY_COLUMN_MAP) {
+                const dayHeader = DAY_COLUMN_MAP[key];
+                const colIndex = headerMap[key];
+                if (colIndex !== undefined && String(row[colIndex] || '').trim().toUpperCase() === 'SI') {
+                    scheduleDays.push(dayHeader);
                 }
-            });
+            }
 
+            const getColumnValue = (columnName: string) => {
+                const upperColName = columnName.toUpperCase();
+                const index = headerMap[upperColName];
+                return index !== undefined ? String(row[index] || '').trim() : '';
+            }
 
             const subject: Subject = {
-                id: String(row[headerMap[COLUMNS.SUBJECT_CRN]] || 'N/A').trim(),
-                key: String(row[headerMap[COLUMNS.SUBJECT_KEY]] || 'N/A').trim(),
+                id: getColumnValue(COLUMNS.SUBJECT_CRN),
+                key: getColumnValue(COLUMNS.SUBJECT_KEY),
                 name: normalizedSubjectName, // Usar el nombre normalizado
-                group: String(row[headerMap[COLUMNS.SUBJECT_GROUP]] || 'N/A').trim(),
-                professorName: String(row[headerMap[COLUMNS.PROFESSOR_NAME]] || 'N/A').trim(),
-                statusDescription: String(row[headerMap[COLUMNS.SUBJECT_STATUS_DESCRIPTION]] || 'N/A').trim(),
-                absences: parseInt(String(row[headerMap[COLUMNS.ABSENCES]] || '0'), 10),
-                absenceLimit: parseInt(String(row[headerMap[COLUMNS.ABSENCE_LIMIT]] || '1'), 10) || 1,
-                missedAssignments: parseInt(String(row[headerMap[COLUMNS.MISSED_ASSIGNMENTS]] || '0'), 10),
-                missedAssignmentLimit: parseInt(String(row[headerMap[COLUMNS.MISSED_ASSIGNMENT_LIMIT]] || '1'), 10) || 1,
-                grade: parseFloat(String(row[headerMap[COLUMNS.GRADE]] || '0')),
-                finalGrade: parseFloat(String(row[headerMap[COLUMNS.FINAL_GRADE]])) || null,
-                finalGradeReason: String(row[headerMap[COLUMNS.FINAL_GRADE_REASON]] || '').trim() || null,
+                group: getColumnValue(COLUMNS.SUBJECT_GROUP),
+                professorName: getColumnValue(COLUMNS.PROFESSOR_NAME),
+                statusDescription: getColumnValue(COLUMNS.SUBJECT_STATUS_DESCRIPTION),
+                absences: parseInt(getColumnValue(COLUMNS.ABSENCES) || '0', 10),
+                absenceLimit: parseInt(getColumnValue(COLUMNS.ABSENCE_LIMIT) || '1', 10) || 1,
+                missedAssignments: parseInt(getColumnValue(COLUMNS.MISSED_ASSIGNMENTS) || '0', 10),
+                missedAssignmentLimit: parseInt(getColumnValue(COLUMNS.MISSED_ASSIGNMENT_LIMIT) || '1', 10) || 1,
+                grade: parseFloat(getColumnValue(COLUMNS.GRADE) || '0'),
+                finalGrade: parseFloat(getColumnValue(COLUMNS.FINAL_GRADE)) || null,
+                finalGradeReason: getColumnValue(COLUMNS.FINAL_GRADE_REASON) || null,
                 activities,
                 schedule: {
                   days: scheduleDays,
-                  startTime: String(row[headerMap[COLUMNS.START_TIME]] || '').trim(),
-                  endTime: String(row[headerMap[COLUMNS.END_TIME]] || '').trim()
+                  startTime: getColumnValue(COLUMNS.START_TIME),
+                  endTime: getColumnValue(COLUMNS.END_TIME)
                 }
             };
             
