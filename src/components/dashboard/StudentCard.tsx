@@ -103,7 +103,10 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                 <TableBody>
                     {subjects.map((subject) => (
                     <TableRow key={subject.id}>
-                        <TableCell className="font-medium">{subject.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {subject.name}
+                          <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{subject.professorName}</TableCell>
                         <TableCell className="text-center">
                             <div className='inline-block'>
