@@ -42,11 +42,14 @@ export const academicEventsTetra: AcademicEvent[] = [
   { date: new Date(2025, 8, 5), title: 'Curso de Inducción', category: 'Clases' },
   { date: new Date(2025, 8, 8), title: '¡Primer Día de Clases!', category: 'Clases' },
   { date: new Date(2025, 8, 16), title: 'Asueto', category: 'Asueto' },
+  { date: new Date(2025, 9, 8), title: 'Salida de promoción para embajadoras: Novou Anáhuac', category: 'Clases' },
+  { date: new Date(2025, 9, 17), title: 'Salida de promoción para embajadoras: Montessori Anáhuac', category: 'Clases' },
   { date: new Date(2025, 9, 20), title: 'Examen de medio término', category: 'Exámenes' },
   { date: new Date(2025, 9, 21), title: 'Examen de medio término', category: 'Exámenes' },
   { date: new Date(2025, 9, 22), title: 'Examen de medio término', category: 'Exámenes' },
   { date: new Date(2025, 9, 23), title: 'Examen de medio término', category: 'Exámenes' },
   { date: new Date(2025, 9, 24), title: 'Examen de medio término', category: 'Exámenes' },
+  { date: new Date(2025, 9, 29), title: 'Salida de promoción para embajadoras: Mario J. Montemayor', category: 'Clases' },
   { date: new Date(2025, 10, 17), title: 'Asueto', category: 'Asueto' },
   { date: new Date(2025, 11, 9), title: 'Último día de clases', category: 'Clases' },
   { date: new Date(2025, 11, 10), title: 'Exámenes Finales', category: 'Exámenes' },
@@ -252,4 +255,6 @@ export const academicEventsSemestral: AcademicEvent[] = [
 
 
     
+    
+
     
