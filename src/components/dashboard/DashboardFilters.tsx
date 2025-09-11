@@ -37,6 +37,8 @@ export function DashboardFilters() {
     setSubjectRiskFilter,
   } = useDashboardFilters();
 
+  const groupOptions = useMemo(() => groupsForSubject(selectedValue), [selectedValue, groupsForSubject]);
+
   if (!hasData && !isLoading) return null;
   
   if (isLoading) {
@@ -54,8 +56,6 @@ export function DashboardFilters() {
     subject: subjects,
     professor: professors,
   }[filterType] || [];
-
-  const groupOptions = useMemo(() => groupsForSubject(selectedValue), [selectedValue, groupsForSubject]);
 
 
   const handleValueChange = (value: string | null) => {
