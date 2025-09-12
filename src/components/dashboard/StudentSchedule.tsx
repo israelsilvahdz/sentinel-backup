@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { type Subject } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,7 +12,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
-
+import { Calendar } from '../ui/calendar';
+import { Checkbox } from '../ui/checkbox';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -46,9 +50,10 @@ const generateTimeSlots = () => {
 
 export function StudentSchedule({ subjects, studentName }: StudentScheduleProps) {
   const { toast } = useToast();
-  const [selectedDayForNotification, setSelectedDayForNotification] = useState<string | null>(null);
   const [absenceReason, setAbsenceReason] = useState("Sin justificar");
   const [customNotes, setCustomNotes] = useState("");
+  const [isFutureAbsence, setIsFutureAbsence] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   if (!subjects || subjects.length === 0) {
     return (
@@ -63,29 +68,33 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
   const timeSlots = generateTimeSlots();
   const minuteHeight = 1.5; // Height per minute in px, you can adjust this
 
-  const scheduleEvents = subjects.flatMap(subject => {
-      if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return [];
-      
-      const startMinutes = timeToMinutes(subject.schedule.startTime);
-      const endMinutes = timeToMinutes(subject.schedule.endTime);
-      const duration = endMinutes - startMinutes;
-      
-      if (duration <= 0 || startMinutes < START_HOUR * 60 || endMinutes > END_HOUR * 60) return [];
-      
-      return subject.schedule.days.map(day => {
-          const dayIndex = DAYS.indexOf(day);
-          if (dayIndex === -1) return null;
+  const scheduleEvents = useMemo(() => {
+      const allEvents = subjects.flatMap(subject => {
+          if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return [];
           
-          return {
-              id: `${subject.id}-${day}`,
-              day,
-              dayIndex,
-              startMinutes,
-              duration,
-              subject,
-          };
-      }).filter(Boolean);
-  });
+          const startMinutes = timeToMinutes(subject.schedule.startTime);
+          const endMinutes = timeToMinutes(subject.schedule.endTime);
+          const duration = endMinutes - startMinutes;
+          
+          if (duration <= 0 || startMinutes < START_HOUR * 60 || endMinutes > END_HOUR * 60) return [];
+          
+          return subject.schedule.days.map(day => {
+              const dayIndex = DAYS.indexOf(day);
+              if (dayIndex === -1) return null;
+              
+              return {
+                  id: `${subject.id}-${day}`,
+                  day,
+                  dayIndex,
+                  startMinutes,
+                  duration,
+                  subject,
+              };
+          }).filter(Boolean);
+      });
+
+      return allEvents;
+  }, [subjects]);
   
   const handleCopyTeachersForDay = (day: string) => {
     const teachersForDay = scheduleEvents
@@ -112,31 +121,51 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
   };
   
   const generateMailtoLink = () => {
-    if (!selectedDayForNotification) return;
+    const allTeacherNames = [...new Set(subjects.map(s => s.professorName).filter(Boolean))];
 
-    const teachersForDay = [...new Set(scheduleEvents
-      .filter(event => event && event.day === selectedDayForNotification && event.subject.professorName)
-      .map(event => event!.subject.professorName)
-    )];
-
-    if (teachersForDay.length === 0) {
+    if (allTeacherNames.length === 0) {
         toast({
             variant: "destructive",
             title: 'Sin Profesores',
-            description: `No se pueden notificar faltas porque no hay profesores asignados para el ${DAY_MAP[selectedDayForNotification]}.`,
+            description: `No se puede notificar porque no hay profesores asignados a este alumno.`,
+        });
+        return;
+    }
+     if (!dateRange || !dateRange.from) {
+        toast({
+            variant: "destructive",
+            title: 'Fechas no seleccionadas',
+            description: `Por favor, selecciona el día o rango de días de la ausencia.`,
         });
         return;
     }
 
-    const subject = `Notificación de Ausencia - ${studentName}`;
-    let body = `Estimados profesores,\n\nLes informo que el alumno ${studentName} no ha asistido a clases el día de hoy, ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.\n\n`;
+
+    const subject = isFutureAbsence 
+        ? `Aviso de Ausencia Futura - ${studentName}`
+        : `Notificación de Ausencia - ${studentName}`;
+    
+    let dateText;
+    if (dateRange.to) {
+        dateText = `del ${format(dateRange.from, "d 'de' LLLL", { locale: es })} al ${format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })}`;
+    } else {
+        dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
+    }
+
+    let body = `Estimados profesores,\n\n`;
+    if(isFutureAbsence) {
+        body += `Les informo que el alumno ${studentName} se ausentará ${dateText}.\n\n`;
+    } else {
+        body += `Les informo que el alumno ${studentName} no ha asistido a clases ${dateText}.\n\n`;
+    }
+    
     body += `Motivo: ${absenceReason}\n`;
     if (customNotes) {
         body += `\nNotas adicionales:\n${customNotes}\n`;
     }
     body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
 
-    const mailtoLink = `mailto:${teachersForDay.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailtoLink = `mailto:${allTeacherNames.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoLink;
   }
 
@@ -161,6 +190,73 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
   return (
     <TooltipProvider>
       <div className="p-4 bg-muted/5 rounded-lg">
+           <div className="mb-4 flex justify-end">
+             <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="outline">
+                        <Mail className="mr-2 h-4 w-4" />
+                        Notificar Ausencia a Profesores
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="sm:max-w-3xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Notificar Ausencia - {studentName}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Selecciona las fechas y el motivo para generar el borrador del correo.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                      <div className="flex flex-col items-center">
+                         <Label className="mb-2 font-semibold">1. Selecciona el día o rango de días</Label>
+                         <Calendar
+                            mode="range"
+                            selected={dateRange}
+                            onSelect={setDateRange}
+                            locale={es}
+                            numberOfMonths={1}
+                        />
+                         <div className="flex items-center space-x-2 mt-4">
+                            <Checkbox id="future-absence" checked={isFutureAbsence} onCheckedChange={(checked) => setIsFutureAbsence(!!checked)} />
+                            <Label htmlFor="future-absence">Es una ausencia futura</Label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div>
+                          <Label className="font-semibold">2. Motivo de la ausencia</Label>
+                          <RadioGroup
+                              id="absence-reason"
+                              defaultValue="Sin justificar"
+                              onValueChange={setAbsenceReason}
+                              value={absenceReason}
+                              className="mt-2"
+                          >
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="Falta Justificada" id="r1" /><Label htmlFor="r1">Falta Justificada</Label></div>
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="Enfermedad" id="r2" /><Label htmlFor="r2">Enfermedad</Label></div>
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="Cita Médica" id="r3" /><Label htmlFor="r3">Cita Médica</Label></div>
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="Asunto Familiar" id="r4" /><Label htmlFor="r4">Asunto Familiar</Label></div>
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="Sin justificar" id="r5" /><Label htmlFor="r5">Sin justificar</Label></div>
+                          </RadioGroup>
+                        </div>
+                        <div>
+                          <Label htmlFor="custom-notes" className="font-semibold">3. Notas adicionales (opcional)</Label>
+                           <Textarea
+                              id="custom-notes"
+                              placeholder="Añade aquí cualquier detalle relevante..."
+                              value={customNotes}
+                              onChange={(e) => setCustomNotes(e.target.value)}
+                              className="mt-2"
+                          />
+                        </div>
+                      </div>
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={generateMailtoLink}>Generar Correo</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+           </div>
           <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * 60 * minuteHeight}px` }}>
               {/* Grid background & lines */}
               <div className="absolute inset-0 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-full">
@@ -187,119 +283,61 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
 
               {/* Day headers */}
                <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] bg-muted/5 backdrop-blur-sm -translate-y-10" style={{ height: 'auto', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-                  <div className="w-14"></div>
+                   <div className="w-14"></div>
                    {DAYS.map(day => (
-                      <div key={day} className="flex flex-col items-center justify-center font-semibold text-foreground gap-2 px-1">
-                          <div className="flex items-center gap-2">
-                            <span>{DAY_MAP[day]}</span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyTeachersForDay(day)}>
-                                    <Copy className="h-3 w-3" />
-                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                  <p>Copiar profesores del {DAY_MAP[day]}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          
-                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedDayForNotification(day)}>
-                                  <Mail className="mr-1.5 h-3 w-3" />
-                                  Notificar
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Notificar Ausencia - {DAY_MAP[selectedDayForNotification!]}</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Selecciona un motivo y añade notas para generar el borrador del correo.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <div className="grid gap-4 py-4">
-                                  <div className="grid gap-2">
-                                      <Label htmlFor="absence-reason">Motivo de la ausencia</Label>
-                                      <RadioGroup
-                                          id="absence-reason"
-                                          defaultValue="Sin justificar"
-                                          onValueChange={setAbsenceReason}
-                                          value={absenceReason}
-                                      >
-                                          <div className="flex items-center space-x-2">
-                                              <RadioGroupItem value="Falta Justificada" id="r1" />
-                                              <Label htmlFor="r1">Falta Justificada</Label>
-                                          </div>
-                                          <div className="flex items-center space-x-2">
-                                              <RadioGroupItem value="Enfermedad" id="r2" />
-                                              <Label htmlFor="r2">Enfermedad</Label>
-                                          </div>
-                                           <div className="flex items-center space-x-2">
-                                              <RadioGroupItem value="Cita Médica" id="r3" />
-                                              <Label htmlFor="r3">Cita Médica</Label>
-                                          </div>
-                                          <div className="flex items-center space-x-2">
-                                              <RadioGroupItem value="Asunto Familiar" id="r4" />
-                                              <Label htmlFor="r4">Asunto Familiar</Label>
-                                          </div>
-                                          <div className="flex items-center space-x-2">
-                                              <RadioGroupItem value="Sin justificar" id="r5" />
-                                              <Label htmlFor="r5">Sin justificar</Label>
-                                          </div>
-                                      </RadioGroup>
-                                  </div>
-                                  <div className="grid gap-2">
-                                      <Label htmlFor="custom-notes">Notas adicionales (opcional)</Label>
-                                       <Textarea
-                                          id="custom-notes"
-                                          placeholder="Añade aquí cualquier detalle relevante..."
-                                          value={customNotes}
-                                          onChange={(e) => setCustomNotes(e.target.value)}
-                                      />
-                                  </div>
-                              </div>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={generateMailtoLink}>Generar Correo</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                      </div>
-                  ))}
-              </div>
+                       <div key={day} className="flex flex-col items-center justify-center font-semibold text-foreground gap-2 px-1">
+                           <div className="flex items-center gap-2">
+                             <span>{DAY_MAP[day]}</span>
+                             <Tooltip>
+                               <TooltipTrigger asChild>
+                                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyTeachersForDay(day)}>
+                                     <Copy className="h-3 w-3" />
+                                   </Button>
+                               </TooltipTrigger>
+                               <TooltipContent>
+                                   <p>Copiar profesores del {DAY_MAP[day]}</p>
+                               </TooltipContent>
+                             </Tooltip>
+                           </div>
+                       </div>
+                   ))}
+               </div>
               
               {/* Events */}
               <div className="absolute top-0 left-14 right-0 bottom-0 grid grid-cols-5">
-                  {scheduleEvents.map(event => (
-                      event && (
-                        <Tooltip key={event.id}>
-                          <TooltipTrigger asChild>
-                            <div
-                                className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 overflow-hidden cursor-pointer flex items-center justify-center"
-                                style={{
-                                    left: `${event.dayIndex * 20}%`,
-                                    top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight + 4}px`, // +4 for margin top
-                                    height: `${event.duration * minuteHeight * 0.9}px`, // 90% of original height
-                                    width: `calc(20% - 4px)`,
-                                    marginLeft: '2px',
-                                    marginRight: '2px'
-                                }}
-                            >
-                                <p className="font-bold text-xs leading-tight text-primary text-center">{event.subject.name}</p>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="font-bold">{event.subject.name}</p>
-                            <p className="text-sm text-muted-foreground">{event.subject.schedule?.startTime} - {event.subject.schedule?.endTime}</p>
-                            <p className="text-sm text-muted-foreground">{event.subject.professorName}</p>
-                          </TooltipContent>
-                        </Tooltip>
+                  {scheduleEvents.map(event => {
+                      if (!event) return null;
+                      
+                      const style: React.CSSProperties = {
+                          gridColumnStart: event.dayIndex + 1,
+                          gridRowStart: 1, // All events start on the single row of the grid
+                          top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight + 4}px`,
+                          height: `${event.duration * minuteHeight - 8}px`,
+                      };
+
+                      return (
+                          <Tooltip key={event.id}>
+                            <TooltipTrigger asChild>
+                              <div
+                                  className="absolute w-[calc(100%-8px)] m-1 p-2 rounded-lg bg-primary/10 border border-primary/50 overflow-hidden cursor-pointer flex items-center justify-center"
+                                  style={style}
+                              >
+                                  <p className="font-bold text-xs leading-tight text-primary text-center">{event.subject.name}</p>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="font-bold">{event.subject.name}</p>
+                              <p className="text-sm text-muted-foreground">{event.subject.schedule?.startTime} - {event.subject.schedule?.endTime}</p>
+                              <p className="text-sm text-muted-foreground">{event.subject.professorName}</p>
+                            </TooltipContent>
+                          </Tooltip>
                       )
-                  ))}
+                  })}
               </div>
           </div>
       </div>
     </TooltipProvider>
   );
 }
+
+    
