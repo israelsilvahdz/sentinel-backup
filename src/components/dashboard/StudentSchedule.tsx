@@ -58,29 +58,15 @@ const TIME_SLOTS_SEMESTRAL = [
     { start: '08:00', end: '08:59' },
     { start: '09:00', end: '09:59' },
     { start: '10:00', end: '10:59' },
-    { start: '11:00', end: '11:59' },
-    { start: '12:00', end: '12:59' },
-    { start: '13:00', end: '13:59' },
-    { start: '14:00', end: '14:59' },
+    { start: '11:30', end: '12:29' },
+    { start: '12:30', end: '13:29' },
 ];
 
 function isSubjectInSlot(subject: Subject, slot: { start: string, end: string }, planType: 'semestral' | 'tetramestral'): boolean {
     if (!subject.schedule?.startTime) return false;
 
-    if (planType === 'tetramestral') {
-        return subject.schedule.startTime === slot.start;
-    }
-
-    // Semestral logic
-    try {
-        const today = new Date();
-        const subjectStart = parse(subject.schedule.startTime, 'HH:mm', today);
-        const slotStart = parse(slot.start, 'HH:mm', today);
-        return subjectStart.getHours() === slotStart.getHours();
-    } catch (e) {
-        console.error("Error parsing time:", e);
-        return false;
-    }
+    // For both plans, we now check if the subject's start time matches the slot's start time.
+    return subject.schedule.startTime === slot.start;
 }
 
 
