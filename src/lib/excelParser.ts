@@ -28,7 +28,7 @@ const COLUMNS = {
   END_TIME: 'FIN',
 };
 
-const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIÉ', 'MIER', 'JUE', 'VIE'];
+const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIÉ', 'MIER', 'JUE', 'VIE', 'VIER'];
 
 const ACTIVITY_REGEX = /^A\d+$/;
 
@@ -194,8 +194,10 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             for (const dayHeader of dayHeadersInFile) {
                 const colIndex = headerMap[dayHeader];
                 if (colIndex !== undefined && String(row[colIndex]).trim().toUpperCase() === 'SI') {
-                    // Normalizar 'MIER' a 'MIÉ' para consistencia interna
-                    const normalizedDay = dayHeader === 'MIER' ? 'MIÉ' : dayHeader;
+                    // Normalizar 'MIER' a 'MIÉ' y 'VIER' a 'VIE' para consistencia interna
+                    let normalizedDay = dayHeader;
+                    if (dayHeader === 'MIER') normalizedDay = 'MIÉ';
+                    if (dayHeader === 'VIER') normalizedDay = 'VIE';
                     scheduleDays.push(normalizedDay);
                 }
             }

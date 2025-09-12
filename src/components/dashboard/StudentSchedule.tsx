@@ -1,33 +1,23 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { type Subject } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Copy, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import contactData from '@/lib/student-contacts.json';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
+import { Label } from '../ui/label';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Textarea } from '../ui/textarea';
 
 
 interface StudentScheduleProps {
   subjects: Subject[];
   studentName: string;
 }
-
-interface ProfessorContact {
-    email: string;
-}
-
-// Suponiendo una estructura donde se pueden buscar los correos de los profes
-const professorContacts: Record<string, ProfessorContact> = {
-    // Esto debería venir de alguna fuente de datos, por ahora es un ejemplo
-    "GARCIA, LAURA": { email: "laura.garcia@tecmilenio.mx" },
-    "PEREZ, JUAN": { email: "juan.perez@tecmilenio.mx" },
-    "GONZALEZ, MARIA": { email: "maria.gonzalez@tecmilenio.mx" }
-};
-
 
 const DAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE'];
 const DAY_MAP: Record<string, string> = {
@@ -56,6 +46,9 @@ const generateTimeSlots = () => {
 
 export function StudentSchedule({ subjects, studentName }: StudentScheduleProps) {
   const { toast } = useToast();
+  const [selectedDayForNotification, setSelectedDayForNotification] = useState<string | null>(null);
+  const [absenceReason, setAbsenceReason] = useState("Sin justificar");
+  const [customNotes, setCustomNotes] = useState("");
 
   if (!subjects || subjects.length === 0) {
     return (
@@ -117,10 +110,12 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
       });
     });
   };
+  
+  const generateMailtoLink = () => {
+    if (!selectedDayForNotification) return;
 
-  const handleNotifyAbsence = (day: string) => {
     const teachersForDay = [...new Set(scheduleEvents
-      .filter(event => event && event.day === day && event.subject.professorName)
+      .filter(event => event && event.day === selectedDayForNotification && event.subject.professorName)
       .map(event => event!.subject.professorName)
     )];
 
@@ -128,19 +123,22 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
         toast({
             variant: "destructive",
             title: 'Sin Profesores',
-            description: `No se pueden notificar faltas porque no hay profesores asignados para el ${DAY_MAP[day]}.`,
+            description: `No se pueden notificar faltas porque no hay profesores asignados para el ${DAY_MAP[selectedDayForNotification]}.`,
         });
         return;
     }
-    
+
     const subject = `Notificación de Ausencia - ${studentName}`;
-    const body = `Estimados profesores,\n\nLes informo que el alumno ${studentName} no ha asistido a clases el día de hoy, ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.\n\nAgradezco su atención.\n\nSaludos cordiales,`;
-    
-    // Usamos los nombres de los profesores directamente en el campo "To"
+    let body = `Estimados profesores,\n\nLes informo que el alumno ${studentName} no ha asistido a clases el día de hoy, ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.\n\n`;
+    body += `Motivo: ${absenceReason}\n`;
+    if (customNotes) {
+        body += `\nNotas adicionales:\n${customNotes}\n`;
+    }
+    body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
+
     const mailtoLink = `mailto:${teachersForDay.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
     window.location.href = mailtoLink;
-  };
+  }
 
 
   if (!hasScheduleData) {
@@ -205,10 +203,68 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                               </TooltipContent>
                             </Tooltip>
                           </div>
-                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleNotifyAbsence(day)}>
-                            <Mail className="mr-1.5 h-3 w-3" />
-                            Notificar
-                          </Button>
+                          
+                           <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedDayForNotification(day)}>
+                                  <Mail className="mr-1.5 h-3 w-3" />
+                                  Notificar
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Notificar Ausencia - {DAY_MAP[day]}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Selecciona un motivo y añade notas para generar el borrador del correo.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <div className="grid gap-4 py-4">
+                                  <div className="grid gap-2">
+                                      <Label htmlFor="absence-reason">Motivo de la ausencia</Label>
+                                      <RadioGroup
+                                          id="absence-reason"
+                                          defaultValue="Sin justificar"
+                                          onValueChange={setAbsenceReason}
+                                          value={absenceReason}
+                                      >
+                                          <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="Falta Justificada" id="r1" />
+                                              <Label htmlFor="r1">Falta Justificada</Label>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="Enfermedad" id="r2" />
+                                              <Label htmlFor="r2">Enfermedad</Label>
+                                          </div>
+                                           <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="Cita Médica" id="r3" />
+                                              <Label htmlFor="r3">Cita Médica</Label>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="Asunto Familiar" id="r4" />
+                                              <Label htmlFor="r4">Asunto Familiar</Label>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="Sin justificar" id="r5" />
+                                              <Label htmlFor="r5">Sin justificar</Label>
+                                          </div>
+                                      </RadioGroup>
+                                  </div>
+                                  <div className="grid gap-2">
+                                      <Label htmlFor="custom-notes">Notas adicionales (opcional)</Label>
+                                       <Textarea
+                                          id="custom-notes"
+                                          placeholder="Añade aquí cualquier detalle relevante..."
+                                          value={customNotes}
+                                          onChange={(e) => setCustomNotes(e.target.value)}
+                                      />
+                                  </div>
+                              </div>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={generateMailtoLink}>Generar Correo</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                       </div>
                   ))}
               </div>
