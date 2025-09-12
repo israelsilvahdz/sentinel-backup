@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
@@ -17,6 +16,7 @@ import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { StudentSchedule } from './StudentSchedule';
+import { StudentContactInfo } from './StudentContactInfo';
 
 interface StudentCardProps {
   student: Student;
@@ -130,7 +130,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
         if (teacherNames) {
             navigator.clipboard.writeText(teacherNames).then(() => {
                 setIsAllCopied(true);
-                setTimeout(() => setIsAllCopied(false), 2000);
+                setTimeout(() => setIsAllCopied(false), 2500);
             });
         }
     };
@@ -141,6 +141,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
           <TabsList>
             <TabsTrigger value="materias">Materias</TabsTrigger>
             <TabsTrigger value="horario">Horario</TabsTrigger>
+            <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="materias">
@@ -213,6 +214,9 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
         </TabsContent>
         <TabsContent value="horario">
           <StudentSchedule subjects={subjects} />
+        </TabsContent>
+         <TabsContent value="contacto">
+          <StudentContactInfo studentId={student.id} />
         </TabsContent>
       </Tabs>
     );
