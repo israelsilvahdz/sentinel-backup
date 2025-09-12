@@ -1,16 +1,32 @@
 
-
 "use client";
 
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import type { Student } from '@/types/student';
+import contactData from '@/lib/student-contacts.json';
+import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+interface StudentContact {
+    nombre: string;
+    telefono_alumno: string;
+    telefono_papa: string;
+    telefono_mama: string;
+    correo_alumno: string;
+    correo_papa: string;
+    correo_mama: string;
+}
+
+const contactsMap = new Map<string, StudentContact>(
+    Object.entries(contactData)
+);
 
 export function StudentPanel() {
   const { 
@@ -26,6 +42,9 @@ export function StudentPanel() {
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const { toast } = useToast();
+  const [isCopied, setIsCopied] = useState(false);
+
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) {
@@ -37,6 +56,42 @@ export function StudentPanel() {
       student.id.toLowerCase().includes(lowercasedFilter)
     );
   }, [searchTerm, initialFilteredStudents]);
+
+  const handleCopyDirectory = () => {
+    if (filteredStudents.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No hay alumnos que mostrar',
+        description: 'No se puede generar un directorio sin alumnos en la lista.',
+      });
+      return;
+    }
+
+    let generatedText = "### Directorio de Alumnos\n\n";
+    
+    filteredStudents.forEach(student => {
+      const contact = contactsMap.get(student.id);
+
+      generatedText += "---\n";
+      generatedText += `**Nombre:** ${student.name}\n`;
+      generatedText += `**Matrícula:** ${student.id}\n`;
+      generatedText += `**Teléfono Alumno:** ${contact ? contact.telefono_alumno : 'No disponible'}\n`;
+      generatedText += `**Teléfono Papá:** ${contact ? contact.telefono_papa : 'No disponible'}\n`;
+      generatedText += `**Teléfono Mamá:** ${contact ? contact.telefono_mama : 'No disponible'}\n`;
+      generatedText += `**Correo Alumno:** ${contact ? contact.correo_alumno : 'No disponible'}\n`;
+      generatedText += `**Correo Papá:** ${contact ? contact.correo_papa : 'No disponible'}\n`;
+      generatedText += `**Correo Mamá:** ${contact ? contact.correo_mama : 'No disponible'}\n\n`;
+    });
+    
+    navigator.clipboard.writeText(generatedText.trim()).then(() => {
+        setIsCopied(true);
+        toast({
+            title: "¡Directorio Copiado!",
+            description: `Se ha copiado la información de ${filteredStudents.length} alumnos.`,
+        });
+        setTimeout(() => setIsCopied(false), 2500);
+    });
+  };
 
 
   if (isLoading) {
@@ -82,14 +137,33 @@ export function StudentPanel() {
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
        <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Panel de Alumnos</h1>
-         <div className="flex items-center gap-2 mt-2">
-             {getPanelTitle()}
-            {hasActiveFilter && (
-                 <Button variant="ghost" size="sm" onClick={handleClearFilter}>
-                   <X className="mr-2 h-4 w-4"/>
-                   Limpiar filtro
-                </Button>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Panel de Alumnos</h1>
+                <div className="flex items-center gap-2 mt-2">
+                    {getPanelTitle()}
+                    {hasActiveFilter && (
+                        <Button variant="ghost" size="sm" onClick={handleClearFilter}>
+                        <X className="mr-2 h-4 w-4"/>
+                        Limpiar filtro
+                        </Button>
+                    )}
+                </div>
+            </div>
+            {hasData && (
+              <TooltipProvider>
+                <Tooltip open={isCopied}>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" onClick={handleCopyDirectory}>
+                          {isCopied ? <Check className="text-primary"/> : <ClipboardCopy />}
+                          Copiar Directorio
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{isCopied ? '¡Directorio Copiado!' : 'Copiar contactos de los alumnos filtrados'}</p>
+                    </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
         </div>
       </header>

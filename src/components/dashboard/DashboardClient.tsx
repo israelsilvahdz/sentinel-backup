@@ -43,7 +43,7 @@ import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findOb
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'directory-generator';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -411,7 +411,6 @@ export function DashboardClient() {
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
-        case 'directory-generator': return <DirectoryGenerator />;
         default: return <WelcomeDashboard />;
     }
   }
@@ -475,12 +474,6 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')}>
                     <HelpCircle />
                     <span>Materias sin Clasificar</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Generador de Directorio" isActive={activeView === 'directory-generator'} onClick={() => handleSetActiveView('directory-generator')}>
-                    <FileText />
-                    <span>Generador de Directorio</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
