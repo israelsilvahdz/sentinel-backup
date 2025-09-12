@@ -19,6 +19,7 @@ import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -247,75 +248,77 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                       Selecciona las fechas y el motivo. El sistema filtrará a los profesores que tienen clase en esos días.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
-                      <div className="flex flex-col items-center md:col-span-1">
-                         <Label className="mb-2 font-semibold">1. Selecciona el día o rango</Label>
-                         <Calendar
-                            mode="range"
-                            selected={dateRange}
-                            onSelect={setDateRange}
-                            locale={es}
-                            numberOfMonths={1}
-                            classNames={{
-                                day_selected: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:bg-destructive/90",
-                                day_range_start: "day-range-start",
-                                day_range_end: "day-range-end",
-                                day_range_middle: "bg-destructive/20 text-accent-foreground",
-                            }}
-                        />
-                         <div className="flex items-center space-x-2 mt-4">
-                            <Checkbox id="future-notice" checked={isFutureNotice} onCheckedChange={(checked) => setIsFutureNotice(!!checked)} />
-                            <Label htmlFor="future-notice">Es un aviso a futuro</Label>
-                        </div>
-                      </div>
-
-                      <div className="space-y-6 md:col-span-2">
-                        <div>
-                          <Label className="font-semibold">2. Motivo</Label>
-                          <RadioGroup
-                              id="notification-reason"
-                              defaultValue="Ausencia"
-                              onValueChange={setNotificationReason}
-                              value={notificationReason}
-                              className="mt-2"
-                          >
-                              <div className="flex items-center space-x-2"><RadioGroupItem value="Ausencia" id="r5" /><Label htmlFor="r5">Ausencia</Label></div>
-                              <div className="flex items-center space-x-2"><RadioGroupItem value="Enfermedad" id="r2" /><Label htmlFor="r2">Enfermedad</Label></div>
-                              <div className="flex items-center space-x-2"><RadioGroupItem value="Cita Médica" id="r3" /><Label htmlFor="r3">Cita Médica</Label></div>
-                              <div className="flex items-center space-x-2"><RadioGroupItem value="Asunto Familiar" id="r4" /><Label htmlFor="r4">Asunto Familiar</Label></div>
-                              <div className="flex items-center space-x-2"><RadioGroupItem value="Otro" id="r6" /><Label htmlFor="r6">Otro (especificar en notas)</Label></div>
-                          </RadioGroup>
-                        </div>
-
-                         <div className="flex items-center space-x-2">
-                            <Checkbox id="has-proof" checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} />
-                            <Label htmlFor="has-proof">Se presentó comprobante</Label>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="custom-notes" className="font-semibold">3. Notas adicionales (opcional)</Label>
-                           <Textarea
-                              id="custom-notes"
-                              placeholder="Añade aquí cualquier detalle relevante..."
-                              value={customNotes}
-                              onChange={(e) => setCustomNotes(e.target.value)}
-                              className="mt-2"
+                  <ScrollArea className="max-h-[60vh] pr-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-4">
+                        <div className="flex flex-col items-center md:col-span-1">
+                           <Label className="mb-2 font-semibold">1. Selecciona el día o rango</Label>
+                           <Calendar
+                              mode="range"
+                              selected={dateRange}
+                              onSelect={setDateRange}
+                              locale={es}
+                              numberOfMonths={1}
+                              classNames={{
+                                  day_selected: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:bg-destructive/90",
+                                  day_range_start: "day-range-start",
+                                  day_range_end: "day-range-end",
+                                  day_range_middle: "bg-destructive/20 text-accent-foreground",
+                              }}
                           />
+                           <div className="flex items-center space-x-2 mt-4">
+                              <Checkbox id="future-notice" checked={isFutureNotice} onCheckedChange={(checked) => setIsFutureNotice(!!checked)} />
+                              <Label htmlFor="future-notice">Es un aviso a futuro</Label>
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="font-semibold flex items-center gap-2"><Users className="h-4 w-4"/>Profesores a Notificar</Label>
-                            <Card className="p-3 bg-muted/50 max-h-32 overflow-y-auto">
-                               {teachersToNotify.length > 0 ? (
-                                    <ul className="text-sm text-muted-foreground list-disc list-inside">
-                                        {teachersToNotify.map(teacher => <li key={teacher}>{teacher}</li>)}
-                                    </ul>
-                               ) : (
-                                    <p className="text-sm text-muted-foreground text-center">Selecciona una fecha para ver los profesores.</p>
-                               )}
-                            </Card>
+
+                        <div className="space-y-6 md:col-span-2">
+                          <div>
+                            <Label className="font-semibold">2. Motivo</Label>
+                            <RadioGroup
+                                id="notification-reason"
+                                defaultValue="Ausencia"
+                                onValueChange={setNotificationReason}
+                                value={notificationReason}
+                                className="mt-2"
+                            >
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="Ausencia" id="r5" /><Label htmlFor="r5">Ausencia</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="Enfermedad" id="r2" /><Label htmlFor="r2">Enfermedad</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="Cita Médica" id="r3" /><Label htmlFor="r3">Cita Médica</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="Asunto Familiar" id="r4" /><Label htmlFor="r4">Asunto Familiar</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="Otro" id="r6" /><Label htmlFor="r6">Otro (especificar en notas)</Label></div>
+                            </RadioGroup>
+                          </div>
+
+                           <div className="flex items-center space-x-2">
+                              <Checkbox id="has-proof" checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} />
+                              <Label htmlFor="has-proof">Se presentó comprobante</Label>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="custom-notes" className="font-semibold">3. Notas adicionales (opcional)</Label>
+                             <Textarea
+                                id="custom-notes"
+                                placeholder="Añade aquí cualquier detalle relevante..."
+                                value={customNotes}
+                                onChange={(e) => setCustomNotes(e.target.value)}
+                                className="mt-2"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                              <Label className="font-semibold flex items-center gap-2"><Users className="h-4 w-4"/>Profesores a Notificar</Label>
+                              <Card className="p-3 bg-muted/50 max-h-32 overflow-y-auto">
+                                 {teachersToNotify.length > 0 ? (
+                                      <ul className="text-sm text-muted-foreground list-disc list-inside">
+                                          {teachersToNotify.map(teacher => <li key={teacher}>{teacher}</li>)}
+                                      </ul>
+                                 ) : (
+                                      <p className="text-sm text-muted-foreground text-center">Selecciona una fecha para ver los profesores.</p>
+                                 )}
+                              </Card>
+                          </div>
                         </div>
-                      </div>
-                  </div>
+                    </div>
+                  </ScrollArea>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={generateMailtoLink}>Generar Correo</AlertDialogAction>
@@ -351,7 +354,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                     <React.Fragment key={slot.start}>
                         {/* Time slot label */}
                         <div className="p-3 bg-card border-t border-border flex items-center justify-center">
-                             <Badge variant="outline" className="font-mono">
+                             <Badge variant="outline" className="font-mono text-xs">
                                 <Clock className="h-3 w-3 mr-1.5" />
                                 {slot.start}
                             </Badge>
@@ -380,3 +383,4 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     </TooltipProvider>
   );
 }
+
