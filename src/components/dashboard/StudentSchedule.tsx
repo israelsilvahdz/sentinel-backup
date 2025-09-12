@@ -223,7 +223,7 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                                 day_selected: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:bg-destructive/90",
                                 day_range_start: "day-range-start",
                                 day_range_end: "day-range-end",
-                                day_range_middle: "bg-destructive/20 text-destructive-foreground",
+                                day_range_middle: "bg-destructive/20 text-accent-foreground",
                             }}
                         />
                          <div className="flex items-center space-x-2 mt-4">
@@ -340,3 +340,6 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
   );
 }
 
+
+
+    
