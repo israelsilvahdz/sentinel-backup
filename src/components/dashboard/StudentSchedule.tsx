@@ -5,6 +5,9 @@ import React from 'react';
 import { type Subject } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { Copy } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface StudentScheduleProps {
@@ -37,6 +40,7 @@ const generateTimeSlots = () => {
 };
 
 export function StudentSchedule({ subjects }: StudentScheduleProps) {
+  const { toast } = useToast();
 
   if (!subjects || subjects.length === 0) {
     return (
@@ -66,6 +70,7 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
           
           return {
               id: `${subject.id}-${day}`,
+              day,
               dayIndex,
               startMinutes,
               duration,
@@ -74,6 +79,29 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
       }).filter(Boolean);
   });
   
+  const handleCopyTeachersForDay = (day: string) => {
+    const teachersForDay = scheduleEvents
+      .filter(event => event && event.day === day && event.subject.professorName)
+      .map(event => event!.subject.professorName);
+
+    if (teachersForDay.length === 0) {
+      toast({
+        title: 'Sin Profesores',
+        description: `No hay profesores asignados para el ${DAY_MAP[day]}.`,
+      });
+      return;
+    }
+    
+    const uniqueTeachers = [...new Set(teachersForDay)];
+    const teacherListString = uniqueTeachers.join('\n');
+    
+    navigator.clipboard.writeText(teacherListString).then(() => {
+      toast({
+        title: '¡Copiado!',
+        description: `Se han copiado ${uniqueTeachers.length} nombres de profesores para el ${DAY_MAP[day]}.`,
+      });
+    });
+  };
 
   if (!hasScheduleData) {
      return (
@@ -122,9 +150,19 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
               {/* Day headers */}
               <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-10 bg-muted/5 backdrop-blur-sm -translate-y-10">
                   <div className="w-14"></div>
-                  {DAYS.map(day => (
-                      <div key={day} className="flex items-center justify-center font-semibold text-foreground">
-                          {DAY_MAP[day]}
+                   {DAYS.map(day => (
+                      <div key={day} className="flex items-center justify-center font-semibold text-foreground gap-2">
+                          <span>{DAY_MAP[day]}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyTeachersForDay(day)}>
+                                  <Copy className="h-3 w-3" />
+                               </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Copiar profesores del {DAY_MAP[day]}</p>
+                            </TooltipContent>
+                          </Tooltip>
                       </div>
                   ))}
               </div>
