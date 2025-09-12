@@ -18,6 +18,7 @@ import { format, isWithinInterval, getDay, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 import { Badge } from '../ui/badge';
+import { Card } from '../ui/card';
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -101,9 +102,10 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     subjects.forEach(subject => {
         if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return;
 
+        const slotKey = `${subject.schedule.startTime} - ${subject.schedule.endTime}`;
+        
         subject.schedule.days.forEach(day => {
             if (DAYS.includes(day)) {
-                const slotKey = `${subject.schedule.startTime} - ${subject.schedule.endTime}`;
                  if (events[day] && (slotKey in events[day])) {
                     events[day][slotKey] = { id: `${subject.id}-${day}`, subject };
                 }
@@ -273,11 +275,15 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
               </AlertDialog>
            </div>
            
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-border rounded-lg border overflow-hidden">
+            <div className="grid grid-cols-6 gap-px bg-border rounded-lg border overflow-hidden">
+                {/* Time column */}
+                <div className="p-3 bg-card flex flex-col space-y-2">
+                  <h3 className="font-bold text-center text-primary invisible">Hora</h3>
+                </div>
                  {DAYS.map(day => (
-                    <div key={day} className="p-3 bg-card flex flex-col space-y-2">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-center text-primary">{DAY_MAP[day]}</h3>
+                    <div key={day} className="p-3 bg-card flex flex-col items-center">
+                        <div className="flex items-center justify-between w-full">
+                            <h3 className="font-bold text-center text-primary flex-1">{DAY_MAP[day]}</h3>
                             <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyTeachersForDay(day)}>
@@ -294,24 +300,27 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
 
                 {TIME_SLOTS.map(slot => (
                     <React.Fragment key={slot.start}>
+                        {/* Time slot label */}
+                        <div className="p-3 bg-card border-t border-border flex items-center justify-center">
+                             <Badge variant="outline" className="font-mono">
+                                <Clock className="h-3 w-3 mr-1.5" />
+                                {slot.start} - {slot.end}
+                            </Badge>
+                        </div>
                         {DAYS.map(day => {
                             const slotKey = `${slot.start} - ${slot.end}`;
                             const event = scheduleByDayAndSlot[day]?.[slotKey];
                             return (
-                                <div key={`${day}-${slotKey}`} className="p-3 bg-card border-t border-border min-h-[120px]">
+                                <div key={`${day}-${slotKey}`} className="p-2 bg-card border-t border-border min-h-[90px]">
                                     {event ? (
-                                        <div className="p-3 bg-card rounded-md h-full flex flex-col justify-between">
+                                        <div className="p-2 bg-card rounded-md h-full flex flex-col justify-center">
                                             <div>
-                                                <p className="font-semibold text-sm leading-tight">{event.subject.name}</p>
+                                                <p className="font-semibold text-xs leading-tight">{event.subject.name}</p>
                                                 <p className="text-xs text-muted-foreground">{event.subject.professorName}</p>
                                             </div>
-                                            <Badge variant="outline" className="mt-2 font-mono w-fit">
-                                                <Clock className="h-3 w-3 mr-1.5" />
-                                                {event.subject.schedule.startTime} - {event.subject.schedule.endTime}
-                                            </Badge>
                                         </div>
                                     ) : (
-                                        <div className="min-h-[96px] rounded-md"></div>
+                                        <div className="min-h-[74px] rounded-md"></div>
                                     )}
                                 </div>
                             );
@@ -323,5 +332,3 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     </TooltipProvider>
   );
 }
-
-    
