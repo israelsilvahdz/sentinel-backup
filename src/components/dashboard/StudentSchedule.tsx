@@ -19,13 +19,13 @@ interface StudentScheduleProps {
   studentName: string;
 }
 
-const DAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE'];
+const DAYS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIER'];
 const DAY_MAP: Record<string, string> = {
     'LUN': 'Lunes',
     'MAR': 'Martes',
-    'MIÉ': 'Miércoles',
+    'MIER': 'Miércoles',
     'JUE': 'Jueves',
-    'VIE': 'Viernes',
+    'VIER': 'Viernes',
 }
 const START_HOUR = 7;
 const END_HOUR = 16; // 4 PM
