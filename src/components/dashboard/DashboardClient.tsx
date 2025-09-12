@@ -44,6 +44,7 @@ type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade';
 export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
+export type PlanType = 'semestral' | 'tetramestral';
 
 
 interface DashboardContextType {
@@ -77,6 +78,7 @@ interface DashboardContextType {
   setActiveView: (view: ActiveView) => void;
   selectedStudentId: string | null;
   setSelectedStudentId: (id: string | null) => void;
+  planType: PlanType;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -93,6 +95,7 @@ const LOCAL_STORAGE_KEYS = {
     STUDENTS: 'academic_sentinel_students',
     HISTORY: 'academic_sentinel_history',
     UPLOADS: 'academic_sentinel_uploads',
+    PLAN_TYPE: 'academic_sentinel_plan_type',
 };
 
 
@@ -101,6 +104,7 @@ export function DashboardClient() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
+  const [planType, setPlanType] = useState<PlanType>('tetramestral');
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
 
@@ -127,11 +131,16 @@ export function DashboardClient() {
 
       const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
       if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
+      
+      const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+      if (storedPlanType) setPlanType(storedPlanType as PlanType);
+
     } catch (error) {
         console.error("Error loading data from Local Storage", error);
         localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
         localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
         localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
+        localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
     }
     setIsLoading(false);
   }, []);
@@ -148,6 +157,8 @@ export function DashboardClient() {
         if(uploadHistory.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
         }
+        localStorage.setItem(LOCAL_STORAGE_KEYS.PLAN_TYPE, planType);
+
     } catch(error) {
         console.error("Error saving data to Local Storage", error);
         toast({
@@ -156,7 +167,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, studentHistory, uploadHistory, toast]);
+  }, [allStudents, studentHistory, uploadHistory, planType, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -191,7 +202,7 @@ export function DashboardClient() {
     setGroupId(null);
   };
   
-  const processSingleFile = (studentData: StudentData) => {
+  const processSingleFile = (studentData: StudentData, fileName: string) => {
     const studentsArray = Object.values(studentData).map(student => ({
         ...student,
         subjectSummaries: (student.subjects || []).map(s => ({
@@ -201,6 +212,14 @@ export function DashboardClient() {
         })),
     }));
     setAllStudents(studentsArray);
+    
+    // Determine plan type from filename
+    if (fileName.includes('40') || fileName.includes('50') || fileName.includes('60')) {
+        setPlanType('semestral');
+    } else {
+        setPlanType('tetramestral');
+    }
+
     return studentsArray.length;
   };
 
@@ -232,7 +251,7 @@ export function DashboardClient() {
                 return;
             }
 
-            const processedCount = processSingleFile(studentData);
+            const processedCount = processSingleFile(studentData, currentFile.name);
             setProgress(90);
 
             setUploadHistory(prev => [{ 
@@ -276,11 +295,13 @@ export function DashboardClient() {
       localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
 
       setAllStudents([]);
       setStudentHistory({});
       setUploadHistory([]);
       setCurrentFile(null);
+      setPlanType('tetramestral');
       
       setProgress(100);
       toast({
@@ -403,7 +424,8 @@ export function DashboardClient() {
     loadStudentSubjects: loadStudentSubjectsWrapper,
     getStudentChanges: getStudentChangesWrapper,
     activeView, setActiveView: handleSetActiveView,
-    selectedStudentId, setSelectedStudentId
+    selectedStudentId, setSelectedStudentId,
+    planType,
   };
 
   const renderActiveView = () => {

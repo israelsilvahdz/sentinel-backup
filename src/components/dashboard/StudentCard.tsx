@@ -86,18 +86,10 @@ function CopyButton({ textToCopy, tooltipText = 'Copiar' }: { textToCopy: string
 
 
 function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
-    const { loadStudentSubjects, setSelectedStudentId, setActiveView } = useDashboardFilters();
+    const { loadStudentSubjects, setSelectedStudentId, setActiveView, planType } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isAllCopied, setIsAllCopied] = useState(false);
-
-    const planType = useMemo((): 'semestral' | 'tetramestral' => {
-        const id = student.id;
-        if (id.endsWith('40') || id.endsWith('50') || id.endsWith('60')) {
-            return 'semestral';
-        }
-        return 'tetramestral';
-    }, [student.id]);
 
     useEffect(() => {
         async function loadSubjects() {
