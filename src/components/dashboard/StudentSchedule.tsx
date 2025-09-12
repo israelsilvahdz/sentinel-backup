@@ -125,30 +125,19 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     )];
 
     if (teachersForDay.length === 0) {
-      toast({
-        variant: "destructive",
-        title: 'Sin Profesores',
-        description: `No se pueden notificar faltas porque no hay profesores asignados para el ${DAY_MAP[day]}.`,
-      });
-      return;
-    }
-    
-    // Simulación de búsqueda de correos. En un caso real, esto vendría de una base de datos.
-    const teacherEmails = teachersForDay.map(name => professorContacts[name]?.email).filter(Boolean);
-
-    if (teacherEmails.length === 0) {
         toast({
             variant: "destructive",
-            title: 'Correos no encontrados',
-            description: `No se encontraron los correos para los profesores de este día.`,
+            title: 'Sin Profesores',
+            description: `No se pueden notificar faltas porque no hay profesores asignados para el ${DAY_MAP[day]}.`,
         });
         return;
     }
-
+    
     const subject = `Notificación de Ausencia - ${studentName}`;
     const body = `Estimados profesores,\n\nLes informo que el alumno ${studentName} no ha asistido a clases el día de hoy, ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.\n\nAgradezco su atención.\n\nSaludos cordiales,`;
     
-    const mailtoLink = `mailto:${teacherEmails.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    // Usamos los nombres de los profesores directamente en el campo "To"
+    const mailtoLink = `mailto:${teachersForDay.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
     window.location.href = mailtoLink;
   };
