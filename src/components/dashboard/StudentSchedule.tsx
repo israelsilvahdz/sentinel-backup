@@ -102,7 +102,7 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
                   <div className="w-14 border-r border-border/50"></div>
                   {/* Day columns */}
                   {DAYS.map((_, index) => (
-                      <div key={index} className={cn("col-start-", index + 2, "border-r border-border/50")}></div>
+                      <div key={index} className={cn("border-r border-border/50", index === 0 ? "col-start-2" : "")}></div>
                   ))}
                   {/* Hour rows */}
                   {timeSlots.slice(0).map((_, index) => (
@@ -120,7 +120,7 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
               </div>
 
               {/* Day headers */}
-              <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-10 bg-muted/20 backdrop-blur-sm -translate-y-10">
+              <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-10 bg-muted/5 backdrop-blur-sm -translate-y-10">
                   <div className="w-14"></div>
                   {DAYS.map(day => (
                       <div key={day} className="flex items-center justify-center font-semibold text-foreground">
@@ -136,17 +136,17 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
                         <Tooltip key={event.id}>
                           <TooltipTrigger asChild>
                             <div
-                                className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 overflow-hidden cursor-pointer"
+                                className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 overflow-hidden cursor-pointer flex items-center justify-center"
                                 style={{
                                     left: `${event.dayIndex * 20}%`,
-                                    top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight}px`,
-                                    height: `${event.duration * minuteHeight}px`,
+                                    top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight + 4}px`, // +4 for margin top
+                                    height: `${event.duration * minuteHeight * 0.9}px`, // 90% of original height
                                     width: `calc(20% - 4px)`,
                                     marginLeft: '2px',
                                     marginRight: '2px'
                                 }}
                             >
-                                <p className="font-bold text-xs leading-tight text-primary">{event.subject.name}</p>
+                                <p className="font-bold text-xs leading-tight text-primary text-center">{event.subject.name}</p>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
