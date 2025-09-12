@@ -246,7 +246,7 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
            
            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {DAYS.map(day => (
-                <div key={day} className="p-3 bg-muted/30 rounded-lg">
+                <div key={day} className="p-3 bg-muted/30 rounded-lg flex flex-col">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-bold text-center text-primary">{DAY_MAP[day]}</h3>
                          <Tooltip>
@@ -283,5 +283,3 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     </TooltipProvider>
   );
 }
-
-    
