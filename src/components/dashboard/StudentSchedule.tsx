@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { type Subject } from '@/types/student';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -21,7 +20,7 @@ const DAY_MAP: Record<string, string> = {
     'VIE': 'Viernes',
 }
 const START_HOUR = 7;
-const END_HOUR = 22;
+const END_HOUR = 16; // 4 PM
 
 const timeToMinutes = (time: string): number => {
     if (!time || !time.includes(':')) return 0;
@@ -50,7 +49,7 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
   const hasScheduleData = subjects.some(s => s.schedule && s.schedule.days.length > 0 && s.schedule.startTime && s.schedule.endTime);
 
   const timeSlots = generateTimeSlots();
-  const minuteHeight = 1.5; // Height per minute in px
+  const minuteHeight = 1.5; // Height per minute in px, you can adjust this
 
   const scheduleEvents = subjects.flatMap(subject => {
       if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return [];
@@ -59,7 +58,7 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
       const endMinutes = timeToMinutes(subject.schedule.endTime);
       const duration = endMinutes - startMinutes;
       
-      if (duration <= 0) return [];
+      if (duration <= 0 || startMinutes < START_HOUR * 60 || endMinutes > END_HOUR * 60) return [];
       
       return subject.schedule.days.map(day => {
           const dayIndex = DAYS.indexOf(day);
@@ -97,50 +96,52 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
     <TooltipProvider>
       <div className="p-4 bg-muted/5 rounded-lg">
           <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * 60 * minuteHeight}px` }}>
-              {/* Grid background */}
-              <div className="absolute inset-0 grid grid-cols-6 h-full">
-                  <div className="col-span-1 border-r border-border/50"></div>
+              {/* Grid background & lines */}
+              <div className="absolute inset-0 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-full">
+                  {/* Time column */}
+                  <div className="w-14 border-r border-border/50"></div>
+                  {/* Day columns */}
                   {DAYS.map((_, index) => (
-                      <div key={index} className={cn("col-span-1", index < DAYS.length - 1 && "border-r border-border/50")}></div>
+                      <div key={index} className={cn("col-start-", index + 2, "border-r border-border/50")}></div>
                   ))}
-                  {timeSlots.slice(1).map((_, index) => (
-                      <div key={index} className="col-span-6 border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
+                  {/* Hour rows */}
+                  {timeSlots.slice(0).map((_, index) => (
+                      <div key={index} className="col-span-full border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
                   ))}
               </div>
 
               {/* Time labels */}
-              <div className="absolute -left-14 top-0 w-12 text-right">
+              <div className="absolute -left-1 top-0 w-12 text-right">
                   {timeSlots.map(time => (
-                      <div key={time} className="text-xs text-muted-foreground" style={{ height: `${60 * minuteHeight}px`}}>
+                      <div key={time} className="text-xs text-muted-foreground -translate-y-2" style={{ height: `${60 * minuteHeight}px`}}>
                           {time}
                       </div>
                   ))}
               </div>
 
               {/* Day headers */}
-              <div className="sticky top-0 z-10 grid grid-cols-6 h-10 bg-muted/20 backdrop-blur-sm">
-                  <div className="col-span-1"></div>
+              <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-10 bg-muted/20 backdrop-blur-sm -translate-y-10">
+                  <div className="w-14"></div>
                   {DAYS.map(day => (
-                      <div key={day} className="col-span-1 text-center font-semibold text-foreground">
+                      <div key={day} className="flex items-center justify-center font-semibold text-foreground">
                           {DAY_MAP[day]}
                       </div>
                   ))}
               </div>
               
               {/* Events */}
-              <div className="absolute inset-0 grid grid-cols-6">
-                  <div className="col-span-1"></div>
+              <div className="absolute top-0 left-14 right-0 bottom-0 grid grid-cols-5">
                   {scheduleEvents.map(event => (
                       event && (
                         <Tooltip key={event.id}>
                           <TooltipTrigger asChild>
                             <div
-                                className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 text-primary-foreground overflow-hidden cursor-pointer"
+                                className="absolute w-full p-2 rounded-lg bg-primary/10 border border-primary/50 overflow-hidden cursor-pointer"
                                 style={{
-                                    left: `${(event.dayIndex + 1) * (100 / 6)}%`,
+                                    left: `${event.dayIndex * 20}%`,
                                     top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight}px`,
                                     height: `${event.duration * minuteHeight}px`,
-                                    width: `calc(${(100 / 6)}% - 4px)`,
+                                    width: `calc(20% - 4px)`,
                                     marginLeft: '2px',
                                     marginRight: '2px'
                                 }}
