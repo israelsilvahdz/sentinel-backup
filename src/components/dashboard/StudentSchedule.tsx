@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -218,7 +217,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     body += `Motivo: ${notificationReason}\n`;
     
     if (hasProof) {
-        body += `Se presentó comprobante: Sí\n`;
+        body += `El alumno presentó comprobante del motivo.\n`;
     }
 
     if (customNotes) {
@@ -381,4 +380,3 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     </TooltipProvider>
   );
 }
-
