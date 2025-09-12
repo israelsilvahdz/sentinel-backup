@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -89,6 +90,14 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isAllCopied, setIsAllCopied] = useState(false);
+
+    const planType = useMemo((): 'semestral' | 'tetramestral' => {
+        const id = student.id;
+        if (id.endsWith('40') || id.endsWith('50') || id.endsWith('60')) {
+            return 'semestral';
+        }
+        return 'tetramestral';
+    }, [student.id]);
 
     useEffect(() => {
         async function loadSubjects() {
@@ -213,7 +222,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
           </div>
         </TabsContent>
         <TabsContent value="horario">
-          <StudentSchedule subjects={subjects} studentName={student.name} />
+          <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} />
         </TabsContent>
          <TabsContent value="contacto">
           <StudentContactInfo studentId={student.id} />

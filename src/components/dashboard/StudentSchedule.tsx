@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -14,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
 import { Calendar } from '../ui/calendar';
 import { Checkbox } from '../ui/checkbox';
-import { format, isWithinInterval, getDay, addDays } from 'date-fns';
+import { format, isWithinInterval, getDay, addDays, parse } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 import { Badge } from '../ui/badge';
@@ -23,6 +24,7 @@ import { Card } from '../ui/card';
 interface StudentScheduleProps {
   subjects: Subject[];
   studentName: string;
+  planType: 'semestral' | 'tetramestral';
 }
 
 const DAYS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIER'];
@@ -44,20 +46,53 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
 };
 
 
-const TIME_SLOTS = [
+const TIME_SLOTS_TETRA = [
     { start: '07:00', end: '08:59' },
     { start: '09:00', end: '10:59' },
     { start: '11:30', end: '13:29' },
     { start: '13:30', end: '14:50' },
 ];
 
-export function StudentSchedule({ subjects, studentName }: StudentScheduleProps) {
+const TIME_SLOTS_SEMESTRAL = [
+    { start: '07:00', end: '07:59' },
+    { start: '08:00', end: '08:59' },
+    { start: '09:00', end: '09:59' },
+    { start: '10:00', end: '10:59' },
+    { start: '11:00', end: '11:59' },
+    { start: '12:00', end: '12:59' },
+    { start: '13:00', end: '13:59' },
+    { start: '14:00', end: '14:59' },
+];
+
+function isSubjectInSlot(subject: Subject, slot: { start: string, end: string }, planType: 'semestral' | 'tetramestral'): boolean {
+    if (!subject.schedule?.startTime) return false;
+
+    if (planType === 'tetramestral') {
+        return subject.schedule.startTime === slot.start;
+    }
+
+    // Semestral logic
+    try {
+        const today = new Date();
+        const subjectStart = parse(subject.schedule.startTime, 'HH:mm', today);
+        const slotStart = parse(slot.start, 'HH:mm', today);
+        return subjectStart.getHours() === slotStart.getHours();
+    } catch (e) {
+        console.error("Error parsing time:", e);
+        return false;
+    }
+}
+
+
+export function StudentSchedule({ subjects, studentName, planType }: StudentScheduleProps) {
   const { toast } = useToast();
   const [notificationReason, setNotificationReason] = useState("Ausencia");
   const [customNotes, setCustomNotes] = useState("");
   const [isFutureNotice, setIsFutureNotice] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [teachersToNotify, setTeachersToNotify] = useState<string[]>([]);
+
+  const TIME_SLOTS = planType === 'semestral' ? TIME_SLOTS_SEMESTRAL : TIME_SLOTS_TETRA;
 
   useEffect(() => {
     if (dateRange?.from) {
@@ -91,39 +126,23 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
   }, [dateRange, subjects]);
 
   const scheduleByDayAndSlot = useMemo(() => {
-    const events: Record<string, Record<string, any>> = {};
+    const grid: Record<string, (Subject | null)[]> = {};
     DAYS.forEach(day => {
-        events[day] = {};
-        TIME_SLOTS.forEach(slot => {
-            const slotKey = `${slot.start} - ${slot.end}`;
-            events[day][slotKey] = null;
+        grid[day] = TIME_SLOTS.map(slot => {
+            return subjects.find(subject => 
+                subject.schedule?.days.includes(day) && isSubjectInSlot(subject, slot, planType)
+            ) || null;
         });
     });
-
-    subjects.forEach(subject => {
-        if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return;
-
-        const slotKey = `${subject.schedule.startTime} - ${subject.schedule.endTime}`;
-        
-        subject.schedule.days.forEach(day => {
-            if (DAYS.includes(day)) {
-                 if (events[day] && (slotKey in events[day])) {
-                    events[day][slotKey] = { id: `${subject.id}-${day}`, subject };
-                }
-            }
-        });
-    });
-    return events;
-  }, [subjects]);
+    return grid;
+  }, [subjects, TIME_SLOTS, planType]);
 
   
   const handleCopyTeachersForDay = (day: string) => {
      const teachersForDay: string[] = [];
-     TIME_SLOTS.forEach(slot => {
-        const slotKey = `${slot.start} - ${slot.end}`;
-        const event = scheduleByDayAndSlot[day] ? scheduleByDayAndSlot[day][slotKey] : null;
-        if (event?.subject?.professorName) {
-            teachersForDay.push(event.subject.professorName);
+     scheduleByDayAndSlot[day].forEach(subject => {
+        if (subject?.professorName) {
+            teachersForDay.push(subject.professorName);
         }
      });
 
@@ -305,25 +324,24 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                     </div>
                 ))}
 
-                {TIME_SLOTS.map(slot => (
+                {TIME_SLOTS.map((slot, slotIndex) => (
                     <React.Fragment key={slot.start}>
                         {/* Time slot label */}
                         <div className="p-3 bg-card border-t border-border flex items-center justify-center">
                              <Badge variant="outline" className="font-mono">
                                 <Clock className="h-3 w-3 mr-1.5" />
-                                {slot.start} - {slot.end}
+                                {slot.start}
                             </Badge>
                         </div>
                         {DAYS.map(day => {
-                            const slotKey = `${slot.start} - ${slot.end}`;
-                            const event = scheduleByDayAndSlot[day]?.[slotKey];
+                            const subject = scheduleByDayAndSlot[day][slotIndex];
                             return (
-                                <div key={`${day}-${slotKey}`} className="p-2 bg-card border-t border-border min-h-[90px]">
-                                    {event ? (
+                                <div key={`${day}-${slot.start}`} className="p-2 bg-card border-t border-border min-h-[90px]">
+                                    {subject ? (
                                         <div className="p-2 bg-card rounded-md h-full flex flex-col justify-center">
                                             <div>
-                                                <p className="font-semibold text-xs leading-tight">{event.subject.name}</p>
-                                                <p className="text-xs text-muted-foreground">{event.subject.professorName}</p>
+                                                <p className="font-semibold text-xs leading-tight">{subject.name}</p>
+                                                <p className="text-xs text-muted-foreground">{subject.professorName}</p>
                                             </div>
                                         </div>
                                     ) : (
@@ -339,7 +357,3 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     </TooltipProvider>
   );
 }
-
-
-
-    
