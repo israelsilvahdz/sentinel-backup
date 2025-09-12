@@ -6,13 +6,28 @@ import { type Subject } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Copy } from 'lucide-react';
+import { Copy, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import contactData from '@/lib/student-contacts.json';
 
 
 interface StudentScheduleProps {
   subjects: Subject[];
+  studentName: string;
 }
+
+interface ProfessorContact {
+    email: string;
+}
+
+// Suponiendo una estructura donde se pueden buscar los correos de los profes
+const professorContacts: Record<string, ProfessorContact> = {
+    // Esto debería venir de alguna fuente de datos, por ahora es un ejemplo
+    "GARCIA, LAURA": { email: "laura.garcia@tecmilenio.mx" },
+    "PEREZ, JUAN": { email: "juan.perez@tecmilenio.mx" },
+    "GONZALEZ, MARIA": { email: "maria.gonzalez@tecmilenio.mx" }
+};
+
 
 const DAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE'];
 const DAY_MAP: Record<string, string> = {
@@ -39,7 +54,7 @@ const generateTimeSlots = () => {
     return slots;
 };
 
-export function StudentSchedule({ subjects }: StudentScheduleProps) {
+export function StudentSchedule({ subjects, studentName }: StudentScheduleProps) {
   const { toast } = useToast();
 
   if (!subjects || subjects.length === 0) {
@@ -103,6 +118,42 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
     });
   };
 
+  const handleNotifyAbsence = (day: string) => {
+    const teachersForDay = [...new Set(scheduleEvents
+      .filter(event => event && event.day === day && event.subject.professorName)
+      .map(event => event!.subject.professorName)
+    )];
+
+    if (teachersForDay.length === 0) {
+      toast({
+        variant: "destructive",
+        title: 'Sin Profesores',
+        description: `No se pueden notificar faltas porque no hay profesores asignados para el ${DAY_MAP[day]}.`,
+      });
+      return;
+    }
+    
+    // Simulación de búsqueda de correos. En un caso real, esto vendría de una base de datos.
+    const teacherEmails = teachersForDay.map(name => professorContacts[name]?.email).filter(Boolean);
+
+    if (teacherEmails.length === 0) {
+        toast({
+            variant: "destructive",
+            title: 'Correos no encontrados',
+            description: `No se encontraron los correos para los profesores de este día.`,
+        });
+        return;
+    }
+
+    const subject = `Notificación de Ausencia - ${studentName}`;
+    const body = `Estimados profesores,\n\nLes informo que el alumno ${studentName} no ha asistido a clases el día de hoy, ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.\n\nAgradezco su atención.\n\nSaludos cordiales,`;
+    
+    const mailtoLink = `mailto:${teacherEmails.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    window.location.href = mailtoLink;
+  };
+
+
   if (!hasScheduleData) {
      return (
         <div className="p-6 bg-muted/20 rounded-lg">
@@ -148,21 +199,27 @@ export function StudentSchedule({ subjects }: StudentScheduleProps) {
               </div>
 
               {/* Day headers */}
-              <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-10 bg-muted/5 backdrop-blur-sm -translate-y-10">
+               <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] bg-muted/5 backdrop-blur-sm -translate-y-10" style={{ height: 'auto', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
                   <div className="w-14"></div>
                    {DAYS.map(day => (
-                      <div key={day} className="flex items-center justify-center font-semibold text-foreground gap-2">
-                          <span>{DAY_MAP[day]}</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyTeachersForDay(day)}>
-                                  <Copy className="h-3 w-3" />
-                               </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Copiar profesores del {DAY_MAP[day]}</p>
-                            </TooltipContent>
-                          </Tooltip>
+                      <div key={day} className="flex flex-col items-center justify-center font-semibold text-foreground gap-2 px-1">
+                          <div className="flex items-center gap-2">
+                            <span>{DAY_MAP[day]}</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyTeachersForDay(day)}>
+                                    <Copy className="h-3 w-3" />
+                                 </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                  <p>Copiar profesores del {DAY_MAP[day]}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleNotifyAbsence(day)}>
+                            <Mail className="mr-1.5 h-3 w-3" />
+                            Notificar
+                          </Button>
                       </div>
                   ))}
               </div>

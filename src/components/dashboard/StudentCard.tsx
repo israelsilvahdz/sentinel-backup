@@ -213,7 +213,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
           </div>
         </TabsContent>
         <TabsContent value="horario">
-          <StudentSchedule subjects={subjects} />
+          <StudentSchedule subjects={subjects} studentName={student.name} />
         </TabsContent>
          <TabsContent value="contacto">
           <StudentContactInfo studentId={student.id} />
