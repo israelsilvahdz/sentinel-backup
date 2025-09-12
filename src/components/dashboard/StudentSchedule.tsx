@@ -33,11 +33,12 @@ const DAY_MAP: Record<string, string> = {
     'VIER': 'Viernes',
 }
 
-const timeToMinutes = (time: string): number => {
-    if (!time || !time.includes(':')) return 0;
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
-};
+// Fixed time slots as defined by the user
+const TIME_SLOTS = [
+    { start: '07:00', end: '08:59' },
+    { start: '09:00', end: '10:59' },
+    { start: '11:30', end: '13:29' },
+];
 
 export function StudentSchedule({ subjects, studentName }: StudentScheduleProps) {
   const { toast } = useToast();
@@ -56,38 +57,36 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
 
   const hasScheduleData = subjects.some(s => s.schedule && s.schedule.days.length > 0 && s.schedule.startTime && s.schedule.endTime);
 
-  const scheduleByDay = useMemo(() => {
-    const events: Record<string, any[]> = {};
-    DAYS.forEach(day => { events[day] = []; });
+  const scheduleByDayAndSlot = useMemo(() => {
+    const events: Record<string, Record<string, any>> = {};
+    DAYS.forEach(day => { events[day] = {}; });
 
     subjects.forEach(subject => {
         if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return;
 
         subject.schedule.days.forEach(day => {
             if (DAYS.includes(day)) {
-                events[day].push({
+                // Find which slot this subject fits into
+                const slotKey = `${subject.schedule.startTime} - ${subject.schedule.endTime}`;
+                events[day][slotKey] = {
                     id: `${subject.id}-${day}`,
                     subject,
-                    startMinutes: timeToMinutes(subject.schedule.startTime),
-                });
+                };
             }
         });
     });
-
-    // Sort events within each day by start time
-    for (const day in events) {
-        events[day].sort((a, b) => a.startMinutes - b.startMinutes);
-    }
-    
     return events;
   }, [subjects]);
   
   const handleCopyTeachersForDay = (day: string) => {
-    const teachersForDay = scheduleByDay[day]
-      ?.map(event => event.subject.professorName)
-      .filter(Boolean);
+     const teachersForDay: string[] = [];
+     Object.values(scheduleByDayAndSlot[day]).forEach((event: any) => {
+         if (event?.subject?.professorName) {
+             teachersForDay.push(event.subject.professorName);
+         }
+     });
 
-    if (!teachersForDay || teachersForDay.length === 0) {
+    if (teachersForDay.length === 0) {
       toast({
         title: 'Sin Profesores',
         description: `No hay profesores asignados para el ${DAY_MAP[day]}.`,
@@ -246,8 +245,8 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
            
            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {DAYS.map(day => (
-                <div key={day} className="p-3 bg-muted/30 rounded-lg flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
+                <div key={day} className="p-3 bg-muted/30 rounded-lg flex flex-col space-y-4">
+                    <div className="flex items-center justify-between mb-2">
                         <h3 className="font-bold text-center text-primary">{DAY_MAP[day]}</h3>
                          <Tooltip>
                            <TooltipTrigger asChild>
@@ -260,21 +259,29 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                            </TooltipContent>
                          </Tooltip>
                     </div>
-                    <div className="space-y-3">
-                        {scheduleByDay[day] && scheduleByDay[day].length > 0 ? (
-                            scheduleByDay[day].map(event => (
-                                <div key={event.id} className="p-3 bg-card rounded-md border shadow-sm">
-                                    <p className="font-semibold text-sm">{event.subject.name}</p>
-                                    <p className="text-xs text-muted-foreground">{event.subject.professorName}</p>
-                                    <Badge variant="outline" className="mt-2 font-mono">
-                                        <Clock className="h-3 w-3 mr-1.5" />
-                                        {event.subject.schedule.startTime} - {event.subject.schedule.endTime}
-                                    </Badge>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-xs text-muted-foreground text-center py-4">No hay clases este día.</p>
-                        )}
+                    <div className="space-y-4">
+                        {TIME_SLOTS.map(slot => {
+                            const slotKey = `${slot.start} - ${slot.end}`;
+                            const event = scheduleByDayAndSlot[day] ? scheduleByDayAndSlot[day][slotKey] : null;
+
+                            if (event) {
+                                return (
+                                     <div key={event.id} className="p-3 bg-card rounded-md border shadow-sm min-h-[120px] flex flex-col justify-between">
+                                        <div>
+                                            <p className="font-semibold text-sm leading-tight">{event.subject.name}</p>
+                                            <p className="text-xs text-muted-foreground">{event.subject.professorName}</p>
+                                        </div>
+                                        <Badge variant="outline" className="mt-2 font-mono w-fit">
+                                            <Clock className="h-3 w-3 mr-1.5" />
+                                            {event.subject.schedule.startTime} - {event.subject.schedule.endTime}
+                                        </Badge>
+                                    </div>
+                                )
+                            } else {
+                                // Render a placeholder to keep the grid structure
+                                return <div key={slotKey} className="min-h-[120px] rounded-md"></div>
+                            }
+                        })}
                     </div>
                 </div>
             ))}
@@ -283,3 +290,5 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     </TooltipProvider>
   );
 }
+
+    
