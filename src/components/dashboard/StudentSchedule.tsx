@@ -13,9 +13,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
-import { Calendar, type CalendarProps } from '../ui/calendar';
+import { Calendar } from '../ui/calendar';
 import { Checkbox } from '../ui/checkbox';
-import { format, isWithinInterval, getDay, addDays, parse } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
 import { Badge } from '../ui/badge';
@@ -80,6 +80,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
   const [notificationReason, setNotificationReason] = useState("Ausencia");
   const [customNotes, setCustomNotes] = useState("");
   const [isFutureNotice, setIsFutureNotice] = useState(false);
+  const [hasProof, setHasProof] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [teachersToNotify, setTeachersToNotify] = useState<string[]>([]);
 
@@ -94,11 +95,11 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
         // Iterate through each day in the range
         let currentDate = start;
         while (currentDate <= end) {
-            const dayOfWeek = getDay(currentDate); // 0 for Sunday, 1 for Monday, etc.
+            const dayOfWeek = currentDate.getDay(); // 0 for Sunday, 1 for Monday, etc.
             if (DATE_FNS_DAY_TO_KEY[dayOfWeek]) {
                 affectedDays.add(DATE_FNS_DAY_TO_KEY[dayOfWeek]);
             }
-            currentDate = addDays(currentDate, 1);
+            currentDate = new Date(currentDate.valueOf() + 86400000); // Add one day
         }
 
         const uniqueTeachers = new Set<string>();
@@ -215,6 +216,11 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     }
     
     body += `Motivo: ${notificationReason}\n`;
+    
+    if (hasProof) {
+        body += `Se presentó comprobante: Sí\n`;
+    }
+
     if (customNotes) {
         body += `\nNotas adicionales:\n${customNotes}\n`;
     }
@@ -274,14 +280,19 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                               value={notificationReason}
                               className="mt-2"
                           >
-                              <div className="flex items-center space-x-2"><RadioGroupItem value="Ausencia Justificada" id="r1" /><Label htmlFor="r1">Ausencia Justificada</Label></div>
-                              <div className="flex items-center space-x-2"><RadioGroupItem value="Ausencia" id="r5" /><Label htmlFor="r5">Ausencia (sin justificar)</Label></div>
+                              <div className="flex items-center space-x-2"><RadioGroupItem value="Ausencia" id="r5" /><Label htmlFor="r5">Ausencia</Label></div>
                               <div className="flex items-center space-x-2"><RadioGroupItem value="Enfermedad" id="r2" /><Label htmlFor="r2">Enfermedad</Label></div>
                               <div className="flex items-center space-x-2"><RadioGroupItem value="Cita Médica" id="r3" /><Label htmlFor="r3">Cita Médica</Label></div>
                               <div className="flex items-center space-x-2"><RadioGroupItem value="Asunto Familiar" id="r4" /><Label htmlFor="r4">Asunto Familiar</Label></div>
                               <div className="flex items-center space-x-2"><RadioGroupItem value="Otro" id="r6" /><Label htmlFor="r6">Otro (especificar en notas)</Label></div>
                           </RadioGroup>
                         </div>
+
+                         <div className="flex items-center space-x-2">
+                            <Checkbox id="has-proof" checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} />
+                            <Label htmlFor="has-proof">Se presentó comprobante</Label>
+                        </div>
+
                         <div>
                           <Label htmlFor="custom-notes" className="font-semibold">3. Notas adicionales (opcional)</Label>
                            <Textarea
@@ -349,7 +360,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                         {DAYS.map(day => {
                             const subject = scheduleByDayAndSlot[day][slotIndex];
                             return (
-                                <div key={`${day}-${slot.start}`} className="p-2 bg-card border-t border-border min-h-[90px]">
+                                <div key={`${day}-${slot.start}`} className="p-2 bg-card border-t border-border min-h-[90px] flex flex-col justify-center">
                                     {subject ? (
                                         <div className="p-2 bg-card rounded-md h-full flex flex-col justify-center">
                                             <div>
@@ -370,3 +381,4 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     </TooltipProvider>
   );
 }
+
