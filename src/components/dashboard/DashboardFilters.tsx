@@ -20,6 +20,7 @@ export function DashboardFilters() {
     tutors,
     subjects,
     professors,
+    groups,
     groupsForSubject,
     filterType,
     setFilterType,
@@ -53,6 +54,7 @@ export function DashboardFilters() {
     tutor: tutors,
     subject: subjects,
     professor: professors,
+    group: groups,
   }[filterType] || [];
 
 
@@ -84,6 +86,7 @@ export function DashboardFilters() {
     { value: 'tutor', label: 'Tutor' },
     { value: 'professor', label: 'Profesor' },
     { value: 'subject', label: 'Materia' },
+    { value: 'group', label: 'Grupo' },
   ];
 
   return (

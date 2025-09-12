@@ -40,9 +40,9 @@ import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 
-type FilterType = 'leader' | 'tutor' | 'subject' | 'professor';
+type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'directory-generator';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -59,6 +59,7 @@ interface DashboardContextType {
   tutors: string[];
   subjects: string[];
   professors: string[];
+  groups: string[];
   groupsForSubject: (subjectName: string | null) => string[];
   filterType: FilterType;
   setFilterType: (type: FilterType) => void;
@@ -312,6 +313,11 @@ export function DashboardClient() {
       const allSubjects = allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []);
       return [...new Set(allSubjects.filter(Boolean))];
   }, [allStudents]);
+  
+  const groups = useMemo(() => {
+    const allGroups = allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.group) || []);
+    return [...new Set(allGroups.filter(Boolean))].sort();
+  }, [allStudents]);
 
   const groupsForSubject = useCallback((subjectName: string | null): string[] => {
     if (!subjectName) return [];
@@ -334,6 +340,7 @@ export function DashboardClient() {
         if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
         if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
         if (filterType === 'professor') students = students.filter(s => s.subjects?.some(sub => sub.professorName === selectedValue));
+        if (filterType === 'group') students = students.filter(s => s.subjectSummaries?.some(sub => sub.group === selectedValue));
         if (filterType === 'subject') {
             students = students.filter(s => s.subjectSummaries?.some(sub => {
                 const subjectMatch = sub.name === selectedValue;
@@ -387,7 +394,7 @@ export function DashboardClient() {
     filteredStudents, allStudents, setAllStudents, studentHistory, setStudentHistory, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
-    leaders, tutors, subjects, professors, groupsForSubject,
+    leaders, tutors, subjects, professors, groups, groupsForSubject,
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
     groupId, setGroupId,
@@ -410,7 +417,6 @@ export function DashboardClient() {
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
-        case 'directory-generator': return <StudentPanel />;
         default: return <WelcomeDashboard />;
     }
   }
@@ -477,7 +483,7 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Generador de Directorio" isActive={activeView === 'directory-generator'} onClick={() => handleSetActiveView('directory-generator')}>
+                   <SidebarMenuButton tooltip="Generador de Directorio" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
                     <FileText />
                     <span>Generador de Directorio</span>
                   </SidebarMenuButton>
