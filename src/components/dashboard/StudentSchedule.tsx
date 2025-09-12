@@ -6,7 +6,7 @@ import { type Subject } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Copy, Mail } from 'lucide-react';
+import { Copy, Mail, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Label } from '../ui/label';
@@ -17,6 +17,7 @@ import { Checkbox } from '../ui/checkbox';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { DateRange } from 'react-day-picker';
+import { Badge } from '../ui/badge';
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -31,21 +32,11 @@ const DAY_MAP: Record<string, string> = {
     'JUE': 'Jueves',
     'VIER': 'Viernes',
 }
-const START_HOUR = 7;
-const END_HOUR = 16; // 4 PM
 
 const timeToMinutes = (time: string): number => {
     if (!time || !time.includes(':')) return 0;
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
-};
-
-const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = START_HOUR; hour < END_HOUR; hour++) {
-        slots.push(`${String(hour).padStart(2, '0')}:00`);
-    }
-    return slots;
 };
 
 export function StudentSchedule({ subjects, studentName }: StudentScheduleProps) {
@@ -65,43 +56,38 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
 
   const hasScheduleData = subjects.some(s => s.schedule && s.schedule.days.length > 0 && s.schedule.startTime && s.schedule.endTime);
 
-  const timeSlots = generateTimeSlots();
-  const minuteHeight = 1.5; // Height per minute in px, you can adjust this
+  const scheduleByDay = useMemo(() => {
+    const events: Record<string, any[]> = {};
+    DAYS.forEach(day => { events[day] = []; });
 
-  const scheduleEvents = useMemo(() => {
-      const allEvents = subjects.flatMap(subject => {
-          if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return [];
-          
-          const startMinutes = timeToMinutes(subject.schedule.startTime);
-          const endMinutes = timeToMinutes(subject.schedule.endTime);
-          const duration = endMinutes - startMinutes;
-          
-          if (duration <= 0 || startMinutes < START_HOUR * 60 || endMinutes > END_HOUR * 60) return [];
-          
-          return subject.schedule.days.map(day => {
-              const dayIndex = DAYS.indexOf(day);
-              if (dayIndex === -1) return null;
-              
-              return {
-                  id: `${subject.id}-${day}`,
-                  day,
-                  dayIndex,
-                  startMinutes,
-                  duration,
-                  subject,
-              };
-          }).filter(Boolean);
-      });
+    subjects.forEach(subject => {
+        if (!subject.schedule || !subject.schedule.startTime || !subject.schedule.endTime) return;
 
-      return allEvents;
+        subject.schedule.days.forEach(day => {
+            if (DAYS.includes(day)) {
+                events[day].push({
+                    id: `${subject.id}-${day}`,
+                    subject,
+                    startMinutes: timeToMinutes(subject.schedule.startTime),
+                });
+            }
+        });
+    });
+
+    // Sort events within each day by start time
+    for (const day in events) {
+        events[day].sort((a, b) => a.startMinutes - b.startMinutes);
+    }
+    
+    return events;
   }, [subjects]);
   
   const handleCopyTeachersForDay = (day: string) => {
-    const teachersForDay = scheduleEvents
-      .filter(event => event && event.day === day && event.subject.professorName)
-      .map(event => event!.subject.professorName);
+    const teachersForDay = scheduleByDay[day]
+      ?.map(event => event.subject.professorName)
+      .filter(Boolean);
 
-    if (teachersForDay.length === 0) {
+    if (!teachersForDay || teachersForDay.length === 0) {
       toast({
         title: 'Sin Profesores',
         description: `No hay profesores asignados para el ${DAY_MAP[day]}.`,
@@ -121,13 +107,13 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
   };
   
   const generateMailtoLink = () => {
-    const allTeacherNames = [...new Set(subjects.map(s => s.professorName).filter(Boolean))];
+    const allTeacherEmails = [...new Set(subjects.map(s => s.professorName).filter(Boolean))];
 
-    if (allTeacherNames.length === 0) {
+    if (allTeacherEmails.length === 0) {
         toast({
             variant: "destructive",
             title: 'Sin Profesores',
-            description: `No se puede notificar porque no hay profesores asignados a este alumno.`,
+            description: `No se puede notificar porque no hay profesores con correo electrónico asignado a este alumno.`,
         });
         return;
     }
@@ -165,7 +151,7 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     }
     body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
 
-    const mailtoLink = `mailto:${allTeacherNames.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailtoLink = `mailto:${allTeacherEmails.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoLink;
   }
 
@@ -189,8 +175,8 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
 
   return (
     <TooltipProvider>
-      <div className="p-4 bg-muted/5 rounded-lg">
-           <div className="mb-4 flex justify-end">
+      <div className="p-4 bg-muted/5 rounded-lg space-y-6">
+           <div className="flex justify-end mb-4">
              <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="outline">
@@ -257,85 +243,42 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                 </AlertDialogContent>
               </AlertDialog>
            </div>
-          <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * 60 * minuteHeight}px` }}>
-              {/* Day headers */}
-              <div className="sticky top-0 z-10 grid grid-cols-[auto_repeat(5,minmax(0,1fr))] bg-muted/5 backdrop-blur-sm mb-2" >
-                   <div className="w-14"></div>
-                   {DAYS.map(day => (
-                       <div key={day} className="flex flex-col items-center justify-center font-semibold text-foreground gap-2 px-1 py-2">
-                           <div className="flex items-center gap-2">
-                             <span>{DAY_MAP[day]}</span>
-                             <Tooltip>
-                               <TooltipTrigger asChild>
-                                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyTeachersForDay(day)}>
-                                     <Copy className="h-3 w-3" />
-                                   </Button>
-                               </TooltipTrigger>
-                               <TooltipContent>
-                                   <p>Copiar profesores del {DAY_MAP[day]}</p>
-                               </TooltipContent>
-                             </Tooltip>
-                           </div>
-                       </div>
-                   ))}
-               </div>
-
-              {/* Grid background & lines */}
-              <div className="absolute inset-0 grid grid-cols-[auto_repeat(5,minmax(0,1fr))] h-full">
-                  {/* Time column */}
-                  <div className="w-14 border-r border-border/50"></div>
-                  {/* Day columns */}
-                  {DAYS.map((_, index) => (
-                      <div key={index} className={cn("border-r border-border/50")}></div>
-                  ))}
-                  {/* Hour rows */}
-                  {timeSlots.slice(0).map((_, index) => (
-                      <div key={index} className="col-span-full border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
-                  ))}
-              </div>
-
-              {/* Time labels */}
-              <div className="absolute -left-1 top-0 w-12 text-right">
-                  {timeSlots.map(time => (
-                      <div key={time} className="text-xs text-muted-foreground -translate-y-2" style={{ height: `${60 * minuteHeight}px`}}>
-                          {time}
-                      </div>
-                  ))}
-              </div>
-
-              
-              {/* Events */}
-              <div className="absolute top-0 left-14 right-0 bottom-0 grid grid-cols-5">
-                  {scheduleEvents.map(event => {
-                      if (!event) return null;
-                      
-                      const style: React.CSSProperties = {
-                          gridColumnStart: event.dayIndex + 1,
-                          gridRowStart: 1, // All events start on the single row of the grid
-                          top: `${(event.startMinutes - START_HOUR * 60) * minuteHeight + 4}px`,
-                          height: `${event.duration * minuteHeight - 8}px`,
-                      };
-
-                      return (
-                          <Tooltip key={event.id}>
-                            <TooltipTrigger asChild>
-                              <div
-                                  className="absolute w-[calc(100%-8px)] m-1 p-2 rounded-lg bg-primary/10 border border-primary/50 overflow-hidden cursor-pointer flex items-center justify-center"
-                                  style={style}
-                              >
-                                  <p className="font-bold text-xs leading-tight text-primary text-center">{event.subject.name}</p>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="font-bold">{event.subject.name}</p>
-                              <p className="text-sm text-muted-foreground">{event.subject.schedule?.startTime} - {event.subject.schedule?.endTime}</p>
-                              <p className="text-sm text-muted-foreground">{event.subject.professorName}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                      )
-                  })}
-              </div>
-          </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {DAYS.map(day => (
+                <div key={day} className="p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-center text-primary">{DAY_MAP[day]}</h3>
+                         <Tooltip>
+                           <TooltipTrigger asChild>
+                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyTeachersForDay(day)}>
+                                 <Copy className="h-4 w-4" />
+                               </Button>
+                           </TooltipTrigger>
+                           <TooltipContent>
+                               <p>Copiar profesores del {DAY_MAP[day]}</p>
+                           </TooltipContent>
+                         </Tooltip>
+                    </div>
+                    <div className="space-y-3">
+                        {scheduleByDay[day] && scheduleByDay[day].length > 0 ? (
+                            scheduleByDay[day].map(event => (
+                                <div key={event.id} className="p-3 bg-card rounded-md border shadow-sm">
+                                    <p className="font-semibold text-sm">{event.subject.name}</p>
+                                    <p className="text-xs text-muted-foreground">{event.subject.professorName}</p>
+                                    <Badge variant="outline" className="mt-2 font-mono">
+                                        <Clock className="h-3 w-3 mr-1.5" />
+                                        {event.subject.schedule.startTime} - {event.subject.schedule.endTime}
+                                    </Badge>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-xs text-muted-foreground text-center py-4">No hay clases este día.</p>
+                        )}
+                    </div>
+                </div>
+            ))}
+           </div>
       </div>
     </TooltipProvider>
   );
