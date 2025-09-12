@@ -258,34 +258,11 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
               </AlertDialog>
            </div>
           <div className="relative" style={{ height: `${(END_HOUR - START_HOUR) * 60 * minuteHeight}px` }}>
-              {/* Grid background & lines */}
-              <div className="absolute inset-0 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] h-full">
-                  {/* Time column */}
-                  <div className="w-14 border-r border-border/50"></div>
-                  {/* Day columns */}
-                  {DAYS.map((_, index) => (
-                      <div key={index} className={cn("border-r border-border/50", index === 0 ? "col-start-2" : "")}></div>
-                  ))}
-                  {/* Hour rows */}
-                  {timeSlots.slice(0).map((_, index) => (
-                      <div key={index} className="col-span-full border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
-                  ))}
-              </div>
-
-              {/* Time labels */}
-              <div className="absolute -left-1 top-0 w-12 text-right">
-                  {timeSlots.map(time => (
-                      <div key={time} className="text-xs text-muted-foreground -translate-y-2" style={{ height: `${60 * minuteHeight}px`}}>
-                          {time}
-                      </div>
-                  ))}
-              </div>
-
               {/* Day headers */}
-               <div className="sticky top-0 z-10 grid grid-cols-[auto_1fr_1fr_1fr_1fr_1fr] bg-muted/5 backdrop-blur-sm -translate-y-10" style={{ height: 'auto', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
+              <div className="sticky top-0 z-10 grid grid-cols-[auto_repeat(5,minmax(0,1fr))] bg-muted/5 backdrop-blur-sm mb-2" >
                    <div className="w-14"></div>
                    {DAYS.map(day => (
-                       <div key={day} className="flex flex-col items-center justify-center font-semibold text-foreground gap-2 px-1">
+                       <div key={day} className="flex flex-col items-center justify-center font-semibold text-foreground gap-2 px-1 py-2">
                            <div className="flex items-center gap-2">
                              <span>{DAY_MAP[day]}</span>
                              <Tooltip>
@@ -302,6 +279,30 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                        </div>
                    ))}
                </div>
+
+              {/* Grid background & lines */}
+              <div className="absolute inset-0 grid grid-cols-[auto_repeat(5,minmax(0,1fr))] h-full">
+                  {/* Time column */}
+                  <div className="w-14 border-r border-border/50"></div>
+                  {/* Day columns */}
+                  {DAYS.map((_, index) => (
+                      <div key={index} className={cn("border-r border-border/50")}></div>
+                  ))}
+                  {/* Hour rows */}
+                  {timeSlots.slice(0).map((_, index) => (
+                      <div key={index} className="col-span-full border-t border-border/30" style={{ height: `${60 * minuteHeight}px` }}></div>
+                  ))}
+              </div>
+
+              {/* Time labels */}
+              <div className="absolute -left-1 top-0 w-12 text-right">
+                  {timeSlots.map(time => (
+                      <div key={time} className="text-xs text-muted-foreground -translate-y-2" style={{ height: `${60 * minuteHeight}px`}}>
+                          {time}
+                      </div>
+                  ))}
+              </div>
+
               
               {/* Events */}
               <div className="absolute top-0 left-14 right-0 bottom-0 grid grid-cols-5">
