@@ -24,24 +24,11 @@ const COLUMNS = {
   GRADE: 'Ponderado',
   FINAL_GRADE: 'Calificación final actual',
   FINAL_GRADE_REASON: 'Motivo cf',
-  LUN: 'LUN',
-  MAR: 'MAR',
-  MIÉ: 'MIÉ',
-  JUE: 'JUE',
-  VIE: 'VIE',
   START_TIME: 'INICIO',
   END_TIME: 'FIN',
 };
 
-// Mapa para normalizar los nombres de las columnas de días
-const DAY_COLUMN_MAP: Record<string, string> = {
-    'LUN': 'LUN',
-    'MAR': 'MAR',
-    'MIÉ': 'MIÉ',
-    'MIER': 'MIÉ', // Handle variation
-    'JUE': 'JUE',
-    'VIE': 'VIE',
-};
+const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIÉ', 'MIER', 'JUE', 'VIE'];
 
 const ACTIVITY_REGEX = /^A\d+$/;
 
@@ -155,6 +142,8 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         headers.forEach((header, index) => {
             headerMap[header] = index;
         });
+        
+        const dayHeadersInFile = headers.filter(h => POSSIBLE_DAY_HEADERS.includes(h));
 
         const requiredCols = [COLUMNS.STUDENT_ID, COLUMNS.STUDENT_NAME, COLUMNS.SUBJECT_CRN, COLUMNS.SUBJECT_NAME];
         for (const col of requiredCols) {
@@ -202,13 +191,14 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             }
 
             const scheduleDays: string[] = [];
-            Object.keys(DAY_COLUMN_MAP).forEach(dayKey => {
-                const colIndex = headerMap[dayKey];
-                if (colIndex !== undefined && String(row[colIndex] || '').trim().toUpperCase() === 'SI') {
-                    // Usamos el valor normalizado del mapa (ej. 'MIÉ' para 'MIER')
-                    scheduleDays.push(DAY_COLUMN_MAP[dayKey]);
+            for (const dayHeader of dayHeadersInFile) {
+                const colIndex = headerMap[dayHeader];
+                if (colIndex !== undefined && String(row[colIndex]).trim().toUpperCase() === 'SI') {
+                    // Normalizar 'MIER' a 'MIÉ' para consistencia interna
+                    const normalizedDay = dayHeader === 'MIER' ? 'MIÉ' : dayHeader;
+                    scheduleDays.push(normalizedDay);
                 }
-            });
+            }
 
 
             const getColumnValue = (columnName: string) => {

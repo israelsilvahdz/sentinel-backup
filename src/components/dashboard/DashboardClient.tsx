@@ -29,7 +29,6 @@ import { MapPlanner } from './MapPlanner';
 import { AcademicCalendar } from './AcademicCalendar';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
-import { DirectoryGenerator } from './DirectoryGenerator';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -43,7 +42,7 @@ import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findOb
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'directory-generator';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 
 
@@ -411,6 +410,7 @@ export function DashboardClient() {
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
+        case 'directory-generator': return <StudentPanel />;
         default: return <WelcomeDashboard />;
     }
   }
@@ -474,6 +474,12 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')}>
                     <HelpCircle />
                     <span>Materias sin Clasificar</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Generador de Directorio" isActive={activeView === 'directory-generator'} onClick={() => handleSetActiveView('directory-generator')}>
+                    <FileText />
+                    <span>Generador de Directorio</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
