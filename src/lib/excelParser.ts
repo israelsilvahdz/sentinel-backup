@@ -202,13 +202,14 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             }
 
             const scheduleDays: string[] = [];
-            for (const key in DAY_COLUMN_MAP) {
-                const dayHeader = DAY_COLUMN_MAP[key];
-                const colIndex = headerMap[key];
+            Object.keys(DAY_COLUMN_MAP).forEach(dayKey => {
+                const colIndex = headerMap[dayKey];
                 if (colIndex !== undefined && String(row[colIndex] || '').trim().toUpperCase() === 'SI') {
-                    scheduleDays.push(dayHeader);
+                    // Usamos el valor normalizado del mapa (ej. 'MIÉ' para 'MIER')
+                    scheduleDays.push(DAY_COLUMN_MAP[dayKey]);
                 }
-            }
+            });
+
 
             const getColumnValue = (columnName: string) => {
                 const upperColName = columnName.toUpperCase();
