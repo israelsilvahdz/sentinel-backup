@@ -9,6 +9,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { UploadCloud, FileText, Copy, Check } from 'lucide-react';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import contactData from '@/lib/student-contacts.json';
+
+interface StudentContact {
+    nombre: string;
+    telefono_alumno: string;
+    telefono_papa: string;
+    telefono_mama: string;
+    correo_alumno: string;
+    correo_papa: string;
+    correo_mama: string;
+}
+
+const contactsMap = new Map<string, StudentContact>(
+    Object.entries(contactData)
+);
+
 
 export function DirectoryGenerator() {
     const { toast } = useToast();
@@ -46,48 +62,33 @@ export function DirectoryGenerator() {
 
                 let generatedText = "### Directorio de Alumnos\n\n";
 
-                const headers: string[] = jsonData[0].map(h => String(h).trim());
+                const headers: string[] = jsonData[0].map(h => String(h).trim().toUpperCase());
+                const matriculaIndex = headers.indexOf('MATRÍCULA');
+                const nombreIndex = headers.indexOf('NOMBRE DEL ALUMNO');
+
+                if (matriculaIndex === -1 || nombreIndex === -1) {
+                    throw new Error("El archivo debe contener las columnas 'Matrícula' y 'Nombre del alumno'.");
+                }
+
                 const rows = jsonData.slice(1);
-                
-                const requiredHeaders = ['Nombre', 'Matrícula', 'Tel alumno', 'Tel Papá', 'Tel Mamá', 'Correo alumno', 'Correo Papá', 'Correo Mamá'];
-                const headerMap: Record<string, string> = {};
-                
-                requiredHeaders.forEach(reqHeader => {
-                    // Find header, ignoring case and extra spaces, but prefer exact match
-                    const exactMatch = headers.find(h => h === reqHeader);
-                    if(exactMatch) {
-                        headerMap[reqHeader] = exactMatch;
-                        return;
-                    }
-                    const flexibleMatch = headers.find(h => h.toLowerCase().trim() === reqHeader.toLowerCase().trim());
-                    if(flexibleMatch) {
-                        headerMap[reqHeader] = flexibleMatch;
-                    } else {
-                        // Special case for 'Correo Papá ' with space
-                        if (reqHeader === 'Correo Papá') {
-                           const papáMailWithSpace = headers.find(h => h.toLowerCase().trim() === 'correo papá');
-                           if(papáMailWithSpace) headerMap[reqHeader] = papáMailWithSpace;
-                        }
-                    }
-                });
 
                 rows.forEach(row => {
-                    const student: Record<string, any> = {};
-                    headers.forEach((header, index) => {
-                        student[header] = row[index] || 'No disponible';
-                    });
+                    const matricula = String(row[matriculaIndex] || '').trim();
+                    const nombre = String(row[nombreIndex] || 'No disponible').trim();
                     
-                    const getValue = (key: string) => student[headerMap[key]] || 'No disponible';
+                    if (!matricula) return;
+
+                    const contact = contactsMap.get(matricula);
 
                     generatedText += "---\n";
-                    generatedText += `**Nombre:** ${getValue('Nombre')}\n`;
-                    generatedText += `**Matrícula:** ${getValue('Matrícula')}\n`;
-                    generatedText += `**Teléfono Alumno:** ${getValue('Tel alumno')}\n`;
-                    generatedText += `**Teléfono Papá:** ${getValue('Tel Papá')}\n`;
-                    generatedText += `**Teléfono Mamá:** ${getValue('Tel Mamá')}\n`;
-                    generatedText += `**Correo Alumno:** ${getValue('Correo alumno')}\n`;
-                    generatedText += `**Correo Papá:** ${getValue('Correo Papá')}\n`;
-                    generatedText += `**Correo Mamá:** ${getValue('Correo Mamá')}\n\n`;
+                    generatedText += `**Nombre:** ${contact ? contact.nombre : nombre}\n`;
+                    generatedText += `**Matrícula:** ${matricula}\n`;
+                    generatedText += `**Teléfono Alumno:** ${contact ? contact.telefono_alumno : 'No disponible'}\n`;
+                    generatedText += `**Teléfono Papá:** ${contact ? contact.telefono_papa : 'No disponible'}\n`;
+                    generatedText += `**Teléfono Mamá:** ${contact ? contact.telefono_mama : 'No disponible'}\n`;
+                    generatedText += `**Correo Alumno:** ${contact ? contact.correo_alumno : 'No disponible'}\n`;
+                    generatedText += `**Correo Papá:** ${contact ? contact.correo_papa : 'No disponible'}\n`;
+                    generatedText += `**Correo Mamá:** ${contact ? contact.correo_mama : 'No disponible'}\n\n`;
                 });
 
                 setOutputText(generatedText.trim());
@@ -135,7 +136,7 @@ export function DirectoryGenerator() {
             <header className="mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">Generador de Directorio</h1>
                 <p className="text-muted-foreground">
-                    Sube un archivo de Excel (.xlsx) para generar un directorio de alumnos en formato de texto.
+                    Sube un archivo de Excel (.xlsx) con los alumnos del día para generar un directorio de contacto.
                 </p>
             </header>
 
@@ -143,7 +144,7 @@ export function DirectoryGenerator() {
                 <CardHeader>
                     <CardTitle>1. Cargar Archivo</CardTitle>
                     <CardDescription>
-                        Selecciona el archivo Excel que contiene los datos de los alumnos. El proceso comenzará automáticamente.
+                        Selecciona el archivo Excel que contiene la lista de alumnos. El proceso comenzará automáticamente.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -198,4 +199,3 @@ export function DirectoryGenerator() {
         </div>
     );
 }
-
