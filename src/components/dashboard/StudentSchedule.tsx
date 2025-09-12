@@ -213,7 +213,7 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Notificar Ausencia - {DAY_MAP[day]}</AlertDialogTitle>
+                                <AlertDialogTitle>Notificar Ausencia - {DAY_MAP[selectedDayForNotification!]}</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   Selecciona un motivo y añade notas para generar el borrador del correo.
                                 </AlertDialogDescription>
