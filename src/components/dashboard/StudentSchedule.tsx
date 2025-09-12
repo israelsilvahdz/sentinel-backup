@@ -48,6 +48,7 @@ const TIME_SLOTS = [
     { start: '07:00', end: '08:59' },
     { start: '09:00', end: '10:59' },
     { start: '11:30', end: '13:29' },
+    { start: '13:30', end: '14:50' },
 ];
 
 export function StudentSchedule({ subjects, studentName }: StudentScheduleProps) {
@@ -218,6 +219,12 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
                             onSelect={setDateRange}
                             locale={es}
                             numberOfMonths={1}
+                            classNames={{
+                                day_selected: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:bg-destructive/90",
+                                day_range_start: "day-range-start",
+                                day_range_end: "day-range-end",
+                                day_range_middle: "bg-destructive/20 text-destructive-foreground",
+                            }}
                         />
                          <div className="flex items-center space-x-2 mt-4">
                             <Checkbox id="future-notice" checked={isFutureNotice} onCheckedChange={(checked) => setIsFutureNotice(!!checked)} />
@@ -332,3 +339,4 @@ export function StudentSchedule({ subjects, studentName }: StudentScheduleProps)
     </TooltipProvider>
   );
 }
+
