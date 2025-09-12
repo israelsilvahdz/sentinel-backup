@@ -28,6 +28,7 @@ const COLUMNS = {
   END_TIME: 'FIN',
 };
 
+// Se usan los encabezados exactos proporcionados por el usuario.
 const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIER'];
 
 const ACTIVITY_REGEX = /^A\d+$/;
@@ -194,6 +195,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             for (const dayHeader of dayHeadersInFile) {
                 const colIndex = headerMap[dayHeader];
                 if (colIndex !== undefined && String(row[colIndex]).trim().toUpperCase() === 'SI') {
+                    // Guarda el día tal como está en la lista `dayHeadersInFile` sin normalizar
                     scheduleDays.push(dayHeader);
                 }
             }
