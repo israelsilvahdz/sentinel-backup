@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
-import { Calendar } from '../ui/calendar';
+import { Calendar, type CalendarProps } from '../ui/calendar';
 import { Checkbox } from '../ui/checkbox';
 import { format, isWithinInterval, getDay, addDays, parse } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -65,7 +65,12 @@ const TIME_SLOTS_SEMESTRAL = [
 function isSubjectInSlot(subject: Subject, slot: { start: string, end: string }, planType: 'semestral' | 'tetramestral'): boolean {
     if (!subject.schedule?.startTime) return false;
 
-    // For both plans, we now check if the subject's start time matches the slot's start time.
+    // For semestre, we match the start time exactly.
+    if (planType === 'semestral') {
+        return subject.schedule.startTime === slot.start;
+    }
+    
+    // For tetra, we check if the subject's start time matches the slot's start time.
     return subject.schedule.startTime === slot.start;
 }
 
@@ -113,6 +118,14 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
 
   const scheduleByDayAndSlot = useMemo(() => {
     const grid: Record<string, (Subject | null)[]> = {};
+
+    // Find the special Thursday 9am class for semestre
+    const thu9amSubject = planType === 'semestral' 
+        ? subjects.find(subject => 
+            subject.schedule?.days.includes('JUE') && subject.schedule.startTime === '09:00'
+          )
+        : undefined;
+
     DAYS.forEach(day => {
         grid[day] = TIME_SLOTS.map(slot => {
             return subjects.find(subject => 
@@ -120,6 +133,20 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
             ) || null;
         });
     });
+    
+    // Apply the special rule for semestre
+    if (thu9amSubject) {
+        const tue9amIndex = TIME_SLOTS.findIndex(slot => slot.start === '09:00');
+        const tue10amIndex = TIME_SLOTS.findIndex(slot => slot.start === '10:00');
+        
+        if (tue9amIndex !== -1) {
+            grid['MAR'][tue9amIndex] = thu9amSubject;
+        }
+        if (tue10amIndex !== -1) {
+            grid['MAR'][tue10amIndex] = thu9amSubject;
+        }
+    }
+    
     return grid;
   }, [subjects, TIME_SLOTS, planType]);
 
