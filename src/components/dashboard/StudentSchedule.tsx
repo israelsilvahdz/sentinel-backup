@@ -20,6 +20,7 @@ import type { DateRange } from 'react-day-picker';
 import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
+import professorContacts from '@/lib/professor-contacts.json';
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -74,6 +75,10 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string },
     return subject.schedule.startTime === slot.start;
 }
 
+const contactsMap = new Map<string, string>(
+    Object.entries(professorContacts)
+);
+
 
 export function StudentSchedule({ subjects, studentName, planType }: StudentScheduleProps) {
   const { toast } = useToast();
@@ -82,7 +87,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
   const [isFutureNotice, setIsFutureNotice] = useState(false);
   const [hasProof, setHasProof] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [teachersToNotify, setTeachersToNotify] = useState<string[]>([]);
+  const [teachersToNotify, setTeachersToNotify] = useState<{name: string, email: string | null}[]>([]);
 
   const TIME_SLOTS = planType === 'semestral' ? TIME_SLOTS_SEMESTRAL : TIME_SLOTS_TETRA;
 
@@ -102,16 +107,20 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
             currentDate = new Date(currentDate.valueOf() + 86400000); // Add one day
         }
 
-        const uniqueTeachers = new Set<string>();
+        const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
         subjects.forEach(subject => {
-            if (subject.professorName && subject.schedule?.days) {
-                const hasClassOnAffectedDays = subject.schedule.days.some(day => affectedDays.has(day));
+            if (subject.professorName) {
+                const hasClassOnAffectedDays = subject.schedule?.days.some(day => affectedDays.has(day));
                 if (hasClassOnAffectedDays) {
-                    uniqueTeachers.add(subject.professorName);
+                    if (!uniqueTeachers.has(subject.professorName)) {
+                        const contactKey = Object.keys(professorContacts).find(k => k.toLowerCase() === subject.professorName.toLowerCase());
+                        const email = contactKey ? contactsMap.get(contactKey) ?? null : null;
+                        uniqueTeachers.set(subject.professorName, { name: subject.professorName, email });
+                    }
                 }
             }
         });
-        setTeachersToNotify(Array.from(uniqueTeachers));
+        setTeachersToNotify(Array.from(uniqueTeachers.values()));
     } else {
         setTeachersToNotify([]);
     }
@@ -197,6 +206,8 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
         return;
     }
 
+    const recipients = teachersToNotify.map(t => t.email || t.name).join(',');
+
     const subject = isFutureNotice 
         ? `Aviso a Futuro - Alumno ${studentName}`
         : `Notificación - Alumno ${studentName}`;
@@ -226,7 +237,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     }
     body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
 
-    const mailtoLink = `mailto:${teachersToNotify.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailtoLink = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailtoLink;
   }
 
@@ -309,7 +320,12 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                               <Card className="p-3 bg-muted/50 max-h-32 overflow-y-auto">
                                  {teachersToNotify.length > 0 ? (
                                       <ul className="text-sm text-muted-foreground list-disc list-inside">
-                                          {teachersToNotify.map(teacher => <li key={teacher}>{teacher}</li>)}
+                                          {teachersToNotify.map(teacher => (
+                                            <li key={teacher.name}>
+                                              {teacher.name}
+                                              {teacher.email && <span className="text-xs text-primary"> ({teacher.email})</span>}
+                                            </li>
+                                          ))}
                                       </ul>
                                  ) : (
                                       <p className="text-sm text-muted-foreground text-center">Selecciona una fecha para ver los profesores.</p>
@@ -383,4 +399,3 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     </TooltipProvider>
   );
 }
-
