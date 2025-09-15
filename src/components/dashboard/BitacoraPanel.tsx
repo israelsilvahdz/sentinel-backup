@@ -14,9 +14,9 @@ import { useDashboardFilters } from './DashboardClient';
 import type { BitacoraEntry } from '@/types/student';
 import { getBitacoraEntries, addBitacoraEntry, deleteBitacoraEntry } from '@/lib/firebase-services';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FileText, Loader2, PlusCircle, Search, Trash2, User, Filter, X } from 'lucide-react';
+import { FileText, Loader2, PlusCircle, Search, Trash2, User, Filter, X, Calendar as CalendarIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
@@ -24,6 +24,9 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Checkbox } from '../ui/checkbox';
 import { Badge } from '../ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { Calendar } from '../ui/calendar';
+import { cn } from '@/lib/utils';
+
 
 const bitacoraSchema = z.object({
   studentId: z.string().min(1, 'La matrícula es requerida.'),
@@ -47,6 +50,8 @@ export function BitacoraPanel() {
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
   const [selectedTutor, setSelectedTutor] = useState<string | null>(null);
   const [selectedReporter, setSelectedReporter] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<BitacoraFormValues>({
     resolver: zodResolver(bitacoraSchema),
@@ -97,7 +102,7 @@ export function BitacoraPanel() {
   }, [bitacoraEntries]);
 
   const filteredEntries = useMemo(() => {
-      const hasActiveFilters = searchTerm || selectedLeader || selectedTutor || selectedReporter;
+      const hasActiveFilters = searchTerm || selectedLeader || selectedTutor || selectedReporter || selectedDate;
       if (!hasActiveFilters) return [];
 
       return bitacoraEntries.filter(entry => {
@@ -111,16 +116,19 @@ export function BitacoraPanel() {
           const leaderMatch = !selectedLeader || (student && student.leader === selectedLeader);
           const tutorMatch = !selectedTutor || (student && student.tutor === selectedTutor);
           const reporterMatch = !selectedReporter || entry.reportedBy === selectedReporter;
+          const dateMatch = !selectedDate || isSameDay(entry.timestamp.toDate(), selectedDate);
 
-          return searchMatch && leaderMatch && tutorMatch && reporterMatch;
+
+          return searchMatch && leaderMatch && tutorMatch && reporterMatch && dateMatch;
       });
-  }, [searchTerm, selectedLeader, selectedTutor, selectedReporter, bitacoraEntries, allStudentsMap]);
+  }, [searchTerm, selectedLeader, selectedTutor, selectedReporter, selectedDate, bitacoraEntries, allStudentsMap]);
   
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedLeader(null);
     setSelectedTutor(null);
     setSelectedReporter(null);
+    setSelectedDate(undefined);
   };
 
 
@@ -199,13 +207,39 @@ export function BitacoraPanel() {
         </CardHeader>
         <CardContent>
              <Card className="mb-6 bg-muted/50 p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div className="lg:col-span-2 space-y-2">
                         <Label htmlFor="search-term">Buscar Alumno</Label>
                         <div className="relative">
                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                            <Input id="search-term" placeholder="Matrícula o nombre..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="filter-date">Fecha</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !selectedDate && "text-muted-foreground"
+                                )}
+                                >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {selectedDate ? format(selectedDate, "PPP", {locale: es}) : <span>Seleccionar fecha</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={setSelectedDate}
+                                initialFocus
+                                locale={es}
+                                />
+                            </PopoverContent>
+                        </Popover>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="filter-leader">Líder</Label>
@@ -221,7 +255,7 @@ export function BitacoraPanel() {
                     </div>
                 </div>
                 <div className="mt-4 flex justify-end">
-                    <Button variant="ghost" onClick={clearFilters} disabled={!searchTerm && !selectedLeader && !selectedTutor && !selectedReporter}><X className="mr-2 h-4 w-4"/>Limpiar Filtros</Button>
+                    <Button variant="ghost" onClick={clearFilters} disabled={!searchTerm && !selectedLeader && !selectedTutor && !selectedReporter && !selectedDate}><X className="mr-2 h-4 w-4"/>Limpiar Filtros</Button>
                 </div>
             </Card>
 
