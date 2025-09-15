@@ -226,8 +226,15 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
 export function StudentCard({ student, bitacoraEntries, startOpen = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
+  const { setActiveView, setSelectedStudentId } = useDashboardFilters();
   const hasBitacora = bitacoraEntries.some(entry => entry.studentId === student.id);
   
+  const handleBitacoraClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Evita que se abra/cierre el card
+    setSelectedStudentId(student.id);
+    setActiveView('bitacora');
+  };
+
   return (
     <Card>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -240,10 +247,12 @@ export function StudentCard({ student, bitacoraEntries, startOpen = false }: Stu
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <FileText className="ml-2 h-4 w-4 text-primary" />
+                                 <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={handleBitacoraClick}>
+                                    <FileText className="h-4 w-4 text-primary" />
+                                </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>Tiene registros en bitácora</p>
+                                <p>Ver registros en bitácora</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
