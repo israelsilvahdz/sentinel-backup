@@ -46,6 +46,8 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
     5: 'VIER',
 };
 
+const ONLINE_SUBJECTS = ['Ciencias de la Vida', 'El mundo contemporáneo'];
+
 
 const TIME_SLOTS_TETRA = [
     { start: '07:00', end: '08:59' },
@@ -76,7 +78,10 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string },
 }
 
 const contactsMap = new Map<string, string>(
-    Object.entries(professorContacts).map(([name, email]) => [name.toLowerCase().replace(/\s+/g, ''), email])
+  Object.entries(professorContacts).map(([name, email]) => [
+    name.toLowerCase().replace(/\s+/g, ''),
+    email,
+  ])
 );
 
 const getProfessorEmail = (name: string): string | null => {
@@ -114,6 +119,10 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
 
         const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
         subjects.forEach(subject => {
+            if (ONLINE_SUBJECTS.includes(subject.name)) {
+                return; // Excluir materias online
+            }
+
             if (subject.professorName) {
                 const hasClassOnAffectedDays = subject.schedule?.days.some(day => affectedDays.has(day));
                 if (hasClassOnAffectedDays) {
@@ -168,7 +177,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
   const handleCopyTeachersForDay = (day: string) => {
      const teachersForDay: string[] = [];
      scheduleByDayAndSlot[day].forEach(subject => {
-        if (subject?.professorName) {
+        if (subject?.professorName && !ONLINE_SUBJECTS.includes(subject.name)) {
             teachersForDay.push(subject.professorName);
         }
      });
@@ -176,7 +185,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     if (teachersForDay.length === 0) {
       toast({
         title: 'Sin Profesores',
-        description: `No hay profesores asignados para el ${DAY_MAP[day]}.`,
+        description: `No hay profesores de materias presenciales para el ${DAY_MAP[day]}.`,
       });
       return;
     }
@@ -196,8 +205,8 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     if (teachersToNotify.length === 0) {
         toast({
             variant: "destructive",
-            title: 'Sin Profesores Seleccionados',
-            description: `No se puede notificar porque no hay profesores con clases en las fechas seleccionadas.`,
+            title: 'Sin Profesores a Notificar',
+            description: `No hay profesores de materias presenciales con clases en las fechas seleccionadas.`,
         });
         return;
     }
@@ -260,7 +269,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                   <AlertDialogHeader>
                     <AlertDialogTitle>Notificar a Profesores - {studentName}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Selecciona las fechas y el motivo. El sistema filtrará a los profesores que tienen clase en esos días.
+                      Selecciona las fechas y el motivo. El sistema filtrará a los profesores que tienen clase en esos días, excluyendo materias online.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <ScrollArea className="max-h-[60vh] pr-6">
