@@ -20,6 +20,9 @@ import { FileText, Loader2, PlusCircle, Search, Trash2, User } from 'lucide-reac
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Checkbox } from '../ui/checkbox';
+import { Badge } from '../ui/badge';
 
 const bitacoraSchema = z.object({
   studentId: z.string().min(1, 'La matrícula es requerida.'),
@@ -27,6 +30,8 @@ const bitacoraSchema = z.object({
   reportedBy: z.string().min(1, 'El campo "Reportado por" es requerido.'),
   description: z.string().min(1, 'La descripción es requerida.'),
   agreements: z.string().min(1, 'Los acuerdos son requeridos.'),
+  caseType: z.enum(['academica', 'conductual'], { required_error: 'Debes seleccionar un tipo de caso.' }),
+  academicCommittee: z.boolean().default(false),
 });
 
 type BitacoraFormValues = z.infer<typeof bitacoraSchema>;
@@ -38,7 +43,7 @@ export function BitacoraPanel() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register, handleSubmit, control, reset, setValue, watch } = useForm<BitacoraFormValues>({
+  const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<BitacoraFormValues>({
     resolver: zodResolver(bitacoraSchema),
     defaultValues: {
       studentId: '',
@@ -46,6 +51,8 @@ export function BitacoraPanel() {
       reportedBy: '',
       description: '',
       agreements: '',
+      caseType: 'academica',
+      academicCommittee: false,
     },
   });
 
@@ -162,23 +169,63 @@ export function BitacoraPanel() {
               <div className="space-y-2">
                 <Label htmlFor="reportedBy">Reportado por</Label>
                 <Input id="reportedBy" {...register('reportedBy')} placeholder="Ej. Juan Pérez (Tutor)" />
-                 {useForm().formState.errors.reportedBy && <p className="text-sm text-destructive">{useForm().formState.errors.reportedBy.message?.toString()}</p>}
+                 {errors.reportedBy && <p className="text-sm text-destructive">{errors.reportedBy.message?.toString()}</p>}
               </div>
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="description">Descripción del Caso</Label>
-                <Textarea id="description" {...register('description')} rows={5} placeholder="Describe la situación, el motivo del reporte, los antecedentes, etc." />
-                {useForm().formState.errors.description && <p className="text-sm text-destructive">{useForm().formState.errors.description.message?.toString()}</p>}
+                <Textarea id="description" {...register('description')} rows={3} placeholder="Describe la situación, el motivo del reporte, los antecedentes, etc." />
+                {errors.description && <p className="text-sm text-destructive">{errors.description.message?.toString()}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="agreements">Acuerdos y Siguientes Pasos</Label>
-                <Textarea id="agreements" {...register('agreements')} rows={3} placeholder="Detalla los compromisos, las acciones a tomar y las fechas de seguimiento."/>
-                {useForm().formState.errors.agreements && <p className="text-sm text-destructive">{useForm().formState.errors.agreements.message?.toString()}</p>}
+                <Textarea id="agreements" {...register('agreements')} rows={2} placeholder="Detalla los compromisos, las acciones a tomar y las fechas de seguimiento."/>
+                {errors.agreements && <p className="text-sm text-destructive">{errors.agreements.message?.toString()}</p>}
               </div>
+               <Controller
+                  name="caseType"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="space-y-2">
+                      <Label>Tipo de Caso</Label>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex gap-4 pt-1"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="academica" id="academica" />
+                          <Label htmlFor="academica">Académica</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="conductual" id="conductual" />
+                          <Label htmlFor="conductual">Conductual</Label>
+                        </div>
+                      </RadioGroup>
+                      {errors.caseType && <p className="text-sm text-destructive">{errors.caseType.message}</p>}
+                    </div>
+                  )}
+                />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex-col items-start gap-4">
+             <div className="flex items-center space-x-2">
+                <Controller
+                  name="academicCommittee"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                        id="academicCommittee"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
+                <Label htmlFor="academicCommittee" className="font-normal">
+                    ¿El caso terminó en comité académico?
+                </Label>
+              </div>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
               Guardar Reporte
@@ -228,7 +275,17 @@ export function BitacoraPanel() {
                   <p className="text-sm text-muted-foreground">
                     {format(entry.timestamp.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
                   </p>
-                  <h3 className="font-semibold text-lg">{entry.studentName} <span className="text-sm text-muted-foreground font-normal">({entry.studentId})</span></h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-lg">{entry.studentName} <span className="text-sm text-muted-foreground font-normal">({entry.studentId})</span></h3>
+                    {entry.caseType && (
+                      <Badge variant={entry.caseType === 'academica' ? 'secondary' : 'default'}>
+                        {entry.caseType === 'academica' ? 'Académica' : 'Conductual'}
+                      </Badge>
+                    )}
+                    {entry.academicCommittee && (
+                      <Badge variant="destructive">En Comité Académico</Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">Reportado por: {entry.reportedBy}</p>
                   <div className="mt-4 space-y-2">
                     <div>

@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
@@ -27,14 +28,10 @@ const firebaseConfig = {
 
 // Inicializa Firebase de forma segura
 let app: FirebaseApp;
-try {
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApps()[0];
-  }
-} catch (error) {
-  console.error("Error al inicializar Firebase. Asegúrate de que la configuración en `src/lib/firebase-services.ts` es correcta.", error);
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApps()[0];
 }
 
 

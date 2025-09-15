@@ -1,3 +1,4 @@
+
 export interface Subject {
   id: string; // CRN
   key: string; // Clave de materia
@@ -68,4 +69,6 @@ export interface BitacoraEntry {
   reportedBy: string;
   description: string;
   agreements: string;
+  caseType: 'academica' | 'conductual';
+  academicCommittee: boolean;
 }
