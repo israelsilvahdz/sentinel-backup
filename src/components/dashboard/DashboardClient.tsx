@@ -42,7 +42,7 @@ import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findOb
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -457,6 +457,7 @@ export function DashboardClient() {
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
+        case 'bitacora': return null; // Placeholder for now
         default: return <WelcomeDashboard />;
     }
   }
@@ -523,9 +524,9 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Generador de Directorio" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
+                   <SidebarMenuButton tooltip="Bitácora de Casos" isActive={activeView === 'bitacora'} onClick={() => handleSetActiveView('bitacora')}>
                     <FileText />
-                    <span>Generador de Directorio</span>
+                    <span>Bitácora de Casos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
