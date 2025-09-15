@@ -29,6 +29,7 @@ import { MapPlanner } from './MapPlanner';
 import { AcademicCalendar } from './AcademicCalendar';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
+import { BitacoraPanel } from './BitacoraPanel';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -459,7 +460,7 @@ export function DashboardClient() {
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
-        case 'bitacora': return <WelcomeDashboard />; // Placeholder for now
+        case 'bitacora': return <BitacoraPanel />;
         default: return <WelcomeDashboard />;
     }
   }

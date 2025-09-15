@@ -59,3 +59,13 @@ export interface UploadHistory {
   fileName: string;
   uploadedAt: string; // ISO String
 }
+
+export interface BitacoraEntry {
+  id?: string; // Asignado por Firestore
+  timestamp: any; // Firestore Timestamp
+  studentId: string;
+  studentName: string;
+  reportedBy: string;
+  description: string;
+  agreements: string;
+}
