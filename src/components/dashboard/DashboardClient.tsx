@@ -37,10 +37,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
+import { getBitacoraEntries } from '@/lib/firebase-services';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
@@ -55,6 +56,7 @@ interface DashboardContextType {
   setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   studentHistory: Record<string, Change[]>;
   setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
+  bitacoraEntries: BitacoraEntry[];
   setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
   isLoading: boolean;
   hasData: boolean;
@@ -106,6 +108,7 @@ export function DashboardClient() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
+  const [bitacoraEntries, setBitacoraEntries] = useState<BitacoraEntry[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -124,27 +127,34 @@ export function DashboardClient() {
   
   // Load data from local storage on initial mount
   useEffect(() => {
-    try {
-      const storedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
-      if (storedStudents) setAllStudents(JSON.parse(storedStudents));
+    async function loadInitialData() {
+        try {
+          const storedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
+          if (storedStudents) setAllStudents(JSON.parse(storedStudents));
 
-      const storedHistory = localStorage.getItem(LOCAL_STORAGE_KEYS.HISTORY);
-      if (storedHistory) setStudentHistory(JSON.parse(storedHistory));
+          const storedHistory = localStorage.getItem(LOCAL_STORAGE_KEYS.HISTORY);
+          if (storedHistory) setStudentHistory(JSON.parse(storedHistory));
 
-      const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
-      if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
-      
-      const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
-      if (storedPlanType) setPlanType(storedPlanType as PlanType);
+          const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
+          if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
+          
+          const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+          if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
-    } catch (error) {
-        console.error("Error loading data from Local Storage", error);
-        localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
-        localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
-        localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
-        localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+          const entries = await getBitacoraEntries();
+          setBitacoraEntries(entries);
+
+        } catch (error) {
+            console.error("Error loading data from Local Storage", error);
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+        } finally {
+            setIsLoading(false);
+        }
     }
-    setIsLoading(false);
+    loadInitialData();
   }, []);
 
   // Persist data to local storage whenever it changes
@@ -432,7 +442,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, setAllStudents, studentHistory, setStudentHistory, setUploadHistory,
+    filteredStudents, allStudents, setAllStudents, studentHistory, setStudentHistory, bitacoraEntries, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,

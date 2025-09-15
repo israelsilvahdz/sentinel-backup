@@ -7,8 +7,8 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone } from 'lucide-react';
-import { type Student, type Subject, type SubjectSummary } from "@/types/student";
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText } from 'lucide-react';
+import { type Student, type Subject, type SubjectSummary, type BitacoraEntry } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +21,7 @@ import { StudentContactInfo } from './StudentContactInfo';
 
 interface StudentCardProps {
   student: Student;
+  bitacoraEntries: BitacoraEntry[];
   startOpen?: boolean;
 }
 
@@ -223,8 +224,9 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     );
 }
 
-export function StudentCard({ student, startOpen = true }: StudentCardProps) {
+export function StudentCard({ student, bitacoraEntries, startOpen = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
+  const hasBitacora = bitacoraEntries.some(entry => entry.studentId === student.id);
   
   return (
     <Card>
@@ -234,6 +236,18 @@ export function StudentCard({ student, startOpen = true }: StudentCardProps) {
                 <div>
                     <CardTitle className="flex items-center text-lg">
                         {student.name}
+                        {hasBitacora && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <FileText className="ml-2 h-4 w-4 text-primary" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Tiene registros en bitácora</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
                     </CardTitle>
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>

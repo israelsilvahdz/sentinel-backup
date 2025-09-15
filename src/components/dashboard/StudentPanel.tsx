@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -31,6 +32,7 @@ const contactsMap = new Map<string, StudentContact>(
 export function StudentPanel() {
   const { 
     filteredStudents: initialFilteredStudents, 
+    bitacoraEntries,
     hasData, 
     isLoading, 
     caseType, 
@@ -192,6 +194,7 @@ export function StudentPanel() {
                   <StudentCard 
                     key={student.id} 
                     student={student} 
+                    bitacoraEntries={bitacoraEntries}
                     startOpen={false} 
                   />
                 ))}
