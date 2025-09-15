@@ -459,7 +459,7 @@ export function DashboardClient() {
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
-        case 'bitacora': return null; // Placeholder for now
+        case 'bitacora': return <WelcomeDashboard />; // Placeholder for now
         default: return <WelcomeDashboard />;
     }
   }
