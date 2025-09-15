@@ -41,7 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
-export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade';
+export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
 export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
@@ -372,6 +372,16 @@ export function DashboardClient() {
     }
     
     if (caseType) {
+        const getStudentIdsWithChange = (fieldName: 'absences' | 'missedAssignments') => {
+            const studentIds = new Set<string>();
+            Object.entries(studentHistory).forEach(([studentId, changes]) => {
+                if (changes.some(c => c.fieldName === fieldName)) {
+                    studentIds.add(studentId);
+                }
+            });
+            return studentIds;
+        }
+
         if (caseType === 'changes') {
             const changedStudentIds = new Set<string>();
             Object.entries(studentHistory).forEach(([studentId, changes]) => {
@@ -381,6 +391,14 @@ export function DashboardClient() {
                 }
             });
             return students.filter(s => changedStudentIds.has(s.id));
+        }
+        if (caseType === 'newAbsences') {
+            const studentIds = getStudentIdsWithChange('absences');
+            return students.filter(s => studentIds.has(s.id));
+        }
+        if (caseType === 'newMissedAssignments') {
+            const studentIds = getStudentIdsWithChange('missedAssignments');
+            return students.filter(s => studentIds.has(s.id));
         }
         if(caseType === 'lost') return findLostCases(students);
         if(caseType === 'extraordinary') return findExtraordinaryCases(students);
@@ -567,3 +585,5 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
+    

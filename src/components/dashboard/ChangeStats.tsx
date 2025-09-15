@@ -257,7 +257,7 @@ export function ChangeStats() {
 
     }, [studentHistory, allStudents]);
 
-    const handleCaseClick = (caseType: 'changes') => {
+    const handleCaseClick = (caseType: 'changes' | 'newAbsences' | 'newMissedAssignments') => {
         setCaseType(caseType);
         setActiveView('students');
     };
@@ -318,9 +318,9 @@ export function ChangeStats() {
                         <>
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                                 <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} onClick={() => handleCaseClick('changes')} />
-                                <KpiCard title="Total de Cambios de Riesgo" value={totalChanges} icon={AlertTriangle} />
-                                <KpiCard title="Total Faltas (nuevas)" value={totalNewAbsences} icon={FileWarning} color="yellow" />
-                                <KpiCard title="Total Tareas NE (nuevas)" value={totalNewMissedAssignments} icon={BadgeAlert} color="red" />
+                                <KpiCard title="Total de Cambios de Riesgo" value={totalChanges} icon={AlertTriangle} onClick={() => handleCaseClick('changes')} />
+                                <KpiCard title="Total Faltas (nuevas)" value={totalNewAbsences} icon={FileWarning} color="yellow" onClick={() => handleCaseClick('newAbsences')} />
+                                <KpiCard title="Total Tareas NE (nuevas)" value={totalNewMissedAssignments} icon={BadgeAlert} color="red" onClick={() => handleCaseClick('newMissedAssignments')} />
                             </div>
                             
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -404,5 +404,7 @@ export function ChangeStats() {
         </div>
     );
 }
+
+    
 
     

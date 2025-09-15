@@ -114,6 +114,8 @@ export function StudentPanel() {
     extraordinary: 'Alumnos con derecho a extraordinario',
     changes: 'Alumnos con Cambios Detectados',
     incompleteGrade: 'Alumnos con Calificaciones Incompletas (SC)',
+    newAbsences: 'Alumnos con Nuevas Faltas',
+    newMissedAssignments: 'Alumnos con Nuevas Tareas No Entregadas',
   };
 
   const getPanelTitle = () => {
@@ -214,3 +216,5 @@ export function StudentPanel() {
     </div>
   );
 }
+
+    
