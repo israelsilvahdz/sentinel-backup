@@ -31,8 +31,8 @@ export function ProfessorSchedulePanel() {
 
     allStudents.forEach(student => {
       student.subjects?.forEach(subject => {
-        if (subject.professorName === selectedProfessor) {
-          const classKey = `${subject.name}-${subject.group}-${subject.schedule?.startTime}`;
+        if (subject.professorName === selectedProfessor && subject.schedule) {
+          const classKey = `${subject.name}-${subject.group}-${subject.schedule.startTime || 'N/A'}`;
           
           if (classesMap.has(classKey)) {
             const existingClass = classesMap.get(classKey)!;
@@ -41,8 +41,8 @@ export function ProfessorSchedulePanel() {
             classesMap.set(classKey, {
               subjectName: subject.name,
               group: subject.group,
-              days: subject.schedule?.days || [],
-              time: subject.schedule?.startTime ? `${subject.schedule.startTime} - ${subject.schedule.endTime}`: 'N/A',
+              days: subject.schedule.days || [],
+              time: subject.schedule.startTime ? `${subject.schedule.startTime} - ${subject.schedule.endTime}`: 'N/A',
               studentCount: 1,
             });
           }
