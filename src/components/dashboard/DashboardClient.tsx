@@ -31,7 +31,7 @@ import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { BitacoraPanel } from './BitacoraPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
@@ -53,10 +53,12 @@ export type PlanType = 'semestral' | 'tetramestral';
 interface DashboardContextType {
   filteredStudents: Student[];
   allStudents: Student[];
+  allStudentsMap: Map<string, Student>;
   setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   studentHistory: Record<string, Change[]>;
   setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
   bitacoraEntries: BitacoraEntry[];
+  fetchBitacoraEntries: () => Promise<void>;
   setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
   isLoading: boolean;
   hasData: boolean;
@@ -125,6 +127,16 @@ export function DashboardClient() {
   const [activeView, setActiveView] = useState<ActiveView>('welcome');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
+  const fetchBitacoraEntries = useCallback(async () => {
+    try {
+        const entries = await getBitacoraEntries();
+        setBitacoraEntries(entries);
+    } catch (error) {
+        console.error("Failed to fetch bitacora entries:", error);
+        toast({ variant: "destructive", title: "Error de Bitácora", description: "No se pudieron cargar los registros de la bitácora." });
+    }
+  }, [toast]);
+
   // Load data from local storage on initial mount
   useEffect(() => {
     async function loadInitialData() {
@@ -141,8 +153,7 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
-          const entries = await getBitacoraEntries();
-          setBitacoraEntries(entries);
+          await fetchBitacoraEntries();
 
         } catch (error) {
             console.error("Error loading data from Local Storage", error);
@@ -155,7 +166,7 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, []);
+  }, [fetchBitacoraEntries]);
 
   // Persist data to local storage whenever it changes
   useEffect(() => {
@@ -335,16 +346,16 @@ export function DashboardClient() {
     }
   };
   
-  const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))], [allStudents]);
-  const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))], [allStudents]);
+  const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))].sort(), [allStudents]);
+  const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))].sort(), [allStudents]);
   const professors = useMemo(() => {
     const allProfessors = allStudents.flatMap(s => s.subjects?.map(sub => sub.professorName) || []);
-    return [...new Set(allProfessors.filter(Boolean))];
+    return [...new Set(allProfessors.filter(Boolean))].sort();
   }, [allStudents]);
   
   const subjects = useMemo(() => {
       const allSubjects = allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []);
-      return [...new Set(allSubjects.filter(Boolean))];
+      return [...new Set(allSubjects.filter(Boolean))].sort();
   }, [allStudents]);
   
   const groups = useMemo(() => {
@@ -354,16 +365,18 @@ export function DashboardClient() {
 
   const groupsForSubject = useCallback((subjectName: string | null): string[] => {
     if (!subjectName) return [];
-    const groups = new Set<string>();
+    const groupsSet = new Set<string>();
     allStudents.forEach(student => {
         student.subjectSummaries?.forEach(subject => {
             if (subject.name === subjectName && subject.group) {
-                groups.add(subject.group);
+                groupsSet.add(subject.group);
             }
         });
     });
-    return Array.from(groups).sort();
+    return Array.from(groupsSet).sort();
   }, [allStudents]);
+  
+  const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
 
   const filteredStudents = useMemo(() => {
@@ -442,7 +455,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, setAllStudents, studentHistory, setStudentHistory, bitacoraEntries, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, bitacoraEntries, fetchBitacoraEntries, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -526,7 +539,7 @@ export function DashboardClient() {
                 </SidebarMenuItem>
                  <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Planificador por Mapa" isActive={activeView === 'map-planner'} onClick={() => handleSetActiveView('map-planner')}>
-                    <Map />
+                    <MapIcon />
                     <span>Planificador por Mapa</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
