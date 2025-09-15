@@ -13,38 +13,22 @@ import {
 } from 'firebase/firestore';
 import type { BitacoraEntry } from '@/types/student';
 
-// =================================================================================
-// --- ¡ACCIÓN REQUERIDA! ---
-// =================================================================================
-//
-// REEMPLAZA LA SIGUIENTE CONFIGURACIÓN CON LA DE TU PROPIO PROYECTO DE FIREBASE.
-//
-// Para encontrar esta información:
-// 1. Ve a la Consola de Firebase (https://console.firebase.google.com/).
-// 2. Selecciona tu proyecto.
-// 3. Haz clic en el ícono de engranaje (⚙️) y ve a "Project settings".
-// 4. En la pestaña "General", baja a la sección "Your apps".
-// 5. Busca tu aplicación web y haz clic en "</>" para ver la configuración del SDK.
-// 6. Copia el objeto `firebaseConfig` y pégalo aquí.
-//
-// =================================================================================
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "TU_API_KEY", // Reemplazar
-  authDomain: "TU_AUTH_DOMAIN", // Reemplazar
-  projectId: "TU_PROJECT_ID", // Reemplazar
-  storageBucket: "TU_STORAGE_BUCKET", // Reemplazar
-  messagingSenderId: "TU_MESSAGING_SENDER_ID", // Reemplazar
-  appId: "TU_APP_ID" // Reemplazar
+  apiKey: "AIzaSyDPkqLHSfu5eHfKWb2eC0dbcM2kbbb65pk",
+  authDomain: "tecmilenio-mdea.firebaseapp.com",
+  databaseURL: "https://tecmilenio-mdea-default-rtdb.firebaseio.com",
+  projectId: "tecmilenio-mdea",
+  storageBucket: "tecmilenio-mdea.firebasestorage.app",
+  messagingSenderId: "576664692340",
+  appId: "1:576664692340:web:6669b709986d62d94d5321"
 };
+
 
 // Inicializa Firebase de forma segura
 let app: FirebaseApp;
 try {
   if (!getApps().length) {
-    // Verifica si el projectId es el de marcador de posición
-    if (firebaseConfig.projectId === "TU_PROJECT_ID") {
-      console.warn("ADVERTENCIA: La configuración de Firebase no ha sido actualizada. La bitácora no funcionará. Por favor, edita `src/lib/firebase-services.ts` con la configuración de tu proyecto.");
-    }
     app = initializeApp(firebaseConfig);
   } else {
     app = getApps()[0];
@@ -62,11 +46,6 @@ const BITACORA_COLLECTION = 'bitacora';
  * @param entry - El objeto de la entrada de la bitácora sin el timestamp.
  */
 export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 'id'>): Promise<void> => {
-  // Previene la escritura si la configuración no ha cambiado
-  if (firebaseConfig.projectId === "TU_PROJECT_ID") {
-    alert("La bitácora no está conectada. Revisa las instrucciones en la consola y en `src/lib/firebase-services.ts`.");
-    throw new Error("Configuración de Firebase no actualizada.");
-  }
   try {
     await addDoc(collection(db, BITACORA_COLLECTION), {
       ...entry,
@@ -83,10 +62,6 @@ export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 
  * @returns Un array de entradas de la bitácora.
  */
 export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
-  // Previene la lectura si la configuración no ha cambiado
-  if (firebaseConfig.projectId === "TU_PROJECT_ID") {
-    return [];
-  }
   try {
     const bitacoraQuery = query(collection(db, BITACORA_COLLECTION), orderBy('timestamp', 'desc'));
     const querySnapshot = await getDocs(bitacoraQuery);
@@ -112,10 +87,6 @@ export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
  * @param id - El ID del documento de Firestore a eliminar.
  */
 export const deleteBitacoraEntry = async (id: string): Promise<void> => {
-  if (firebaseConfig.projectId === "TU_PROJECT_ID") {
-    alert("La bitácora no está conectada. Revisa las instrucciones en la consola y en `src/lib/firebase-services.ts`.");
-    throw new Error("Configuración de Firebase no actualizada.");
-  }
   try {
     const docRef = doc(db, BITACORA_COLLECTION, id);
     await deleteDoc(docRef);
