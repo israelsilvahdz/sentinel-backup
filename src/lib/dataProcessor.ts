@@ -166,11 +166,18 @@ export function findRiskCasesBySubject(students: Student[], subjectName: string,
 
 
 /**
- * Criterio: Alumnos con calificación final en "null".
+ * Criterio: Alumnos con materias cuya calificacion es "SC" (sin calificar).
  */
 export function findIncompleteGradeCases(students: Student[]): Student[] {
     return students.filter(student => {
-        if (!student.subjectSummaries) return false;
-        return student.subjectSummaries.some(subject => subject.finalGrade === null);
+        if (!student.subjects) return false;
+        return student.subjects.some(subject => {
+            for (const activityKey in subject.activities) {
+                if (String(subject.activities[activityKey]).toUpperCase() === 'SC') {
+                    return true;
+                }
+            }
+            return false;
+        });
     });
 }
