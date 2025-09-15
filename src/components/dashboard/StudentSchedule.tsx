@@ -76,9 +76,14 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string },
 }
 
 const contactsMap = new Map<string, string>(
-    Object.entries(professorContacts)
+    Object.entries(professorContacts).map(([name, email]) => [name.toLowerCase().replace(/\s+/g, ''), email])
 );
 
+const getProfessorEmail = (name: string): string | null => {
+    if (!name) return null;
+    const normalizedName = name.toLowerCase().replace(/\s+/g, '');
+    return contactsMap.get(normalizedName) || null;
+}
 
 export function StudentSchedule({ subjects, studentName, planType }: StudentScheduleProps) {
   const { toast } = useToast();
@@ -113,8 +118,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                 const hasClassOnAffectedDays = subject.schedule?.days.some(day => affectedDays.has(day));
                 if (hasClassOnAffectedDays) {
                     if (!uniqueTeachers.has(subject.professorName)) {
-                        const contactKey = Object.keys(professorContacts).find(k => k.toLowerCase() === subject.professorName.toLowerCase());
-                        const email = contactKey ? contactsMap.get(contactKey) ?? null : null;
+                        const email = getProfessorEmail(subject.professorName);
                         uniqueTeachers.set(subject.professorName, { name: subject.professorName, email });
                     }
                 }
