@@ -167,7 +167,7 @@ export function Dashboard() {
                     <CardTitle>Focos de Riesgo y Seguimiento</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                     <KpiCard title="Alumnos con NE en 'El Mundo Contemporáneo'" value={onlineRiskMundo.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('El mundo contemporáneo')} />
+                     <KpiCard title="Alumnos con NE en 'El mundo contemporáneo'" value={onlineRiskMundo.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('El mundo contemporáneo')} />
                      <KpiCard title="Alumnos con NE en 'Ciencias de la Vida'" value={onlineRiskVida.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('Ciencias de la Vida')} />
                      <KpiCard title="Alumnos con Calificaciones Incompletas (SC)" value={incompleteGradeCases.length} icon={FileText} onClick={() => handleCaseClick('incompleteGrade')} />
                 </CardContent>
@@ -222,6 +222,3 @@ export function Dashboard() {
     </div>
   );
 }
-
-
-
