@@ -30,9 +30,10 @@ import { AcademicCalendar } from './AcademicCalendar';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 
 
 import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary } from '@/types/student';
@@ -42,7 +43,7 @@ import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findOb
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -457,6 +458,7 @@ export function DashboardClient() {
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
+        case 'professor-schedule': return <ProfessorSchedulePanel />;
         case 'bitacora': return null; // Placeholder for now
         default: return <WelcomeDashboard />;
     }
@@ -503,6 +505,12 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
                     <Users />
                     <span>Panel de Alumnos</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')}>
+                    <Contact />
+                    <span>Horarios de Profesores</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
