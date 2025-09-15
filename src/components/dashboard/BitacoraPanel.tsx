@@ -36,6 +36,7 @@ const bitacoraSchema = z.object({
   agreements: z.string().min(1, 'Los acuerdos son requeridos.'),
   caseType: z.enum(['academica', 'conductual'], { required_error: 'Debes seleccionar un tipo de caso.' }),
   academicCommittee: z.boolean().default(false),
+  eventDate: z.date({ required_error: 'La fecha del evento es requerida.' }),
 });
 
 type BitacoraFormValues = z.infer<typeof bitacoraSchema>;
@@ -55,7 +56,10 @@ export function BitacoraPanel() {
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<BitacoraFormValues>({
     resolver: zodResolver(bitacoraSchema),
-    defaultValues: { studentId: '', studentName: '', reportedBy: '', description: '', agreements: '', caseType: 'academica', academicCommittee: false, },
+    defaultValues: { 
+        studentId: '', studentName: '', reportedBy: '', description: '', agreements: '', 
+        caseType: 'academica', academicCommittee: false, eventDate: new Date() 
+    },
   });
 
 
@@ -68,7 +72,10 @@ export function BitacoraPanel() {
     try {
       await addBitacoraEntry(data);
       toast({ title: 'Reporte Guardado', description: 'La nueva entrada de la bitácora se ha guardado correctamente.', });
-      reset();
+      reset({ 
+          studentId: '', studentName: '', reportedBy: '', description: '', agreements: '', 
+          caseType: 'academica', academicCommittee: false, eventDate: new Date() 
+      });
       fetchBitacoraEntries(); // Refresh the list
     } catch (error) {
       console.error("Error saving bitácora entry:", error);
@@ -116,7 +123,7 @@ export function BitacoraPanel() {
           const leaderMatch = !selectedLeader || (student && student.leader === selectedLeader);
           const tutorMatch = !selectedTutor || (student && student.tutor === selectedTutor);
           const reporterMatch = !selectedReporter || entry.reportedBy === selectedReporter;
-          const dateMatch = !selectedDate || isSameDay(entry.timestamp.toDate(), selectedDate);
+          const dateMatch = !selectedDate || isSameDay(entry.eventDate.toDate(), selectedDate);
 
 
           return searchMatch && leaderMatch && tutorMatch && reporterMatch && dateMatch;
@@ -145,7 +152,7 @@ export function BitacoraPanel() {
             <CardTitle>Nuevo Reporte de Bitácora</CardTitle>
             <CardDescription>Completa los campos para registrar un nuevo caso de seguimiento.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-4">
                <Controller control={control} name="studentId" render={({ field, fieldState }) => (
                     <div className="space-y-2">
@@ -172,9 +179,34 @@ export function BitacoraPanel() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="agreements">Acuerdos y Siguientes Pasos</Label>
-                <Textarea id="agreements" {...register('agreements')} rows={2} placeholder="Detalla los compromisos, las acciones a tomar y las fechas de seguimiento."/>
+                <Textarea id="agreements" {...register('agreements')} rows={3} placeholder="Detalla los compromisos, las acciones a tomar y las fechas de seguimiento."/>
                 {errors.agreements && <p className="text-sm text-destructive">{errors.agreements.message?.toString()}</p>}
               </div>
+            </div>
+            <div className="space-y-4">
+                <Controller name="eventDate" control={control} render={({ field }) => (
+                    <div className="space-y-2">
+                        <Label>Fecha del Evento</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                )}
+                                >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {field.value ? format(field.value, "PPP", {locale: es}) : <span>Seleccionar fecha</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus locale={es} />
+                            </PopoverContent>
+                        </Popover>
+                        {errors.eventDate && <p className="text-sm text-destructive">{errors.eventDate.message}</p>}
+                    </div>
+                )} />
                <Controller name="caseType" control={control} render={({ field }) => (
                     <div className="space-y-2">
                       <Label>Tipo de Caso</Label>
@@ -184,14 +216,14 @@ export function BitacoraPanel() {
                       </RadioGroup>
                       {errors.caseType && <p className="text-sm text-destructive">{errors.caseType.message}</p>}
                     </div>
-                  )} />
+                )} />
+                 <div className="flex items-center space-x-2 pt-6">
+                    <Controller name="academicCommittee" control={control} render={({ field }) => ( <Checkbox id="academicCommittee" checked={field.value} onCheckedChange={field.onChange} /> )} />
+                    <Label htmlFor="academicCommittee" className="font-normal"> ¿El caso terminó en comité académico? </Label>
+                </div>
             </div>
           </CardContent>
-          <CardFooter className="flex-col items-start gap-4">
-             <div className="flex items-center space-x-2">
-                <Controller name="academicCommittee" control={control} render={({ field }) => ( <Checkbox id="academicCommittee" checked={field.value} onCheckedChange={field.onChange} /> )} />
-                <Label htmlFor="academicCommittee" className="font-normal"> ¿El caso terminó en comité académico? </Label>
-              </div>
+          <CardFooter>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
               Guardar Reporte
@@ -273,7 +305,7 @@ export function BitacoraPanel() {
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
-                  <p className="text-sm text-muted-foreground">{format(entry.timestamp.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}</p>
+                  <p className="text-sm text-muted-foreground">Fecha del evento: {format(entry.eventDate.toDate(), "d 'de' LLLL, yyyy", { locale: es })}</p>
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-lg">{entry.studentName} <span className="text-sm text-muted-foreground font-normal">({entry.studentId})</span></h3>
                     {entry.caseType && (<Badge variant={entry.caseType === 'academica' ? 'secondary' : 'default'}>{entry.caseType === 'academica' ? 'Académica' : 'Conductual'}</Badge>)}

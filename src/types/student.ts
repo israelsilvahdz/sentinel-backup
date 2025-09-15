@@ -63,7 +63,8 @@ export interface UploadHistory {
 
 export interface BitacoraEntry {
   id?: string; // Asignado por Firestore
-  timestamp: any; // Firestore Timestamp
+  timestamp: any; // Firestore Timestamp of creation
+  eventDate: any; // Firestore Timestamp of event
   studentId: string;
   studentName: string;
   reportedBy: string;

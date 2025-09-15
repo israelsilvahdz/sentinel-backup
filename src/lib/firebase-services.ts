@@ -44,8 +44,10 @@ const BITACORA_COLLECTION = 'bitacora';
  */
 export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 'id'>): Promise<void> => {
   try {
+    const { eventDate, ...rest } = entry;
     await addDoc(collection(db, BITACORA_COLLECTION), {
-      ...entry,
+      ...rest,
+      eventDate: Timestamp.fromDate(eventDate as Date),
       timestamp: Timestamp.now(),
     });
   } catch (error) {
@@ -60,7 +62,7 @@ export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 
  */
 export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
   try {
-    const bitacoraQuery = query(collection(db, BITACORA_COLLECTION), orderBy('timestamp', 'desc'));
+    const bitacoraQuery = query(collection(db, BITACORA_COLLECTION), orderBy('eventDate', 'desc'));
     const querySnapshot = await getDocs(bitacoraQuery);
     
     return querySnapshot.docs.map(doc => ({
