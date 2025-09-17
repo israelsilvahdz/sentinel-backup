@@ -139,7 +139,6 @@ export function SeguimientoPanel() {
               <thead>
                 <tr>
                   <th>Alumno</th>
-                  <th>Tutor</th>
                   <th>Situación</th>
                   <th>Materias</th>
                   <th>Notas</th>
@@ -152,7 +151,6 @@ export function SeguimientoPanel() {
                   return `
                     <tr>
                       <td class="student-cell"><strong>${entry.studentName}</strong><br><small>${entry.studentId}</small></td>
-                      <td class="tutor-cell">${entry.tutor || 'N/A'}</td>
                       <td class="situation-cell">${situationText}</td>
                       <td>
                         ${subjectsInCase.length > 0 ? `<ul class="subjects-list">${subjectsInCase.map(s => `<li>- ${s!.name}</li>`).join('')}</ul>` : 'N/A'}
