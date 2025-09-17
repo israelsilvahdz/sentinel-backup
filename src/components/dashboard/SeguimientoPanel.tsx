@@ -38,7 +38,7 @@ export function SeguimientoPanel() {
     fetchEntries();
   }, [fetchEntries]);
 
-  const filteredEntries = useMemo(() => {
+ const filteredEntries = useMemo(() => {
     if (!selectedValue) return entries;
     
     if (filterType === 'leader') {
@@ -48,9 +48,6 @@ export function SeguimientoPanel() {
         return entries.filter(entry => entry.tutor === selectedValue);
     }
     
-    // If filterType is something else but there's a selectedValue, we might want to clear
-    // or just return all entries if the filter doesn't apply to this panel.
-    // For now, let's assume we show all if the filter is not leader/tutor based.
     return entries;
   }, [entries, selectedValue, filterType]);
 
@@ -102,38 +99,52 @@ export function SeguimientoPanel() {
           <head>
             <title>Reporte de Seguimiento - ${format(new Date(), 'dd/MM/yyyy')}</title>
             <style>
-              @page {
-                  size: letter;
-                  margin: 0.7in;
-              }
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                line-height: 1.4; 
+                line-height: 1.5; 
                 color: #27272a; 
                 font-size: 9px;
+                margin: 0.5in;
               }
               @media print {
-                body { 
-                  font-size: 8px; 
-                  column-count: 2;
-                  column-gap: 20px;
-                }
                 .no-print { display: none; }
-                .report-entry { page-break-inside: avoid; }
               }
-              h1 { color: #17594A; border-bottom: 2px solid #17594A; padding-bottom: 6px; margin-bottom: 1rem; font-size: 1.4em; }
-              .print-button { position: fixed; top: 1rem; right: 1rem; padding: 6px 10px; background: #17594A; color: white; border: none; border-radius: 5px; cursor: pointer; }
+              h1 { 
+                color: #17594A; 
+                border-bottom: 2px solid #17594A; 
+                padding-bottom: 8px; 
+                margin-bottom: 1rem; 
+                font-size: 1.5em; 
+              }
+              .print-button { 
+                position: fixed; 
+                top: 1rem; 
+                right: 1rem; 
+                padding: 8px 12px; 
+                background: #17594A; 
+                color: white; 
+                border: none; 
+                border-radius: 5px; 
+                cursor: pointer; 
+              }
               .report-entry {
-                margin-bottom: 12px;
+                margin-bottom: 1rem;
+                padding-bottom: 1rem;
                 border-bottom: 1px solid #e2e8f0;
-                padding-bottom: 8px;
+                page-break-inside: avoid;
               }
-              .student-name { font-weight: bold; font-size: 1.1em; }
+              .student-header { font-weight: bold; font-size: 1.1em; }
               .situation { font-style: italic; }
-              .subjects, .notes { margin-left: 10px; }
-              .subjects-list { padding: 0; margin: 0; }
-              .notes-text { white-space: pre-wrap; background-color: #f1f5f9; padding: 4px; border-radius: 3px; }
-
+              .details { margin-left: 15px; margin-top: 5px; }
+              .subjects-list, .notes-text {
+                  padding: 0;
+                  margin: 0;
+                  white-space: pre-wrap;
+              }
+               .subject-item {
+                  display: block;
+                  margin-bottom: 3px;
+              }
             </style>
           </head>
           <body>
@@ -143,25 +154,32 @@ export function SeguimientoPanel() {
             
             <div id="report-content">
               ${pendingEntries.map(entry => {
-                const subjectsInCase = entry.subjects.map(subjectId => studentData(entry.studentId)?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
+                const student = studentData(entry.studentId);
+                const subjectsInCase = entry.subjects.map(subjectId => student?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
                 const situationText = SITUATION_MAP[entry.situation].text || entry.situation;
 
                 let materiasHtml = '';
                 if (subjectsInCase.length > 0) {
-                    const subjectItems = subjectsInCase.map(s => `${s!.name} (Gpo: ${s!.group})`).join(', ');
-                    materiasHtml = `<div class="subjects"><strong>Materias:</strong> ${subjectItems}</div>`;
+                    const subjectItems = subjectsInCase.map(s => {
+                        const schedule = s?.schedule;
+                        const scheduleInfo = schedule && schedule.days.length > 0
+                            ? ` - [${schedule.days.join(', ')}, ${schedule.startTime}-${schedule.endTime}]`
+                            : '';
+                        return `<span class="subject-item">${s!.name} (Gpo: ${s!.group})${scheduleInfo}</span>`;
+                    }).join('');
+                    materiasHtml = `<div class="details"><strong>Materias:</strong><br>${subjectItems}</div>`;
                 }
 
                 let notasHtml = '';
                 if (entry.notes) {
-                    notasHtml = `<div class="notes"><strong>Notas:</strong> <span class="notes-text">${entry.notes}</span></div>`;
+                    notasHtml = `<div class="details"><strong>Notas:</strong> <span class="notes-text">${entry.notes}</span></div>`;
                 }
 
                 return `
                   <div class="report-entry">
-                      <p>
-                        <span class="student-name">${entry.studentName} (${entry.studentId})</span>
-                        - <span class="situation">${situationText}</span>
+                      <p class="student-header">
+                        ${entry.studentName} (${entry.studentId}) - 
+                        <span class="situation">${situationText}</span>
                       </p>
                       ${materiasHtml}
                       ${notasHtml}
@@ -176,6 +194,7 @@ export function SeguimientoPanel() {
       reportWindow.document.close();
     }
   };
+
 
   if (isLoading) {
     return (
@@ -273,5 +292,3 @@ export function SeguimientoPanel() {
     </div>
   );
 }
-
-    
