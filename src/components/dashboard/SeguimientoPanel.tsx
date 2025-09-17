@@ -96,22 +96,39 @@ export function SeguimientoPanel() {
           <head>
             <title>Reporte de Seguimiento - ${format(new Date(), 'dd/MM/yyyy')}</title>
             <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 1.5rem; color: #27272a; font-size: 9px; }
-              @media print {
-                body { padding: 1rem; font-size: 8px; }
-                .no-print { display: none; }
+              @page {
+                  size: landscape;
+                  margin: 0.5in;
               }
-              h1 { color: #17594A; border-bottom: 2px solid #17594A; padding-bottom: 8px; margin-bottom: 1.5rem; font-size: 1.6em; }
-              .print-button { position: fixed; top: 1rem; right: 1rem; padding: 8px 12px; background: #17594A; color: white; border: none; border-radius: 5px; cursor: pointer; }
-              table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
-              th, td { border: 1px solid #e2e8f0; padding: 4px 6px; text-align: left; vertical-align: top; }
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                line-height: 1.3; 
+                color: #27272a; 
+                font-size: 9px;
+              }
+              @media print {
+                body { 
+                  padding: 0;
+                  font-size: 7px; 
+                  column-count: 2;
+                  column-gap: 20px;
+                }
+                .no-print { display: none; }
+                h1 { margin-top: 0; }
+                table { page-break-inside: auto; }
+                tr { page-break-inside: avoid; page-break-after: auto; }
+              }
+              h1 { color: #17594A; border-bottom: 2px solid #17594A; padding-bottom: 6px; margin-bottom: 1rem; font-size: 1.4em; }
+              .print-button { position: fixed; top: 1rem; right: 1rem; padding: 6px 10px; background: #17594A; color: white; border: none; border-radius: 5px; cursor: pointer; }
+              table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+              th, td { border: 1px solid #e2e8f0; padding: 3px 4px; text-align: left; vertical-align: top; }
               th { background-color: #f1f5f9; font-weight: 600; }
-              .notes-cell { white-space: pre-wrap; min-width: 150px; }
+              .notes-cell { white-space: pre-wrap; min-width: 120px; }
               .subjects-list { list-style: none; padding: 0; margin: 0; }
-              .subjects-list li { margin-bottom: 2px; }
-              .student-cell { min-width: 120px; }
-              .tutor-cell { min-width: 100px; }
-              .situation-cell { min-width: 80px; }
+              .subjects-list li { margin-bottom: 1px; }
+              .student-cell { min-width: 100px; }
+              .tutor-cell { min-width: 80px; }
+              .situation-cell { min-width: 60px; }
             </style>
           </head>
           <body>
@@ -257,3 +274,5 @@ export function SeguimientoPanel() {
     </div>
   );
 }
+
+    
