@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
@@ -243,19 +243,16 @@ export function StudentCard({ student, startOpen = false }: StudentCardProps) {
                     </CardTitle>
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
                 </div>
-                <div className="flex items-center">
-                     <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExpedienteClick}>
-                                    <FileText className="h-4 w-4 text-primary" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Ver Expediente del Alumno</p></TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                    <CreateBitacoraDialog student={student} />
-                    <AddToSeguimientoDialog student={student} />
+                <div className="flex items-center gap-2">
+                     <Button variant="outline" size="sm" onClick={handleExpedienteClick}>
+                        EXPEDIENTE
+                    </Button>
+                    <CreateBitacoraDialog student={student}>
+                        <Button variant="outline" size="sm">REPORTE</Button>
+                    </CreateBitacoraDialog>
+                    <AddToSeguimientoDialog student={student}>
+                        <Button variant="outline" size="sm">SEGUIMIENTO</Button>
+                    </AddToSeguimientoDialog>
                     <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="w-9 p-0">
                             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

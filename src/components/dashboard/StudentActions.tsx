@@ -17,10 +17,9 @@ import { cn } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '../ui/alert-dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,12 +27,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardList, FileText, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 
 
 // --- Dialog para "Añadir a Reporte de Seguimiento" ---
 
-export function AddToSeguimientoDialog({ student }: { student: Student }) {
+export function AddToSeguimientoDialog({ student, children }: { student: Student, children: React.ReactNode }) {
     const { toast } = useToast();
     const { loadStudentSubjects } = useDashboardFilters();
     const [isOpen, setIsOpen] = useState(false);
@@ -114,20 +113,9 @@ export function AddToSeguimientoDialog({ student }: { student: Student }) {
 
     return (
         <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <ClipboardList className="h-4 w-4" />
-                            </Button>
-                        </AlertDialogTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Añadir a Reporte de Seguimiento</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <AlertDialogTrigger asChild>
+                {children}
+            </AlertDialogTrigger>
             <AlertDialogContent className="sm:max-w-xl">
                 <AlertDialogHeader>
                     <AlertDialogTitle>Agregar Caso de Seguimiento</AlertDialogTitle>
@@ -203,7 +191,7 @@ const bitacoraSchema = z.object({
 
 type BitacoraFormValues = z.infer<typeof bitacoraSchema>;
 
-export function CreateBitacoraDialog({ student }: { student: Student }) {
+export function CreateBitacoraDialog({ student, children }: { student: Student, children: React.ReactNode }) {
     const { toast } = useToast();
     const { fetchBitacoraEntries } = useDashboardFilters();
     const [isOpen, setIsOpen] = useState(false);
@@ -246,18 +234,9 @@ export function CreateBitacoraDialog({ student }: { student: Student }) {
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <FileText className="h-4 w-4" />
-                            </Button>
-                        </DialogTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Crear Reporte en Bitácora</p></TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <Dialog.Trigger asChild>
+                {children}
+            </Dialog.Trigger>
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>Nuevo Reporte de Bitácora</DialogTitle>
@@ -335,4 +314,3 @@ export function CreateBitacoraDialog({ student }: { student: Student }) {
         </Dialog>
     );
 }
-
