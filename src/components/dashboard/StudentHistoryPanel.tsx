@@ -1,21 +1,28 @@
 
+
 "use client";
 
 import { useMemo } from 'react';
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft } from 'lucide-react';
-import { useDashboardFilters, ActiveView } from './DashboardClient';
+import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { ChangeHistory } from './ChangeHistory';
 
 export function StudentHistoryPanel() {
-  const { allStudents, isLoading, selectedStudentId, setSelectedStudentId, setActiveView } = useDashboardFilters();
+  const { allStudents, bitacoraEntries, isLoading, selectedStudentId, setSelectedStudentId, setActiveView } = useDashboardFilters();
 
   const selectedStudent = useMemo(() => {
     if (!selectedStudentId) return null;
     return allStudents.find(s => s.id === selectedStudentId) ?? null;
   }, [allStudents, selectedStudentId]);
+
+  const studentBitacoraEntries = useMemo(() => {
+    if (!selectedStudentId) return [];
+    return bitacoraEntries.filter(entry => entry.studentId === selectedStudentId);
+  }, [bitacoraEntries, selectedStudentId]);
+
 
   if (isLoading) {
     return (
@@ -27,7 +34,7 @@ export function StudentHistoryPanel() {
 
   const handleBackClick = () => {
     setSelectedStudentId(null);
-    setActiveView('dashboard'); // O a la vista anterior que se podría guardar en el estado
+    setActiveView('students'); // O a la vista anterior que se podría guardar en el estado
   }
 
   return (
@@ -37,14 +44,14 @@ export function StudentHistoryPanel() {
             <ArrowLeft className="h-4 w-4" />
          </Button>
          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Historial del Alumno</h1>
-            <p className="text-muted-foreground">Vista detallada del progreso y cambios de un alumno.</p>
+            <h1 className="text-3xl font-bold tracking-tight">Expediente del Alumno</h1>
+            <p className="text-muted-foreground">Vista unificada del historial de cambios y la bitácora de seguimiento.</p>
         </div>
       </header>
 
       {selectedStudent ? (
         <div className="space-y-6">
-            <StudentCard student={selectedStudent} startOpen={true} />
+            <StudentCard student={selectedStudent} bitacoraEntries={studentBitacoraEntries} startOpen={true} />
             <ChangeHistory studentId={selectedStudent.id} />
         </div>
       ) : (
@@ -62,4 +69,3 @@ export function StudentHistoryPanel() {
     </div>
   );
 }
-

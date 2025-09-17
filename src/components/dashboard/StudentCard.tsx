@@ -366,9 +366,6 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                       ))}
                   </TableBody>
               </Table>
-              <div className="px-6 py-4 border-t">
-                <Button variant="outline" size="sm" onClick={handleHistoryClick}>Ver Historial de Cambios</Button>
-              </div>
           </div>
         </TabsContent>
         <TabsContent value="horario">
@@ -384,12 +381,11 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 export function StudentCard({ student, bitacoraEntries, startOpen = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
   const { setActiveView, setSelectedStudentId } = useDashboardFilters();
-  const hasBitacora = bitacoraEntries.some(entry => entry.studentId === student.id);
   
-  const handleBitacoraClick = (e: React.MouseEvent) => {
+  const handleExpedienteClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Evita que se abra/cierre el card
     setSelectedStudentId(student.id);
-    setActiveView('bitacora');
+    setActiveView('history');
   };
 
   return (
@@ -400,20 +396,18 @@ export function StudentCard({ student, bitacoraEntries, startOpen = false }: Stu
                 <div>
                     <CardTitle className="flex items-center text-lg">
                         {student.name}
-                        {hasBitacora && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                 <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={handleBitacoraClick}>
+                        <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={handleExpedienteClick}>
                                     <FileText className="h-4 w-4 text-primary" />
                                 </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Ver registros en bitácora</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Ver expediente del alumno</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        </TooltipProvider>
                         {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
                     </CardTitle>
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>

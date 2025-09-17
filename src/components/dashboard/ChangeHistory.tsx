@@ -1,15 +1,17 @@
 
+
 "use client";
 
-import { useEffect, useState }from 'react';
+import { useEffect, useState, useMemo }from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Timeline, TimelineItem, TimelineConnector, TimelineHeader, TimelineIcon, TimelineTitle, TimelineBody } from '@/components/ui/timeline';
 import { useDashboardFilters } from './DashboardClient';
-import { type Change } from '@/types/student';
+import { type Change, type BitacoraEntry } from '@/types/student';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, BookOpenCheck, Calendar, FileWarning, UserCog, Users } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Calendar, FileText, FileWarning, UserCog, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Badge } from '../ui/badge';
 
 interface ChangeHistoryProps {
   studentId: string;
@@ -21,6 +23,7 @@ const ICONS: Record<string, React.ReactElement> = {
     leader: <UserCog />,
     tutor: <UserCog />,
     group: <Users />,
+    bitacora: <FileText />,
 };
 
 function formatFieldName(fieldName: string): string {
@@ -29,14 +32,15 @@ function formatFieldName(fieldName: string): string {
         'missedAssignments': 'Nueva Tarea No Entregada',
         'leader': 'Cambio de Líder',
         'tutor': 'Cambio de Tutor',
-        'group': 'Cambio de Grupo'
+        'group': 'Cambio de Grupo',
+        'bitacora': 'Entrada en Bitácora',
     };
     return map[fieldName] || fieldName;
 }
 
 export function ChangeHistory({ studentId }: ChangeHistoryProps) {
-  const { getStudentChanges, allStudents } = useDashboardFilters();
-  const [history, setHistory] = useState<Change[]>([]);
+  const { getStudentChanges, bitacoraEntries, allStudents } = useDashboardFilters();
+  const [history, setHistory] = useState<(Change | BitacoraEntry)[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const student = allStudents.find(s => s.id === studentId);
@@ -44,8 +48,9 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
   useEffect(() => {
     async function loadHistory() {
       setIsLoading(true);
-      const allChanges = await getStudentChanges(studentId);
       
+      // 1. Get changes from comparison history
+      const allChanges = await getStudentChanges(studentId);
       const isIncrement = (change: Change) => 
         typeof change.newValue === 'number' &&
         typeof change.oldValue === 'number' &&
@@ -59,20 +64,30 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
         change.fieldName === 'group'
       );
       
-      relevantChanges.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // 2. Get bitacora entries for this student
+      const studentBitacoraEntries = bitacoraEntries.filter(e => e.studentId === studentId);
+      
+      // 3. Combine and sort
+      const combinedHistory = [...relevantChanges, ...studentBitacoraEntries];
+      
+      combinedHistory.sort((a, b) => {
+          const dateA = new Date('timestamp' in a ? a.timestamp.toDate() : a.date).getTime();
+          const dateB = new Date('timestamp' in b ? b.timestamp.toDate() : b.date).getTime();
+          return dateB - dateA;
+      });
 
-      setHistory(relevantChanges);
+      setHistory(combinedHistory);
       setIsLoading(false);
     }
     loadHistory();
-  }, [studentId, getStudentChanges]);
+  }, [studentId, getStudentChanges, bitacoraEntries]);
 
   if (isLoading) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Historial de Cambios</CardTitle>
-                <CardDescription>Línea de tiempo de los eventos de riesgo y cambios para este alumno.</CardDescription>
+                <CardTitle>Historial Unificado</CardTitle>
+                <CardDescription>Línea de tiempo de los eventos de riesgo y bitácora para este alumno.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <Skeleton className="h-16 w-full" />
@@ -86,50 +101,85 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Historial de Cambios</CardTitle>
-         <CardDescription>Línea de tiempo de los eventos de riesgo y cambios para este alumno.</CardDescription>
+        <CardTitle>Historial Unificado</CardTitle>
+         <CardDescription>Línea de tiempo de los eventos de riesgo y bitácora para este alumno.</CardDescription>
       </CardHeader>
       <CardContent>
         {history.length > 0 ? (
           <Timeline>
-            {history.map((change, index) => {
-              const subjectName = student?.subjects?.find(s => s.id === change.subjectId)?.name;
-              return (
-                <TimelineItem key={index}>
-                  <TimelineConnector />
-                  <TimelineHeader>
-                      <TimelineIcon>
-                          {ICONS[change.fieldName] || <AlertTriangle />}
-                      </TimelineIcon>
-                    <TimelineTitle>{formatFieldName(change.fieldName)}</TimelineTitle>
-                  </TimelineHeader>
-                  <TimelineBody>
-                    <div className="font-mono text-sm text-muted-foreground mb-2">
-                       <p>
-                          <span className="font-semibold text-foreground">
-                              {change.oldValue}
-                          </span> → <span className="font-semibold text-primary">{change.newValue}</span>
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {format(new Date(change.date), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
+            {history.map((item, index) => {
+              // Type guard to differentiate Change and BitacoraEntry
+              if ('fieldName' in item) { // It's a Change
+                const subjectName = student?.subjects?.find(s => s.id === item.subjectId)?.name;
+                return (
+                  <TimelineItem key={`change-${index}`}>
+                    <TimelineConnector />
+                    <TimelineHeader>
+                        <TimelineIcon>
+                            {ICONS[item.fieldName] || <AlertTriangle />}
+                        </TimelineIcon>
+                      <TimelineTitle>{formatFieldName(item.fieldName)}</TimelineTitle>
+                    </TimelineHeader>
+                    <TimelineBody>
+                      <div className="font-mono text-sm text-muted-foreground mb-2">
+                         <p>
+                            <span className="font-semibold text-foreground">
+                                {item.oldValue}
+                            </span> → <span className="font-semibold text-primary">{item.newValue}</span>
+                        </p>
                       </div>
-                       {subjectName && (
-                          <div className="flex items-center gap-1">
-                              <BookOpenCheck className="h-3 w-3" />
-                              <span>{subjectName} ({change.subjectId})</span>
-                          </div>
-                       )}
-                    </div>
-                  </TimelineBody>
-                </TimelineItem>
-              )
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(item.date), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
+                        </div>
+                         {subjectName && (
+                            <div className="flex items-center gap-1">
+                                <BookOpenCheck className="h-3 w-3" />
+                                <span>{subjectName} ({item.subjectId})</span>
+                            </div>
+                         )}
+                      </div>
+                    </TimelineBody>
+                  </TimelineItem>
+                )
+              } else { // It's a BitacoraEntry
+                return (
+                    <TimelineItem key={`bitacora-${item.id}`}>
+                        <TimelineConnector />
+                        <TimelineHeader>
+                            <TimelineIcon className="bg-blue-500">
+                                {ICONS['bitacora']}
+                            </TimelineIcon>
+                            <TimelineTitle>{formatFieldName('bitacora')}</TimelineTitle>
+                        </TimelineHeader>
+                        <TimelineBody>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                     <Badge variant={item.caseType === 'academica' ? 'secondary' : 'default'}>{item.caseType}</Badge>
+                                     {item.academicCommittee && <Badge variant="destructive">Comité Académico</Badge>}
+                                </div>
+                                <p className="text-sm"><span className="font-semibold">Descripción:</span> {item.description}</p>
+                                <p className="text-sm"><span className="font-semibold">Acuerdos:</span> {item.agreements}</p>
+                            </div>
+                             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                                <div className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>Evento: {format(item.eventDate.toDate(), "d 'de' LLLL, yyyy", { locale: es })}</span>
+                                </div>
+                                 <div className="flex items-center gap-1">
+                                    <UserCog className="h-3 w-3" />
+                                    <span>Reportado por: {item.reportedBy}</span>
+                                </div>
+                            </div>
+                        </TimelineBody>
+                    </TimelineItem>
+                )
+              }
             })}
           </Timeline>
         ) : (
-          <p className="text-muted-foreground">No se encontraron cambios relevantes entre los dos reportes para este alumno.</p>
+          <p className="text-muted-foreground text-center py-4">No se encontraron cambios relevantes ni entradas en la bitácora para este alumno.</p>
         )}
       </CardContent>
     </Card>
