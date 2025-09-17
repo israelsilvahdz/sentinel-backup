@@ -32,6 +32,35 @@ const contactsMap = new Map<string, StudentContact>(
     Object.entries(contactData)
 );
 
+function CopyableContactField({ label, value }: { label: string, value: string }) {
+    const { toast } = useToast();
+    if (!value || value.toLowerCase() === 'no disponible') return null;
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(value).then(() => {
+            toast({
+                title: 'Copiado!',
+                description: `${label} copiado al portapapeles.`
+            });
+        });
+    };
+
+    return (
+        <div className="flex items-center justify-between rounded-md border p-3">
+            <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                <div className="flex flex-col">
+                    <Badge variant="secondary" className="w-fit">{label}</Badge>
+                    <span className="font-mono text-sm">{value}</span>
+                </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={handleCopy}>
+                <Copy className="mr-2 h-4 w-4" /> Copiar
+            </Button>
+        </div>
+    );
+}
+
 function NotifyParentsDialog({ entry, subjectsInCase }: { entry: SeguimientoEntry, subjectsInCase: any[] }) {
   const { toast } = useToast();
   const [isCopied, setIsCopied] = useState(false);
@@ -95,20 +124,8 @@ function NotifyParentsDialog({ entry, subjectsInCase }: { entry: SeguimientoEntr
             {contact ? (
                 <div className="space-y-2">
                     <h4 className="font-semibold">Contactos de los Padres</h4>
-                    <div className="flex items-center justify-between rounded-md border p-3">
-                        <div className="flex items-center gap-2">
-                           <Phone className="h-4 w-4" />
-                           <span className="font-mono text-sm">{contact.telefono_papa}</span>
-                        </div>
-                        <Badge variant="secondary">Papá</Badge>
-                    </div>
-                     <div className="flex items-center justify-between rounded-md border p-3">
-                        <div className="flex items-center gap-2">
-                           <Phone className="h-4 w-4" />
-                           <span className="font-mono text-sm">{contact.telefono_mama}</span>
-                        </div>
-                        <Badge variant="secondary">Mamá</Badge>
-                    </div>
+                    <CopyableContactField label="Teléfono Papá" value={contact.telefono_papa} />
+                    <CopyableContactField label="Teléfono Mamá" value={contact.telefono_mama} />
                 </div>
             ) : <p className="text-sm text-muted-foreground text-center">No se encontró información de contacto para los padres.</p>}
         </div>
@@ -203,7 +220,7 @@ export function SeguimientoPanel() {
             <style>
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                line-height: 1.6;
+                line-height: 1.5;
                 color: #27272a; 
                 font-size: 9px;
                 margin: 0.5in;
@@ -235,23 +252,24 @@ export function SeguimientoPanel() {
                 cursor: pointer; 
               }
               .report-entry {
-                margin-bottom: 1.5rem;
+                margin-bottom: 1rem;
                 padding-bottom: 1rem;
                 border-bottom: 1px solid #e2e8f0;
                 page-break-inside: avoid;
               }
               .student-header { font-weight: bold; font-size: 1.1em; }
-              .situation { font-style: italic; }
-              .details { margin-top: 5px; }
-              .subjects-list, .notes-text {
+              .details-section { margin-top: 5px; }
+              .materias-list, .notes-text {
                   padding: 0;
                   margin: 0;
                   white-space: pre-wrap;
-                  font-family: monospace;
               }
-              .subject-item {
+               .materia-item {
                   display: block;
-                  margin-bottom: 4px;
+                  margin-bottom: 2px;
+              }
+              strong {
+                  font-weight: bold;
               }
             </style>
           </head>
@@ -281,21 +299,20 @@ export function SeguimientoPanel() {
                             detail = `(${s!.missedAssignments} de ${s!.missedAssignmentLimit} Tareas NE)`;
                         }
 
-                        return `<span class="subject-item">${s!.name} (Gpo: ${s!.group}) ${detail}${scheduleInfo}</span>`;
+                        return `<span class="materia-item">${s!.name} (Gpo: ${s!.group}) ${detail}${scheduleInfo}</span>`;
                     }).join('');
-                    materiasHtml = `<div class="details"><strong>Materias:</strong><br><div class="subjects-list">${subjectItems}</div></div>`;
+                    materiasHtml = `<div class="details-section"><strong>Materias:</strong><div class="materias-list">${subjectItems}</div></div>`;
                 }
 
                 let notasHtml = '';
                 if (entry.notes) {
-                    notasHtml = `<div class="details"><strong>Notas:</strong> <span class="notes-text">${entry.notes}</span></div>`;
+                    notasHtml = `<div class="details-section"><strong>Notas:</strong> <span class="notes-text">${entry.notes}</span></div>`;
                 }
 
                 return `
                   <div class="report-entry">
                       <p class="student-header">
-                        ${entry.studentName} (${entry.studentId}) - 
-                        <span class="situation">${situationText}</span>
+                        ${entry.studentName} (${entry.studentId}) - <strong>Situación:</strong> ${situationText}
                       </p>
                       ${materiasHtml}
                       ${notasHtml}
@@ -416,3 +433,5 @@ export function SeguimientoPanel() {
     </div>
   );
 }
+
+    
