@@ -101,13 +101,20 @@ export function SeguimientoPanel() {
             <style>
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                line-height: 1.5; 
+                line-height: 1.6; 
                 color: #27272a; 
                 font-size: 9px;
                 margin: 0.5in;
               }
+              @page {
+                size: letter;
+                margin: 0.5in;
+              }
               @media print {
                 .no-print { display: none; }
+                body {
+                  font-size: 9px;
+                }
               }
               h1 { 
                 color: #17594A; 
@@ -128,8 +135,8 @@ export function SeguimientoPanel() {
                 cursor: pointer; 
               }
               .report-entry {
-                margin-bottom: 1rem;
-                padding-bottom: 1rem;
+                margin-bottom: 1.2rem;
+                padding-bottom: 1.2rem;
                 border-bottom: 1px solid #e2e8f0;
                 page-break-inside: avoid;
               }
@@ -140,10 +147,11 @@ export function SeguimientoPanel() {
                   padding: 0;
                   margin: 0;
                   white-space: pre-wrap;
+                  font-family: monospace;
               }
                .subject-item {
                   display: block;
-                  margin-bottom: 3px;
+                  margin-bottom: 4px;
               }
             </style>
           </head>
@@ -165,7 +173,15 @@ export function SeguimientoPanel() {
                         const scheduleInfo = schedule && schedule.days.length > 0
                             ? ` - [${schedule.days.join(', ')}, ${schedule.startTime}-${schedule.endTime}]`
                             : '';
-                        return `<span class="subject-item">${s!.name} (Gpo: ${s!.group})${scheduleInfo}</span>`;
+                        
+                        let detail = '';
+                        if (entry.situation === 'faltas') {
+                            detail = `(${s!.absences} Faltas)`;
+                        } else if (entry.situation === 'no-entregados') {
+                            detail = `(${s!.missedAssignments} Tareas NE)`;
+                        }
+
+                        return `<span class="subject-item">${s!.name} (Gpo: ${s!.group}) ${detail}${scheduleInfo}</span>`;
                     }).join('');
                     materiasHtml = `<div class="details"><strong>Materias:</strong><br>${subjectItems}</div>`;
                 }
