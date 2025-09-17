@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '../ui/alert-dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
@@ -170,7 +170,7 @@ export function AddToSeguimientoDialog({ student, children }: { student: Student
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={handleSubmit} disabled={isSubmitting}>
-                        {isSubmitting ? 'Guardando...' : 'Agregar al Reporte'}
+                        {isSubmitting ? 'Guardando...' : 'Añadir a Reporte de Seguimiento'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -234,9 +234,9 @@ export function CreateBitacoraDialog({ student, children }: { student: Student, 
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <Dialog.Trigger asChild>
+            <DialogTrigger asChild>
                 {children}
-            </Dialog.Trigger>
+            </DialogTrigger>
             <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>Nuevo Reporte de Bitácora</DialogTitle>
