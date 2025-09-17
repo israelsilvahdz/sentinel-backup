@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
@@ -19,6 +19,9 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { AddToSeguimientoDialog, CreateBitacoraDialog } from './StudentActions';
+import { Dialog, DialogContent, DialogTrigger } from '../ui/dialog';
+import { ScrollArea } from '../ui/scroll-area';
+import { ChangeHistory } from './ChangeHistory';
 
 
 interface StudentCardProps {
@@ -87,7 +90,7 @@ function CopyButton({ textToCopy, tooltipText = 'Copiar' }: { textToCopy: string
 }
 
 function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
-    const { loadStudentSubjects, setSelectedStudentId, setActiveView, planType } = useDashboardFilters();
+    const { loadStudentSubjects, planType } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isAllCopied, setIsAllCopied] = useState(false);
@@ -115,11 +118,6 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     
     if (subjects.length === 0 && isOpen) {
        return <p className="text-muted-foreground text-sm px-6 pb-4">No se encontraron materias para este alumno.</p>
-    }
-
-    const handleHistoryClick = () => {
-      setSelectedStudentId(student.id);
-      setActiveView('history');
     }
 
     const handleCopyAllTeachers = (e: React.MouseEvent) => {
@@ -223,13 +221,6 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
 export function StudentCard({ student, startOpen = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
-  const { setActiveView, setSelectedStudentId } = useDashboardFilters();
-  
-  const handleExpedienteClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita que se abra/cierre el card
-    setSelectedStudentId(student.id);
-    setActiveView('history');
-  };
 
   return (
     <Card>
@@ -244,9 +235,26 @@ export function StudentCard({ student, startOpen = false }: StudentCardProps) {
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                     <Button variant="outline" size="sm" onClick={handleExpedienteClick}>
-                        EXPEDIENTE
-                    </Button>
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">EXPEDIENTE</Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                             <CardHeader>
+                                <CardTitle className="flex items-center text-2xl gap-3">
+                                    <FileText />
+                                    Expediente del Alumno
+                                </CardTitle>
+                                <CardDescription>Vista unificada del historial de cambios y la bitácora de seguimiento.</CardDescription>
+                            </CardHeader>
+                            <ScrollArea className="pr-6">
+                                <div className="space-y-6">
+                                    <StudentCard student={student} startOpen={true} />
+                                    <ChangeHistory studentId={student.id} />
+                                </div>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
                     <CreateBitacoraDialog student={student}>
                         <Button variant="outline" size="sm">REPORTE</Button>
                     </CreateBitacoraDialog>

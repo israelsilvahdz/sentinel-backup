@@ -21,7 +21,6 @@ import {
 import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
 import { StudentPanel } from './StudentPanel';
-import { StudentHistoryPanel } from './StudentHistoryPanel';
 import { ChangeStats } from './ChangeStats';
 import { PonderacionesDashboard } from './PonderacionesDashboard';
 import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
@@ -46,7 +45,7 @@ import { getBitacoraEntries } from '@/lib/firebase-services';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'history' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'seguimiento';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'seguimiento';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -85,8 +84,6 @@ interface DashboardContextType {
   getStudentChanges: (studentId: string) => Promise<Change[]>;
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
-  selectedStudentId: string | null;
-  setSelectedStudentId: (id: string | null) => void;
   planType: PlanType;
 }
 
@@ -130,7 +127,6 @@ export function DashboardClient() {
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('welcome');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   const fetchBitacoraEntries = useCallback(async () => {
     try {
@@ -219,9 +215,6 @@ export function DashboardClient() {
       setCaseType(null);
       setSubjectRiskFilter(null);
       setGroupId(null);
-    }
-     if (view !== 'history') {
-        setSelectedStudentId(null);
     }
   }
 
@@ -481,7 +474,6 @@ export function DashboardClient() {
     loadStudentSubjects: loadStudentSubjectsWrapper,
     getStudentChanges: getStudentChangesWrapper,
     activeView, setActiveView: handleSetActiveView,
-    selectedStudentId, setSelectedStudentId,
     planType,
   };
 
@@ -490,7 +482,6 @@ export function DashboardClient() {
         case 'welcome': return <WelcomeDashboard />;
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
-        case 'history': return <StudentHistoryPanel />;
         case 'change-stats': return <ChangeStats />;
         case 'map-planner': return <MapPlanner />;
         case 'ponderaciones': return <PonderacionesDashboard />;
