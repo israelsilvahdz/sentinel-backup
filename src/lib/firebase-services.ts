@@ -91,7 +91,7 @@ export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
  */
 export const deleteBitacoraEntry = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, BITACora_COLLECTION, id);
+    const docRef = doc(db, BITACORA_COLLECTION, id);
     await deleteDoc(docRef);
   } catch (error) {
     console.error("Error al eliminar documento de Firestore: ", error);
