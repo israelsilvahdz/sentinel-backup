@@ -3,12 +3,12 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText } from 'lucide-react';
-import { type Student, type Subject, type SubjectSummary, type BitacoraEntry } from "@/types/student";
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText, ClipboardList } from 'lucide-react';
+import { type Student, type Subject, type SubjectSummary, type BitacoraEntry, type SeguimientoEntry } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +18,14 @@ import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '../ui/alert-dialog';
+import { Label } from '../ui/label';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Textarea } from '../ui/textarea';
+import { Checkbox } from '../ui/checkbox';
+import { addSeguimientoEntry } from '@/lib/firebase-services';
+import { useToast } from '@/hooks/use-toast';
+
 
 interface StudentCardProps {
   student: Student;
@@ -85,6 +93,144 @@ function CopyButton({ textToCopy, tooltipText = 'Copiar' }: { textToCopy: string
     );
 }
 
+function AddToSeguimientoDialog({ student, studentSubjects }: { student: Student, studentSubjects: Subject[] }) {
+    const { toast } = useToast();
+    const [isOpen, setIsOpen] = useState(false);
+    const [situation, setSituation] = useState<'faltas' | 'no-entregados' | 'otro'>('otro');
+    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+    const [notes, setNotes] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const relevantSubjects = (studentSubjects || []).filter(s => {
+        if (situation === 'faltas') return s.absences > 0;
+        if (situation === 'no-entregados') return s.missedAssignments > 0;
+        return false;
+    });
+
+    const handleSituationChange = (value: 'faltas' | 'no-entregados' | 'otro') => {
+        setSituation(value);
+        setSelectedSubjects([]); // Reset selection when situation changes
+    };
+
+    const handleSubjectToggle = (subjectId: string) => {
+        setSelectedSubjects(prev => 
+            prev.includes(subjectId) ? prev.filter(id => id !== subjectId) : [...prev, subjectId]
+        );
+    };
+
+    const handleSubmit = async () => {
+        if (situation !== 'otro' && selectedSubjects.length === 0) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Debes seleccionar al menos una materia.' });
+            return;
+        }
+        if (situation === 'otro' && !notes.trim()) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Debes añadir una nota para la situación "Otro".' });
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const entry: Omit<SeguimientoEntry, 'id' | 'createdAt' | 'status'> = {
+                studentId: student.id,
+                studentName: student.name,
+                leader: student.leader,
+                tutor: student.tutor,
+                situation,
+                subjects: selectedSubjects,
+                notes: notes.trim(),
+            };
+            await addSeguimientoEntry(entry);
+            toast({ title: 'Éxito', description: `${student.name} ha sido añadido al reporte de seguimiento.` });
+            setIsOpen(false);
+            // Reset state
+            setSituation('otro');
+            setSelectedSubjects([]);
+            setNotes('');
+        } catch (error) {
+            console.error("Error adding to seguimiento report:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el caso de seguimiento.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="ml-2">
+                                <ClipboardList className="h-4 w-4" />
+                            </Button>
+                        </AlertDialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Agregar a Reporte de Seguimiento</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+            <AlertDialogContent className="sm:max-w-xl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Agregar Caso de Seguimiento</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Crea un nuevo caso para {student.name} ({student.id})
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Situación a reportar</Label>
+                        <RadioGroup value={situation} onValueChange={handleSituationChange} className="flex gap-4">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="faltas" id="faltas" /><Label htmlFor="faltas">Faltas</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="no-entregados" id="no-entregados" /><Label htmlFor="no-entregados">Tareas No Entregadas</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="otro" id="otro" /><Label htmlFor="otro">Otro</Label></div>
+                        </RadioGroup>
+                    </div>
+
+                    {situation !== 'otro' && (
+                        <div className="space-y-2">
+                            <Label>Materias con riesgo</Label>
+                            {relevantSubjects.length > 0 ? (
+                                <Card className="p-3 max-h-36 overflow-y-auto">
+                                    <div className="space-y-2">
+                                        {relevantSubjects.map(s => (
+                                            <div key={s.id} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`subject-${s.id}`}
+                                                    checked={selectedSubjects.includes(s.id)}
+                                                    onCheckedChange={() => handleSubjectToggle(s.id)}
+                                                />
+                                                <Label htmlFor={`subject-${s.id}`} className="font-normal w-full flex justify-between">
+                                                    <span>{s.name}</span>
+                                                    <Badge variant="secondary">
+                                                        {situation === 'faltas' ? `${s.absences} Faltas` : `${s.missedAssignments} NE`}
+                                                    </Badge>
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">No se encontraron materias con riesgo para esta situación.</p>
+                            )}
+                        </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                        <Label htmlFor="notes">Notas adicionales</Label>
+                        <Textarea id="notes" placeholder="Describe el contexto, acuerdos o cualquier información relevante..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+                    </div>
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? 'Guardando...' : 'Agregar al Reporte'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
 
 function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
     const { loadStudentSubjects, setSelectedStudentId, setActiveView, planType } = useDashboardFilters();
@@ -139,13 +285,16 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
     return (
       <Tabs defaultValue="materias" className="w-full">
-        <div className="px-6">
-          <TabsList>
-            <TabsTrigger value="materias">Materias</TabsTrigger>
-            <TabsTrigger value="horario">Horario</TabsTrigger>
-            <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
-          </TabsList>
-        </div>
+        <CardHeader className="flex-row items-center justify-between pt-0 px-6">
+            <TabsList>
+                <TabsTrigger value="materias">Materias</TabsTrigger>
+                <TabsTrigger value="horario">Horario</TabsTrigger>
+                <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-2">
+               <AddToSeguimientoDialog student={student} studentSubjects={subjects} />
+            </div>
+        </CardHeader>
         <TabsContent value="materias">
           <div className="overflow-x-auto">
               <Table>

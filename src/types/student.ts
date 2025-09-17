@@ -1,4 +1,5 @@
 
+
 export interface Subject {
   id: string; // CRN
   key: string; // Clave de materia
@@ -72,4 +73,17 @@ export interface BitacoraEntry {
   agreements: string;
   caseType: 'academica' | 'conductual';
   academicCommittee: boolean;
+}
+
+export interface SeguimientoEntry {
+    id: string;
+    createdAt: any; // Firestore Timestamp
+    studentId: string;
+    studentName: string;
+    leader: string;
+    tutor: string;
+    situation: 'faltas' | 'no-entregados' | 'otro';
+    subjects: string[]; // Array of subject CRNs
+    notes: string;
+    status: 'pendiente' | 'completado';
 }

@@ -10,9 +10,10 @@ import {
   orderBy, 
   Timestamp,
   doc,
-  deleteDoc
+  deleteDoc,
+  updateDoc
 } from 'firebase/firestore';
-import type { BitacoraEntry } from '@/types/student';
+import type { BitacoraEntry, SeguimientoEntry } from '@/types/student';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -20,7 +21,7 @@ const firebaseConfig = {
   authDomain: "tecmilenio-mdea.firebaseapp.com",
   databaseURL: "https://tecmilenio-mdea-default-rtdb.firebaseio.com",
   projectId: "tecmilenio-mdea",
-  storageBucket: "tecmilenio-mdea.firebasestorage.app",
+  storageBucket: "tecmilenio-mdea.appspot.com",
   messagingSenderId: "576664692340",
   appId: "1:576664692340:web:6669b709986d62d94d5321"
 };
@@ -37,6 +38,7 @@ if (!getApps().length) {
 
 const db = getFirestore(app);
 const BITACORA_COLLECTION = 'bitacora';
+const SEGUIMIENTO_COLLECTION = 'seguimiento';
 
 /**
  * Añade una nueva entrada a la bitácora en Firestore.
@@ -65,15 +67,17 @@ export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
     const bitacoraQuery = query(collection(db, BITACORA_COLLECTION), orderBy('eventDate', 'desc'));
     const querySnapshot = await getDocs(bitacoraQuery);
     
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    } as BitacoraEntry));
+    const entries: BitacoraEntry[] = [];
+    querySnapshot.forEach(doc => {
+        entries.push({
+            id: doc.id,
+            ...doc.data()
+        } as BitacoraEntry);
+    });
+    return entries;
 
   } catch (error) {
     console.error("Error al obtener documentos de Firestore: ", error);
-    // Si la base de datos no está configurada, es mejor devolver un array vacío
-    // para no romper la UI. El error ya se muestra en la consola.
     if (error instanceof Error && error.message.includes("Failed to get document because the client is offline")) {
         console.warn("Firestore está offline. Verifica la configuración y la conexión a internet.");
     }
@@ -87,10 +91,83 @@ export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
  */
 export const deleteBitacoraEntry = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, BITACORA_COLLECTION, id);
+    const docRef = doc(db, BITACora_COLLECTION, id);
     await deleteDoc(docRef);
   } catch (error) {
     console.error("Error al eliminar documento de Firestore: ", error);
     throw new Error("No se pudo eliminar el registro de la base de datos.");
+  }
+};
+
+
+// --- Funciones para Reporte de Seguimiento ---
+
+/**
+ * Añade un nuevo caso al reporte de seguimiento.
+ */
+export const addSeguimientoEntry = async (entry: Omit<SeguimientoEntry, 'id' | 'createdAt' | 'status'>): Promise<void> => {
+  try {
+    await addDoc(collection(db, SEGUIMIENTO_COLLECTION), {
+      ...entry,
+      status: 'pendiente',
+      createdAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error("Error al añadir caso de seguimiento: ", error);
+    throw new Error("No se pudo guardar el caso de seguimiento.");
+  }
+};
+
+
+/**
+ * Obtiene todos los casos de seguimiento, ordenados por fecha de creación.
+ */
+export const getSeguimientoEntries = async (): Promise<SeguimientoEntry[]> => {
+  try {
+    const seguimientoQuery = query(collection(db, SEGUIMIENTO_COLLECTION), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(seguimientoQuery);
+    
+    const entries: SeguimientoEntry[] = [];
+    querySnapshot.forEach(doc => {
+        const data = doc.data();
+        entries.push({
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt, // Mantener como Timestamp por ahora
+        } as SeguimientoEntry);
+    });
+    return entries;
+
+  } catch (error) {
+    console.error("Error al obtener casos de seguimiento: ", error);
+    return [];
+  }
+};
+
+
+/**
+ * Actualiza el estado de un caso de seguimiento.
+ */
+export const updateSeguimientoStatus = async (id: string, status: 'pendiente' | 'completado'): Promise<void> => {
+    try {
+        const docRef = doc(db, SEGUIMIENTO_COLLECTION, id);
+        await updateDoc(docRef, { status });
+    } catch (error) {
+        console.error("Error al actualizar estado de seguimiento: ", error);
+        throw new Error("No se pudo actualizar el estado del caso.");
+    }
+};
+
+
+/**
+ * Elimina un caso de seguimiento por su ID.
+ */
+export const deleteSeguimientoEntry = async (id: string): Promise<void> => {
+  try {
+    const docRef = doc(db, SEGUIMIENTO_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error("Error al eliminar caso de seguimiento: ", error);
+    throw new Error("No se pudo eliminar el caso de la base de datos.");
   }
 };
