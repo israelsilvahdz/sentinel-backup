@@ -220,10 +220,11 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     }
 
     const recipients = teachersToNotify.map(t => t.email || t.name).join(',');
-
-    const subject = isFutureNotice 
-        ? `Aviso a Futuro - Alumno ${studentName}`
-        : `Notificación - Alumno ${studentName}`;
+    
+    let subject = 'Notificación';
+    if(notificationReason === 'Ausencia') {
+        subject = 'Notificación de Ausencia';
+    }
     
     let dateText;
     if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
@@ -412,3 +413,5 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     </TooltipProvider>
   );
 }
+
+    
