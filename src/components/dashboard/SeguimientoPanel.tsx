@@ -12,8 +12,110 @@ import type { SeguimientoEntry } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList } from 'lucide-react';
+import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList, MessageSquare, Phone, Copy, Check } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import contactData from '@/lib/student-contacts.json';
+
+
+interface StudentContact {
+    nombre: string;
+    telefono_alumno: string;
+    telefono_papa: string;
+    telefono_mama: string;
+    correo_alumno: string;
+    correo_papa: string;
+    correo_mama: string;
+}
+
+const contactsMap = new Map<string, StudentContact>(
+    Object.entries(contactData)
+);
+
+function NotifyParentsDialog({ entry, subjectsInCase }: { entry: SeguimientoEntry, subjectsInCase: any[] }) {
+  const { toast } = useToast();
+  const [isCopied, setIsCopied] = useState(false);
+  const contact = contactsMap.get(entry.studentId);
+
+  const generateMessage = () => {
+    let subjectDetails = subjectsInCase.map(s => {
+        if (entry.situation === 'faltas') {
+            return `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`;
+        }
+        if (entry.situation === 'no-entregados') {
+            return `${s.missedAssignments} de ${s.missedAssignmentLimit} tareas no entregadas en ${s.name}`;
+        }
+        return s.name;
+    }).join(', ');
+
+    let message = `Estimados padres de ${entry.studentName}, les saludamos cordialmente desde Tecmilenio para informarles sobre la siguiente situación académica: `;
+
+    switch (entry.situation) {
+        case 'faltas':
+            message += `Se ha detectado un número considerable de faltas en las siguientes materias: ${subjectDetails}.`;
+            break;
+        case 'no-entregados':
+            message += `Se ha registrado un número considerable de tareas no entregadas en: ${subjectDetails}.`;
+            break;
+        case 'otro':
+            message += `Se ha registrado un caso de seguimiento con las siguientes notas: "${entry.notes}".`;
+            break;
+    }
+
+    message += ` Agradecemos su apoyo desde casa para dar seguimiento a este tema. Quedo a su disposición.`;
+    return message;
+  };
+  
+  const message = generateMessage();
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message).then(() => {
+        setIsCopied(true);
+        toast({ title: '¡Mensaje copiado!', description: 'El mensaje está listo para ser pegado.' });
+        setTimeout(() => setIsCopied(false), 2500);
+    });
+  };
+
+  return (
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Notificar a Padres</DialogTitle>
+          <DialogDescription>
+            Copia el mensaje y usa los contactos para enviarlo por WhatsApp.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+            <div className="rounded-md border bg-muted/50 p-4 text-sm">
+                {message}
+            </div>
+             <Button onClick={handleCopy} className="w-full">
+                {isCopied ? <Check className="mr-2 h-4 w-4"/> : <Copy className="mr-2 h-4 w-4" />}
+                {isCopied ? 'Copiado' : 'Copiar Mensaje'}
+            </Button>
+            {contact ? (
+                <div className="space-y-2">
+                    <h4 className="font-semibold">Contactos de los Padres</h4>
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                        <div className="flex items-center gap-2">
+                           <Phone className="h-4 w-4" />
+                           <span className="font-mono text-sm">{contact.telefono_papa}</span>
+                        </div>
+                        <Badge variant="secondary">Papá</Badge>
+                    </div>
+                     <div className="flex items-center justify-between rounded-md border p-3">
+                        <div className="flex items-center gap-2">
+                           <Phone className="h-4 w-4" />
+                           <span className="font-mono text-sm">{contact.telefono_mama}</span>
+                        </div>
+                        <Badge variant="secondary">Mamá</Badge>
+                    </div>
+                </div>
+            ) : <p className="text-sm text-muted-foreground text-center">No se encontró información de contacto para los padres.</p>}
+        </div>
+      </DialogContent>
+  );
+}
+
 
 export function SeguimientoPanel() {
   const { allStudentsMap, selectedValue, filterType } = useDashboardFilters();
@@ -101,7 +203,7 @@ export function SeguimientoPanel() {
             <style>
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                line-height: 1.5; 
+                line-height: 1.6;
                 color: #27272a; 
                 font-size: 9px;
                 margin: 0.5in;
@@ -112,9 +214,7 @@ export function SeguimientoPanel() {
               }
               @media print {
                 .no-print { display: none; }
-                body {
-                  font-size: 9px;
-                }
+                body { font-size: 9px; }
               }
               h1 { 
                 color: #17594A; 
@@ -135,21 +235,21 @@ export function SeguimientoPanel() {
                 cursor: pointer; 
               }
               .report-entry {
-                margin-bottom: 1rem;
+                margin-bottom: 1.5rem;
                 padding-bottom: 1rem;
                 border-bottom: 1px solid #e2e8f0;
                 page-break-inside: avoid;
               }
               .student-header { font-weight: bold; font-size: 1.1em; }
               .situation { font-style: italic; }
-              .details { margin-left: 15px; margin-top: 5px; }
+              .details { margin-top: 5px; }
               .subjects-list, .notes-text {
                   padding: 0;
                   margin: 0;
                   white-space: pre-wrap;
                   font-family: monospace;
               }
-               .subject-item {
+              .subject-item {
                   display: block;
                   margin-bottom: 4px;
               }
@@ -183,7 +283,7 @@ export function SeguimientoPanel() {
 
                         return `<span class="subject-item">${s!.name} (Gpo: ${s!.group}) ${detail}${scheduleInfo}</span>`;
                     }).join('');
-                    materiasHtml = `<div class="details"><strong>Materias:</strong><br>${subjectItems}</div>`;
+                    materiasHtml = `<div class="details"><strong>Materias:</strong><br><div class="subjects-list">${subjectItems}</div></div>`;
                 }
 
                 let notasHtml = '';
@@ -259,13 +359,21 @@ export function SeguimientoPanel() {
                     Agregado el: {format(entry.createdAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
                   </CardDescription>
                 </div>
-                 <AlertDialog>
-                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente y eliminará el caso de seguimiento.</AlertDialogDescription></AlertDialogHeader>
-                        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(entry.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                <div className="flex items-center gap-1">
+                     <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600"><MessageSquare className="h-4 w-4" /></Button>
+                        </DialogTrigger>
+                        <NotifyParentsDialog entry={entry} subjectsInCase={subjectsInCase} />
+                     </Dialog>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente y eliminará el caso de seguimiento.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(entry.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                  <div className="flex items-center gap-2 font-semibold">
