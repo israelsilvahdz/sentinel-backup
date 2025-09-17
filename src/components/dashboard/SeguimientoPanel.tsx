@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -16,7 +17,7 @@ import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, Clipb
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 
 export function SeguimientoPanel() {
-  const { allStudentsMap } = useDashboardFilters();
+  const { allStudentsMap, selectedValue: selectedLeader } = useDashboardFilters();
   const [entries, setEntries] = useState<SeguimientoEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -37,6 +38,12 @@ export function SeguimientoPanel() {
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
+
+  const filteredEntries = useMemo(() => {
+    if (!selectedLeader) return entries;
+    return entries.filter(entry => entry.leader === selectedLeader);
+  }, [entries, selectedLeader]);
+
 
   const handleStatusChange = async (id: string, currentStatus: 'pendiente' | 'completado') => {
     const newStatus = currentStatus === 'pendiente' ? 'completado' : 'pendiente';
@@ -59,6 +66,79 @@ export function SeguimientoPanel() {
     }
   };
 
+  const handleGenerateReport = () => {
+    const pendingEntries = filteredEntries.filter(e => e.status === 'pendiente');
+
+    if (pendingEntries.length === 0) {
+      toast({
+        title: "No hay casos pendientes",
+        description: "No hay casos de seguimiento marcados como 'pendientes' para generar un reporte.",
+      });
+      return;
+    }
+
+    const reportWindow = window.open('', '_blank');
+    if (reportWindow) {
+      const studentData = (id: string) => allStudentsMap.get(id);
+
+      const content = `
+        <html>
+          <head>
+            <title>Reporte de Seguimiento - ${format(new Date(), 'dd/MM/yyyy')}</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 2rem; color: #333; }
+              @media print {
+                body { padding: 1rem; }
+                .no-print { display: none; }
+              }
+              h1 { color: #17594A; border-bottom: 2px solid #17594A; padding-bottom: 8px; }
+              .case { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; page-break-inside: avoid; }
+              .case-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+              .student-info h2 { margin: 0; font-size: 1.5rem; }
+              .student-info p { margin: 0; color: #666; }
+              .situation-badge { background-color: #eee; color: #333; padding: 4px 8px; border-radius: 4px; font-weight: 500; text-transform: capitalize; }
+              .notes { background-color: #f9f9f9; border: 1px solid #eee; border-radius: 4px; padding: 1rem; white-space: pre-wrap; margin-top: 1rem; }
+              .subjects-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.5rem;}
+              .subjects-list li { background-color: #e2e8f0; padding: 2px 8px; border-radius: 99px; font-size: 0.875rem; }
+              .print-button { position: fixed; top: 1rem; right: 1rem; padding: 10px 15px; background: #17594A; color: white; border: none; border-radius: 5px; cursor: pointer; }
+            </style>
+          </head>
+          <body>
+            <button class="print-button no-print" onclick="window.print()">Imprimir Reporte</button>
+            <h1>Reporte de Seguimiento - ${selectedLeader ? `${selectedLeader} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
+            <p>Total de casos pendientes: ${pendingEntries.length}</p>
+            ${pendingEntries.map(entry => {
+              const subjectsInCase = entry.subjects.map(subjectId => studentData(entry.studentId)?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
+              return `
+                <div class="case">
+                  <div class="case-header">
+                    <div class="student-info">
+                      <h2>${entry.studentName}</h2>
+                      <p>Matrícula: ${entry.studentId} | Tutor: ${entry.tutor}</p>
+                    </div>
+                    <span class="situation-badge">${entry.situation}</span>
+                  </div>
+                  ${subjectsInCase.length > 0 ? `
+                    <div>
+                      <strong>Materias:</strong>
+                      <ul class="subjects-list">
+                        ${subjectsInCase.map(s => `<li>${s!.name}</li>`).join('')}
+                      </ul>
+                    </div>
+                  ` : ''}
+                  ${entry.notes ? `<div class="notes"><strong>Notas:</strong><br/>${entry.notes}</div>` : ''}
+                </div>
+              `
+            }).join('')}
+          </body>
+        </html>
+      `;
+      reportWindow.document.write(content);
+      reportWindow.document.close();
+    }
+  };
+
+
   const SITUATION_MAP: Record<SeguimientoEntry['situation'], { icon: React.ReactNode, text: string }> = {
     'faltas': { icon: <FileWarning className="h-4 w-4 text-yellow-600" />, text: 'Faltas' },
     'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
@@ -80,14 +160,14 @@ export function SeguimientoPanel() {
             <h1 className="text-3xl font-bold tracking-tight">Reporte de Seguimiento</h1>
             <p className="text-muted-foreground">Casos de alumnos que requieren atención y seguimiento especial.</p>
         </div>
-        <Button disabled>
+        <Button onClick={handleGenerateReport}>
             <Printer className="mr-2 h-4 w-4" />
             Terminar y Generar Reporte
         </Button>
       </header>
 
       <div className="space-y-4">
-        {entries.length > 0 ? entries.map(entry => {
+        {filteredEntries.length > 0 ? filteredEntries.map(entry => {
           const student = allStudentsMap.get(entry.studentId);
           const subjectsInCase = entry.subjects.map(subjectId => 
             student?.subjects?.find(s => s.id === subjectId)
@@ -152,7 +232,7 @@ export function SeguimientoPanel() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                      Agrega un caso desde el Panel de Alumnos para comenzar.
+                      Agrega un caso desde el Panel de Alumnos para comenzar, o revisa que los filtros aplicados no estén ocultando los casos.
                     </p>
                 </CardContent>
             </Card>

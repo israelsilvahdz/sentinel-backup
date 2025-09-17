@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -106,11 +106,19 @@ function AddToSeguimientoDialog({ student, studentSubjects }: { student: Student
         if (situation === 'no-entregados') return s.missedAssignments > 0;
         return false;
     });
-
-    const handleSituationChange = (value: 'faltas' | 'no-entregados' | 'otro') => {
+    
+    const handleSituationChange = useCallback((value: 'faltas' | 'no-entregados' | 'otro') => {
         setSituation(value);
-        setSelectedSubjects([]); // Reset selection when situation changes
-    };
+        if (value === 'faltas' || value === 'no-entregados') {
+            const subjectsToSelect = (studentSubjects || [])
+                .filter(s => (value === 'faltas' ? s.absences > 0 : s.missedAssignments > 0))
+                .map(s => s.id);
+            setSelectedSubjects(subjectsToSelect);
+        } else {
+            setSelectedSubjects([]);
+        }
+    }, [studentSubjects]);
+
 
     const handleSubjectToggle = (subjectId: string) => {
         setSelectedSubjects(prev => 
