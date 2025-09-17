@@ -91,50 +91,63 @@ export function SeguimientoPanel() {
           <head>
             <title>Reporte de Seguimiento - ${format(new Date(), 'dd/MM/yyyy')}</title>
             <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 2rem; color: #333; }
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; padding: 1.5rem; color: #27272a; font-size: 10px; }
               @media print {
-                body { padding: 1rem; }
+                body { padding: 1rem; font-size: 9px; }
                 .no-print { display: none; }
               }
-              h1 { color: #17594A; border-bottom: 2px solid #17594A; padding-bottom: 8px; }
-              .case { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; page-break-inside: avoid; }
-              .case-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
-              .student-info h2 { margin: 0; font-size: 1.5rem; }
-              .student-info p { margin: 0; color: #666; }
-              .situation-badge { background-color: #eee; color: #333; padding: 4px 8px; border-radius: 4px; font-weight: 500; text-transform: capitalize; }
-              .notes { background-color: #f9f9f9; border: 1px solid #eee; border-radius: 4px; padding: 1rem; white-space: pre-wrap; margin-top: 1rem; }
-              .subjects-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.5rem;}
-              .subjects-list li { background-color: #e2e8f0; padding: 2px 8px; border-radius: 99px; font-size: 0.875rem; }
-              .print-button { position: fixed; top: 1rem; right: 1rem; padding: 10px 15px; background: #17594A; color: white; border: none; border-radius: 5px; cursor: pointer; }
+              h1 { color: #17594A; border-bottom: 2px solid #17594A; padding-bottom: 8px; margin-bottom: 1.5rem; font-size: 1.8em; }
+              .print-button { position: fixed; top: 1rem; right: 1rem; padding: 8px 12px; background: #17594A; color: white; border: none; border-radius: 5px; cursor: pointer; }
+              table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+              th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; vertical-align: top; }
+              th { background-color: #f1f5f9; font-weight: 600; }
+              .notes-cell { white-space: pre-wrap; min-width: 150px; }
+              .subjects-list { list-style: none; padding: 0; margin: 0; }
+              .subjects-list li { margin-bottom: 2px; }
+              .student-cell { min-width: 120px; }
+              .tutor-cell { min-width: 100px; }
+              .situation-cell { min-width: 80px; }
+              .follow-up-cell { min-width: 180px; height: 60px; }
+              .follow-up-lines { height: 100%; display: flex; flex-direction: column; justify-content: space-around; }
+              .follow-up-lines > div { border-bottom: 1px dotted #a1a1aa; flex-grow: 1; }
             </style>
           </head>
           <body>
             <button class="print-button no-print" onclick="window.print()">Imprimir Reporte</button>
             <h1>Reporte de Seguimiento - ${selectedValue ? `${selectedValue} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
             <p>Total de casos pendientes: ${pendingEntries.length}</p>
-            ${pendingEntries.map(entry => {
-              const subjectsInCase = entry.subjects.map(subjectId => studentData(entry.studentId)?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
-              return `
-                <div class="case">
-                  <div class="case-header">
-                    <div class="student-info">
-                      <h2>${entry.studentName}</h2>
-                      <p>Matrícula: ${entry.studentId} | Tutor: ${entry.tutor}</p>
-                    </div>
-                    <span class="situation-badge">${entry.situation}</span>
-                  </div>
-                  ${subjectsInCase.length > 0 ? `
-                    <div>
-                      <strong>Materias:</strong>
-                      <ul class="subjects-list">
-                        ${subjectsInCase.map(s => `<li>${s!.name}</li>`).join('')}
-                      </ul>
-                    </div>
-                  ` : ''}
-                  ${entry.notes ? `<div class="notes"><strong>Notas:</strong><br/>${entry.notes}</div>` : ''}
-                </div>
-              `
-            }).join('')}
+            <table>
+              <thead>
+                <tr>
+                  <th>Alumno</th>
+                  <th>Tutor</th>
+                  <th>Situación</th>
+                  <th>Materias</th>
+                  <th>Notas</th>
+                  <th class="follow-up-cell">Seguimiento</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pendingEntries.map(entry => {
+                  const subjectsInCase = entry.subjects.map(subjectId => studentData(entry.studentId)?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
+                  const situationText = SITUATION_MAP[entry.situation].text || entry.situation;
+                  return `
+                    <tr>
+                      <td class="student-cell"><strong>${entry.studentName}</strong><br><small>${entry.studentId}</small></td>
+                      <td class="tutor-cell">${entry.tutor || 'N/A'}</td>
+                      <td class="situation-cell">${situationText}</td>
+                      <td>
+                        ${subjectsInCase.length > 0 ? `<ul class="subjects-list">${subjectsInCase.map(s => `<li>- ${s!.name}</li>`).join('')}</ul>` : 'N/A'}
+                      </td>
+                      <td class="notes-cell">${entry.notes || ''}</td>
+                      <td class="follow-up-cell">
+                        <div class="follow-up-lines"><div></div><div></div><div></div></div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
           </body>
         </html>
       `;
