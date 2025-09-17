@@ -16,6 +16,8 @@ import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, Clipb
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import contactData from '@/lib/student-contacts.json';
+import { Switch } from '../ui/switch';
+import { Label } from '../ui/label';
 
 
 interface StudentContact {
@@ -138,6 +140,7 @@ export function SeguimientoPanel() {
   const { allStudentsMap, selectedValue, filterType } = useDashboardFilters();
   const [entries, setEntries] = useState<SeguimientoEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(false);
   const { toast } = useToast();
 
   const fetchEntries = useCallback(async () => {
@@ -158,17 +161,23 @@ export function SeguimientoPanel() {
   }, [fetchEntries]);
 
  const filteredEntries = useMemo(() => {
-    if (!selectedValue) return entries;
+    let baseEntries = entries;
+    
+    if (!showCompleted) {
+        baseEntries = baseEntries.filter(entry => entry.status === 'pendiente');
+    }
+
+    if (!selectedValue) return baseEntries;
     
     if (filterType === 'leader') {
-      return entries.filter(entry => entry.leader === selectedValue);
+      return baseEntries.filter(entry => entry.leader === selectedValue);
     }
     if (filterType === 'tutor') {
-        return entries.filter(entry => entry.tutor === selectedValue);
+        return baseEntries.filter(entry => entry.tutor === selectedValue);
     }
     
-    return entries;
-  }, [entries, selectedValue, filterType]);
+    return baseEntries;
+  }, [entries, selectedValue, filterType, showCompleted]);
 
 
   const handleStatusChange = async (id: string, currentStatus: 'pendiente' | 'completado') => {
@@ -199,7 +208,7 @@ export function SeguimientoPanel() {
   };
 
   const handleGenerateReport = () => {
-    const pendingEntries = filteredEntries.filter(e => e.status === 'pendiente');
+    const pendingEntries = entries.filter(e => e.status === 'pendiente');
 
     if (pendingEntries.length === 0) {
       toast({
@@ -222,7 +231,6 @@ export function SeguimientoPanel() {
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
                 line-height: 1.5;
                 color: #27272a; 
-                font-size: 9px;
                 margin: 0.5in;
               }
               @page {
@@ -258,7 +266,7 @@ export function SeguimientoPanel() {
                 page-break-inside: avoid;
               }
               .student-header { font-weight: bold; font-size: 1.1em; }
-              .details-section { margin-top: 5px; }
+              .details-section { margin-top: 5px; padding-left: 1rem; }
               .materias-list, .notes-text {
                   padding: 0;
                   margin: 0;
@@ -344,10 +352,16 @@ export function SeguimientoPanel() {
             <h1 className="text-3xl font-bold tracking-tight">Reporte de Seguimiento</h1>
             <p className="text-muted-foreground">Casos de alumnos que requieren atención y seguimiento especial.</p>
         </div>
-        <Button onClick={handleGenerateReport}>
-            <Printer className="mr-2 h-4 w-4" />
-            Terminar y Generar Reporte
-        </Button>
+        <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Switch id="show-completed" checked={showCompleted} onCheckedChange={setShowCompleted} />
+              <Label htmlFor="show-completed">Mostrar completados</Label>
+            </div>
+            <Button onClick={handleGenerateReport}>
+                <Printer className="mr-2 h-4 w-4" />
+                Terminar y Generar Reporte
+            </Button>
+        </div>
       </header>
 
       <div className="space-y-4">
@@ -424,7 +438,7 @@ export function SeguimientoPanel() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                      Agrega un caso desde el Panel de Alumnos para comenzar, o revisa que los filtros aplicados no estén ocultando los casos.
+                      {showCompleted ? "No se encontraron casos de seguimiento con los filtros actuales." : "No hay casos pendientes. ¡Buen trabajo! Activa el interruptor para ver los casos completados."}
                     </p>
                 </CardContent>
             </Card>
