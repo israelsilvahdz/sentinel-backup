@@ -19,7 +19,7 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { AddToSeguimientoDialog, CreateBitacoraDialog } from './StudentActions';
-import { Dialog, DialogContent, DialogTrigger } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 
@@ -240,15 +240,15 @@ export function StudentCard({ student, startOpen = false }: StudentCardProps) {
                             <Button variant="outline" size="sm">EXPEDIENTE</Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                             <CardHeader>
-                                <CardTitle className="flex items-center text-2xl gap-3">
+                             <DialogHeader>
+                                <DialogTitle className="flex items-center text-2xl gap-3">
                                     <FileText />
                                     Expediente del Alumno
-                                </CardTitle>
-                                <CardDescription>
+                                </DialogTitle>
+                                <DialogDescription>
                                   {student.name} ({student.id}) | Líder: {student.leader} | Tutor: {student.tutor}
-                                </CardDescription>
-                            </CardHeader>
+                                </DialogDescription>
+                            </DialogHeader>
                             <ScrollArea className="pr-6 flex-1">
                                 <ChangeHistory studentId={student.id} />
                             </ScrollArea>
