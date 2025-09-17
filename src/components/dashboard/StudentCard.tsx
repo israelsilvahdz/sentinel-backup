@@ -245,13 +245,12 @@ export function StudentCard({ student, startOpen = false }: StudentCardProps) {
                                     <FileText />
                                     Expediente del Alumno
                                 </CardTitle>
-                                <CardDescription>Vista unificada del historial de cambios y la bitácora de seguimiento.</CardDescription>
+                                <CardDescription>
+                                  {student.name} ({student.id}) | Líder: {student.leader} | Tutor: {student.tutor}
+                                </CardDescription>
                             </CardHeader>
-                            <ScrollArea className="pr-6">
-                                <div className="space-y-6">
-                                    <StudentCard student={student} startOpen={true} />
-                                    <ChangeHistory studentId={student.id} />
-                                </div>
+                            <ScrollArea className="pr-6 flex-1">
+                                <ChangeHistory studentId={student.id} />
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
