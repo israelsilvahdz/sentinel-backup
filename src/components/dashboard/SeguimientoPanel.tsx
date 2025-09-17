@@ -107,9 +107,6 @@ export function SeguimientoPanel() {
               .student-cell { min-width: 120px; }
               .tutor-cell { min-width: 100px; }
               .situation-cell { min-width: 80px; }
-              .follow-up-cell { min-width: 180px; height: 60px; }
-              .follow-up-lines { height: 100%; display: flex; flex-direction: column; justify-content: space-around; }
-              .follow-up-lines > div { border-bottom: 1px dotted #a1a1aa; flex-grow: 1; }
             </style>
           </head>
           <body>
@@ -124,7 +121,6 @@ export function SeguimientoPanel() {
                   <th>Situación</th>
                   <th>Materias</th>
                   <th>Notas</th>
-                  <th class="follow-up-cell">Seguimiento</th>
                 </tr>
               </thead>
               <tbody>
@@ -140,9 +136,6 @@ export function SeguimientoPanel() {
                         ${subjectsInCase.length > 0 ? `<ul class="subjects-list">${subjectsInCase.map(s => `<li>- ${s!.name}</li>`).join('')}</ul>` : 'N/A'}
                       </td>
                       <td class="notes-cell">${entry.notes || ''}</td>
-                      <td class="follow-up-cell">
-                        <div class="follow-up-lines"><div></div><div></div><div></div></div>
-                      </td>
                     </tr>
                   `;
                 }).join('')}
