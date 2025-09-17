@@ -87,3 +87,19 @@ export interface SeguimientoEntry {
     notes: string;
     status: 'pendiente' | 'completado';
 }
+
+export interface StudentContact {
+    studentId: string;
+    name: string;
+    sedena: string;
+    group: string;
+    studentPhone: string;
+    studentEmail: string;
+    dadName: string;
+    dadPhone: string;
+    dadEmail: string;
+    momName: string;
+    momPhone: string;
+    momEmail: string;
+    mentoringId: string;
+}

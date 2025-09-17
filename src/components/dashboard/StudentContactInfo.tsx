@@ -1,35 +1,24 @@
 
+
 "use client";
 
 import React from 'react';
-import contactData from '@/lib/student-contacts.json';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { User, Phone, Mail, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useDashboardFilters } from './DashboardClient';
+
 
 interface StudentContactProps {
     studentId: string;
 }
 
-interface StudentContact {
-    nombre: string;
-    telefono_alumno: string;
-    telefono_papa: string;
-    telefono_mama: string;
-    correo_alumno: string;
-    correo_papa: string;
-    correo_mama: string;
-}
-
-const contactsMap = new Map<string, StudentContact>(
-    Object.entries(contactData)
-);
 
 function ContactDetail({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
     const { toast } = useToast();
 
-    if (!value || value.toLowerCase() === 'no disponible') {
+    if (!value || value.toLowerCase() === 'no disponible' || value.trim() === '') {
         return null;
     }
 
@@ -60,12 +49,13 @@ function ContactDetail({ icon, label, value }: { icon: React.ReactNode, label: s
 }
 
 export function StudentContactInfo({ studentId }: StudentContactProps) {
-    const contact = contactsMap.get(studentId);
+    const { studentContacts } = useDashboardFilters();
+    const contact = studentContacts[studentId];
 
     if (!contact) {
         return (
             <div className="p-6 text-center text-muted-foreground">
-                No se encontró información de contacto para este alumno.
+                No se encontró información de contacto para este alumno. Carga un directorio de alumnos en el panel principal.
             </div>
         );
     }
@@ -78,18 +68,18 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
                         <Users className="h-6 w-6" />
                         Información de Contacto
                     </CardTitle>
-                    <CardDescription>{contact.nombre}</CardDescription>
+                    <CardDescription>{contact.name}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                     <h3 className="font-semibold text-lg mb-2">Alumno</h3>
-                    <ContactDetail icon={<Phone size={20} />} label="Teléfono Alumno" value={contact.telefono_alumno} />
-                    <ContactDetail icon={<Mail size={20} />} label="Correo Alumno" value={contact.correo_alumno} />
+                    <ContactDetail icon={<Phone size={20} />} label="Teléfono Alumno" value={contact.studentPhone} />
+                    <ContactDetail icon={<Mail size={20} />} label="Correo Alumno" value={contact.studentEmail} />
                     
                     <h3 className="font-semibold text-lg mt-6 mb-2">Padres / Tutores</h3>
-                    <ContactDetail icon={<Phone size={20} />} label="Teléfono Papá" value={contact.telefono_papa} />
-                    <ContactDetail icon={<Mail size={20} />} label="Correo Papá" value={contact.correo_papa} />
-                    <ContactDetail icon={<Phone size={20} />} label="Teléfono Mamá" value={contact.telefono_mama} />
-                    <ContactDetail icon={<Mail size={20} />} label="Correo Mamá" value={contact.correo_mama} />
+                    <ContactDetail icon={<Phone size={20} />} label="Teléfono Papá" value={contact.dadPhone} />
+                    <ContactDetail icon={<Mail size={20} />} label="Correo Papá" value={contact.dadEmail} />
+                    <ContactDetail icon={<Phone size={20} />} label="Teléfono Mamá" value={contact.momPhone} />
+                    <ContactDetail icon={<Mail size={20} />} label="Correo Mamá" value={contact.momEmail} />
                 </CardContent>
             </Card>
         </div>

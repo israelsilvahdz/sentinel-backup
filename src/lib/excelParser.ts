@@ -1,7 +1,7 @@
 
 
 import * as XLSX from 'xlsx';
-import type { StudentData, Subject, Student } from '@/types/student';
+import type { StudentData, Subject, Student, StudentContact } from '@/types/student';
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -253,4 +253,97 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 
     reader.readAsArrayBuffer(file);
   });
+}
+
+
+const DIRECTORY_COLUMNS = {
+    STUDENT_ID: 'Número de matrícula',
+    NAME: 'Contacto: Nombre completo',
+    SEDENA: 'SEDENA',
+    GROUP: 'GRUPO',
+    STUDENT_PHONE: 'Teléfono Alumno',
+    STUDENT_EMAIL: 'Correo Alumno',
+    DAD_NAME: 'Nombre Papá',
+    DAD_PHONE: 'Teléfono Papá',
+    DAD_EMAIL: 'Correo Papá',
+    MOM_NAME: 'Nombre Mamá',
+    MOM_PHONE: 'Teléfono Mamá',
+    MOM_EMAIL: 'Correo Mamá',
+    MENTORING_ID: 'Consecutivo de mentoreo',
+};
+
+export async function parseDirectoryExcel(file: File): Promise<Record<string, StudentContact> | null> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = (e: ProgressEvent<FileReader>) => {
+            try {
+                const data = e.target?.result;
+                if (!data) {
+                    return resolve(null);
+                }
+
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                
+                const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+                if (jsonData.length < 2) {
+                    return resolve(null);
+                }
+
+                const headers: string[] = jsonData[0].map((h: any) => String(h).trim());
+                const headerMap: Record<string, number> = {};
+                headers.forEach((header, index) => {
+                    headerMap[header] = index;
+                });
+
+                // Validar que las columnas necesarias existan
+                const requiredCols = [DIRECTORY_COLUMNS.STUDENT_ID, DIRECTORY_COLUMNS.NAME];
+                for (const col of requiredCols) {
+                    if (headerMap[col] === undefined) {
+                        throw new Error(`Falta la columna requerida en el directorio: '${col}'`);
+                    }
+                }
+
+                const contacts: Record<string, StudentContact> = {};
+                const dataRows = jsonData.slice(1);
+
+                for (const row of dataRows) {
+                    const studentId = String(row[headerMap[DIRECTORY_COLUMNS.STUDENT_ID]]).trim();
+                    if (!studentId) {
+                        continue;
+                    }
+
+                    const getColumnValue = (columnName: string) => String(row[headerMap[columnName]] || '').trim();
+
+                    contacts[studentId] = {
+                        studentId: studentId,
+                        name: getColumnValue(DIRECTORY_COLUMNS.NAME),
+                        sedena: getColumnValue(DIRECTORY_COLUMNS.SEDENA),
+                        group: getColumnValue(DIRECTORY_COLUMNS.GROUP),
+                        studentPhone: getColumnValue(DIRECTORY_COLUMNS.STUDENT_PHONE),
+                        studentEmail: getColumnValue(DIRECTORY_COLUMNS.STUDENT_EMAIL),
+                        dadName: getColumnValue(DIRECTORY_COLUMNS.DAD_NAME),
+                        dadPhone: getColumnValue(DIRECTORY_COLUMNS.DAD_PHONE),
+                        dadEmail: getColumnValue(DIRECTORY_COLUMNS.DAD_EMAIL),
+                        momName: getColumnValue(DIRECTORY_COLUMNS.MOM_NAME),
+                        momPhone: getColumnValue(DIRECTORY_COLUMNS.MOM_PHONE),
+                        momEmail: getColumnValue(DIRECTORY_COLUMNS.MOM_EMAIL),
+                        mentoringId: getColumnValue(DIRECTORY_COLUMNS.MENTORING_ID),
+                    };
+                }
+                
+                resolve(contacts);
+
+            } catch (error) {
+                console.error("Error al procesar el archivo de directorio:", error);
+                reject(error);
+            }
+        };
+
+        reader.onerror = (error) => reject(error);
+        reader.readAsArrayBuffer(file);
+    });
 }

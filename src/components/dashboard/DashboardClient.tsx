@@ -38,7 +38,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
@@ -58,6 +58,8 @@ interface DashboardContextType {
   setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   studentHistory: Record<string, Change[]>;
   setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
+  studentContacts: Record<string, StudentContact>;
+  setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
   bitacoraEntries: BitacoraEntry[];
   fetchBitacoraEntries: () => Promise<void>;
   setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
@@ -103,6 +105,7 @@ const LOCAL_STORAGE_KEYS = {
     HISTORY: 'academic_sentinel_history',
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
+    CONTACTS: 'academic_sentinel_contacts',
 };
 
 
@@ -110,6 +113,7 @@ export function DashboardClient() {
   const { toast } = useToast();
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
+  const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [bitacoraEntries, setBitacoraEntries] = useState<BitacoraEntry[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
@@ -154,6 +158,9 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
+          const storedContacts = localStorage.getItem(LOCAL_STORAGE_KEYS.CONTACTS);
+          if (storedContacts) setStudentContacts(JSON.parse(storedContacts));
+
           await fetchBitacoraEntries();
 
         } catch (error) {
@@ -162,6 +169,7 @@ export function DashboardClient() {
             localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.CONTACTS);
         } finally {
             setIsLoading(false);
         }
@@ -178,6 +186,9 @@ export function DashboardClient() {
         if(Object.keys(studentHistory).length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.HISTORY, JSON.stringify(studentHistory));
         }
+         if (Object.keys(studentContacts).length > 0) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.CONTACTS, JSON.stringify(studentContacts));
+        }
         if(uploadHistory.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
         }
@@ -191,7 +202,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, studentHistory, uploadHistory, planType, toast]);
+  }, [allStudents, studentHistory, studentContacts, uploadHistory, planType, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -320,12 +331,14 @@ export function DashboardClient() {
       localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.CONTACTS);
 
       setAllStudents([]);
       setStudentHistory({});
       setUploadHistory([]);
       setCurrentFile(null);
       setPlanType('tetramestral');
+      setStudentContacts({});
       
       setProgress(100);
       toast({
@@ -456,7 +469,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, bitacoraEntries, fetchBitacoraEntries, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, bitacoraEntries, fetchBitacoraEntries, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,

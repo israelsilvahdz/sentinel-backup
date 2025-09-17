@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -8,31 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { getSeguimientoEntries, updateSeguimientoStatus, deleteSeguimientoEntry } from '@/lib/firebase-services';
-import type { SeguimientoEntry } from '@/types/student';
+import type { SeguimientoEntry, StudentContact } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList, MessageSquare, Phone, Copy, Check } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import contactData from '@/lib/student-contacts.json';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 
-
-interface StudentContact {
-    nombre: string;
-    telefono_alumno: string;
-    telefono_papa: string;
-    telefono_mama: string;
-    correo_alumno: string;
-    correo_papa: string;
-    correo_mama: string;
-}
-
-const contactsMap = new Map<string, StudentContact>(
-    Object.entries(contactData)
-);
 
 function CopyableContactField({ label, value }: { label: string, value: string }) {
     const { toast } = useToast();
@@ -63,10 +49,9 @@ function CopyableContactField({ label, value }: { label: string, value: string }
     );
 }
 
-function NotifyParentsDialog({ entry, subjectsInCase }: { entry: SeguimientoEntry, subjectsInCase: any[] }) {
+function NotifyParentsDialog({ entry, subjectsInCase, contact }: { entry: SeguimientoEntry, subjectsInCase: any[], contact: StudentContact | undefined }) {
   const { toast } = useToast();
   const [isCopied, setIsCopied] = useState(false);
-  const contact = contactsMap.get(entry.studentId);
 
   const generateMessage = () => {
     let subjectDetails = subjectsInCase.map(s => {
@@ -126,8 +111,8 @@ function NotifyParentsDialog({ entry, subjectsInCase }: { entry: SeguimientoEntr
             {contact ? (
                 <div className="space-y-2">
                     <h4 className="font-semibold">Contactos de los Padres</h4>
-                    <CopyableContactField label="Teléfono Papá" value={contact.telefono_papa} />
-                    <CopyableContactField label="Teléfono Mamá" value={contact.telefono_mama} />
+                    <CopyableContactField label="Teléfono Papá" value={contact.dadPhone} />
+                    <CopyableContactField label="Teléfono Mamá" value={contact.momPhone} />
                 </div>
             ) : <p className="text-sm text-muted-foreground text-center">No se encontró información de contacto para los padres.</p>}
         </div>
@@ -137,7 +122,7 @@ function NotifyParentsDialog({ entry, subjectsInCase }: { entry: SeguimientoEntr
 
 
 export function SeguimientoPanel() {
-  const { allStudentsMap, selectedValue, filterType } = useDashboardFilters();
+  const { allStudentsMap, studentContacts, selectedValue, filterType } = useDashboardFilters();
   const [entries, setEntries] = useState<SeguimientoEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -232,6 +217,7 @@ export function SeguimientoPanel() {
                 line-height: 1.5;
                 color: #27272a; 
                 margin: 0.5in;
+                font-size: 9px;
               }
               @page {
                 size: letter;
@@ -239,7 +225,7 @@ export function SeguimientoPanel() {
               }
               @media print {
                 .no-print { display: none; }
-                body { font-size: 9px; }
+                body { font-size: 8px; }
               }
               h1 { 
                 color: #17594A; 
@@ -259,26 +245,23 @@ export function SeguimientoPanel() {
                 border-radius: 5px; 
                 cursor: pointer; 
               }
-              .report-entry {
-                margin-bottom: 1rem;
-                padding-bottom: 1rem;
+               .report-entry {
+                margin-bottom: 0.75rem;
+                padding-bottom: 0.75rem;
                 border-bottom: 1px solid #e2e8f0;
                 page-break-inside: avoid;
               }
-              .student-header { font-weight: bold; font-size: 1.1em; }
-              .details-section { margin-top: 5px; padding-left: 1rem; }
+              .student-header { font-weight: bold; }
+              .details-section { margin-top: 2px; }
               .materias-list, .notes-text {
-                  padding: 0;
-                  margin: 0;
                   white-space: pre-wrap;
+                  line-height: 1.3;
               }
-               .materia-item {
+              .materia-item {
                   display: block;
-                  margin-bottom: 2px;
+                  margin-bottom: 1px;
               }
-              strong {
-                  font-weight: bold;
-              }
+              strong { font-weight: bold; }
             </style>
           </head>
           <body>
@@ -367,6 +350,7 @@ export function SeguimientoPanel() {
       <div className="space-y-4">
         {filteredEntries.length > 0 ? filteredEntries.map(entry => {
           const student = allStudentsMap.get(entry.studentId);
+          const studentContact = studentContacts[entry.studentId];
           const subjectsInCase = entry.subjects.map(subjectId => 
             student?.subjects?.find(s => s.id === subjectId)
           ).filter(Boolean);
@@ -395,7 +379,7 @@ export function SeguimientoPanel() {
                         <DialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600"><MessageSquare className="h-4 w-4" /></Button>
                         </DialogTrigger>
-                        <NotifyParentsDialog entry={entry} subjectsInCase={subjectsInCase} />
+                        <NotifyParentsDialog entry={entry} subjectsInCase={subjectsInCase} contact={studentContact} />
                      </Dialog>
                     <AlertDialog>
                         <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
@@ -447,5 +431,3 @@ export function SeguimientoPanel() {
     </div>
   );
 }
-
-    

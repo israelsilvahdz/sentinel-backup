@@ -2,37 +2,27 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import type { Student } from '@/types/student';
-import contactData from '@/lib/student-contacts.json';
+import type { Student, StudentContact } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { FileUpload } from './FileUpload';
+import { parseDirectoryExcel } from '@/lib/excelParser';
 
-interface StudentContact {
-    nombre: string;
-    telefono_alumno: string;
-    telefono_papa: string;
-    telefono_mama: string;
-    correo_alumno: string;
-    correo_papa: string;
-    correo_mama: string;
-}
-
-const contactsMap = new Map<string, StudentContact>(
-    Object.entries(contactData)
-);
 
 export function StudentPanel() {
   const { 
     filteredStudents: initialFilteredStudents, 
     bitacoraEntries,
+    studentContacts,
+    setStudentContacts,
     hasData, 
     isLoading, 
     caseType, 
@@ -44,8 +34,41 @@ export function StudentPanel() {
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const { toast } = useToast();
   const [isCopied, setIsCopied] = useState(false);
+  const [directoryFile, setDirectoryFile] = useState<File | null>(null);
+  const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
+
+  const { toast } = useToast();
+
+  const handleDirectoryUpload = useCallback(async (file: File | null) => {
+    if (!file) {
+      setDirectoryFile(null);
+      return;
+    }
+    setDirectoryFile(file);
+    setIsProcessingDirectory(true);
+    try {
+      const contacts = await parseDirectoryExcel(file);
+      if (contacts) {
+        setStudentContacts(contacts);
+        toast({
+          title: "Directorio Cargado",
+          description: `Se procesaron ${Object.keys(contacts).length} contactos del directorio.`,
+        });
+      } else {
+        throw new Error("El archivo no tiene el formato esperado.");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al cargar directorio",
+        description: error.message || "No se pudo procesar el archivo Excel.",
+      });
+    } finally {
+      setIsProcessingDirectory(false);
+      setDirectoryFile(null);
+    }
+  }, [setStudentContacts, toast]);
 
 
   const filteredStudents = useMemo(() => {
@@ -72,17 +95,17 @@ export function StudentPanel() {
     let generatedText = "### Directorio de Alumnos\n\n";
     
     filteredStudents.forEach(student => {
-      const contact = contactsMap.get(student.id);
+      const contact = studentContacts[student.id];
 
       generatedText += "---\n";
       generatedText += `**Nombre:** ${student.name}\n`;
       generatedText += `**Matrícula:** ${student.id}\n`;
-      generatedText += `**Teléfono Alumno:** ${contact ? contact.telefono_alumno : 'No disponible'}\n`;
-      generatedText += `**Teléfono Papá:** ${contact ? contact.telefono_papa : 'No disponible'}\n`;
-      generatedText += `**Teléfono Mamá:** ${contact ? contact.telefono_mama : 'No disponible'}\n`;
-      generatedText += `**Correo Alumno:** ${contact ? contact.correo_alumno : 'No disponible'}\n`;
-      generatedText += `**Correo Papá:** ${contact ? contact.correo_papa : 'No disponible'}\n`;
-      generatedText += `**Correo Mamá:** ${contact ? contact.correo_mama : 'No disponible'}\n\n`;
+      generatedText += `**Teléfono Alumno:** ${contact ? contact.studentPhone : 'No disponible'}\n`;
+      generatedText += `**Teléfono Papá:** ${contact ? contact.dadPhone : 'No disponible'}\n`;
+      generatedText += `**Teléfono Mamá:** ${contact ? contact.momPhone : 'No disponible'}\n`;
+      generatedText += `**Correo Alumno:** ${contact ? contact.studentEmail : 'No disponible'}\n`;
+      generatedText += `**Correo Papá:** ${contact ? contact.dadEmail : 'No disponible'}\n`;
+      generatedText += `**Correo Mamá:** ${contact ? contact.momEmail : 'No disponible'}\n\n`;
     });
     
     navigator.clipboard.writeText(generatedText.trim()).then(() => {
@@ -154,21 +177,31 @@ export function StudentPanel() {
                     )}
                 </div>
             </div>
-            {hasData && (
-              <TooltipProvider>
-                <Tooltip open={isCopied}>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" onClick={handleCopyDirectory}>
-                          {isCopied ? <Check className="text-primary"/> : <ClipboardCopy />}
-                          Copiar Directorio
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{isCopied ? '¡Directorio Copiado!' : 'Copiar contactos de los alumnos filtrados'}</p>
-                    </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+             <div className="flex items-center gap-2">
+                <FileUpload 
+                  onFileSelect={handleDirectoryUpload}
+                  selectedFile={directoryFile}
+                  isLoading={isProcessingDirectory}
+                  label="Cargar Directorio"
+                  icon={<Contact />}
+                  variant="secondary"
+                />
+                {hasData && (
+                <TooltipProvider>
+                    <Tooltip open={isCopied}>
+                        <TooltipTrigger asChild>
+                        <Button variant="outline" onClick={handleCopyDirectory}>
+                            {isCopied ? <Check className="text-primary"/> : <ClipboardCopy />}
+                            Copiar Directorio
+                        </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{isCopied ? '¡Directorio Copiado!' : 'Copiar contactos de los alumnos filtrados'}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                )}
+            </div>
         </div>
       </header>
 
