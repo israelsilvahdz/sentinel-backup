@@ -76,11 +76,27 @@ export function StudentPanel() {
       return initialFilteredStudents;
     }
     const lowercasedFilter = searchTerm.toLowerCase();
-    return initialFilteredStudents.filter((student: Student) => 
-      student.name.toLowerCase().includes(lowercasedFilter) ||
-      student.id.toLowerCase().includes(lowercasedFilter)
-    );
-  }, [searchTerm, initialFilteredStudents]);
+    const numericFilter = searchTerm.replace(/\D/g, ''); // For phone number search
+
+    return initialFilteredStudents.filter((student: Student) => {
+      const nameMatch = student.name.toLowerCase().includes(lowercasedFilter);
+      const idMatch = student.id.toLowerCase().includes(lowercasedFilter);
+      
+      let phoneMatch = false;
+      if (numericFilter && studentContacts[student.id]) {
+        const contact = studentContacts[student.id];
+        const studentPhone = contact.studentPhone.replace(/\D/g, '');
+        const dadPhone = contact.dadPhone.replace(/\D/g, '');
+        const momPhone = contact.momPhone.replace(/\D/g, '');
+        
+        phoneMatch = studentPhone.includes(numericFilter) ||
+                     dadPhone.includes(numericFilter) ||
+                     momPhone.includes(numericFilter);
+      }
+      
+      return nameMatch || idMatch || phoneMatch;
+    });
+  }, [searchTerm, initialFilteredStudents, studentContacts]);
 
   const handleCopyDirectory = () => {
     if (filteredStudents.length === 0) {
@@ -211,7 +227,7 @@ export function StudentPanel() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                   type="text"
-                  placeholder="Buscar alumno por nombre o matrícula..."
+                  placeholder="Buscar alumno por nombre, matrícula o teléfono..."
                   className="pl-10 w-full"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -252,5 +268,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
-    
