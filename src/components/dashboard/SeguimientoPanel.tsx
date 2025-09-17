@@ -76,6 +76,12 @@ export function SeguimientoPanel() {
     }
   };
 
+    const SITUATION_MAP: Record<SeguimientoEntry['situation'], { icon: React.ReactNode, text: string }> = {
+    'faltas': { icon: <FileWarning className="h-4 w-4 text-yellow-600" />, text: 'Faltas' },
+    'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
+    'otro': { icon: <HelpCircle className="h-4 w-4 text-blue-600" />, text: 'Otro' },
+  };
+
   const handleGenerateReport = () => {
     const pendingEntries = filteredEntries.filter(e => e.status === 'pendiente');
 
@@ -97,83 +103,78 @@ export function SeguimientoPanel() {
             <title>Reporte de Seguimiento - ${format(new Date(), 'dd/MM/yyyy')}</title>
             <style>
               @page {
-                  size: landscape;
-                  margin: 0.5in;
+                  size: letter;
+                  margin: 0.7in;
               }
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                line-height: 1.3; 
+                line-height: 1.4; 
                 color: #27272a; 
                 font-size: 9px;
               }
               @media print {
                 body { 
-                  padding: 0;
-                  font-size: 7px; 
+                  font-size: 8px; 
                   column-count: 2;
                   column-gap: 20px;
                 }
                 .no-print { display: none; }
-                h1 { margin-top: 0; }
-                table { page-break-inside: auto; }
-                tr { page-break-inside: avoid; page-break-after: auto; }
+                .report-entry { page-break-inside: avoid; }
               }
               h1 { color: #17594A; border-bottom: 2px solid #17594A; padding-bottom: 6px; margin-bottom: 1rem; font-size: 1.4em; }
               .print-button { position: fixed; top: 1rem; right: 1rem; padding: 6px 10px; background: #17594A; color: white; border: none; border-radius: 5px; cursor: pointer; }
-              table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-              th, td { border: 1px solid #e2e8f0; padding: 3px 4px; text-align: left; vertical-align: top; }
-              th { background-color: #f1f5f9; font-weight: 600; }
-              .notes-cell { white-space: pre-wrap; min-width: 120px; }
-              .subjects-list { list-style: none; padding: 0; margin: 0; }
-              .subjects-list li { margin-bottom: 1px; }
-              .student-cell { min-width: 100px; }
-              .tutor-cell { min-width: 80px; }
-              .situation-cell { min-width: 60px; }
+              .report-entry {
+                margin-bottom: 12px;
+                border-bottom: 1px solid #e2e8f0;
+                padding-bottom: 8px;
+              }
+              .student-name { font-weight: bold; font-size: 1.1em; }
+              .situation { font-style: italic; }
+              .subjects, .notes { margin-left: 10px; }
+              .subjects-list { padding: 0; margin: 0; }
+              .notes-text { white-space: pre-wrap; background-color: #f1f5f9; padding: 4px; border-radius: 3px; }
+
             </style>
           </head>
           <body>
             <button class="print-button no-print" onclick="window.print()">Imprimir Reporte</button>
-            <h1>Reporte de Seguimiento - ${selectedValue ? `${selectedValue} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
+            <h1>Reporte de Seguimiento - ${selectedValue ? `${filterType}: ${selectedValue} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
             <p>Total de casos pendientes: ${pendingEntries.length}</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Alumno</th>
-                  <th>Situación</th>
-                  <th>Materias</th>
-                  <th>Notas</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${pendingEntries.map(entry => {
-                  const subjectsInCase = entry.subjects.map(subjectId => studentData(entry.studentId)?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
-                  const situationText = SITUATION_MAP[entry.situation].text || entry.situation;
-                  return `
-                    <tr>
-                      <td class="student-cell"><strong>${entry.studentName}</strong><br><small>${entry.studentId}</small></td>
-                      <td class="situation-cell">${situationText}</td>
-                      <td>
-                        ${subjectsInCase.length > 0 ? `<ul class="subjects-list">${subjectsInCase.map(s => `<li>- ${s!.name}</li>`).join('')}</ul>` : 'N/A'}
-                      </td>
-                      <td class="notes-cell">${entry.notes || ''}</td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
+            
+            <div id="report-content">
+              ${pendingEntries.map(entry => {
+                const subjectsInCase = entry.subjects.map(subjectId => studentData(entry.studentId)?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
+                const situationText = SITUATION_MAP[entry.situation].text || entry.situation;
+
+                let materiasHtml = '';
+                if (subjectsInCase.length > 0) {
+                    const subjectItems = subjectsInCase.map(s => `${s!.name} (Gpo: ${s!.group})`).join(', ');
+                    materiasHtml = `<div class="subjects"><strong>Materias:</strong> ${subjectItems}</div>`;
+                }
+
+                let notasHtml = '';
+                if (entry.notes) {
+                    notasHtml = `<div class="notes"><strong>Notas:</strong> <span class="notes-text">${entry.notes}</span></div>`;
+                }
+
+                return `
+                  <div class="report-entry">
+                      <p>
+                        <span class="student-name">${entry.studentName} (${entry.studentId})</span>
+                        - <span class="situation">${situationText}</span>
+                      </p>
+                      ${materiasHtml}
+                      ${notasHtml}
+                  </div>
+                `;
+              }).join('')}
+            </div>
           </body>
         </html>
       `;
       reportWindow.document.write(content);
       reportWindow.document.close();
     }
-  };
-
-
-  const SITUATION_MAP: Record<SeguimientoEntry['situation'], { icon: React.ReactNode, text: string }> = {
-    'faltas': { icon: <FileWarning className="h-4 w-4 text-yellow-600" />, text: 'Faltas' },
-    'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
-    'otro': { icon: <HelpCircle className="h-4 w-4 text-blue-600" />, text: 'Otro' },
   };
 
   if (isLoading) {
