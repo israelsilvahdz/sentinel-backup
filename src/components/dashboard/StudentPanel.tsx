@@ -20,7 +20,6 @@ import { parseDirectoryExcel } from '@/lib/excelParser';
 export function StudentPanel() {
   const { 
     filteredStudents: initialFilteredStudents, 
-    bitacoraEntries,
     studentContacts,
     setStudentContacts,
     hasData, 
@@ -243,7 +242,6 @@ export function StudentPanel() {
                   <StudentCard 
                     key={student.id} 
                     student={student} 
-                    bitacoraEntries={bitacoraEntries}
                     startOpen={false} 
                   />
                 ))}

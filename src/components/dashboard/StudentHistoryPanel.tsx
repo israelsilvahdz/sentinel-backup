@@ -11,18 +11,12 @@ import { StudentCard } from './StudentCard';
 import { ChangeHistory } from './ChangeHistory';
 
 export function StudentHistoryPanel() {
-  const { allStudents, bitacoraEntries, isLoading, selectedStudentId, setSelectedStudentId, setActiveView } = useDashboardFilters();
+  const { allStudents, isLoading, selectedStudentId, setSelectedStudentId, setActiveView } = useDashboardFilters();
 
   const selectedStudent = useMemo(() => {
     if (!selectedStudentId) return null;
     return allStudents.find(s => s.id === selectedStudentId) ?? null;
   }, [allStudents, selectedStudentId]);
-
-  const studentBitacoraEntries = useMemo(() => {
-    if (!selectedStudentId) return [];
-    return bitacoraEntries.filter(entry => entry.studentId === selectedStudentId);
-  }, [bitacoraEntries, selectedStudentId]);
-
 
   if (isLoading) {
     return (
@@ -51,7 +45,7 @@ export function StudentHistoryPanel() {
 
       {selectedStudent ? (
         <div className="space-y-6">
-            <StudentCard student={selectedStudent} bitacoraEntries={studentBitacoraEntries} startOpen={true} />
+            <StudentCard student={selectedStudent} startOpen={true} />
             <ChangeHistory studentId={selectedStudent.id} />
         </div>
       ) : (
