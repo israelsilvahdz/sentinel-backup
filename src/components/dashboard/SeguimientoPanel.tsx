@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -17,7 +16,7 @@ import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, Clipb
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 
 export function SeguimientoPanel() {
-  const { allStudentsMap, selectedValue: selectedLeader } = useDashboardFilters();
+  const { allStudentsMap, selectedValue, filterType } = useDashboardFilters();
   const [entries, setEntries] = useState<SeguimientoEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -40,9 +39,15 @@ export function SeguimientoPanel() {
   }, [fetchEntries]);
 
   const filteredEntries = useMemo(() => {
-    if (!selectedLeader) return entries;
-    return entries.filter(entry => entry.leader === selectedLeader);
-  }, [entries, selectedLeader]);
+    if (!selectedValue) return entries;
+    if (filterType === 'leader') {
+      return entries.filter(entry => entry.leader === selectedValue);
+    }
+    if (filterType === 'tutor') {
+        return entries.filter(entry => entry.tutor === selectedValue);
+    }
+    return entries;
+  }, [entries, selectedValue, filterType]);
 
 
   const handleStatusChange = async (id: string, currentStatus: 'pendiente' | 'completado') => {
@@ -105,7 +110,7 @@ export function SeguimientoPanel() {
           </head>
           <body>
             <button class="print-button no-print" onclick="window.print()">Imprimir Reporte</button>
-            <h1>Reporte de Seguimiento - ${selectedLeader ? `${selectedLeader} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
+            <h1>Reporte de Seguimiento - ${selectedValue ? `${selectedValue} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
             <p>Total de casos pendientes: ${pendingEntries.length}</p>
             ${pendingEntries.map(entry => {
               const subjectsInCase = entry.subjects.map(subjectId => studentData(entry.studentId)?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
