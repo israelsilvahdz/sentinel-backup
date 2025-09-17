@@ -101,7 +101,7 @@ export function SeguimientoPanel() {
             <style>
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                line-height: 1.6; 
+                line-height: 1.5; 
                 color: #27272a; 
                 font-size: 9px;
                 margin: 0.5in;
@@ -135,8 +135,8 @@ export function SeguimientoPanel() {
                 cursor: pointer; 
               }
               .report-entry {
-                margin-bottom: 1.2rem;
-                padding-bottom: 1.2rem;
+                margin-bottom: 1rem;
+                padding-bottom: 1rem;
                 border-bottom: 1px solid #e2e8f0;
                 page-break-inside: avoid;
               }
@@ -176,9 +176,9 @@ export function SeguimientoPanel() {
                         
                         let detail = '';
                         if (entry.situation === 'faltas') {
-                            detail = `(${s!.absences} Faltas)`;
+                            detail = `(${s!.absences} de ${s!.absenceLimit} Faltas)`;
                         } else if (entry.situation === 'no-entregados') {
-                            detail = `(${s!.missedAssignments} Tareas NE)`;
+                            detail = `(${s!.missedAssignments} de ${s!.missedAssignmentLimit} Tareas NE)`;
                         }
 
                         return `<span class="subject-item">${s!.name} (Gpo: ${s!.group}) ${detail}${scheduleInfo}</span>`;
