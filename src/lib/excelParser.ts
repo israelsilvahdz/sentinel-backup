@@ -257,19 +257,19 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 
 
 const DIRECTORY_COLUMNS = {
-    STUDENT_ID: 'Número de matrícula',
-    NAME: 'Contacto: Nombre completo',
+    STUDENT_ID: 'Matrícula',
+    NAME: 'Nombre',
     SEDENA: 'SEDENA',
-    GROUP: 'GRUPO',
-    STUDENT_PHONE: 'Teléfono Alumno',
-    STUDENT_EMAIL: 'Correo Alumno',
-    DAD_NAME: 'Nombre Papá',
-    DAD_PHONE: 'Teléfono Papá',
+    GROUP: 'GRUPO', // Aunque no está en la nueva lista, lo mantenemos por si acaso
+    STUDENT_PHONE: 'Tel alumno',
+    STUDENT_EMAIL: 'Correo alumno',
+    DAD_NAME: 'Papá',
+    DAD_PHONE: 'Tel Papá',
     DAD_EMAIL: 'Correo Papá',
-    MOM_NAME: 'Nombre Mamá',
-    MOM_PHONE: 'Teléfono Mamá',
+    MOM_NAME: 'Mamá',
+    MOM_PHONE: 'Tel Mamá',
     MOM_EMAIL: 'Correo Mamá',
-    MENTORING_ID: 'Consecutivo de mentoreo',
+    MENTORING_ID: 'Consecutivo de mentoreo', // No está en la lista nueva, pero se mantiene
 };
 
 export async function parseDirectoryExcel(file: File): Promise<Record<string, StudentContact> | null> {
@@ -296,14 +296,24 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                 const headers: string[] = jsonData[0].map((h: any) => String(h).trim());
                 const headerMap: Record<string, number> = {};
                 headers.forEach((header, index) => {
-                    headerMap[header] = index;
+                    // Normalizar cabeceras para ser más flexibles
+                    headerMap[header.toUpperCase()] = index;
                 });
 
                 // Validar que las columnas necesarias existan
                 const requiredCols = [DIRECTORY_COLUMNS.STUDENT_ID, DIRECTORY_COLUMNS.NAME];
                 for (const col of requiredCols) {
-                    if (headerMap[col] === undefined) {
-                        throw new Error(`Falta la columna requerida en el directorio: '${col}'`);
+                    if (headerMap[col.toUpperCase()] === undefined) {
+                        // Reintentar con el formato antiguo para retrocompatibilidad
+                         const oldFormatMap: Record<string, string> = {
+                            'Matrícula': 'Número de matrícula',
+                            'Nombre': 'Contacto: Nombre completo'
+                        };
+                        if(headerMap[oldFormatMap[col]?.toUpperCase()] !== undefined) {
+                           headerMap[col.toUpperCase()] = headerMap[oldFormatMap[col].toUpperCase()];
+                        } else {
+                           throw new Error(`Falta la columna requerida en el directorio: '${col}'`);
+                        }
                     }
                 }
 
@@ -311,12 +321,12 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
-                    const studentId = String(row[headerMap[DIRECTORY_COLUMNS.STUDENT_ID]]).trim();
+                    const studentId = String(row[headerMap[DIRECTORY_COLUMNS.STUDENT_ID.toUpperCase()]]).trim();
                     if (!studentId) {
                         continue;
                     }
 
-                    const getColumnValue = (columnName: string) => String(row[headerMap[columnName]] || '').trim();
+                    const getColumnValue = (columnName: string) => String(row[headerMap[columnName.toUpperCase()]] || '').trim();
 
                     contacts[studentId] = {
                         studentId: studentId,
