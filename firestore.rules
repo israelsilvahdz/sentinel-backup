@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Permite el acceso a la colección 'bitacora'
+    match /bitacora/{entry} {
+      allow read, write: if true;
+    }
+
+    // Permite el acceso a la nueva colección 'seguimiento'
+    match /seguimiento/{entry} {
+      allow read, write: if true;
+    }
+
+    // Permite el acceso a la colección 'contacts'
+    match /contacts/{contact} {
+      allow read, write: if true;
+    }
+
+  }
+}
