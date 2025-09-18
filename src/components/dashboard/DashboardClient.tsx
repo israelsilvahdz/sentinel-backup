@@ -41,7 +41,7 @@ import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSumma
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts } from '@/lib/firebase-services';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
@@ -102,7 +102,6 @@ const LOCAL_STORAGE_KEYS = {
     HISTORY: 'academic_sentinel_history',
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
-    CONTACTS: 'academic_sentinel_contacts',
 };
 
 
@@ -154,18 +153,17 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
-          const storedContacts = localStorage.getItem(LOCAL_STORAGE_KEYS.CONTACTS);
-          if (storedContacts) setStudentContacts(JSON.parse(storedContacts));
-
+          const contactsFromDb = await getContacts();
+          setStudentContacts(contactsFromDb);
+          
           await fetchBitacoraEntries();
 
         } catch (error) {
-            console.error("Error loading data from Local Storage", error);
+            console.error("Error loading data from Local Storage or DB", error);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
-            localStorage.removeItem(LOCAL_STORAGE_KEYS.CONTACTS);
         } finally {
             setIsLoading(false);
         }
@@ -173,7 +171,7 @@ export function DashboardClient() {
     loadInitialData();
   }, [fetchBitacoraEntries]);
 
-  // Persist data to local storage whenever it changes
+  // Persist data to local storage whenever it changes (contacts are now in DB)
   useEffect(() => {
     try {
         if(allStudents.length > 0) {
@@ -181,9 +179,6 @@ export function DashboardClient() {
         }
         if(Object.keys(studentHistory).length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.HISTORY, JSON.stringify(studentHistory));
-        }
-         if (Object.keys(studentContacts).length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEYS.CONTACTS, JSON.stringify(studentContacts));
         }
         if(uploadHistory.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
@@ -198,7 +193,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, studentHistory, studentContacts, uploadHistory, planType, toast]);
+  }, [allStudents, studentHistory, uploadHistory, planType, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -324,19 +319,21 @@ export function DashboardClient() {
       localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.CONTACTS);
+      
+      // NOTE: This does NOT clear Firebase data (bitacora, seguimiento, contacts).
+      // This is intentional to prevent accidental deletion of important cloud data.
 
       setAllStudents([]);
       setStudentHistory({});
       setUploadHistory([]);
       setCurrentFile(null);
       setPlanType('tetramestral');
-      setStudentContacts({});
+      setStudentContacts({}); // Clear local state, but not DB
       
       setProgress(100);
       toast({
-          title: 'Datos Eliminados',
-          description: 'Todos los datos guardados en el navegador han sido borrados.',
+          title: 'Datos Locales Eliminados',
+          description: 'Todos los datos guardados en el navegador han sido borrados. Los datos en la nube (bitácora, seguimiento, contactos) permanecen.',
       });
     } catch (error) {
        console.error("Error clearing Local Storage", error);

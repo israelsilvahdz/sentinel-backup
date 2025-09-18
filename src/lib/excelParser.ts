@@ -2,6 +2,7 @@
 
 import * as XLSX from 'xlsx';
 import type { StudentData, Subject, Student, StudentContact } from '@/types/student';
+import { bulkAddOrUpdateContacts } from './firebase-services';
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -257,26 +258,32 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 
 
 const DIRECTORY_COLUMNS = {
-    STUDENT_ID: 'Matrícula',
-    NAME: 'Nombre',
-    SEDENA: 'SEDENA',
-    GROUP: 'GRUPO', // Aunque no está en la nueva lista, lo mantenemos por si acaso
-    STUDENT_PHONE: 'Tel alumno',
-    STUDENT_EMAIL: 'Correo alumno',
-    DAD_NAME: 'Papá',
-    DAD_PHONE: 'Tel Papá',
-    DAD_EMAIL: 'Correo Papá',
-    MOM_NAME: 'Mamá',
-    MOM_PHONE: 'Tel Mamá',
-    MOM_EMAIL: 'Correo Mamá',
-    MENTORING_ID: 'Consecutivo de mentoreo', // No está en la lista nueva, pero se mantiene
+  MATRICULA: 'Matrícula',
+  NOMBRE: 'Nombre',
+  REGULARES: 'regulares',
+  PAPA: 'Papá',
+  MAMA: 'Mamá',
+  TEL_ALUMNO: 'Tel alumno',
+  TEL_PAPA: 'Tel Papá',
+  TEL_MAMA: 'Tel Mamá',
+  CORREO_ALUMNO: 'Correo alumno',
+  CORREO_PAPA: 'Correo Papá',
+  CORREO_MAMA: 'Correo Mamá',
+  CUMPLEANOS: 'Cumpleaños',
+  MODALIDAD: 'Modalidad',
+  IDIOMA: 'IDIOMA',
+  CONTACTO: 'Contacto',
+  SEDENA: 'SEDENA',
+  BECA: 'BECA',
+  CONFIRMACION_ASISTENCIA: 'Confirmacion asistencia taller',
 };
+
 
 export async function parseDirectoryExcel(file: File): Promise<Record<string, StudentContact> | null> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
-        reader.onload = (e: ProgressEvent<FileReader>) => {
+        reader.onload = async (e: ProgressEvent<FileReader>) => {
             try {
                 const data = e.target?.result;
                 if (!data) {
@@ -296,55 +303,58 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                 const headers: string[] = jsonData[0].map((h: any) => String(h).trim());
                 const headerMap: Record<string, number> = {};
                 headers.forEach((header, index) => {
-                    // Normalizar cabeceras para ser más flexibles
                     headerMap[header.toUpperCase()] = index;
                 });
-
-                // Validar que las columnas necesarias existan
-                const requiredCols = [DIRECTORY_COLUMNS.STUDENT_ID, DIRECTORY_COLUMNS.NAME];
-                for (const col of requiredCols) {
-                    if (headerMap[col.toUpperCase()] === undefined) {
-                        // Reintentar con el formato antiguo para retrocompatibilidad
-                         const oldFormatMap: Record<string, string> = {
-                            'Matrícula': 'Número de matrícula',
-                            'Nombre': 'Contacto: Nombre completo'
-                        };
-                        if(headerMap[oldFormatMap[col]?.toUpperCase()] !== undefined) {
-                           headerMap[col.toUpperCase()] = headerMap[oldFormatMap[col].toUpperCase()];
-                        } else {
-                           throw new Error(`Falta la columna requerida en el directorio: '${col}'`);
-                        }
+                
+                const getColumnIndex = (possibleNames: string[]): number | undefined => {
+                    for(const name of possibleNames) {
+                        const idx = headerMap[name.toUpperCase()];
+                        if (idx !== undefined) return idx;
                     }
+                    return undefined;
+                }
+
+                const studentIdIndex = getColumnIndex([DIRECTORY_COLUMNS.MATRICULA, 'Número de matrícula']);
+                const nameIndex = getColumnIndex([DIRECTORY_COLUMNS.NOMBRE, 'Contacto: Nombre completo']);
+
+                if (studentIdIndex === undefined || nameIndex === undefined) {
+                    throw new Error(`Faltan columnas requeridas en el directorio: 'Matrícula' y 'Nombre'`);
                 }
 
                 const contacts: Record<string, StudentContact> = {};
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
-                    const studentId = String(row[headerMap[DIRECTORY_COLUMNS.STUDENT_ID.toUpperCase()]]).trim();
+                    const studentId = String(row[studentIdIndex]).trim();
                     if (!studentId) {
                         continue;
                     }
-
-                    const getColumnValue = (columnName: string) => String(row[headerMap[columnName.toUpperCase()]] || '').trim();
+                    
+                    const getValue = (key: keyof typeof DIRECTORY_COLUMNS, oldKey?: string) => {
+                       const index = getColumnIndex(oldKey ? [DIRECTORY_COLUMNS[key], oldKey] : [DIRECTORY_COLUMNS[key]]);
+                       return index !== undefined ? String(row[index] || '').trim() : '';
+                    }
 
                     contacts[studentId] = {
                         studentId: studentId,
-                        name: getColumnValue(DIRECTORY_COLUMNS.NAME),
-                        sedena: getColumnValue(DIRECTORY_COLUMNS.SEDENA),
-                        group: getColumnValue(DIRECTORY_COLUMNS.GROUP),
-                        studentPhone: getColumnValue(DIRECTORY_COLUMNS.STUDENT_PHONE),
-                        studentEmail: getColumnValue(DIRECTORY_COLUMNS.STUDENT_EMAIL),
-                        dadName: getColumnValue(DIRECTORY_COLUMNS.DAD_NAME),
-                        dadPhone: getColumnValue(DIRECTORY_COLUMNS.DAD_PHONE),
-                        dadEmail: getColumnValue(DIRECTORY_COLUMNS.DAD_EMAIL),
-                        momName: getColumnValue(DIRECTORY_COLUMNS.MOM_NAME),
-                        momPhone: getColumnValue(DIRECTORY_COLUMNS.MOM_PHONE),
-                        momEmail: getColumnValue(DIRECTORY_COLUMNS.MOM_EMAIL),
-                        mentoringId: getColumnValue(DIRECTORY_COLUMNS.MENTORING_ID),
+                        name: String(row[nameIndex]).trim(),
+                        studentPhone: getValue('TEL_ALUMNO'),
+                        studentEmail: getValue('CORREO_ALUMNO'),
+                        dadName: getValue('PAPA', 'Nombre Papá'),
+                        dadPhone: getValue('TEL_PAPA', 'Teléfono Papá'),
+                        dadEmail: getValue('CORREO_PAPA'),
+                        momName: getValue('MAMA', 'Nombre Mamá'),
+                        momPhone: getValue('TEL_MAMA', 'Teléfono Mamá'),
+                        momEmail: getValue('CORREO_MAMA'),
+                        sedena: getValue('SEDENA'),
+                        // --- campos que no se guardan pero se parsean por retrocompatibilidad ---
+                        group: '', 
+                        mentoringId: ''
                     };
                 }
                 
+                // Guardar en Firebase en lugar de devolver
+                await bulkAddOrUpdateContacts(contacts);
                 resolve(contacts);
 
             } catch (error) {

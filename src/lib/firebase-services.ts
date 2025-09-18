@@ -11,9 +11,11 @@ import {
   Timestamp,
   doc,
   deleteDoc,
-  updateDoc
+  updateDoc,
+  setDoc,
+  writeBatch
 } from 'firebase/firestore';
-import type { BitacoraEntry, SeguimientoEntry } from '@/types/student';
+import type { BitacoraEntry, SeguimientoEntry, StudentContact } from '@/types/student';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -39,6 +41,8 @@ if (!getApps().length) {
 const db = getFirestore(app);
 const BITACORA_COLLECTION = 'bitacora';
 const SEGUIMIENTO_COLLECTION = 'seguimiento';
+const CONTACTS_COLLECTION = 'contacts';
+
 
 /**
  * Añade una nueva entrada a la bitácora en Firestore.
@@ -170,4 +174,59 @@ export const deleteSeguimientoEntry = async (id: string): Promise<void> => {
     console.error("Error al eliminar caso de seguimiento: ", error);
     throw new Error("No se pudo eliminar el caso de la base de datos.");
   }
+};
+
+
+// --- Funciones para Directorio de Contactos ---
+
+/**
+ * Añade o actualiza la información de contacto de un alumno.
+ * @param contact El objeto de contacto del alumno.
+ */
+export const addOrUpdateContact = async (contact: StudentContact): Promise<void> => {
+  try {
+    // Usamos el studentId como el ID del documento para evitar duplicados.
+    const docRef = doc(db, CONTACTS_COLLECTION, contact.studentId);
+    await setDoc(docRef, contact, { merge: true });
+  } catch (error) {
+    console.error("Error al guardar el contacto en Firestore: ", error);
+    throw new Error("No se pudo guardar la información de contacto.");
+  }
+};
+
+/**
+ * Guarda múltiples contactos en un solo lote para mayor eficiencia.
+ * @param contacts Objeto donde la clave es el studentId y el valor es el StudentContact.
+ */
+export const bulkAddOrUpdateContacts = async (contacts: Record<string, StudentContact>): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    Object.values(contacts).forEach(contact => {
+      const docRef = doc(db, CONTACTS_COLLECTION, contact.studentId);
+      batch.set(docRef, contact, { merge: true });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Error al guardar contactos en lote en Firestore: ", error);
+    throw new Error("No se pudieron guardar los contactos en la base de datos.");
+  }
+};
+
+
+/**
+ * Obtiene todos los contactos de Firestore.
+ * @returns Un objeto donde la clave es el studentId y el valor es la información de contacto.
+ */
+export const getContacts = async (): Promise<Record<string, StudentContact>> => {
+    try {
+        const querySnapshot = await getDocs(collection(db, CONTACTS_COLLECTION));
+        const contacts: Record<string, StudentContact> = {};
+        querySnapshot.forEach(doc => {
+            contacts[doc.id] = doc.data() as StudentContact;
+        });
+        return contacts;
+    } catch (error) {
+        console.error("Error al obtener contactos de Firestore: ", error);
+        return {};
+    }
 };

@@ -14,6 +14,7 @@ import { useDashboardFilters } from './DashboardClient';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { StudentContact } from '@/types/student';
+import { addOrUpdateContact } from '@/lib/firebase-services';
 
 interface StudentContactProps {
     studentId: string;
@@ -85,27 +86,43 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
     useEffect(() => {
         if (contact) {
             reset(contact);
+        } else {
+             reset({
+                studentPhone: '', studentEmail: '',
+                dadName: '', dadPhone: '', dadEmail: '',
+                momName: '', momPhone: '', momEmail: '',
+            });
         }
     }, [contact, reset]);
 
-    const onSubmit = (data: ContactFormValues) => {
-        const newContact: StudentContact = {
+    const onSubmit = async (data: ContactFormValues) => {
+        if (!student) return;
+
+        const updatedContact: StudentContact = {
+            ...contact, // Preserve existing non-form fields
             studentId: studentId,
-            name: student?.name || '',
-            ...contact, // preserve existing fields like sedena, group, etc.
+            name: student.name,
             ...data,
         };
 
-        setStudentContacts(prev => ({
-            ...prev,
-            [studentId]: newContact
-        }));
-
-        toast({
-            title: 'Contacto Guardado',
-            description: 'La información de contacto ha sido actualizada.',
-        });
-        setIsEditing(false);
+        try {
+            await addOrUpdateContact(updatedContact);
+            setStudentContacts(prev => ({
+                ...prev,
+                [studentId]: updatedContact
+            }));
+            toast({
+                title: 'Contacto Guardado',
+                description: 'La información de contacto ha sido actualizada en la base de datos.',
+            });
+            setIsEditing(false);
+        } catch (error) {
+             toast({
+                variant: 'destructive',
+                title: 'Error al guardar',
+                description: 'No se pudo guardar la información de contacto en la base de datos.',
+            });
+        }
     };
 
     if (!student) {
@@ -189,14 +206,14 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
                     ) : (
                         <>
                             <h3 className="font-semibold text-lg mb-2">Alumno</h3>
-                            <ContactDetail icon={<Phone size={20} />} label="Teléfono Alumno" value={contact.studentPhone} />
-                            <ContactDetail icon={<Mail size={20} />} label="Correo Alumno" value={contact.studentEmail} />
+                            <ContactDetail icon={<Phone size={20} />} label="Teléfono Alumno" value={contact?.studentPhone} />
+                            <ContactDetail icon={<Mail size={20} />} label="Correo Alumno" value={contact?.studentEmail} />
                             
                             <h3 className="font-semibold text-lg mt-6 mb-2">Padres / Tutores</h3>
-                            <ContactDetail icon={<Phone size={20} />} label="Teléfono Papá" value={contact.dadPhone} />
-                            <ContactDetail icon={<Mail size={20} />} label="Correo Papá" value={contact.dadEmail} />
-                            <ContactDetail icon={<Phone size={20} />} label="Teléfono Mamá" value={contact.momPhone} />
-                            <ContactDetail icon={<Mail size={20} />} label="Correo Mamá" value={contact.momEmail} />
+                            <ContactDetail icon={<Phone size={20} />} label="Teléfono Papá" value={contact?.dadPhone} />
+                            <ContactDetail icon={<Mail size={20} />} label="Correo Papá" value={contact?.dadEmail} />
+                            <ContactDetail icon={<Phone size={20} />} label="Teléfono Mamá" value={contact?.momPhone} />
+                            <ContactDetail icon={<Mail size={20} />} label="Correo Mamá" value={contact?.momEmail} />
                         </>
                     )}
                 </CardContent>

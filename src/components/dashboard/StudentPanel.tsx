@@ -26,8 +26,6 @@ export function StudentPanel() {
     isLoading, 
     caseType, 
     setCaseType, 
-    setActiveView, 
-    setSelectedStudentId,
     subjectRiskFilter,
     setSubjectRiskFilter,
   } = useDashboardFilters();
@@ -49,13 +47,13 @@ export function StudentPanel() {
     try {
       const contacts = await parseDirectoryExcel(file);
       if (contacts) {
-        setStudentContacts(contacts);
+        setStudentContacts(prev => ({ ...prev, ...contacts }));
         toast({
-          title: "Directorio Cargado",
-          description: `Se procesaron ${Object.keys(contacts).length} contactos del directorio.`,
+          title: "Directorio Guardado en la Nube",
+          description: `Se procesaron y guardaron ${Object.keys(contacts).length} contactos en la base de datos.`,
         });
       } else {
-        throw new Error("El archivo no tiene el formato esperado.");
+        throw new Error("El archivo no tiene el formato esperado o está vacío.");
       }
     } catch (error: any) {
       toast({
@@ -84,9 +82,9 @@ export function StudentPanel() {
       let phoneMatch = false;
       if (numericFilter && studentContacts[student.id]) {
         const contact = studentContacts[student.id];
-        const studentPhone = contact.studentPhone.replace(/\D/g, '');
-        const dadPhone = contact.dadPhone.replace(/\D/g, '');
-        const momPhone = contact.momPhone.replace(/\D/g, '');
+        const studentPhone = contact.studentPhone?.replace(/\D/g, '') || '';
+        const dadPhone = contact.dadPhone?.replace(/\D/g, '') || '';
+        const momPhone = contact.momPhone?.replace(/\D/g, '') || '';
         
         phoneMatch = studentPhone.includes(numericFilter) ||
                      dadPhone.includes(numericFilter) ||
@@ -115,12 +113,12 @@ export function StudentPanel() {
       generatedText += "---\n";
       generatedText += `**Nombre:** ${student.name}\n`;
       generatedText += `**Matrícula:** ${student.id}\n`;
-      generatedText += `**Teléfono Alumno:** ${contact ? contact.studentPhone : 'No disponible'}\n`;
-      generatedText += `**Teléfono Papá:** ${contact ? contact.dadPhone : 'No disponible'}\n`;
-      generatedText += `**Teléfono Mamá:** ${contact ? contact.momPhone : 'No disponible'}\n`;
-      generatedText += `**Correo Alumno:** ${contact ? contact.studentEmail : 'No disponible'}\n`;
-      generatedText += `**Correo Papá:** ${contact ? contact.dadEmail : 'No disponible'}\n`;
-      generatedText += `**Correo Mamá:** ${contact ? contact.momEmail : 'No disponible'}\n\n`;
+      generatedText += `**Teléfono Alumno:** ${contact?.studentPhone || 'No disponible'}\n`;
+      generatedText += `**Teléfono Papá:** ${contact?.dadPhone || 'No disponible'}\n`;
+      generatedText += `**Teléfono Mamá:** ${contact?.momPhone || 'No disponible'}\n`;
+      generatedText += `**Correo Alumno:** ${contact?.studentEmail || 'No disponible'}\n`;
+      generatedText += `**Correo Papá:** ${contact?.dadEmail || 'No disponible'}\n`;
+      generatedText += `**Correo Mamá:** ${contact?.momEmail || 'No disponible'}\n\n`;
     });
     
     navigator.clipboard.writeText(generatedText.trim()).then(() => {
@@ -140,11 +138,6 @@ export function StudentPanel() {
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
     );
-  }
-
-  const handleStudentClick = (studentId: string) => {
-    setSelectedStudentId(studentId);
-    setActiveView('history');
   }
 
   const caseTypeMap = {
