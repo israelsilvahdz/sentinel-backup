@@ -103,3 +103,46 @@ El encabezado, que forma parte de `<SidebarInset>`, también tiene un diseño re
     -   **Filtros en Móvil:** En la vista móvil, los filtros se mueven a una línea separada debajo de los logos y botones para optimizar el espacio.
 
 Este diseño modular y basado en estados de CSS (atributos `data-*`) hace que la interfaz sea robusta, fácil de mantener y estilizar.
+
+---
+
+## 5. Arquitectura del Planificador por Mapa (`MapPlanner`)
+
+El planificador por mapa es una simulación visual e interactiva del avance académico de un alumno. Su funcionamiento se basa en la interacción de cuatro pilares: la **Estructura de Datos**, la **Gestión de Estado**, la **Lógica de Simulación** y la **Visualización Reactiva**.
+
+### a. Estructura de Datos (El ADN del Plan)
+
+-   **Archivo:** `src/lib/curriculum.ts`
+-   **Funcionamiento:** La malla curricular se define como un array de `CurriculumTerm` (períodos). Cada período contiene un array de `CurriculumCourse` (materias). La propiedad clave es `prerequisite`, que establece una dependencia directa entre materias y forma la base para toda la lógica de bloqueo y recomendación.
+
+### b. Gestión de Estado (El Cerebro de la Simulación)
+
+El componente `MapPlanner` utiliza varios `useState` para registrar las acciones del usuario y simular diferentes escenarios:
+
+-   `selectedTermIndex`: Almacena el período "actual" del alumno simulado.
+-   `pendingCourses`: Guarda un `Set` con los nombres de las materias que el usuario marca manualmente como "pendientes" (reprobadas).
+-   `activeTerms`: Un `Set` que define qué períodos (o generaciones) están activos. Esto simula la oferta académica real.
+-   `manuallyApprovedCourses`: Permite al usuario forzar una materia a estado "aprobado".
+
+### c. Lógica de Simulación y "Energías" (El Motor)
+
+Esta es la parte central del componente. En lugar de estados fijos, el estado de cada materia se calcula en tiempo real cada vez que cambia una de las variables de estado anteriores. Este cálculo se realiza de forma eficiente dentro de un hook `useMemo`.
+
+La lógica sigue una cascada de prioridades para determinar el estado final de cada materia:
+
+1.  **Cursos Bloqueados (`lockedCourses` - Energía Negativa):** Es el estado de mayor prioridad. Un curso se bloquea si su prerrequisito está en la lista de `pendingCourses` o si también está bloqueado. Esta lógica se ejecuta en un bucle hasta que no se puedan bloquear más materias, creando un efecto dominó.
+2.  **Cursos Aprobados (`approvedCourses` - Energía Positiva):** Todas las materias de períodos *anteriores* al `selectedTermIndex` se consideran aprobadas, a menos que estén marcadas como `pendingCourses`. Las materias en `manuallyApprovedCourses` también se incluyen aquí.
+3.  **Cursos Críticos (`criticalCourses` - ¡Alerta Máxima!):** Una materia se considera "crítica" si es de alta prioridad y no hay una generación "N-1" que la vaya a cursar en el próximo ciclo. Simula un riesgo real de atraso.
+4.  **Cursos Recomendados (`recommendedCourses` - El Camino a Seguir):** Es el estado de acción. Se recomienda una materia si:
+    *   Es una materia pendiente de un período anterior que no está bloqueada.
+    *   Pertenece al período actual y sus prerrequisitos ya están aprobados.
+
+### d. Visualización Reactiva (La Interfaz)
+
+-   **Clases CSS Dinámicas:** El estado final calculado (`locked`, `approved`, `critical`, etc.) se asigna como una clase CSS a la tarjeta de la materia (ej. `course-cell.critical`). Estas clases modifican colores, bordes e incluso aplican animaciones, como el pulso rojo de las materias críticas.
+-   **Indicadores Visuales:**
+    -   El **círculo de estado** en cada materia permite al usuario cambiar su estado (pendiente/aprobado).
+    -   La **letra "F"** indica que una materia es "Flexible" (no pertenece a la lista de alta prioridad).
+-   **Conectores SVG:** Las líneas que conectan las materias son `path` de SVG. Sus coordenadas de inicio y fin se actualizan cuando cambia el layout. La clase CSS del conector también es dinámica: si el prerrequisito está pendiente, la línea se vuelve roja y punteada, mostrando visualmente el "flujo de energía" bloqueado.
+
+En resumen, el planificador es un sistema reactivo: **Interacción del usuario (cambio de estado) ➞ Recálculo de estados de todas las materias (`useMemo`) ➞ Actualización de clases CSS y SVG (la vista)**. Es un ciclo que proporciona retroalimentación visual instantánea sobre el impacto de cada decisión.
