@@ -104,6 +104,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
   const [selectedClasses, setSelectedClasses] = useState<Set<string>>(new Set());
   const [showMailtoLink, setShowMailtoLink] = useState(false);
   const [mailtoLink, setMailtoLink] = useState('');
+  const [mailtoBody, setMailtoBody] = useState('');
   const mailtoLinkRef = React.useRef<HTMLTextAreaElement>(null);
 
 
@@ -226,7 +227,49 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     });
   };
   
-  const generateMailtoLink = (): string | undefined => {
+    const generateMailtoBody = () => {
+        if (!dateRange || !dateRange.from) {
+            return '';
+        }
+        let dateText;
+        if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
+            dateText = `del ${format(dateRange.from, "d 'de' LLLL", { locale: es })} al ${format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })}`;
+        } else {
+            dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
+        }
+
+        let body = `Estimados profesores,\n\n`;
+        if (isFutureNotice) {
+            body += `Les notifico sobre el alumno ${studentName} con respecto a los días ${dateText}.\n\n`;
+        } else {
+            body += `Les notifico sobre el alumno ${studentName} con respecto al día/periodo ${dateText}.\n\n`;
+        }
+
+        body += `Motivo: ${notificationReason}\n`;
+
+        if (isPartialAbsence) {
+            const selectedClassNames = affectedClasses.filter(c => selectedClasses.has(c.id)).map(c => c.name).join(', ');
+            body += `Clases afectadas: ${selectedClassNames || 'Ninguna seleccionada'}\n`;
+        }
+
+        if (hasProof) {
+            body += `El alumno presentó comprobante del motivo.\n`;
+        }
+
+        if (notificationReason === 'Salida de Difusión (Embajadores)') {
+            body = `Estimados profesores,\n\nLes informo que el alumno(a) ${studentName}, quien forma parte del equipo de embajadores, se ausentará de sus clases ${dateText} por motivo de una salida de difusión.\n\nAgradezco de antemano su apoyo y comprensión.\n\nSaludos cordiales,`;
+        }
+
+        if (customNotes) {
+            body += `\nNotas adicionales:\n${customNotes}\n`;
+        }
+        body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
+
+        return body;
+    };
+
+
+  const generateAndSetMailto = (): (string | undefined) => {
     if (teachersToNotify.length === 0) {
         toast({
             variant: "destructive",
@@ -244,55 +287,24 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
         return;
     }
 
-    const recipients = teachersToNotify.map(t => t.email || t.name).join(',');
+    const recipients = teachersToNotify.map(t => t.email).filter(Boolean).join(',');
     
     let subject = 'Notificación';
     if(notificationReason === 'Ausencia') {
         subject = 'Notificación de Ausencia';
     }
-    
-    let dateText;
-    if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
-        dateText = `del ${format(dateRange.from, "d 'de' LLLL", { locale: es })} al ${format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })}`;
-    } else {
-        dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
-    }
 
-    let body = `Estimados profesores,\n\n`;
-    if(isFutureNotice) {
-        body += `Les notifico sobre el alumno ${studentName} con respecto a los días ${dateText}.\n\n`;
-    } else {
-        body += `Les notifico sobre el alumno ${studentName} con respecto al día/periodo ${dateText}.\n\n`;
-    }
-    
-    body += `Motivo: ${notificationReason}\n`;
+    const body = generateMailtoBody();
+    setMailtoBody(body);
 
-    if (isPartialAbsence) {
-        const selectedClassNames = affectedClasses.filter(c => selectedClasses.has(c.id)).map(c => c.name).join(', ');
-        body += `Clases afectadas: ${selectedClassNames}\n`;
-    }
-    
-    if (hasProof) {
-        body += `El alumno presentó comprobante del motivo.\n`;
-    }
-    
-    if (notificationReason === 'Salida de Difusión (Embajadores)') {
-        body = `Estimados profesores,\n\nLes informo que el alumno(a) ${studentName}, quien forma parte del equipo de embajadores, se ausentará de sus clases ${dateText} por motivo de una salida de difusión.\n\nAgradezco de antemano su apoyo y comprensión.\n\nSaludos cordiales,`;
-    }
-
-
-    if (customNotes) {
-        body += `\nNotas adicionales:\n${customNotes}\n`;
-    }
-    body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
-
-    return `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const fullLink = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setMailtoLink(fullLink);
+    return fullLink;
   }
 
   const handleShowLink = () => {
-    const link = generateMailtoLink();
+    const link = generateAndSetMailto();
     if (link) {
-      setMailtoLink(link);
       setShowMailtoLink(true);
       setTimeout(() => {
         mailtoLinkRef.current?.select();
@@ -305,6 +317,12 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     if (!checked) {
         setSelectedClasses(new Set()); // Clear selection when toggled off
     }
+  }
+
+  const handleCopyBody = () => {
+    navigator.clipboard.writeText(mailtoBody).then(() => {
+        toast({ title: '¡Cuerpo del correo copiado!' });
+    });
   }
 
   return (
@@ -424,19 +442,37 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                           </div>
 
                            {showMailtoLink && (
-                            <div className="space-y-2">
-                               <Label htmlFor="mailto-link-area" className="font-semibold">Enlace `mailto` generado</Label>
-                               <Textarea
-                                  ref={mailtoLinkRef}
-                                  id="mailto-link-area"
-                                  readOnly
-                                  value={mailtoLink}
-                                  className="h-24 font-mono text-xs"
-                                  onClick={() => mailtoLinkRef.current?.select()}
-                               />
-                               <p className="text-xs text-muted-foreground">
-                                   Copia este enlace y pégalo en la barra de direcciones de tu navegador.
-                               </p>
+                            <div className="space-y-4">
+                                <div>
+                                   <Label htmlFor="mailto-link-area" className="font-semibold">Enlace `mailto` (para apps de escritorio)</Label>
+                                   <p className="text-xs text-muted-foreground">
+                                        Copia este enlace y pégalo en la barra de direcciones de tu navegador, o haz clic en "Generar Correo" para abrirlo.
+                                   </p>
+                                   <Textarea
+                                      ref={mailtoLinkRef}
+                                      id="mailto-link-area"
+                                      readOnly
+                                      value={mailtoLink}
+                                      className="h-24 font-mono text-xs mt-2"
+                                      onClick={() => mailtoLinkRef.current?.select()}
+                                   />
+                                </div>
+                                <div>
+                                   <Label htmlFor="mailto-body-area" className="font-semibold">Cuerpo del Correo (para web)</Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Usa este texto si prefieres redactar el correo manualmente en Outlook Web.
+                                    </p>
+                                   <Textarea
+                                      id="mailto-body-area"
+                                      readOnly
+                                      value={mailtoBody}
+                                      className="h-32 font-sans text-sm mt-2"
+                                   />
+                                   <Button variant="outline" size="sm" onClick={handleCopyBody} className="mt-2">
+                                       <Copy className="mr-2 h-4 w-4" />
+                                       Copiar Cuerpo del Mensaje
+                                    </Button>
+                                </div>
                             </div>
                            )}
 
@@ -445,11 +481,11 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                   </ScrollArea>
                   <AlertDialogFooter>
                     <AlertDialogCancel onClick={() => setShowMailtoLink(false)}>Cancelar</AlertDialogCancel>
-                     <Button variant="outline" onClick={handleShowLink}><LinkIcon className="mr-2"/>{showMailtoLink ? "Actualizar Enlace" : "Mostrar Enlace para Web"}</Button>
+                     <Button variant="outline" onClick={handleShowLink}><LinkIcon className="mr-2"/>{showMailtoLink ? "Actualizar Información" : "Generar Información de Correo"}</Button>
                     <AlertDialogAction onClick={() => {
-                        const link = generateMailtoLink();
+                        const link = generateAndSetMailto();
                         if (link) window.location.href = link;
-                    }}>Generar Correo</AlertDialogAction>
+                    }}>Abrir en App de Correo</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
