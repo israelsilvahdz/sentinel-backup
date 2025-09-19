@@ -102,6 +102,10 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
   const [teachersToNotify, setTeachersToNotify] = useState<{name: string, email: string | null}[]>([]);
   const [affectedClasses, setAffectedClasses] = useState<Subject[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<Set<string>>(new Set());
+  const [showMailtoLink, setShowMailtoLink] = useState(false);
+  const [mailtoLink, setMailtoLink] = useState('');
+  const mailtoLinkRef = React.useRef<HTMLTextAreaElement>(null);
+
 
   const TIME_SLOTS = planType === 'semestral' ? TIME_SLOTS_SEMESTRAL : TIME_SLOTS_TETRA;
 
@@ -222,7 +226,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     });
   };
   
-  const generateMailtoLink = (forCopy: boolean = false): string | undefined => {
+  const generateMailtoLink = (): string | undefined => {
     if (teachersToNotify.length === 0) {
         toast({
             variant: "destructive",
@@ -282,22 +286,17 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     }
     body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
 
-    const mailtoLink = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    if (!forCopy) {
-      window.location.href = mailtoLink;
-    }
-    return mailtoLink;
+    return `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
-  const handleCopyLink = () => {
-    const link = generateMailtoLink(true);
+  const handleShowLink = () => {
+    const link = generateMailtoLink();
     if (link) {
-      navigator.clipboard.writeText(link).then(() => {
-        toast({
-          title: '¡Enlace copiado!',
-          description: 'Pega el enlace en tu navegador para abrir el correo web.',
-        });
-      });
+      setMailtoLink(link);
+      setShowMailtoLink(true);
+      setTimeout(() => {
+        mailtoLinkRef.current?.select();
+      }, 100);
     }
   };
 
@@ -423,13 +422,34 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                                  )}
                               </Card>
                           </div>
+
+                           {showMailtoLink && (
+                            <div className="space-y-2">
+                               <Label htmlFor="mailto-link-area" className="font-semibold">Enlace `mailto` generado</Label>
+                               <Textarea
+                                  ref={mailtoLinkRef}
+                                  id="mailto-link-area"
+                                  readOnly
+                                  value={mailtoLink}
+                                  className="h-24 font-mono text-xs"
+                                  onClick={() => mailtoLinkRef.current?.select()}
+                               />
+                               <p className="text-xs text-muted-foreground">
+                                   Copia este enlace y pégalo en la barra de direcciones de tu navegador.
+                               </p>
+                            </div>
+                           )}
+
                         </div>
                     </div>
                   </ScrollArea>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <Button variant="outline" onClick={handleCopyLink}><LinkIcon className="mr-2"/>Copiar Enlace para Web</Button>
-                    <AlertDialogAction onClick={() => generateMailtoLink()}>Generar Correo</AlertDialogAction>
+                    <AlertDialogCancel onClick={() => setShowMailtoLink(false)}>Cancelar</AlertDialogCancel>
+                     <Button variant="outline" onClick={handleShowLink}><LinkIcon className="mr-2"/>{showMailtoLink ? "Actualizar Enlace" : "Mostrar Enlace para Web"}</Button>
+                    <AlertDialogAction onClick={() => {
+                        const link = generateMailtoLink();
+                        if (link) window.location.href = link;
+                    }}>Generar Correo</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
