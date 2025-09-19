@@ -6,7 +6,7 @@ import { type Subject } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Copy, Mail, Clock, Users } from 'lucide-react';
+import { Copy, Mail, Clock, Users, Link as LinkIcon, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Label } from '../ui/label';
@@ -21,6 +21,7 @@ import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import professorContacts from '@/lib/professor-contacts.json';
+import { Switch } from '../ui/switch';
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -95,9 +96,12 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
   const [notificationReason, setNotificationReason] = useState("Ausencia");
   const [customNotes, setCustomNotes] = useState("");
   const [isFutureNotice, setIsFutureNotice] = useState(false);
+  const [isPartialAbsence, setIsPartialAbsence] = useState(false);
   const [hasProof, setHasProof] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [teachersToNotify, setTeachersToNotify] = useState<{name: string, email: string | null}[]>([]);
+  const [affectedClasses, setAffectedClasses] = useState<Subject[]>([]);
+  const [selectedClasses, setSelectedClasses] = useState<Set<string>>(new Set());
 
   const TIME_SLOTS = planType === 'semestral' ? TIME_SLOTS_SEMESTRAL : TIME_SLOTS_TETRA;
 
@@ -107,42 +111,60 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
         const start = dateRange.from;
         const end = dateRange.to || start;
 
-        // Iterate through each day in the range
         let currentDate = start;
         while (currentDate <= end) {
-            const dayOfWeek = currentDate.getDay(); // 0 for Sunday, 1 for Monday, etc.
+            const dayOfWeek = currentDate.getDay(); 
             if (DATE_FNS_DAY_TO_KEY[dayOfWeek]) {
                 affectedDays.add(DATE_FNS_DAY_TO_KEY[dayOfWeek]);
             }
             currentDate = new Date(currentDate.valueOf() + 86400000); // Add one day
         }
 
-        const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
-        subjects.forEach(subject => {
-            if (ONLINE_SUBJECTS.includes(subject.name)) {
-                return; // Excluir materias online
-            }
-
-            if (subject.professorName) {
-                const hasClassOnAffectedDays = subject.schedule?.days.some(day => affectedDays.has(day));
-                if (hasClassOnAffectedDays) {
-                    if (!uniqueTeachers.has(subject.professorName)) {
-                        const email = getProfessorEmail(subject.professorName);
-                        uniqueTeachers.set(subject.professorName, { name: subject.professorName, email });
-                    }
+        const classesOnAffectedDays = subjects.filter(subject => 
+            !ONLINE_SUBJECTS.includes(subject.name) &&
+            subject.professorName &&
+            subject.schedule?.days.some(day => affectedDays.has(day))
+        );
+        setAffectedClasses(classesOnAffectedDays);
+        
+        if (isPartialAbsence) {
+            // Wait for user to select classes
+        } else {
+            const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
+            classesOnAffectedDays.forEach(subject => {
+                 if (!uniqueTeachers.has(subject.professorName!)) {
+                    const email = getProfessorEmail(subject.professorName!);
+                    uniqueTeachers.set(subject.professorName!, { name: subject.professorName!, email });
                 }
-            }
-        });
-        setTeachersToNotify(Array.from(uniqueTeachers.values()));
+            });
+            setTeachersToNotify(Array.from(uniqueTeachers.values()));
+        }
+
     } else {
         setTeachersToNotify([]);
+        setAffectedClasses([]);
     }
-  }, [dateRange, subjects]);
+  }, [dateRange, subjects, isPartialAbsence]);
+  
+  useEffect(() => {
+    if (isPartialAbsence && affectedClasses.length > 0) {
+      const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
+      affectedClasses.forEach(subject => {
+        if (selectedClasses.has(subject.id) && subject.professorName) {
+           if (!uniqueTeachers.has(subject.professorName)) {
+              const email = getProfessorEmail(subject.professorName);
+              uniqueTeachers.set(subject.professorName, { name: subject.professorName, email });
+          }
+        }
+      });
+      setTeachersToNotify(Array.from(uniqueTeachers.values()));
+    }
+  }, [isPartialAbsence, selectedClasses, affectedClasses]);
+
 
   const scheduleByDayAndSlot = useMemo(() => {
     const grid: Record<string, (Subject | null)[]> = {};
 
-    // Find the special Thursday 9am class for semestre
     const thu9amSubject = planType === 'semestral' 
         ? subjects.find(subject => 
             subject.schedule?.days.includes('JUE') && subject.schedule.startTime === '09:00'
@@ -157,7 +179,6 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
         });
     });
     
-    // Apply the special rule for semestre
     if (thu9amSubject) {
         const tue9amIndex = TIME_SLOTS.findIndex(slot => slot.start === '09:00');
         const tue10amIndex = TIME_SLOTS.findIndex(slot => slot.start === '10:00');
@@ -201,12 +222,12 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     });
   };
   
-  const generateMailtoLink = () => {
+  const generateMailtoLink = (forCopy: boolean = false): string | undefined => {
     if (teachersToNotify.length === 0) {
         toast({
             variant: "destructive",
             title: 'Sin Profesores a Notificar',
-            description: `No hay profesores de materias presenciales con clases en las fechas seleccionadas.`,
+            description: `No hay profesores seleccionados. Revisa las fechas y las clases marcadas.`,
         });
         return;
     }
@@ -241,10 +262,20 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     }
     
     body += `Motivo: ${notificationReason}\n`;
+
+    if (isPartialAbsence) {
+        const selectedClassNames = affectedClasses.filter(c => selectedClasses.has(c.id)).map(c => c.name).join(', ');
+        body += `Clases afectadas: ${selectedClassNames}\n`;
+    }
     
     if (hasProof) {
         body += `El alumno presentó comprobante del motivo.\n`;
     }
+    
+    if (notificationReason === 'Salida de Difusión (Embajadores)') {
+        body = `Estimados profesores,\n\nLes informo que el alumno(a) ${studentName}, quien forma parte del equipo de embajadores, se ausentará de sus clases ${dateText} por motivo de una salida de difusión.\n\nAgradezco de antemano su apoyo y comprensión.\n\nSaludos cordiales,`;
+    }
+
 
     if (customNotes) {
         body += `\nNotas adicionales:\n${customNotes}\n`;
@@ -252,7 +283,29 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     body += `\nAgradezco su atención.\n\nSaludos cordiales,`;
 
     const mailtoLink = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.location.href = mailtoLink;
+    if (!forCopy) {
+      window.location.href = mailtoLink;
+    }
+    return mailtoLink;
+  }
+
+  const handleCopyLink = () => {
+    const link = generateMailtoLink(true);
+    if (link) {
+      navigator.clipboard.writeText(link).then(() => {
+        toast({
+          title: '¡Enlace copiado!',
+          description: 'Pega el enlace en tu navegador para abrir el correo web.',
+        });
+      });
+    }
+  };
+
+  const handlePartialAbsenceToggle = (checked: boolean) => {
+    setIsPartialAbsence(checked);
+    if (!checked) {
+        setSelectedClasses(new Set()); // Clear selection when toggled off
+    }
   }
 
   return (
@@ -290,19 +343,26 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                                   day_range_middle: "bg-destructive/20 text-accent-foreground",
                               }}
                           />
-                           <div className="flex items-center space-x-2 mt-4">
-                              <Checkbox id="future-notice" checked={isFutureNotice} onCheckedChange={(checked) => setIsFutureNotice(!!checked)} />
-                              <Label htmlFor="future-notice">Es un aviso a futuro</Label>
-                          </div>
                         </div>
 
                         <div className="space-y-6 md:col-span-2">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id="future-notice" checked={isFutureNotice} onCheckedChange={(checked) => setIsFutureNotice(!!checked)} />
+                                <Label htmlFor="future-notice">Es un aviso a futuro</Label>
+                            </div>
+                             <div className="flex items-center space-x-2">
+                                <Checkbox id="has-proof" checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} />
+                                <Label htmlFor="has-proof">Se presentó comprobante</Label>
+                            </div>
+                          </div>
+
                           <div>
                             <Label className="font-semibold">2. Motivo</Label>
                             <RadioGroup
                                 id="notification-reason"
                                 defaultValue="Ausencia"
-                                onValueChange={setNotificationReason}
+                                onValueChange={(value) => setNotificationReason(value)}
                                 value={notificationReason}
                                 className="mt-2"
                             >
@@ -310,14 +370,31 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="Enfermedad" id="r2" /><Label htmlFor="r2">Enfermedad</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="Cita Médica" id="r3" /><Label htmlFor="r3">Cita Médica</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="Asunto Familiar" id="r4" /><Label htmlFor="r4">Asunto Familiar</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="Salida de Difusión (Embajadores)" id="r7" /><Label htmlFor="r7">Salida de Difusión (Embajadores)</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="Otro" id="r6" /><Label htmlFor="r6">Otro (especificar en notas)</Label></div>
                             </RadioGroup>
                           </div>
-
+                          
                            <div className="flex items-center space-x-2">
-                              <Checkbox id="has-proof" checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} />
-                              <Label htmlFor="has-proof">Se presentó comprobante</Label>
-                          </div>
+                              <Switch id="partial-absence" checked={isPartialAbsence} onCheckedChange={handlePartialAbsenceToggle} />
+                              <Label htmlFor="partial-absence">¿Es ausencia parcializada?</Label>
+                           </div>
+
+                           {isPartialAbsence && (
+                             <div className="space-y-2">
+                               <Label>Clases afectadas en el período</Label>
+                               <Card className="p-3 bg-muted/50 max-h-32 overflow-y-auto">
+                                 {affectedClasses.length > 0 ? (
+                                   affectedClasses.map(c => (
+                                     <div key={c.id} className="flex items-center space-x-2">
+                                        <Checkbox id={`class-${c.id}`} checked={selectedClasses.has(c.id)} onCheckedChange={() => setSelectedClasses(prev => { const next = new Set(prev); if (next.has(c.id)) { next.delete(c.id); } else { next.add(c.id); } return next; })} />
+                                        <Label htmlFor={`class-${c.id}`} className="font-normal">{c.name}</Label>
+                                     </div>
+                                   ))
+                                 ) : <p className="text-xs text-muted-foreground">No hay clases en las fechas seleccionadas.</p>}
+                               </Card>
+                             </div>
+                           )}
 
                           <div>
                             <Label htmlFor="custom-notes" className="font-semibold">3. Notas adicionales (opcional)</Label>
@@ -342,7 +419,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                                           ))}
                                       </ul>
                                  ) : (
-                                      <p className="text-sm text-muted-foreground text-center">Selecciona una fecha para ver los profesores.</p>
+                                      <p className="text-sm text-muted-foreground text-center">Selecciona una fecha (y clases, si es parcial) para ver los profesores.</p>
                                  )}
                               </Card>
                           </div>
@@ -351,7 +428,8 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                   </ScrollArea>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={generateMailtoLink}>Generar Correo</AlertDialogAction>
+                    <Button variant="outline" onClick={handleCopyLink}><LinkIcon className="mr-2"/>Copiar Enlace para Web</Button>
+                    <AlertDialogAction onClick={() => generateMailtoLink()}>Generar Correo</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -413,5 +491,3 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     </TooltipProvider>
   );
 }
-
-    
