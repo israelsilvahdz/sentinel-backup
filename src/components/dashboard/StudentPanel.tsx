@@ -51,6 +51,8 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
             ...(options.includeContacts ? [{ key: 'includeContacts', label: 'Teléfonos' }] : []),
         ];
 
+        const excludedGroups = new Set(['101', '102', '108', 'f31', '103', '106', '105']);
+
         let tableContent = `
             <thead>
                 <tr>
@@ -60,7 +62,11 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
             <tbody>
                 ${students.map(student => {
                     const studentContact = contacts[student.id] || {};
-                    const groups = Array.from(new Set(student.subjectSummaries?.map(s => s.group).filter(Boolean) || [])).join(', ');
+                    const groups = Array.from(
+                        new Set(
+                            student.subjectSummaries?.map(s => s.group).filter(g => g && !excludedGroups.has(g)) || []
+                        )
+                    ).join(', ');
                     
                     let contactInfo = '';
                     if (options.includeContacts) {
