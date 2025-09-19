@@ -5,7 +5,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
@@ -15,6 +15,154 @@ import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileUpload } from './FileUpload';
 import { parseDirectoryExcel } from '@/lib/excelParser';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '../ui/checkbox';
+import { Label } from '../ui/label';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+
+interface PrintOptions {
+  includeId: boolean;
+  includeName: boolean;
+  includeLeader: boolean;
+  includeTutor: boolean;
+  includeGroups: boolean;
+  includeContacts: boolean;
+}
+
+function PrintListDialog({ students, contacts }: { students: Student[], contacts: Record<string, StudentContact>}) {
+    const [options, setOptions] = useState<PrintOptions>({
+        includeId: true,
+        includeName: true,
+        includeLeader: false,
+        includeTutor: false,
+        includeGroups: true,
+        includeContacts: false,
+    });
+
+    const handlePrint = () => {
+        const headers: { key: keyof PrintOptions; label: string }[] = [
+            ...(options.includeId ? [{ key: 'includeId', label: 'Matrícula' }] : []),
+            ...(options.includeName ? [{ key: 'includeName', label: 'Nombre Completo' }] : []),
+            ...(options.includeLeader ? [{ key: 'includeLeader', label: 'Líder' }] : []),
+            ...(options.includeTutor ? [{ key: 'includeTutor', label: 'Tutor' }] : []),
+            ...(options.includeGroups ? [{ key: 'includeGroups', label: 'Grupos' }] : []),
+            ...(options.includeContacts ? [{ key: 'includeContacts', label: 'Teléfonos' }] : []),
+        ];
+
+        let tableContent = `
+            <thead>
+                <tr>
+                    ${headers.map(h => `<th>${h.label}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                ${students.map(student => {
+                    const studentContact = contacts[student.id] || {};
+                    const groups = Array.from(new Set(student.subjectSummaries?.map(s => s.group).filter(Boolean) || [])).join(', ');
+                    
+                    let contactInfo = '';
+                    if (options.includeContacts) {
+                        const phones = [
+                            studentContact.studentPhone && `Alumno: ${studentContact.studentPhone}`,
+                            studentContact.dadPhone && `Papá: ${studentContact.dadPhone}`,
+                            studentContact.momPhone && `Mamá: ${studentContact.momPhone}`,
+                        ].filter(Boolean).join('<br>');
+                        contactInfo = phones || 'No disponible';
+                    }
+
+                    const rowData = {
+                        includeId: student.id,
+                        includeName: student.name,
+                        includeLeader: student.leader,
+                        includeTutor: student.tutor,
+                        includeGroups: groups,
+                        includeContacts: contactInfo,
+                    };
+
+                    return `
+                        <tr>
+                            ${headers.map(h => `<td>${rowData[h.key]}</td>`).join('')}
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Lista de Alumnos - ${format(new Date(), 'dd/MM/yyyy')}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 2rem; }
+                            h1 { color: #17594A; }
+                            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+                            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                            th { background-color: #f2f2f2; }
+                            tr:nth-child(even) { background-color: #f9f9f9; }
+                            @media print { .no-print { display: none; } }
+                        </style>
+                    </head>
+                    <body>
+                        <button class="no-print" onclick="window.print()">Imprimir</button>
+                        <h1>Lista de Alumnos</h1>
+                        <p>Generado el ${format(new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })} - Total: ${students.length} alumnos</p>
+                        <table>${tableContent}</table>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+        }
+    };
+
+
+    return (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Imprimir Lista de Alumnos</DialogTitle>
+                <DialogDescription>
+                    Selecciona las columnas que deseas incluir en el reporte impreso.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="print-id" checked={options.includeId} onCheckedChange={(checked) => setOptions(o => ({...o, includeId: !!checked}))} />
+                    <Label htmlFor="print-id">Matrícula</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="print-name" checked={options.includeName} onCheckedChange={(checked) => setOptions(o => ({...o, includeName: !!checked}))} />
+                    <Label htmlFor="print-name">Nombre Completo</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="print-leader" checked={options.includeLeader} onCheckedChange={(checked) => setOptions(o => ({...o, includeLeader: !!checked}))} />
+                    <Label htmlFor="print-leader">Líder</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="print-tutor" checked={options.includeTutor} onCheckedChange={(checked) => setOptions(o => ({...o, includeTutor: !!checked}))} />
+                    <Label htmlFor="print-tutor">Tutor</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="print-groups" checked={options.includeGroups} onCheckedChange={(checked) => setOptions(o => ({...o, includeGroups: !!checked}))} />
+                    <Label htmlFor="print-groups">Grupos</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="print-contacts" checked={options.includeContacts} onCheckedChange={(checked) => setOptions(o => ({...o, includeContacts: !!checked}))} />
+                    <Label htmlFor="print-contacts">Teléfonos de Contacto</Label>
+                </div>
+            </div>
+            <div className="flex justify-end">
+                <Button onClick={handlePrint}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Generar e Imprimir
+                </Button>
+            </div>
+        </DialogContent>
+    );
+}
 
 
 export function StudentPanel() {
@@ -194,6 +342,15 @@ export function StudentPanel() {
                   icon={<Contact />}
                   variant="secondary"
                 />
+                 <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant="outline">
+                            <Printer className="mr-2 h-4 w-4" />
+                            Imprimir Lista
+                        </Button>
+                    </DialogTrigger>
+                    <PrintListDialog students={filteredStudents} contacts={studentContacts} />
+                </Dialog>
                 {hasData && (
                 <TooltipProvider>
                     <Tooltip open={isCopied}>
