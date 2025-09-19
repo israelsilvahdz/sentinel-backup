@@ -3,6 +3,7 @@ export interface CurriculumCourse {
   name: string;
   prerequisite?: string;
   isPlaceholder?: boolean;
+  isFlexible?: boolean;
 }
 
 export interface CurriculumTerm {
@@ -19,7 +20,7 @@ export const curriculum: CurriculumTerm[] = [
       { name: 'El ser humano en sociedad' },
       { name: 'placeholder2', isPlaceholder: true },
       { name: 'Lectura y Redacción' },
-      { name: 'Optativa de lengua adicional al español I' },
+      { name: 'Optativa de lengua adicional al español I', isFlexible: true },
       { name: 'Ecología y Geografía' },
       { name: 'Tecnologías de la Información I' },
       { name: 'placeholder3', isPlaceholder: true },
@@ -34,7 +35,7 @@ export const curriculum: CurriculumTerm[] = [
       { name: 'placeholder2', isPlaceholder: true },
       { name: 'Historia de México' },
       { name: 'Comunicación Integral', prerequisite: 'Lectura y Redacción' },
-      { name: 'Optativa de lengua adicional al español II', prerequisite: 'Optativa de lengua adicional al español I' },
+      { name: 'Optativa de lengua adicional al español II', prerequisite: 'Optativa de lengua adicional al español I', isFlexible: true },
       { name: 'Transformación de la materia' },
       { name: 'Tecnologías de la Información II', prerequisite: 'Tecnologías de la Información I' },
       { name: 'placeholder3', isPlaceholder: true },
@@ -49,7 +50,7 @@ export const curriculum: CurriculumTerm[] = [
       { name: 'placeholder2', isPlaceholder: true },
       { name: 'México Contemporáneo', prerequisite: 'Historia de México' },
       { name: 'Los grandes escritores universales', prerequisite: 'Comunicación Integral' },
-      { name: 'Optativa de lengua adicional al español III', prerequisite: 'Optativa de lengua adicional al español II' },
+      { name: 'Optativa de lengua adicional al español III', prerequisite: 'Optativa de lengua adicional al español II', isFlexible: true },
       { name: 'El carbono y sus componentes', prerequisite: 'Transformación de la materia' },
       { name: 'placeholder3', isPlaceholder: true },
       { name: 'Conceptos y dilemas éticos' },
@@ -63,8 +64,8 @@ export const curriculum: CurriculumTerm[] = [
       { name: 'Materia y energía I', prerequisite: 'Matemáticas II: pensamiento matemático' },
       { name: 'Antropología', prerequisite: 'El ser humano en sociedad' },
       { name: 'placeholder1', isPlaceholder: true },
-      { name: 'Expresión Literaria', prerequisite: 'Los grandes escritores universales' },
-      { name: 'Optativa de lengua adicional al español IV', prerequisite: 'Optativa de lengua adicional al español III' },
+      { name: 'Expresión Literaria', prerequisite: 'Los grandes escritores universales', isFlexible: true },
+      { name: 'Optativa de lengua adicional al español IV', prerequisite: 'Optativa de lengua adicional al español III', isFlexible: true },
       { name: 'placeholder2', isPlaceholder: true },
       { name: 'Ciencias de la Vida' },
       { name: 'placeholder3', isPlaceholder: true },
@@ -79,8 +80,8 @@ export const curriculum: CurriculumTerm[] = [
       { name: 'El mundo contemporáneo' },
       { name: 'placeholder1', isPlaceholder: true },
       { name: 'placeholder2', isPlaceholder: true },
-      { name: 'Optativa de lengua adicional al español V', prerequisite: 'Optativa de lengua adicional al español IV' },
-      { name: 'Expresión musical' },
+      { name: 'Optativa de lengua adicional al español V', prerequisite: 'Optativa de lengua adicional al español IV', isFlexible: true },
+      { name: 'Expresión musical', isFlexible: true },
       { name: 'Cuidado del cuerpo humano', prerequisite: 'Ciencias de la Vida' },
       { name: 'placeholder3', isPlaceholder: true },
       { name: 'Habilidades y valores V: lenguaje' },
@@ -91,10 +92,10 @@ export const curriculum: CurriculumTerm[] = [
     courses: [
       { name: 'Cálculo Integral', prerequisite: 'Cálculo Diferencial' },
       { name: 'placeholder1', isPlaceholder: true },
-      { name: 'Arte y cultura', prerequisite: 'El mundo contemporáneo' },
+      { name: 'Arte y cultura', prerequisite: 'El mundo contemporáneo', isFlexible: true },
       { name: 'México en el siglo XXI', prerequisite: 'México Contemporáneo' },
-      { name: 'Pensamiento científico' },
-      { name: 'Optativa de módulo de formación' },
+      { name: 'Pensamiento científico', isFlexible: true },
+      { name: 'Optativa de módulo de formación', isFlexible: true },
       { name: 'placeholder2', isPlaceholder: true },
       { name: 'placeholder3', isPlaceholder: true },
       { name: 'Pensamiento Filosófico', prerequisite: 'Conceptos y dilemas éticos' },

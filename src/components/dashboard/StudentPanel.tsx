@@ -20,6 +20,7 @@ import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { curriculum } from '@/lib/curriculum';
 
 
 interface PrintOptions {
@@ -28,8 +29,16 @@ interface PrintOptions {
   includeLeader: boolean;
   includeTutor: boolean;
   includeGroups: boolean;
+  includeOnlineFlexGroups: boolean;
   includeContacts: boolean;
 }
+
+const onlineFlexSubjects = new Set(
+    curriculum.flatMap(term => term.courses.filter(c => c.isFlexible).map(c => c.name))
+);
+onlineFlexSubjects.add('Ciencias de la Vida');
+onlineFlexSubjects.add('El mundo contemporáneo');
+
 
 function PrintListDialog({ students, contacts }: { students: Student[], contacts: Record<string, StudentContact>}) {
     const [options, setOptions] = useState<PrintOptions>({
@@ -38,6 +47,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
         includeLeader: false,
         includeTutor: false,
         includeGroups: true,
+        includeOnlineFlexGroups: false,
         includeContacts: false,
     });
 
@@ -47,11 +57,10 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
             ...(options.includeName ? [{ key: 'includeName', label: 'Nombre Completo' }] : []),
             ...(options.includeLeader ? [{ key: 'includeLeader', label: 'Líder' }] : []),
             ...(options.includeTutor ? [{ key: 'includeTutor', label: 'Tutor' }] : []),
-            ...(options.includeGroups ? [{ key: 'includeGroups', label: 'Grupos' }] : []),
+            ...(options.includeGroups ? [{ key: 'includeGroups', label: 'Grupos Regulares' }] : []),
+            ...(options.includeOnlineFlexGroups ? [{ key: 'includeOnlineFlexGroups', label: 'Grupos Online/Flex' }] : []),
             ...(options.includeContacts ? [{ key: 'includeContacts', label: 'Teléfonos' }] : []),
         ];
-
-        const excludedGroups = new Set(['101', '102', '108', 'f31', '103', '106', '105']);
 
         let tableContent = `
             <thead>
@@ -62,9 +71,20 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
             <tbody>
                 ${students.map(student => {
                     const studentContact = contacts[student.id] || {};
-                    const groups = Array.from(
+                    
+                    const regularGroups = Array.from(
                         new Set(
-                            student.subjectSummaries?.map(s => s.group).filter(g => g && !excludedGroups.has(g)) || []
+                            student.subjectSummaries
+                                ?.filter(s => s.group && !s.group.startsWith('10') && !s.group.toUpperCase().startsWith('F') && !onlineFlexSubjects.has(s.name))
+                                .map(s => s.group) || []
+                        )
+                    ).join(', ');
+
+                    const onlineFlexGroups = Array.from(
+                        new Set(
+                            student.subjectSummaries
+                                ?.filter(s => s.group && onlineFlexSubjects.has(s.name))
+                                .map(s => `${s.name.substring(0, 5)}... (${s.group})`) || []
                         )
                     ).join(', ');
                     
@@ -83,7 +103,8 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                         includeName: student.name,
                         includeLeader: student.leader,
                         includeTutor: student.tutor,
-                        includeGroups: groups,
+                        includeGroups: regularGroups,
+                        includeOnlineFlexGroups: onlineFlexGroups,
                         includeContacts: contactInfo,
                     };
 
@@ -106,7 +127,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                             body { font-family: Arial, sans-serif; margin: 2rem; }
                             h1 { color: #17594A; }
                             table { width: 100%; border-collapse: collapse; font-size: 10px; }
-                            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+                            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; word-break: break-word; }
                             th { background-color: #f2f2f2; }
                             tr:nth-child(even) { background-color: #f9f9f9; }
                             @media print { .no-print { display: none; } }
@@ -153,7 +174,11 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="print-groups" checked={options.includeGroups} onCheckedChange={(checked) => setOptions(o => ({...o, includeGroups: !!checked}))} />
-                    <Label htmlFor="print-groups">Grupos</Label>
+                    <Label htmlFor="print-groups">Grupos Regulares</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="print-online-flex" checked={options.includeOnlineFlexGroups} onCheckedChange={(checked) => setOptions(o => ({...o, includeOnlineFlexGroups: !!checked}))} />
+                    <Label htmlFor="print-online-flex">Grupos Online y Flex</Label>
                 </div>
                  <div className="flex items-center space-x-2">
                     <Checkbox id="print-contacts" checked={options.includeContacts} onCheckedChange={(checked) => setOptions(o => ({...o, includeContacts: !!checked}))} />
