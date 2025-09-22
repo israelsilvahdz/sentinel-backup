@@ -30,7 +30,8 @@ interface PrintOptions {
   includeTutor: boolean;
   includeGroups: boolean;
   includeOnlineFlexGroups: boolean;
-  includeContacts: boolean;
+  includeStudentPhone: boolean;
+  includeParentPhones: boolean;
 }
 
 const onlineFlexSubjects = new Set(
@@ -48,7 +49,8 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
         includeTutor: false,
         includeGroups: true,
         includeOnlineFlexGroups: false,
-        includeContacts: false,
+        includeStudentPhone: false,
+        includeParentPhones: false,
     });
 
     const handlePrint = () => {
@@ -59,7 +61,8 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
             ...(options.includeTutor ? [{ key: 'includeTutor', label: 'Tutor' }] : []),
             ...(options.includeGroups ? [{ key: 'includeGroups', label: 'Grupos Regulares' }] : []),
             ...(options.includeOnlineFlexGroups ? [{ key: 'includeOnlineFlexGroups', label: 'Grupos Online/Flex' }] : []),
-            ...(options.includeContacts ? [{ key: 'includeContacts', label: 'Teléfonos' }] : []),
+            ...(options.includeStudentPhone ? [{ key: 'includeStudentPhone', label: 'Teléfono Alumno' }] : []),
+            ...(options.includeParentPhones ? [{ key: 'includeParentPhones', label: 'Teléfonos Padres/Tutores' }] : []),
         ];
 
         let tableContent = `
@@ -88,14 +91,13 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                         )
                     ).join(', ');
                     
-                    let contactInfo = '';
-                    if (options.includeContacts) {
+                    let parentPhones = '';
+                    if (options.includeParentPhones) {
                         const phones = [
-                            studentContact.studentPhone && `Alumno: ${studentContact.studentPhone}`,
                             studentContact.dadPhone && `Papá: ${studentContact.dadPhone}`,
                             studentContact.momPhone && `Mamá: ${studentContact.momPhone}`,
                         ].filter(Boolean).join('<br>');
-                        contactInfo = phones || 'No disponible';
+                        parentPhones = phones || 'No disponible';
                     }
 
                     const rowData = {
@@ -105,7 +107,8 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                         includeTutor: student.tutor,
                         includeGroups: regularGroups,
                         includeOnlineFlexGroups: onlineFlexGroups,
-                        includeContacts: contactInfo,
+                        includeStudentPhone: studentContact.studentPhone || 'No disponible',
+                        includeParentPhones: parentPhones,
                     };
 
                     return `
@@ -180,9 +183,13 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                     <Checkbox id="print-online-flex" checked={options.includeOnlineFlexGroups} onCheckedChange={(checked) => setOptions(o => ({...o, includeOnlineFlexGroups: !!checked}))} />
                     <Label htmlFor="print-online-flex">Grupos Online y Flex</Label>
                 </div>
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="print-contacts" checked={options.includeContacts} onCheckedChange={(checked) => setOptions(o => ({...o, includeContacts: !!checked}))} />
-                    <Label htmlFor="print-contacts">Teléfonos de Contacto</Label>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="print-student-phone" checked={options.includeStudentPhone} onCheckedChange={(checked) => setOptions(o => ({...o, includeStudentPhone: !!checked}))} />
+                    <Label htmlFor="print-student-phone">Teléfono Alumno</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="print-parent-phones" checked={options.includeParentPhones} onCheckedChange={(checked) => setOptions(o => ({...o, includeParentPhones: !!checked}))} />
+                    <Label htmlFor="print-parent-phones">Teléfonos Padres/Tutores</Label>
                 </div>
             </div>
             <div className="flex justify-end">
