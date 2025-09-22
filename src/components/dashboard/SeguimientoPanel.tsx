@@ -164,6 +164,7 @@ export function SeguimientoPanel() {
     return baseEntries;
   }, [entries, selectedValue, filterType, showCompleted]);
 
+  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
 
   const handleStatusChange = async (id: string, currentStatus: 'pendiente' | 'completado') => {
     const newStatus = currentStatus === 'pendiente' ? 'completado' : 'pendiente';
@@ -328,8 +329,6 @@ export function SeguimientoPanel() {
     );
   }
   
-  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
-
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
       <header className="flex items-center justify-between flex-wrap gap-4">
