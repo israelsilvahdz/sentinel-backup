@@ -193,12 +193,12 @@ export function SeguimientoPanel() {
   };
 
   const handleGenerateReport = () => {
-    const pendingEntries = entries.filter(e => e.status === 'pendiente');
+    const entriesToPrint = filteredEntries.filter(e => e.status === 'pendiente');
 
-    if (pendingEntries.length === 0) {
+    if (entriesToPrint.length === 0) {
       toast({
-        title: "No hay casos pendientes",
-        description: "No hay casos de seguimiento marcados como 'pendientes' para generar un reporte.",
+        title: "No hay casos pendientes para imprimir",
+        description: "No hay casos de seguimiento marcados como 'pendientes' en la vista actual.",
       });
       return;
     }
@@ -267,10 +267,10 @@ export function SeguimientoPanel() {
           <body>
             <button class="print-button no-print" onclick="window.print()">Imprimir Reporte</button>
             <h1>Reporte de Seguimiento - ${selectedValue ? `${filterType}: ${selectedValue} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
-            <p>Total de casos pendientes: ${pendingEntries.length}</p>
+            <p>Total de casos pendientes: ${entriesToPrint.length}</p>
             
             <div id="report-content">
-              ${pendingEntries.map(entry => {
+              ${entriesToPrint.map(entry => {
                 const student = studentData(entry.studentId);
                 const subjectsInCase = entry.subjects.map(subjectId => student?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
                 const situationText = SITUATION_MAP[entry.situation].text || entry.situation;
@@ -327,6 +327,8 @@ export function SeguimientoPanel() {
       </div>
     );
   }
+  
+  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -342,7 +344,7 @@ export function SeguimientoPanel() {
             </div>
             <Button onClick={handleGenerateReport}>
                 <Printer className="mr-2 h-4 w-4" />
-                Terminar y Generar Reporte
+                Generar Reporte ({pendingCount})
             </Button>
         </div>
       </header>
