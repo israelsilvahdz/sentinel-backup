@@ -117,7 +117,7 @@ function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTask
 }
 
 export function SeguimientoPanel() {
-  const { allStudents, seguimientoEntries, fetchSeguimientoEntries, isLoading } = useDashboardFilters();
+  const { filteredStudents, allStudents, seguimientoEntries, fetchSeguimientoEntries, isLoading } = useDashboardFilters();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTopic, setFilterTopic] = useState<FilterTopic>('all');
   
@@ -129,8 +129,10 @@ export function SeguimientoPanel() {
     const studentsWithRisk: { student: Student; riskCategory: RiskCategory }[] = [];
     const processedIds = new Set<string>();
 
+    const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
+
     // 1. Clasificar todos los alumnos por su mayor riesgo
-    allStudents.forEach(student => {
+    studentSource.forEach(student => {
       if (!student.subjectSummaries || student.subjectSummaries.length === 0) return;
 
       let highRiskNE = false;
@@ -163,7 +165,7 @@ export function SeguimientoPanel() {
     // 2. Añadir alumnos con seguimiento previo que no están en la lista de riesgo
     Object.keys(seguimientoEntries).forEach(studentId => {
       if (!processedIds.has(studentId)) {
-        const student = allStudents.find(s => s.id === studentId);
+        const student = studentSource.find(s => s.id === studentId);
         if (student) {
           studentsWithRisk.push({ student, riskCategory: 'other' });
           processedIds.add(student.id);
@@ -190,7 +192,7 @@ export function SeguimientoPanel() {
     
     return finalFilteredList;
 
-  }, [allStudents, seguimientoEntries, searchTerm, filterTopic]);
+  }, [filteredStudents, allStudents, seguimientoEntries, searchTerm, filterTopic]);
   
   const riskDisplayInfo: Record<RiskCategory, { text: string; badgeClass: string; borderClass: string; }> = {
     ne: { text: 'Riesgo por NE', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
@@ -341,5 +343,7 @@ export function SeguimientoPanel() {
     </TooltipProvider>
   );
 }
+
+    
 
     
