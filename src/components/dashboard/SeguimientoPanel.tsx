@@ -108,10 +108,10 @@ export function SeguimientoPanel() {
       let highRiskFaltas = false;
 
       student.subjectSummaries.forEach(subject => {
-        if (subject.missedAssignmentLimit > 0 && (subject.missedAssignments / subject.missedAssignmentLimit) >= 0.8) {
+        if (subject.missedAssignmentLimit > 0 && (subject.missedAssignments / subject.missedAssignmentLimit) >= 0.5) {
           highRiskNE = true;
         }
-        if (subject.absenceLimit > 0 && (subject.absences / subject.absenceLimit) >= 0.8) {
+        if (subject.absenceLimit > 0 && (subject.absences / subject.absenceLimit) >= 0.5) {
           highRiskFaltas = true;
         }
       });
