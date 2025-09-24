@@ -51,11 +51,17 @@ const CONTACTS_COLLECTION = 'contacts';
 export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 'id'>): Promise<void> => {
   try {
     const { eventDate, ...rest } = entry;
-    await addDoc(collection(db, BITACORA_COLLECTION), {
-      ...rest,
-      eventDate: Timestamp.fromDate(eventDate as Date),
-      timestamp: Timestamp.now(),
-    });
+    const docData = {
+        ...rest,
+        eventDate: Timestamp.fromDate(eventDate as Date),
+        timestamp: Timestamp.now(),
+    };
+    
+    // Clean up undefined fields before sending to Firestore
+    Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
+
+    await addDoc(collection(db, BITACORA_COLLECTION), docData);
+
   } catch (error) {
     console.error("Error al añadir documento a Firestore: ", error);
     throw new Error("No se pudo guardar el registro en la base de datos.");
@@ -95,7 +101,7 @@ export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
  */
 export const deleteBitacoraEntry = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, BITACora_COLLECTION, id);
+    const docRef = doc(db, BITACORA_COLLECTION, id);
     await deleteDoc(docRef);
   } catch (error) {
     console.error("Error al eliminar documento de Firestore: ", error);
@@ -158,9 +164,7 @@ export const updateSeguimientoStatus = async (id: string, status: 'pendiente' | 
         const updateData: any = { status };
         if (status === 'completado') {
             updateData.completedAt = Timestamp.now();
-            if (completionNotes) {
-                updateData.completionNotes = completionNotes;
-            }
+            updateData.completionNotes = completionNotes || null;
         } else {
              // Si se vuelve a poner como pendiente, opcionalmente limpiar los campos de completado
             updateData.completedAt = null;
@@ -241,3 +245,5 @@ export const getContacts = async (): Promise<Record<string, StudentContact>> => 
         return {};
     }
 };
+
+    

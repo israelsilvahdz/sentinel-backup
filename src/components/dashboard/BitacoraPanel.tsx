@@ -16,7 +16,7 @@ import { getBitacoraEntries, addBitacoraEntry, deleteBitacoraEntry } from '@/lib
 import { useToast } from '@/hooks/use-toast';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FileText, Loader2, PlusCircle, Search, Trash2, User, Filter, X, Calendar as CalendarIcon } from 'lucide-react';
+import { FileText, Loader2, PlusCircle, Search, Trash2, User, Filter, X, Calendar as CalendarIcon, Phone, FileWarning } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
@@ -31,11 +31,14 @@ import { cn } from '@/lib/utils';
 const bitacoraSchema = z.object({
   studentId: z.string().min(1, 'La matrícula es requerida.'),
   studentName: z.string().min(1, 'El nombre del alumno es requerido.'),
+  absencesAtFollowUp: z.number().optional(),
+  missedAssignmentsAtFollowUp: z.number().optional(),
   reportedBy: z.string().min(1, 'El campo "Reportado por" es requerido.'),
   description: z.string().min(1, 'La descripción es requerida.'),
   agreements: z.string().min(1, 'Los acuerdos son requeridos.'),
   caseType: z.enum(['academica', 'conductual'], { required_error: 'Debes seleccionar un tipo de caso.' }),
   academicCommittee: z.boolean().default(false),
+  parentsContacted: z.boolean().default(false),
   eventDate: z.date({ required_error: 'La fecha del evento es requerida.' }),
 });
 
@@ -58,7 +61,8 @@ export function BitacoraPanel() {
     resolver: zodResolver(bitacoraSchema),
     defaultValues: { 
         studentId: '', studentName: '', reportedBy: '', description: '', agreements: '', 
-        caseType: 'academica', academicCommittee: false, eventDate: new Date() 
+        caseType: 'academica', academicCommittee: false, parentsContacted: false, eventDate: new Date(),
+        absencesAtFollowUp: 0, missedAssignmentsAtFollowUp: 0,
     },
   });
 
@@ -74,7 +78,8 @@ export function BitacoraPanel() {
       toast({ title: 'Reporte Guardado', description: 'La nueva entrada de la bitácora se ha guardado correctamente.', });
       reset({ 
           studentId: '', studentName: '', reportedBy: '', description: '', agreements: '', 
-          caseType: 'academica', academicCommittee: false, eventDate: new Date() 
+          caseType: 'academica', academicCommittee: false, parentsContacted: false, eventDate: new Date(),
+          absencesAtFollowUp: 0, missedAssignmentsAtFollowUp: 0,
       });
       fetchBitacoraEntries(); // Refresh the list
     } catch (error) {
@@ -100,7 +105,17 @@ export function BitacoraPanel() {
 
   useEffect(() => {
     const student = allStudents.find(s => s.id === studentIdValue);
-    setValue('studentName', student ? student.name : '');
+    if (student) {
+        setValue('studentName', student.name);
+        const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
+        const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
+        setValue('absencesAtFollowUp', totalAbsences);
+        setValue('missedAssignmentsAtFollowUp', totalMissed);
+    } else {
+        setValue('studentName', '');
+        setValue('absencesAtFollowUp', 0);
+        setValue('missedAssignmentsAtFollowUp', 0);
+    }
   }, [studentIdValue, allStudents, setValue]);
 
   const reporters = useMemo(() => {
@@ -165,6 +180,16 @@ export function BitacoraPanel() {
                 <Label htmlFor="studentName">Nombre del Alumno</Label>
                 <Input id="studentName" {...register('studentName')} readOnly className="bg-muted/50" />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="absencesAtFollowUp">Faltas (al momento)</Label>
+                    <Input id="absencesAtFollowUp" type="number" {...register('absencesAtFollowUp', { valueAsNumber: true })} readOnly className="bg-muted/50 font-bold" />
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="missedAssignmentsAtFollowUp">NE (al momento)</Label>
+                    <Input id="missedAssignmentsAtFollowUp" type="number" {...register('missedAssignmentsAtFollowUp', { valueAsNumber: true })} readOnly className="bg-muted/50 font-bold" />
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="reportedBy">Reportado por</Label>
                 <Input id="reportedBy" {...register('reportedBy')} placeholder="Ej. Juan Pérez (Tutor)" />
@@ -217,7 +242,11 @@ export function BitacoraPanel() {
                       {errors.caseType && <p className="text-sm text-destructive">{errors.caseType.message}</p>}
                     </div>
                 )} />
-                 <div className="flex items-center space-x-2 pt-6">
+                 <div className="flex items-center space-x-2 pt-4">
+                    <Controller name="parentsContacted" control={control} render={({ field }) => ( <Checkbox id="parentsContacted" checked={field.value} onCheckedChange={field.onChange} /> )} />
+                    <Label htmlFor="parentsContacted" className="font-normal"> ¿Se contactó a los padres en este seguimiento? </Label>
+                </div>
+                 <div className="flex items-center space-x-2 pt-4">
                     <Controller name="academicCommittee" control={control} render={({ field }) => ( <Checkbox id="academicCommittee" checked={field.value} onCheckedChange={field.onChange} /> )} />
                     <Label htmlFor="academicCommittee" className="font-normal"> ¿El caso terminó en comité académico? </Label>
                 </div>
@@ -306,12 +335,25 @@ export function BitacoraPanel() {
                       </AlertDialog>
                     </div>
                   <p className="text-sm text-muted-foreground">Fecha del evento: {format(entry.eventDate.toDate(), "d 'de' LLLL, yyyy", { locale: es })}</p>
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h3 className="font-semibold text-lg">{entry.studentName} <span className="text-sm text-muted-foreground font-normal">({entry.studentId})</span></h3>
                     {entry.caseType && (<Badge variant={entry.caseType === 'academica' ? 'secondary' : 'default'}>{entry.caseType === 'academica' ? 'Académica' : 'Conductual'}</Badge>)}
                     {entry.academicCommittee && (<Badge variant="destructive">En Comité Académico</Badge>)}
+                    {entry.parentsContacted && (<Badge variant="outline" className="text-blue-600 border-blue-600"><Phone className="mr-1 h-3 w-3"/>Padres Contactados</Badge>)}
                   </div>
                   <p className="text-sm text-muted-foreground">Reportado por: {entry.reportedBy}</p>
+                   { (entry.absencesAtFollowUp !== undefined || entry.missedAssignmentsAtFollowUp !== undefined) && (
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
+                          <div className="flex items-center gap-1 font-semibold">
+                              <FileWarning className="h-4 w-4" />
+                              <span>Faltas: {entry.absencesAtFollowUp ?? 0}</span>
+                          </div>
+                           <div className="flex items-center gap-1 font-semibold">
+                              <FileWarning className="h-4 w-4" />
+                              <span>NE: {entry.missedAssignmentsAtFollowUp ?? 0}</span>
+                          </div>
+                      </div>
+                  )}
                   <div className="mt-4 space-y-2">
                     <div><h4 className="font-semibold">Descripción:</h4><p className="text-sm whitespace-pre-wrap">{entry.description}</p></div>
                     <div><h4 className="font-semibold">Acuerdos:</h4><p className="text-sm whitespace-pre-wrap">{entry.agreements}</p></div>
@@ -372,3 +414,5 @@ function StudentSearchPopover({ onStudentSelect }: { onStudentSelect: (student: 
     </Popover>
   );
 }
+
+    

@@ -73,6 +73,9 @@ export interface BitacoraEntry {
   agreements: string;
   caseType: 'academica' | 'conductual';
   academicCommittee: boolean;
+  parentsContacted: boolean;
+  absencesAtFollowUp?: number;
+  missedAssignmentsAtFollowUp?: number;
 }
 
 export interface SeguimientoEntry {
@@ -105,3 +108,5 @@ export interface StudentContact {
     momEmail: string;
     mentoringId: string;
 }
+
+    
