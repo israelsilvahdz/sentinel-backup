@@ -375,7 +375,7 @@ export function BitacoraPanel() {
   );
 }
 
-function StudentSearchPopover({ onStudentSelect }: { onStudentSelect: (student: { id: string, name: string }) => void }) {
+export function StudentSearchPopover({ onStudentSelect }: { onStudentSelect: (student: { id: string, name: string }) => void }) {
   const { allStudents } = useDashboardFilters();
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");

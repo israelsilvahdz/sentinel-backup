@@ -81,6 +81,7 @@ export interface BitacoraEntry {
 export interface SeguimientoEntry {
     id: string;
     createdAt: any; // Firestore Timestamp
+    completedAt?: any; // Firestore Timestamp
     studentId: string;
     studentName: string;
     leader: string;
@@ -89,8 +90,21 @@ export interface SeguimientoEntry {
     subjects: string[]; // Array of subject CRNs
     notes: string;
     status: 'pendiente' | 'completado';
-    completedAt?: any; // Firestore Timestamp of completion
+    assignedTo?: 'leader' | 'tutor' | 'both';
     completionNotes?: string;
+}
+
+export interface SeguimientoPilotEntry {
+  id?: string;
+  createdAt: any; // Firestore Timestamp
+  studentId: string;
+  studentName: string;
+  attendedBy: string;
+  topic: string;
+  notes: string;
+  absencesAtFollowUp: number;
+  missedAssignmentsAtFollowUp: number;
+  parentsContacted: boolean;
 }
 
 export interface StudentContact {

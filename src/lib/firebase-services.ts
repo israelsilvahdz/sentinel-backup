@@ -15,7 +15,7 @@ import {
   setDoc,
   writeBatch
 } from 'firebase/firestore';
-import type { BitacoraEntry, SeguimientoEntry, StudentContact } from '@/types/student';
+import type { BitacoraEntry, SeguimientoEntry, StudentContact, SeguimientoPilotEntry } from '@/types/student';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -42,6 +42,7 @@ const db = getFirestore(app);
 const BITACORA_COLLECTION = 'bitacora';
 const SEGUIMIENTO_COLLECTION = 'seguimiento';
 const CONTACTS_COLLECTION = 'contacts';
+const SEGUIMIENTO_PILOT_COLLECTION = 'seguimientosPilot';
 
 
 /**
@@ -143,7 +144,8 @@ export const getSeguimientoEntries = async (): Promise<SeguimientoEntry[]> => {
         entries.push({
             id: doc.id,
             ...data,
-            createdAt: data.createdAt, // Mantener como Timestamp por ahora
+            createdAt: data.createdAt,
+            completedAt: data.completedAt,
         } as SeguimientoEntry);
     });
     return entries;
@@ -244,4 +246,33 @@ export const getContacts = async (): Promise<Record<string, StudentContact>> => 
         console.error("Error al obtener contactos de Firestore: ", error);
         return {};
     }
+};
+
+// --- Funciones para Seguimiento Piloto ---
+
+export const addSeguimientoPilotEntry = async (entry: Omit<SeguimientoPilotEntry, 'id' | 'createdAt'>): Promise<void> => {
+  try {
+    await addDoc(collection(db, SEGUIMIENTO_PILOT_COLLECTION), {
+      ...entry,
+      createdAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error("Error al añadir seguimiento piloto: ", error);
+    throw new Error("No se pudo guardar el registro piloto.");
+  }
+};
+
+export const getSeguimientoPilotEntries = async (): Promise<SeguimientoPilotEntry[]> => {
+  try {
+    const q = query(collection(db, SEGUIMIENTO_PILOT_COLLECTION), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    const entries: SeguimientoPilotEntry[] = [];
+    querySnapshot.forEach(doc => {
+      entries.push({ id: doc.id, ...doc.data() } as SeguimientoPilotEntry);
+    });
+    return entries;
+  } catch (error) {
+    console.error("Error al obtener seguimientos piloto: ", error);
+    return [];
+  }
 };
