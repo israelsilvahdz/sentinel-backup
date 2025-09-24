@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useDashboardFilters } from './DashboardClient';
 import type { Student, SeguimientoEntry } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
@@ -366,5 +366,3 @@ export function SeguimientoPanel() {
     </TooltipProvider>
   );
 }
-
-    
