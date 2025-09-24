@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -12,7 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDashboardFilters } from './DashboardClient';
 import type { BitacoraEntry } from '@/types/student';
-import { getBitacoraEntries, addBitacoraEntry, deleteBitacoraEntry } from '@/lib/firebase-services';
+import { addBitacoraEntry, deleteBitacoraEntry } from '@/lib/firebase-services';
 import { useToast } from '@/hooks/use-toast';
 import { format, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -125,7 +126,7 @@ export function BitacoraPanel() {
 
   const filteredEntries = useMemo(() => {
       const hasActiveFilters = searchTerm || selectedLeader || selectedTutor || selectedReporter || selectedDate;
-      if (!hasActiveFilters) return [];
+      if (!hasActiveFilters) return bitacoraEntries;
 
       return bitacoraEntries.filter(entry => {
           const student = allStudentsMap.get(entry.studentId);

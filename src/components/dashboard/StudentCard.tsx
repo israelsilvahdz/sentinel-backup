@@ -18,7 +18,7 @@ import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
-import { AddToSeguimientoDialog, CreateBitacoraDialog } from './StudentActions';
+import { AddToSeguimientoDialog } from './StudentActions';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
@@ -254,9 +254,6 @@ export function StudentCard({ student, startOpen = false }: StudentCardProps) {
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
-                    <CreateBitacoraDialog student={student}>
-                        <Button variant="outline" size="sm">REPORTE</Button>
-                    </CreateBitacoraDialog>
                     <AddToSeguimientoDialog student={student}>
                         <Button variant="outline" size="sm">SEGUIMIENTO</Button>
                     </AddToSeguimientoDialog>

@@ -51,7 +51,7 @@ const CONTACTS_COLLECTION = 'contacts';
 export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 'id'>): Promise<void> => {
   try {
     const { eventDate, ...rest } = entry;
-    const docData = {
+    const docData: any = {
         ...rest,
         eventDate: Timestamp.fromDate(eventDate as Date),
         timestamp: Timestamp.now(),
@@ -245,5 +245,3 @@ export const getContacts = async (): Promise<Record<string, StudentContact>> => 
         return {};
     }
 };
-
-    
