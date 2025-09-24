@@ -7,7 +7,6 @@ import { useDashboardFilters } from './DashboardClient';
 import type { Student, SeguimientoEntry } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { addSeguimientoEntry } from '@/lib/firebase-services';
-import { getStudentOverallRisk } from '@/lib/dataProcessor';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,10 +80,10 @@ function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTask
                       const isHighRiskFaltas = s.absenceLimit > 0 && (s.absences / s.absenceLimit) >= 0.5;
                       return (
                         <div key={s.id} className="text-sm flex justify-between items-center">
-                          <span>{s.name}</span>
+                          <span className="font-medium">{s.name}</span>
                           <div className="flex gap-2">
-                            {isHighRiskFaltas && <Badge variant="secondary">F: {s.absences}</Badge>}
-                            {isHighRiskNE && <Badge variant="destructive">NE: {s.missedAssignments}</Badge>}
+                            {isHighRiskFaltas && <Badge variant="secondary">F: {s.absences} / {s.absenceLimit}</Badge>}
+                            {isHighRiskNE && <Badge variant="destructive">NE: {s.missedAssignments} / {s.missedAssignmentLimit}</Badge>}
                           </div>
                         </div>
                       )
