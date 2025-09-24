@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useDashboardFilters, type CaseType } from './DashboardClient';
 import type { Student, SeguimientoEntry } from '@/types/student';
