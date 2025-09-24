@@ -279,6 +279,26 @@ export const getSeguimientoEntries = async (): Promise<Record<string, Seguimient
   }
 };
 
+export const updateSeguimientoEntry = async (id: string, data: Partial<Omit<SeguimientoEntry, 'id' | 'createdAt'>>): Promise<void> => {
+  try {
+    const docRef = doc(db, SEGUIMIENTOS_K_COLLECTION, id);
+    await updateDoc(docRef, data);
+  } catch (error) {
+    console.error("Error al actualizar seguimiento: ", error);
+    throw new Error("No se pudo actualizar el registro de seguimiento.");
+  }
+};
+
+export const deleteSeguimientoEntry = async (id: string): Promise<void> => {
+  try {
+    const docRef = doc(db, SEGUIMIENTOS_K_COLLECTION, id);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error("Error al eliminar seguimiento: ", error);
+    throw new Error("No se pudo eliminar el registro de seguimiento.");
+  }
+};
+
 
 // --- Funciones para Seguimientos (Piloto) ---
 export interface SeguimientoPilotEntry {

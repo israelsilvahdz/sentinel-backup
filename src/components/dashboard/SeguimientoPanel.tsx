@@ -1,23 +1,25 @@
 
+
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useDashboardFilters } from './DashboardClient';
 import type { Student, SeguimientoEntry } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
-import { addSeguimientoEntry } from '@/lib/firebase-services';
+import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry } from '@/lib/firebase-services';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '../ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
@@ -34,13 +36,25 @@ const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
     'other': 'Otro'
 };
 
-function AddSeguimientoForm({ student, riskCategory, onTaskAdded }: { student: Student, riskCategory: RiskCategory, onTaskAdded: () => void }) {
+function SeguimientoForm({ 
+  student, 
+  riskCategory, 
+  onTaskAdded,
+  existingEntry,
+}: { 
+  student: Student, 
+  riskCategory: RiskCategory, 
+  onTaskAdded: () => void,
+  existingEntry?: SeguimientoEntry,
+}) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { register, handleSubmit, reset, control, formState: { errors } } = useForm<{ attendedBy: string, topic: string, notes: string }>({
     defaultValues: {
-      topic: RISK_CATEGORY_TEXT[riskCategory] || 'Otro'
+      topic: existingEntry ? existingEntry.topic : (RISK_CATEGORY_TEXT[riskCategory] || 'Otro'),
+      attendedBy: existingEntry?.attendedBy || '',
+      notes: existingEntry?.notes || '',
     }
   });
   
@@ -55,25 +69,32 @@ function AddSeguimientoForm({ student, riskCategory, onTaskAdded }: { student: S
   const onSubmit = async (data: { attendedBy: string, topic: string, notes: string }) => {
     setIsSubmitting(true);
     try {
-      const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
-      const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
-      
-      const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
-        studentId: student.id,
-        studentName: student.name,
-        attendedBy: data.attendedBy,
-        topic: data.topic,
-        notes: data.notes,
-        absencesAtFollowUp: totalAbsences,
-        missedAssignmentsAtFollowUp: totalMissed,
-      };
+      if (existingEntry) {
+        // Editing existing entry
+        await updateSeguimientoEntry(existingEntry.id, data);
+        toast({ title: 'Seguimiento actualizado', description: `Se ha actualizado el seguimiento para ${student.name}.` });
+      } else {
+        // Creating new entry
+        const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
+        const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
+        
+        const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
+          studentId: student.id,
+          studentName: student.name,
+          attendedBy: data.attendedBy,
+          topic: data.topic,
+          notes: data.notes,
+          absencesAtFollowUp: totalAbsences,
+          missedAssignmentsAtFollowUp: totalMissed,
+        };
 
-      await addSeguimientoEntry(newEntry);
-      toast({ title: 'Seguimiento añadido', description: `Se ha añadido un nuevo seguimiento para ${student.name}.` });
+        await addSeguimientoEntry(newEntry);
+        toast({ title: 'Seguimiento añadido', description: `Se ha añadido un nuevo seguimiento para ${student.name}.` });
+      }
       onTaskAdded();
       reset();
     } catch (error) {
-      console.error("Error adding seguimiento entry", error);
+      console.error("Error saving seguimiento entry", error);
       toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el seguimiento.' });
     } finally {
       setIsSubmitting(false);
@@ -82,7 +103,7 @@ function AddSeguimientoForm({ student, riskCategory, onTaskAdded }: { student: S
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-       {highRiskSubjects.length > 0 && (
+       {highRiskSubjects.length > 0 && !existingEntry && (
          <div className="space-y-2">
             <Label className="font-semibold">Contexto del Riesgo</Label>
             <Card className="p-3 bg-muted/50 max-h-32 overflow-y-auto">
@@ -135,7 +156,7 @@ function AddSeguimientoForm({ student, riskCategory, onTaskAdded }: { student: S
       <DialogFooter>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-          Guardar Seguimiento
+          {existingEntry ? 'Actualizar Seguimiento' : 'Guardar Seguimiento'}
         </Button>
       </DialogFooter>
     </form>
@@ -144,6 +165,7 @@ function AddSeguimientoForm({ student, riskCategory, onTaskAdded }: { student: S
 
 export function SeguimientoPanel() {
   const { filteredStudents, allStudents, seguimientoEntries, fetchSeguimientoEntries, isLoading } = useDashboardFilters();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTopic, setFilterTopic] = useState<FilterTopic>('all');
   
@@ -224,6 +246,16 @@ export function SeguimientoPanel() {
     other: { text: 'Otro Caso', badgeClass: 'bg-gray-100 text-gray-800', borderClass: 'border-transparent' },
   };
 
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await deleteSeguimientoEntry(id);
+      toast({ title: "Registro eliminado", description: "El seguimiento ha sido borrado." });
+      fetchSeguimientoEntries();
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error", description: "No se pudo eliminar el registro." });
+    }
+  }, [toast, fetchSeguimientoEntries]);
+
 
   if (isLoading) {
     return (
@@ -291,7 +323,7 @@ export function SeguimientoPanel() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <DialogTrigger asChild>
-                            <Card className="cursor-pointer hover:bg-muted/50 transition-colors h-full flex flex-col">
+                            <Card className="cursor-pointer hover:bg-muted/50 transition-colors h-full flex flex-col group relative">
                               <CardHeader className="p-4">
                                 <CardTitle className="text-sm">Seguimiento #{index + 1}</CardTitle>
                                 <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
@@ -304,6 +336,31 @@ export function SeguimientoPanel() {
                                   <Badge variant="destructive">NE: {entry.missedAssignmentsAtFollowUp}</Badge>
                                 </div>
                               </CardContent>
+                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Dialog onOpenChange={(isOpen) => { if (isOpen) { event.stopPropagation(); } else { fetchSeguimientoEntries(); }}}>
+                                  <DialogTrigger asChild onClick={e => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Editar Seguimiento #{index + 1}</DialogTitle>
+                                    </DialogHeader>
+                                    <SeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} existingEntry={entry} />
+                                  </DialogContent>
+                                </Dialog>
+                                <AlertDialog onOpenChange={(isOpen) => { if (isOpen) event.stopPropagation(); }}>
+                                  <AlertDialogTrigger asChild onClick={e => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDelete(entry.id)}>Eliminar</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
                             </Card>
                           </DialogTrigger>
                         </TooltipTrigger>
@@ -346,7 +403,7 @@ export function SeguimientoPanel() {
                                 Se registrarán las faltas y NE actuales del alumno.
                             </DialogDescription>
                         </DialogHeader>
-                        <AddSeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} />
+                        <SeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} />
                     </DialogContent>
                   </Dialog>
                 </div>
