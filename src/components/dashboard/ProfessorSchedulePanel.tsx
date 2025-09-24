@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type Subject } from '@/types/student';
-import { Contact, Search, Copy, Mail } from 'lucide-react';
+import { Contact, Search, Copy, Mail, CalendarDays } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,7 @@ const getProfessorEmail = (name: string): string | null => {
 export function ProfessorSchedulePanel() {
   const { allStudents, filteredStudents, isLoading, selectedValue } = useDashboardFilters();
   const [selectedProfessor, setSelectedProfessor] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string>('all');
   const { toast } = useToast();
 
   const professorList = useMemo(() => {
@@ -87,7 +88,25 @@ export function ProfessorSchedulePanel() {
   }, [selectedProfessor, allStudents]);
   
   const handleCopyEmails = () => {
-    const emails = professorList
+    let professorsToGetEmailsFrom = professorList;
+
+    if (selectedDay !== 'all') {
+        const professorsForDay = new Set<string>();
+        allStudents.forEach(student => {
+            student.subjects?.forEach(subject => {
+                // Check if this subject is on the selected day and taught by a professor in our current list
+                if (subject.professorName && 
+                    professorList.includes(subject.professorName) && 
+                    subject.schedule?.days.includes(selectedDay)) 
+                {
+                    professorsForDay.add(subject.professorName);
+                }
+            });
+        });
+        professorsToGetEmailsFrom = Array.from(professorsForDay);
+    }
+    
+    const emails = professorsToGetEmailsFrom
       .map(prof => getProfessorEmail(prof))
       .filter(Boolean); // Filtra los nulos o vacíos
 
@@ -95,7 +114,7 @@ export function ProfessorSchedulePanel() {
       toast({
         variant: 'destructive',
         title: 'Sin correos',
-        description: 'No se encontraron correos para los profesores en la lista actual.',
+        description: 'No se encontraron correos para los filtros seleccionados.',
       });
       return;
     }
@@ -125,7 +144,7 @@ export function ProfessorSchedulePanel() {
             Seleccionar Profesor
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-4">
+        <CardContent className="flex flex-wrap items-center gap-4">
           <Select onValueChange={setSelectedProfessor} value={selectedProfessor || ''} disabled={isLoading}>
             <SelectTrigger className="w-full md:w-[300px]">
               <SelectValue placeholder={isLoading ? "Cargando..." : "Elige un profesor..."} />
@@ -138,10 +157,25 @@ export function ProfessorSchedulePanel() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleCopyEmails} variant="outline">
-            <Mail className="mr-2 h-4 w-4" />
-            Copiar Correos
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={selectedDay} onValueChange={setSelectedDay}>
+                <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Todos los días</SelectItem>
+                    <SelectItem value="LUN">Lunes</SelectItem>
+                    <SelectItem value="MAR">Martes</SelectItem>
+                    <SelectItem value="MIER">Miércoles</SelectItem>
+                    <SelectItem value="JUE">Jueves</SelectItem>
+                    <SelectItem value="VIER">Viernes</SelectItem>
+                </SelectContent>
+            </Select>
+            <Button onClick={handleCopyEmails} variant="outline">
+                <Mail className="mr-2 h-4 w-4" />
+                Copiar Correos
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
