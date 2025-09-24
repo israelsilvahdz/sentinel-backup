@@ -2,226 +2,120 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { useDashboardFilters } from './DashboardClient';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { getSeguimientoEntries, updateSeguimientoStatus, deleteSeguimientoEntry } from '@/lib/firebase-services';
-import type { SeguimientoEntry, StudentContact } from '@/types/student';
+import { useDashboardFilters, type CaseType } from './DashboardClient';
+import type { Student, SeguimientoEntry } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
+import { addSeguimientoEntry } from '@/lib/firebase-services';
+import { findUrgentCases, findLostCases } from '@/lib/dataProcessor';
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { PlusCircle, Loader2, FileWarning, Search, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList, MessageSquare, Phone, Copy, Check, FileCheck2, Info } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { Switch } from '../ui/switch';
-import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
 
-
-function CopyableContactField({ label, value }: { label: string, value: string }) {
-    const { toast } = useToast();
-    if (!value || value.toLowerCase() === 'no disponible') return null;
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(value).then(() => {
-            toast({
-                title: 'Copiado!',
-                description: `${label} copiado al portapapeles.`
-            });
-        });
-    };
-
-    return (
-        <div className="flex items-center justify-between rounded-md border p-3">
-            <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                <div className="flex flex-col">
-                    <Badge variant="secondary" className="w-fit">{label}</Badge>
-                    <span className="font-mono text-sm">{value}</span>
-                </div>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleCopy}>
-                <Copy className="mr-2 h-4 w-4" /> Copiar
-            </Button>
-        </div>
-    );
-}
-
-function NotifyParentsDialog({ entry, subjectsInCase, contact }: { entry: SeguimientoEntry, subjectsInCase: any[], contact: StudentContact | undefined }) {
+function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTaskAdded: () => void }) {
   const { toast } = useToast();
-  const [isCopied, setIsCopied] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<{ attendedBy: string, topic: string, notes: string }>();
 
-  const generateMessage = () => {
-    let subjectDetails = subjectsInCase.map(s => {
-        if (entry.situation === 'faltas') {
-            return `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`;
-        }
-        if (entry.situation === 'no-entregados') {
-            return `${s.missedAssignments} de ${s.missedAssignmentLimit} tareas no entregadas en ${s.name}`;
-        }
-        return s.name;
-    }).join(', ');
+  const onSubmit = async (data: { attendedBy: string, topic: string, notes: string }) => {
+    setIsSubmitting(true);
+    try {
+      const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
+      const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
+      
+      const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
+        studentId: student.id,
+        studentName: student.name,
+        attendedBy: data.attendedBy,
+        topic: data.topic,
+        notes: data.notes,
+        absencesAtFollowUp: totalAbsences,
+        missedAssignmentsAtFollowUp: totalMissed,
+      };
 
-    let message = `Estimados padres de ${entry.studentName}, les saludamos cordialmente desde Tecmilenio para informarles sobre la siguiente situación académica: `;
-
-    switch (entry.situation) {
-        case 'faltas':
-            message += `Se ha detectado un número considerable de faltas en las siguientes materias: ${subjectDetails}.`;
-            break;
-        case 'no-entregados':
-            message += `Se ha registrado un número considerable de tareas no entregadas en: ${subjectDetails}.`;
-            break;
-        case 'otro':
-            message += `Se ha registrado un caso de seguimiento con las siguientes notas: "${entry.notes}".`;
-            break;
+      await addSeguimientoEntry(newEntry);
+      toast({ title: 'Seguimiento añadido', description: `Se ha añadido un nuevo seguimiento para ${student.name}.` });
+      onTaskAdded();
+      reset();
+    } catch (error) {
+      console.error("Error adding seguimiento entry", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el seguimiento.' });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    message += ` Agradecemos su apoyo desde casa para dar seguimiento a este tema. Quedo a su disposición.`;
-    return message;
-  };
-  
-  const message = generateMessage();
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message).then(() => {
-        setIsCopied(true);
-        toast({ title: '¡Mensaje copiado!', description: 'El mensaje está listo para ser pegado.' });
-        setTimeout(() => setIsCopied(false), 2500);
-    });
   };
 
   return (
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Notificar a Padres</DialogTitle>
-          <DialogDescription>
-            Copia el mensaje y usa los contactos para enviarlo por WhatsApp.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-            <div className="rounded-md border bg-muted/50 p-4 text-sm">
-                {message}
-            </div>
-             <Button onClick={handleCopy} className="w-full">
-                {isCopied ? <Check className="mr-2 h-4 w-4"/> : <Copy className="mr-2 h-4 w-4" />}
-                {isCopied ? 'Copiado' : 'Copiar Mensaje'}
-            </Button>
-            {contact ? (
-                <div className="space-y-2">
-                    <h4 className="font-semibold">Contactos de los Padres</h4>
-                    <CopyableContactField label="Teléfono Papá" value={contact.dadPhone} />
-                    <CopyableContactField label="Teléfono Mamá" value={contact.momPhone} />
-                </div>
-            ) : <p className="text-sm text-muted-foreground text-center">No se encontró información de contacto para los padres.</p>}
-        </div>
-      </DialogContent>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="attendedBy">Atendido por</Label>
+        <Input id="attendedBy" {...register('attendedBy', { required: 'Este campo es requerido' })} placeholder="Ej. Líder de Generación" />
+        {errors.attendedBy && <p className="text-sm text-destructive">{errors.attendedBy.message}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="topic">Tema</Label>
+        <Input id="topic" {...register('topic', { required: 'Este campo es requerido' })} placeholder="Ej. Aumento de Faltas" />
+        {errors.topic && <p className="text-sm text-destructive">{errors.topic.message}</p>}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="notes">Notas</Label>
+        <Textarea id="notes" {...register('notes')} placeholder="Detalles del seguimiento, si se contactó a los padres, etc." />
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+          Guardar Seguimiento
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
-
 export function SeguimientoPanel() {
-  const { allStudentsMap, studentContacts, selectedValue, filterType } = useDashboardFilters();
-  const [entries, setEntries] = useState<SeguimientoEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [completingTask, setCompletingTask] = useState<SeguimientoEntry | null>(null);
-  const { toast } = useToast();
-
-  const { register: registerCompletion, handleSubmit: handleSubmitCompletion, reset: resetCompletion } = useForm<{ completionNotes: string }>();
-
-  const fetchEntries = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const fetchedEntries = await getSeguimientoEntries();
-      setEntries(fetchedEntries);
-    } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron cargar los casos de seguimiento.' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchEntries();
-  }, [fetchEntries]);
-
- const filteredEntries = useMemo(() => {
-    let baseEntries = entries;
-    
-    if (!showCompleted) {
-        baseEntries = baseEntries.filter(entry => entry.status === 'pendiente');
-    }
-
-    if (!selectedValue) return baseEntries;
-    
-    if (filterType === 'leader') {
-      return baseEntries.filter(entry => entry.leader === selectedValue);
-    }
-    if (filterType === 'tutor') {
-        return baseEntries.filter(entry => entry.tutor === selectedValue);
-    }
-    
-    return baseEntries;
-  }, [entries, selectedValue, filterType, showCompleted]);
+  const { allStudents, seguimientoEntries, fetchSeguimientoEntries, isLoading } = useDashboardFilters();
+  const [searchTerm, setSearchTerm] = useState('');
   
-  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
+  useEffect(() => {
+    fetchSeguimientoEntries();
+  }, [fetchSeguimientoEntries]);
+  
+  const studentList = useMemo(() => {
+    const urgentCaseStudents = findUrgentCases(allStudents, new Set(findLostCases(allStudents).map(s => s.id)));
+    const urgentCaseIds = new Set(urgentCaseStudents.map(s => s.id));
+    
+    // Add any student who already has a seguimiento entry, if not already included
+    const studentsWithEntries = new Set(Object.keys(seguimientoEntries));
+    
+    let combinedStudents = [...urgentCaseStudents];
+    studentsWithEntries.forEach(studentId => {
+      if (!urgentCaseIds.has(studentId)) {
+        const student = allStudents.find(s => s.id === studentId);
+        if (student) {
+          combinedStudents.push(student);
+        }
+      }
+    });
 
-  const handleOpenCompletionDialog = (entry: SeguimientoEntry) => {
-    if (entry.status === 'completado') {
-        // Si ya está completado, lo volvemos a poner pendiente
-        updateSeguimientoStatus(entry.id, 'pendiente').then(() => {
-            setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, status: 'pendiente', completedAt: undefined, completionNotes: undefined } : e));
-            toast({ title: 'Tarea reabierta' });
-        }).catch(err => {
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo reabrir la tarea.'});
-        });
-    } else {
-        setCompletingTask(entry);
+    if (searchTerm) {
+      return allStudents.filter(s => 
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        s.id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-  };
-
-
-  const onCompleteSubmit = async (data: { completionNotes: string }) => {
-    if (!completingTask) return;
-
-    try {
-      await updateSeguimientoStatus(completingTask.id, 'completado', data.completionNotes);
-      setEntries(prev => prev.map(e => e.id === completingTask.id ? { 
-          ...e, 
-          status: 'completado', 
-          completionNotes: data.completionNotes,
-          completedAt: new Date() // Simula el timestamp para la UI
-      } : e));
-      toast({ title: 'Tarea completada' });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado del caso.' });
-    } finally {
-      setCompletingTask(null);
-      resetCompletion();
-    }
-  };
-
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteSeguimientoEntry(id);
-      setEntries(prev => prev.filter(e => e.id !== id));
-      toast({ title: 'Caso eliminado' });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar el caso.' });
-    }
-  };
-
-    const SITUATION_MAP: Record<SeguimientoEntry['situation'], { icon: React.ReactNode, text: string }> = {
-    'faltas': { icon: <FileWarning className="h-4 w-4 text-yellow-600" />, text: 'Faltas' },
-    'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
-    'otro': { icon: <HelpCircle className="h-4 w-4 text-blue-600" />, text: 'Otro' },
-  };
+    
+    return combinedStudents;
+  }, [allStudents, seguimientoEntries, searchTerm]);
 
   if (isLoading) {
     return (
@@ -231,266 +125,113 @@ export function SeguimientoPanel() {
     );
   }
 
-  const handleGenerateReport = () => {
-    const entriesToPrint = filteredEntries.filter(e => e.status === 'pendiente');
-
-    if (entriesToPrint.length === 0) {
-      toast({
-        title: "No hay casos pendientes para imprimir",
-        description: "No hay casos de seguimiento marcados como 'pendientes' en la vista actual.",
-      });
-      return;
-    }
-
-    const reportWindow = window.open('', '_blank');
-    if (reportWindow) {
-      const studentData = (id: string) => allStudentsMap.get(id);
-
-      const content = `
-        <html>
-          <head>
-            <title>Reporte de Seguimiento - ${format(new Date(), 'dd/MM/yyyy')}</title>
-            <style>
-              body { 
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                line-height: 1.5;
-                color: #27272a; 
-                margin: 0.5in;
-                font-size: 9px;
-              }
-              @page {
-                size: letter;
-                margin: 0.5in;
-              }
-              @media print {
-                .no-print { display: none; }
-                body { font-size: 8px; }
-              }
-              h1 { 
-                color: #17594A; 
-                border-bottom: 2px solid #17594A; 
-                padding-bottom: 8px; 
-                margin-bottom: 1rem; 
-                font-size: 1.5em; 
-              }
-              .print-button { 
-                position: fixed; 
-                top: 1rem; 
-                right: 1rem; 
-                padding: 8px 12px; 
-                background: #17594A; 
-                color: white; 
-                border: none; 
-                border-radius: 5px; 
-                cursor: pointer; 
-              }
-               .report-entry {
-                margin-bottom: 0.75rem;
-                padding-bottom: 0.75rem;
-                border-bottom: 1px solid #e2e8f0;
-                page-break-inside: avoid;
-              }
-              .student-header { font-weight: bold; }
-              .details-section { margin-top: 2px; }
-              .materias-list, .notes-text {
-                  white-space: pre-wrap;
-                  line-height: 1.3;
-              }
-              .materia-item {
-                  display: block;
-                  margin-bottom: 1px;
-              }
-              strong { font-weight: bold; }
-            </style>
-          </head>
-          <body>
-            <button class="print-button no-print" onclick="window.print()">Imprimir Reporte</button>
-            <h1>Reporte de Seguimiento - ${selectedValue ? `${filterType}: ${selectedValue} - ` : ''}${format(new Date(), "d 'de' LLLL, yyyy", { locale: es })}</h1>
-            <p>Total de casos pendientes: ${entriesToPrint.length}</p>
-            
-            <div id="report-content">
-              ${entriesToPrint.map(entry => {
-                const student = studentData(entry.studentId);
-                const subjectsInCase = entry.subjects.map(subjectId => student?.subjects?.find(s => s.id === subjectId)).filter(Boolean);
-                const situationText = SITUATION_MAP[entry.situation].text || entry.situation;
-
-                let materiasHtml = '';
-                if (subjectsInCase.length > 0) {
-                    const subjectItems = subjectsInCase.map(s => {
-                        const schedule = s?.schedule;
-                        const scheduleInfo = schedule && schedule.days.length > 0
-                            ? ` - [${schedule.days.join(', ')}, ${schedule.startTime}-${schedule.endTime}]`
-                            : '';
-                        
-                        let detail = '';
-                        if (entry.situation === 'faltas') {
-                            detail = `(${s!.absences} de ${s!.absenceLimit} Faltas)`;
-                        } else if (entry.situation === 'no-entregados') {
-                            detail = `(${s!.missedAssignments} de ${s!.missedAssignmentLimit} Tareas NE)`;
-                        }
-
-                        return `<span class="materia-item">${s!.name} (Gpo: ${s!.group}) ${detail}${scheduleInfo}</span>`;
-                    }).join('');
-                    materiasHtml = `<div class="details-section"><strong>Materias:</strong><div class="materias-list">${subjectItems}</div></div>`;
-                }
-
-                let notasHtml = '';
-                if (entry.notes) {
-                    notasHtml = `<div class="details-section"><strong>Notas:</strong> <span class="notes-text">${entry.notes}</span></div>`;
-                }
-
-                return `
-                  <div class="report-entry">
-                      <p class="student-header">
-                        ${entry.studentName} (${entry.studentId}) - <strong>Situación:</strong> ${situationText}
-                      </p>
-                      ${materiasHtml}
-                      ${notasHtml}
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </body>
-        </html>
-      `;
-      reportWindow.document.write(content);
-      reportWindow.document.close();
-    }
-  };
-
   return (
-    <div className="space-y-8 p-4 md:p-8 pt-6">
-      <header className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-            <h1 className="text-3xl font-bold tracking-tight">Reporte de Seguimiento</h1>
-            <p className="text-muted-foreground">Casos de alumnos que requieren atención y seguimiento especial.</p>
-        </div>
-        <div className="flex items-center gap-4">
-            <div className="flex items-center space-x-2">
-              <Switch id="show-completed" checked={showCompleted} onCheckedChange={setShowCompleted} />
-              <Label htmlFor="show-completed">Mostrar completados</Label>
-            </div>
-            <Button onClick={handleGenerateReport}>
-                <Printer className="mr-2 h-4 w-4" />
-                Generar Reporte ({pendingCount})
-            </Button>
-        </div>
-      </header>
+    <TooltipProvider>
+      <div className="space-y-8 p-4 md:p-8 pt-6">
+        <header>
+          <h1 className="text-3xl font-bold tracking-tight">Seguimientos</h1>
+          <p className="text-muted-foreground">Tablero de seguimiento de casos por alumno.</p>
+        </header>
 
-      <div className="space-y-4">
-        {filteredEntries.length > 0 ? filteredEntries.map(entry => {
-          const student = allStudentsMap.get(entry.studentId);
-          const studentContact = studentContacts[entry.studentId];
-          const subjectsInCase = entry.subjects.map(subjectId => 
-            student?.subjects?.find(s => s.id === subjectId)
-          ).filter(Boolean);
-
-          return (
-            <Card key={entry.id} className={entry.status === 'completado' ? 'bg-muted/30' : ''}>
-              <CardHeader className="flex flex-row items-start justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Checkbox
-                        checked={entry.status === 'completado'}
-                        onCheckedChange={() => handleOpenCompletionDialog(entry)}
-                        className="mr-2"
-                     />
-                    <span className={entry.status === 'completado' ? 'line-through text-muted-foreground' : ''}>
-                        {entry.studentName}
-                    </span>
-                    <Badge variant="secondary">{entry.studentId}</Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    Agregado el: {format(entry.createdAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-1">
-                     <Dialog>
-                        <DialogTrigger asChild>
-                           <Button variant="outline" size="sm"><MessageSquare className="h-4 w-4 mr-2" />Notificar Padres</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <NotifyParentsDialog entry={entry} subjectsInCase={subjectsInCase} contact={studentContact} />
-                        </DialogContent>
-                     </Dialog>
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente y eliminará el caso de seguimiento.</AlertDialogDescription></AlertDialogHeader>
-                            <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(entry.id)} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction></AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                 <div className="flex items-center gap-2 font-semibold">
-                    {SITUATION_MAP[entry.situation].icon}
-                    <span>Situación: {SITUATION_MAP[entry.situation].text}</span>
-                 </div>
-                 {subjectsInCase.length > 0 && (
-                    <div>
-                        <h4 className="font-medium text-sm">Materias involucradas:</h4>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                            {subjectsInCase.map(s => <Badge key={s!.id} variant="outline">{s!.name}</Badge>)}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar alumno por nombre o matrícula para añadirlo al tablero..."
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <div className="space-y-6">
+          {studentList.length > 0 ? studentList.map(student => {
+            const studentSeguimientos = seguimientoEntries[student.id] || [];
+            return (
+              <div key={student.id} className="grid grid-cols-[200px_1fr] items-start gap-4 border-b pb-6">
+                <Card className="sticky top-20">
+                    <CardHeader className="p-4">
+                       <CardTitle className="text-base">{student.name}</CardTitle>
+                       <CardDescription>{student.id}</CardDescription>
+                    </CardHeader>
+                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {studentSeguimientos.map((entry, index) => (
+                    <Dialog key={entry.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DialogTrigger asChild>
+                            <Card className="cursor-pointer hover:bg-muted/50 transition-colors h-full flex flex-col">
+                              <CardHeader className="p-4">
+                                <CardTitle className="text-sm">Seguimiento #{index + 1}</CardTitle>
+                                <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
+                              </CardHeader>
+                              <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
+                                <p><strong className="text-muted-foreground">Atendido por:</strong> {entry.attendedBy}</p>
+                                <p><strong className="text-muted-foreground">Tema:</strong> {entry.topic}</p>
+                                <div className="flex items-center gap-2 text-muted-foreground pt-2">
+                                  <Badge variant="secondary">F: {entry.absencesAtFollowUp}</Badge>
+                                  <Badge variant="destructive">NE: {entry.missedAssignmentsAtFollowUp}</Badge>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </DialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p className="max-w-xs text-sm">{entry.notes || "Sin notas adicionales."}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Detalle del Seguimiento #{index + 1} - {student.name}</DialogTitle>
+                           <DialogDescription>
+                             Registrado por {entry.attendedBy} el {format(entry.createdAt.toDate(), "PPPP", {locale: es})}.
+                           </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <p><strong>Tema:</strong> {entry.topic}</p>
+                          <p><strong>Notas:</strong> <pre className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md">{entry.notes || "N/A"}</pre></p>
+                          <div className="flex items-center gap-4 text-sm">
+                             <Badge>Faltas en ese momento: {entry.absencesAtFollowUp}</Badge>
+                             <Badge>NE en ese momento: {entry.missedAssignmentsAtFollowUp}</Badge>
+                          </div>
                         </div>
-                    </div>
-                 )}
-                 {entry.notes && (
-                    <div>
-                        <h4 className="font-medium text-sm">Notas:</h4>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-gray-50 p-2 rounded-md">{entry.notes}</p>
-                    </div>
-                 )}
-                 {entry.status === 'completado' && (
-                    <div className="border-t pt-3 mt-3">
-                        <h4 className="font-medium text-sm flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-primary"/>Notas de Cierre:</h4>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{entry.completionNotes || 'Sin notas.'}</p>
-                        <p className="text-xs text-muted-foreground mt-1 pl-6">Completado el: {entry.completedAt ? format(entry.completedAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es }) : 'N/A'}</p>
-                    </div>
-                 )}
-              </CardContent>
-            </Card>
-          );
-        }) : (
-            <Card className="text-center p-12">
-                <CardHeader>
-                    <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
-                        <ClipboardList className="h-8 w-8 text-primary" />
-                    </div>
-                    <CardTitle>No hay casos de seguimiento</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">
-                      {showCompleted ? "No se encontraron casos de seguimiento con los filtros actuales." : "No hay casos pendientes. ¡Buen trabajo! Activa el interruptor para ver los casos completados."}
-                    </p>
-                </CardContent>
-            </Card>
-        )}
-      </div>
-      
-      {/* Diálogo para completar tarea */}
-      <Dialog open={!!completingTask} onOpenChange={(open) => !open && setCompletingTask(null)}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Completar Tarea de Seguimiento</DialogTitle>
-                <DialogDescription>Añade una nota de cierre para documentar las acciones tomadas.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmitCompletion(onCompleteSubmit)}>
-                <div className="py-4 space-y-2">
-                    <Label htmlFor="completionNotes">Notas de Cierre (Opcional)</Label>
-                    <Textarea id="completionNotes" {...registerCompletion('completionNotes')} placeholder="Ej. Se contactó a los padres, el alumno se comprometió a..." />
+                      </DialogContent>
+                    </Dialog>
+                  ))}
+
+                  <Dialog onOpenChange={(isOpen) => !isOpen && fetchSeguimientoEntries()}>
+                    <DialogTrigger asChild>
+                       <Card className="border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer min-h-[160px] flex items-center justify-center">
+                          <div className="text-center text-muted-foreground">
+                              <PlusCircle className="mx-auto h-8 w-8" />
+                              <p className="mt-2 font-medium">Añadir Nuevo Seguimiento</p>
+                          </div>
+                       </Card>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Nuevo Seguimiento para {student.name}</DialogTitle>
+                            <DialogDescription>
+                                Se registrarán las faltas y NE actuales del alumno.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <AddSeguimientoForm student={student} onTaskAdded={fetchSeguimientoEntries} />
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                <DialogFooter>
-                     <Button type="button" variant="ghost" onClick={() => setCompletingTask(null)}>Cancelar</Button>
-                     <Button type="submit">Marcar como Completada</Button>
-                </DialogFooter>
-            </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+              </div>
+            );
+          }) : (
+            <Card className="text-center p-12 col-span-full">
+              <Info className="mx-auto h-12 w-12 text-muted-foreground" />
+              <CardTitle className="mt-4">Tablero de Seguimiento Vacío</CardTitle>
+              <CardDescription className="mt-2">
+                Los alumnos con casos urgentes aparecerán aquí automáticamente. También puedes buscar un alumno para añadirlo manualmente al tablero.
+              </CardDescription>
+            </Card>
+          )}
+        </div>
+      </div>
+    </TooltipProvider>
   );
 }
-
-    
-
-    

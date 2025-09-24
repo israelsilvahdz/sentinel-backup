@@ -11,8 +11,8 @@ import { es } from 'date-fns/locale';
 
 import { useDashboardFilters } from './DashboardClient';
 import { useToast } from '@/hooks/use-toast';
-import { addSeguimientoEntry } from '@/lib/firebase-services';
-import type { Student, Subject, SeguimientoEntry, BitacoraEntry } from '@/types/student';
+import { addTeamTask } from '@/lib/firebase-services';
+import type { Student, Subject, TeamTask, BitacoraEntry } from '@/types/student';
 import { cn } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
@@ -27,18 +27,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 
 
-// --- Dialog para "Añadir a Reporte de Seguimiento" ---
+// --- Dialog para "Añadir a Tarea de Equipo" ---
 
-export function AddToSeguimientoDialog({ student, children }: { student: Student, children: React.ReactNode }) {
+export function AddToTeamTaskDialog({ student, children }: { student: Student, children: React.ReactNode }) {
     const { toast } = useToast();
-    const { loadStudentSubjects } = useDashboardFilters();
+    const { loadStudentSubjects, fetchTeamTasks } = useDashboardFilters();
     const [isOpen, setIsOpen] = useState(false);
     const [situation, setSituation] = useState<'faltas' | 'no-entregados' | 'otro'>('otro');
     const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
     const [notes, setNotes] = useState('');
+    const [assignedTo, setAssignedTo] = useState<'leader' | 'tutor' | 'both'>('leader');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [studentSubjects, setStudentSubjects] = useState<Subject[]>([]);
 
@@ -87,7 +89,7 @@ export function AddToSeguimientoDialog({ student, children }: { student: Student
 
         setIsSubmitting(true);
         try {
-            const entry: Omit<SeguimientoEntry, 'id' | 'createdAt' | 'status'> = {
+            const entry: Omit<TeamTask, 'id' | 'createdAt' | 'status'> = {
                 studentId: student.id,
                 studentName: student.name,
                 leader: student.leader,
@@ -95,17 +97,19 @@ export function AddToSeguimientoDialog({ student, children }: { student: Student
                 situation,
                 subjects: selectedSubjects,
                 notes: notes.trim(),
+                assignedTo,
             };
-            await addSeguimientoEntry(entry);
-            toast({ title: 'Éxito', description: `${student.name} ha sido añadido al reporte de seguimiento.` });
+            await addTeamTask(entry);
+            toast({ title: 'Éxito', description: `${student.name} ha sido añadido a las tareas de equipo.` });
+            fetchTeamTasks(); // Actualizar la lista de tareas
             setIsOpen(false);
             // Reset state for next time
             setSituation('otro');
             setSelectedSubjects([]);
             setNotes('');
         } catch (error) {
-            console.error("Error adding to seguimiento report:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el caso de seguimiento.' });
+            console.error("Error adding to team tasks:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar la tarea.' });
         } finally {
             setIsSubmitting(false);
         }
@@ -118,17 +122,28 @@ export function AddToSeguimientoDialog({ student, children }: { student: Student
             </AlertDialogTrigger>
             <AlertDialogContent className="sm:max-w-xl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Agregar Caso de Seguimiento</AlertDialogTitle>
+                    <AlertDialogTitle>Crear Tarea de Equipo</AlertDialogTitle>
                     <AlertDialogDescription>
                         Crea un nuevo caso para {student.name} ({student.id})
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
+                        <Label>Asignar a</Label>
+                         <Select value={assignedTo} onValueChange={(value) => setAssignedTo(value as any)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                               <SelectItem value="leader">Líder de Generación</SelectItem>
+                               <SelectItem value="tutor">Tutor/a</SelectItem>
+                               <SelectItem value="both">Ambos</SelectItem>
+                            </SelectContent>
+                         </Select>
+                    </div>
+                    <div className="space-y-2">
                         <Label>Situación a reportar</Label>
-                        <RadioGroup value={situation} onValueChange={handleSituationChange} className="flex gap-4">
+                        <RadioGroup value={situation} onValueChange={handleSituationChange as any} className="flex gap-4">
                             <div className="flex items-center space-x-2"><RadioGroupItem value="faltas" id="faltas" /><Label htmlFor="faltas">Faltas</Label></div>
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="no-entregados" id="no-entregados" /><Label htmlFor="no-entregados">Tareas No Entregadas</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="no-entregados" id="no-entregados" /><Label htmlFor="no-entregados">Tareas NE</Label></div>
                             <div className="flex items-center space-x-2"><RadioGroupItem value="otro" id="otro" /><Label htmlFor="otro">Otro</Label></div>
                         </RadioGroup>
                     </div>
@@ -170,7 +185,7 @@ export function AddToSeguimientoDialog({ student, children }: { student: Student
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={handleSubmit} disabled={isSubmitting}>
-                        {isSubmitting ? 'Guardando...' : 'Añadir a Reporte de Seguimiento'}
+                        {isSubmitting ? 'Guardando...' : 'Crear Tarea'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

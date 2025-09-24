@@ -29,8 +29,8 @@ import { AcademicCalendar } from './AcademicCalendar';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { BitacoraPanel } from './BitacoraPanel';
+import { TeamTasksPanel } from './TeamTasksPanel';
 import { SeguimientoPanel } from './SeguimientoPanel';
-import { SeguimientoPilotPanel } from './SeguimientoPilotPanel';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -38,15 +38,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, SeguimientoEntry, SeguimientoPilotEntry } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getSeguimientoEntries, getSeguimientoPilotEntries } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries } from '@/lib/firebase-services';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'seguimiento' | 'seguimiento-piloto';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -62,10 +62,10 @@ interface DashboardContextType {
   setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
   bitacoraEntries: BitacoraEntry[];
   fetchBitacoraEntries: () => Promise<void>;
-  seguimientoEntries: SeguimientoEntry[];
+  teamTasks: TeamTask[];
+  fetchTeamTasks: () => Promise<void>;
+  seguimientoEntries: Record<string, SeguimientoEntry[]>;
   fetchSeguimientoEntries: () => Promise<void>;
-  seguimientoPilotEntries: SeguimientoPilotEntry[];
-  fetchSeguimientoPilotEntries: () => Promise<void>;
   setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
   isLoading: boolean;
   hasData: boolean;
@@ -117,8 +117,8 @@ export function DashboardClient() {
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [bitacoraEntries, setBitacoraEntries] = useState<BitacoraEntry[]>([]);
-  const [seguimientoEntries, setSeguimientoEntries] = useState<SeguimientoEntry[]>([]);
-  const [seguimientoPilotEntries, setSeguimientoPilotEntries] = useState<SeguimientoPilotEntry[]>([]);
+  const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
+  const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, SeguimientoEntry[]>>({});
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -144,23 +144,23 @@ export function DashboardClient() {
     }
   }, [toast]);
   
+  const fetchTeamTasks = useCallback(async () => {
+    try {
+        const entries = await getTeamTasks();
+        setTeamTasks(entries);
+    } catch (error) {
+        console.error("Failed to fetch team tasks:", error);
+        toast({ variant: "destructive", title: "Error de Tareas de Equipo", description: "No se pudieron cargar las tareas." });
+    }
+  }, [toast]);
+  
   const fetchSeguimientoEntries = useCallback(async () => {
     try {
         const entries = await getSeguimientoEntries();
         setSeguimientoEntries(entries);
     } catch (error) {
         console.error("Failed to fetch seguimiento entries:", error);
-        toast({ variant: "destructive", title: "Error de Seguimiento", description: "No se pudieron cargar los casos de seguimiento." });
-    }
-  }, [toast]);
-  
-  const fetchSeguimientoPilotEntries = useCallback(async () => {
-    try {
-        const entries = await getSeguimientoPilotEntries();
-        setSeguimientoPilotEntries(entries);
-    } catch (error) {
-        console.error("Failed to fetch pilot seguimiento entries:", error);
-        toast({ variant: "destructive", title: "Error de Seguimiento Piloto", description: "No se pudieron cargar los casos de seguimiento piloto." });
+        toast({ variant: "destructive", title: "Error de Seguimientos", description: "No se pudieron cargar los seguimientos." });
     }
   }, [toast]);
 
@@ -185,8 +185,8 @@ export function DashboardClient() {
           
           await Promise.all([
             fetchBitacoraEntries(),
-            fetchSeguimientoEntries(),
-            fetchSeguimientoPilotEntries()
+            fetchTeamTasks(),
+            fetchSeguimientoEntries()
           ]);
 
 
@@ -201,7 +201,7 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, [fetchBitacoraEntries, fetchSeguimientoEntries, fetchSeguimientoPilotEntries]);
+  }, [fetchBitacoraEntries, fetchTeamTasks, fetchSeguimientoEntries]);
 
   // Persist data to local storage whenever it changes (contacts are now in DB)
   useEffect(() => {
@@ -491,7 +491,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, bitacoraEntries, fetchBitacoraEntries, seguimientoEntries, fetchSeguimientoEntries, seguimientoPilotEntries, fetchSeguimientoPilotEntries, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, bitacoraEntries, fetchBitacoraEntries, teamTasks, fetchTeamTasks, seguimientoEntries, fetchSeguimientoEntries, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -518,8 +518,8 @@ export function DashboardClient() {
         case 'academic-calendar': return <AcademicCalendar />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
         case 'bitacora': return <BitacoraPanel />;
+        case 'team-tasks': return <TeamTasksPanel />;
         case 'seguimiento': return <SeguimientoPanel />;
-        case 'seguimiento-piloto': return <SeguimientoPilotPanel />;
         default: return <WelcomeDashboard />;
     }
   }
@@ -574,9 +574,15 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Reporte de Seguimiento" isActive={activeView === 'seguimiento'} onClick={() => handleSetActiveView('seguimiento')}>
+                   <SidebarMenuButton tooltip="Tareas de Equipo" isActive={activeView === 'team-tasks'} onClick={() => handleSetActiveView('team-tasks')}>
                     <ClipboardList />
-                    <span>Reporte de Seguimiento</span>
+                    <span>Tareas de Equipo</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Seguimientos" isActive={activeView === 'seguimiento'} onClick={() => handleSetActiveView('seguimiento')}>
+                    <FileText />
+                    <span>Seguimientos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
@@ -601,12 +607,6 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Bitácora de Casos" isActive={activeView === 'bitacora'} onClick={() => handleSetActiveView('bitacora')}>
                     <FileText />
                     <span>Bitácora de Casos</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Seguimientos (Piloto)" isActive={activeView === 'seguimiento-piloto'} onClick={() => handleSetActiveView('seguimiento-piloto')}>
-                    <FileText />
-                    <span>Seguimientos (Piloto)</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

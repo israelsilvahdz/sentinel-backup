@@ -15,7 +15,7 @@ import {
   setDoc,
   writeBatch
 } from 'firebase/firestore';
-import type { BitacoraEntry, SeguimientoEntry, StudentContact, SeguimientoPilotEntry } from '@/types/student';
+import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry } from '@/types/student';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -40,9 +40,9 @@ if (!getApps().length) {
 
 const db = getFirestore(app);
 const BITACORA_COLLECTION = 'bitacora';
-const SEGUIMIENTO_COLLECTION = 'seguimiento';
+const TEAM_TASKS_COLLECTION = 'teamTasks';
 const CONTACTS_COLLECTION = 'contacts';
-const SEGUIMIENTO_PILOT_COLLECTION = 'seguimientosPilot';
+const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
 
 
 /**
@@ -111,85 +111,82 @@ export const deleteBitacoraEntry = async (id: string): Promise<void> => {
 };
 
 
-// --- Funciones para Reporte de Seguimiento ---
+// --- Funciones para Tareas de Equipo ---
 
 /**
- * Añade un nuevo caso al reporte de seguimiento.
+ * Añade una nueva tarea al reporte de seguimiento.
  */
-export const addSeguimientoEntry = async (entry: Omit<SeguimientoEntry, 'id' | 'createdAt' | 'status'>): Promise<void> => {
+export const addTeamTask = async (task: Omit<TeamTask, 'id' | 'createdAt' | 'status'>): Promise<void> => {
   try {
-    await addDoc(collection(db, SEGUIMIENTO_COLLECTION), {
-      ...entry,
+    await addDoc(collection(db, TEAM_TASKS_COLLECTION), {
+      ...task,
       status: 'pendiente',
       createdAt: Timestamp.now(),
     });
   } catch (error) {
-    console.error("Error al añadir caso de seguimiento: ", error);
-    throw new Error("No se pudo guardar el caso de seguimiento.");
+    console.error("Error al añadir tarea de equipo: ", error);
+    throw new Error("No se pudo guardar la tarea.");
   }
 };
 
 
 /**
- * Obtiene todos los casos de seguimiento, ordenados por fecha de creación.
+ * Obtiene todas las tareas de equipo, ordenadas por fecha de creación.
  */
-export const getSeguimientoEntries = async (): Promise<SeguimientoEntry[]> => {
+export const getTeamTasks = async (): Promise<TeamTask[]> => {
   try {
-    const seguimientoQuery = query(collection(db, SEGUIMIENTO_COLLECTION), orderBy('createdAt', 'desc'));
-    const querySnapshot = await getDocs(seguimientoQuery);
+    const tasksQuery = query(collection(db, TEAM_TASKS_COLLECTION), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(tasksQuery);
     
-    const entries: SeguimientoEntry[] = [];
+    const tasks: TeamTask[] = [];
     querySnapshot.forEach(doc => {
         const data = doc.data();
-        entries.push({
+        tasks.push({
             id: doc.id,
             ...data,
-            createdAt: data.createdAt,
-            completedAt: data.completedAt,
-        } as SeguimientoEntry);
+        } as TeamTask);
     });
-    return entries;
+    return tasks;
 
   } catch (error) {
-    console.error("Error al obtener casos de seguimiento: ", error);
+    console.error("Error al obtener tareas de equipo: ", error);
     return [];
   }
 };
 
 
 /**
- * Actualiza el estado de un caso de seguimiento.
+ * Actualiza el estado de una tarea de equipo.
  */
-export const updateSeguimientoStatus = async (id: string, status: 'pendiente' | 'completado', completionNotes?: string): Promise<void> => {
+export const updateTeamTaskStatus = async (id: string, status: 'pendiente' | 'completado', completionNotes?: string): Promise<void> => {
     try {
-        const docRef = doc(db, SEGUIMIENTO_COLLECTION, id);
+        const docRef = doc(db, TEAM_TASKS_COLLECTION, id);
         const updateData: any = { status };
         if (status === 'completado') {
             updateData.completedAt = Timestamp.now();
             updateData.completionNotes = completionNotes || null;
         } else {
-             // Si se vuelve a poner como pendiente, opcionalmente limpiar los campos de completado
             updateData.completedAt = null;
             updateData.completionNotes = null;
         }
         await updateDoc(docRef, updateData);
     } catch (error) {
-        console.error("Error al actualizar estado de seguimiento: ", error);
-        throw new Error("No se pudo actualizar el estado del caso.");
+        console.error("Error al actualizar estado de la tarea: ", error);
+        throw new Error("No se pudo actualizar el estado de la tarea.");
     }
 };
 
 
 /**
- * Elimina un caso de seguimiento por su ID.
+ * Elimina una tarea de equipo por su ID.
  */
-export const deleteSeguimientoEntry = async (id: string): Promise<void> => {
+export const deleteTeamTask = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, SEGUIMIENTO_COLLECTION, id);
+    const docRef = doc(db, TEAM_TASKS_COLLECTION, id);
     await deleteDoc(docRef);
   } catch (error) {
-    console.error("Error al eliminar caso de seguimiento: ", error);
-    throw new Error("No se pudo eliminar el caso de la base de datos.");
+    console.error("Error al eliminar tarea de equipo: ", error);
+    throw new Error("No se pudo eliminar la tarea de la base de datos.");
   }
 };
 
@@ -248,31 +245,35 @@ export const getContacts = async (): Promise<Record<string, StudentContact>> => 
     }
 };
 
-// --- Funciones para Seguimiento Piloto ---
+// --- Funciones para Seguimientos Kanban ---
 
-export const addSeguimientoPilotEntry = async (entry: Omit<SeguimientoPilotEntry, 'id' | 'createdAt'>): Promise<void> => {
+export const addSeguimientoEntry = async (entry: Omit<SeguimientoEntry, 'id' | 'createdAt'>): Promise<void> => {
   try {
-    await addDoc(collection(db, SEGUIMIENTO_PILOT_COLLECTION), {
+    await addDoc(collection(db, SEGUIMIENTOS_K_COLLECTION), {
       ...entry,
       createdAt: Timestamp.now(),
     });
   } catch (error) {
-    console.error("Error al añadir seguimiento piloto: ", error);
-    throw new Error("No se pudo guardar el registro piloto.");
+    console.error("Error al añadir seguimiento: ", error);
+    throw new Error("No se pudo guardar el registro de seguimiento.");
   }
 };
 
-export const getSeguimientoPilotEntries = async (): Promise<SeguimientoPilotEntry[]> => {
+export const getSeguimientoEntries = async (): Promise<Record<string, SeguimientoEntry[]>> => {
   try {
-    const q = query(collection(db, SEGUIMIENTO_PILOT_COLLECTION), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, SEGUIMIENTOS_K_COLLECTION), orderBy('createdAt', 'asc'));
     const querySnapshot = await getDocs(q);
-    const entries: SeguimientoPilotEntry[] = [];
+    const entriesByStudent: Record<string, SeguimientoEntry[]> = {};
     querySnapshot.forEach(doc => {
-      entries.push({ id: doc.id, ...doc.data() } as SeguimientoPilotEntry);
+      const entry = { id: doc.id, ...doc.data() } as SeguimientoEntry;
+      if (!entriesByStudent[entry.studentId]) {
+        entriesByStudent[entry.studentId] = [];
+      }
+      entriesByStudent[entry.studentId].push(entry);
     });
-    return entries;
+    return entriesByStudent;
   } catch (error) {
-    console.error("Error al obtener seguimientos piloto: ", error);
-    return [];
+    console.error("Error al obtener seguimientos: ", error);
+    return {};
   }
 };

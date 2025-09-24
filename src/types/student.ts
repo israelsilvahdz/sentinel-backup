@@ -78,7 +78,7 @@ export interface BitacoraEntry {
   missedAssignmentsAtFollowUp?: number;
 }
 
-export interface SeguimientoEntry {
+export interface TeamTask {
     id: string;
     createdAt: any; // Firestore Timestamp
     completedAt?: any; // Firestore Timestamp
@@ -90,12 +90,12 @@ export interface SeguimientoEntry {
     subjects: string[]; // Array of subject CRNs
     notes: string;
     status: 'pendiente' | 'completado';
-    assignedTo?: 'leader' | 'tutor' | 'both';
+    assignedTo: 'leader' | 'tutor' | 'both';
     completionNotes?: string;
 }
 
-export interface SeguimientoPilotEntry {
-  id?: string;
+export interface SeguimientoEntry {
+  id: string;
   createdAt: any; // Firestore Timestamp
   studentId: string;
   studentName: string;
@@ -104,7 +104,6 @@ export interface SeguimientoPilotEntry {
   notes: string;
   absencesAtFollowUp: number;
   missedAssignmentsAtFollowUp: number;
-  parentsContacted: boolean;
 }
 
 export interface StudentContact {
@@ -122,5 +121,3 @@ export interface StudentContact {
     momEmail: string;
     mentoringId: string;
 }
-
-    

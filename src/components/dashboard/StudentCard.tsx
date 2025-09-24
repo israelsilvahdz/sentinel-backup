@@ -18,7 +18,7 @@ import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
-import { AddToSeguimientoDialog } from './StudentActions';
+import { AddToTeamTaskDialog } from './StudentActions';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
@@ -254,9 +254,9 @@ export function StudentCard({ student, startOpen = false }: StudentCardProps) {
                             </ScrollArea>
                         </DialogContent>
                     </Dialog>
-                    <AddToSeguimientoDialog student={student}>
-                        <Button variant="outline" size="sm">SEGUIMIENTO</Button>
-                    </AddToSeguimientoDialog>
+                    <AddToTeamTaskDialog student={student}>
+                        <Button variant="outline" size="sm">CREAR TAREA</Button>
+                    </AddToTeamTaskDialog>
                     <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="w-9 p-0">
                             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
