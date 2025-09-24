@@ -86,6 +86,8 @@ export interface SeguimientoEntry {
     subjects: string[]; // Array of subject CRNs
     notes: string;
     status: 'pendiente' | 'completado';
+    completedAt?: any; // Firestore Timestamp of completion
+    completionNotes?: string;
 }
 
 export interface StudentContact {

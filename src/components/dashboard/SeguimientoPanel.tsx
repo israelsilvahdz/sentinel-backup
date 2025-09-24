@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
 import { useDashboardFilters } from './DashboardClient';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,11 +14,12 @@ import type { SeguimientoEntry, StudentContact } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList, MessageSquare, Phone, Copy, Check } from 'lucide-react';
+import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList, MessageSquare, Phone, Copy, Check, FileCheck2, Info } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 
 
 function CopyableContactField({ label, value }: { label: string, value: string }) {
@@ -126,7 +128,10 @@ export function SeguimientoPanel() {
   const [entries, setEntries] = useState<SeguimientoEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [completingTask, setCompletingTask] = useState<SeguimientoEntry | null>(null);
   const { toast } = useToast();
+
+  const { register: registerCompletion, handleSubmit: handleSubmitCompletion, reset: resetCompletion } = useForm<{ completionNotes: string }>();
 
   const fetchEntries = useCallback(async () => {
     setIsLoading(true);
@@ -165,17 +170,42 @@ export function SeguimientoPanel() {
   }, [entries, selectedValue, filterType, showCompleted]);
 
   const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
-
-  const handleStatusChange = async (id: string, currentStatus: 'pendiente' | 'completado') => {
-    const newStatus = currentStatus === 'pendiente' ? 'completado' : 'pendiente';
-    try {
-      await updateSeguimientoStatus(id, newStatus);
-      setEntries(prev => prev.map(e => e.id === id ? { ...e, status: newStatus } : e));
-      toast({ title: 'Estado actualizado' });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado del caso.' });
+  
+  const handleOpenCompletionDialog = (entry: SeguimientoEntry) => {
+    if (entry.status === 'completado') {
+        // Si ya está completado, lo volvemos a poner pendiente
+        updateSeguimientoStatus(entry.id, 'pendiente').then(() => {
+            setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, status: 'pendiente', completedAt: undefined, completionNotes: undefined } : e));
+            toast({ title: 'Tarea reabierta' });
+        }).catch(err => {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo reabrir la tarea.'});
+        });
+    } else {
+        setCompletingTask(entry);
     }
   };
+
+
+  const onCompleteSubmit = async (data: { completionNotes: string }) => {
+    if (!completingTask) return;
+
+    try {
+      await updateSeguimientoStatus(completingTask.id, 'completado', data.completionNotes);
+      setEntries(prev => prev.map(e => e.id === completingTask.id ? { 
+          ...e, 
+          status: 'completado', 
+          completionNotes: data.completionNotes,
+          completedAt: new Date() // Simula el timestamp para la UI
+      } : e));
+      toast({ title: 'Tarea completada' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el estado del caso.' });
+    } finally {
+      setCompletingTask(null);
+      resetCompletion();
+    }
+  };
+
 
   const handleDelete = async (id: string) => {
     try {
@@ -363,7 +393,7 @@ export function SeguimientoPanel() {
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Checkbox
                         checked={entry.status === 'completado'}
-                        onCheckedChange={() => handleStatusChange(entry.id, entry.status)}
+                        onCheckedChange={() => handleOpenCompletionDialog(entry)}
                         className="mr-2"
                      />
                     <span className={entry.status === 'completado' ? 'line-through text-muted-foreground' : ''}>
@@ -410,6 +440,13 @@ export function SeguimientoPanel() {
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-gray-50 p-2 rounded-md">{entry.notes}</p>
                     </div>
                  )}
+                 {entry.status === 'completado' && (
+                    <div className="border-t pt-3 mt-3">
+                        <h4 className="font-medium text-sm flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-primary"/>Notas de Cierre:</h4>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-6">{entry.completionNotes || 'Sin notas.'}</p>
+                        <p className="text-xs text-muted-foreground mt-1 pl-6">Completado el: {entry.completedAt ? format(entry.completedAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es }) : 'N/A'}</p>
+                    </div>
+                 )}
               </CardContent>
             </Card>
           );
@@ -429,6 +466,26 @@ export function SeguimientoPanel() {
             </Card>
         )}
       </div>
+      
+      {/* Diálogo para completar tarea */}
+      <Dialog open={!!completingTask} onOpenChange={(open) => !open && setCompletingTask(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Completar Tarea de Seguimiento</DialogTitle>
+                <DialogDescription>Añade una nota de cierre para documentar las acciones tomadas.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitCompletion(onCompleteSubmit)}>
+                <div className="py-4 space-y-2">
+                    <Label htmlFor="completionNotes">Notas de Cierre (Opcional)</Label>
+                    <Textarea id="completionNotes" {...registerCompletion('completionNotes')} placeholder="Ej. Se contactó a los padres, el alumno se comprometió a..." />
+                </div>
+                <DialogFooter>
+                     <Button type="button" variant="ghost" onClick={() => setCompletingTask(null)}>Cancelar</Button>
+                     <Button type="submit">Marcar como Completada</Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

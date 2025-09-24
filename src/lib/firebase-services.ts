@@ -95,7 +95,7 @@ export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
  */
 export const deleteBitacoraEntry = async (id: string): Promise<void> => {
   try {
-    const docRef = doc(db, BITACORA_COLLECTION, id);
+    const docRef = doc(db, BITACora_COLLECTION, id);
     await deleteDoc(docRef);
   } catch (error) {
     console.error("Error al eliminar documento de Firestore: ", error);
@@ -152,10 +152,21 @@ export const getSeguimientoEntries = async (): Promise<SeguimientoEntry[]> => {
 /**
  * Actualiza el estado de un caso de seguimiento.
  */
-export const updateSeguimientoStatus = async (id: string, status: 'pendiente' | 'completado'): Promise<void> => {
+export const updateSeguimientoStatus = async (id: string, status: 'pendiente' | 'completado', completionNotes?: string): Promise<void> => {
     try {
         const docRef = doc(db, SEGUIMIENTO_COLLECTION, id);
-        await updateDoc(docRef, { status });
+        const updateData: any = { status };
+        if (status === 'completado') {
+            updateData.completedAt = Timestamp.now();
+            if (completionNotes) {
+                updateData.completionNotes = completionNotes;
+            }
+        } else {
+             // Si se vuelve a poner como pendiente, opcionalmente limpiar los campos de completado
+            updateData.completedAt = null;
+            updateData.completionNotes = null;
+        }
+        await updateDoc(docRef, updateData);
     } catch (error) {
         console.error("Error al actualizar estado de seguimiento: ", error);
         throw new Error("No se pudo actualizar el estado del caso.");
