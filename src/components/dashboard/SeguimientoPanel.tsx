@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList, MessageSquare, Phone, Copy, Check, FileCheck2, Info } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -168,6 +168,8 @@ export function SeguimientoPanel() {
     
     return baseEntries;
   }, [entries, selectedValue, filterType, showCompleted]);
+  
+  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
 
   const handleOpenCompletionDialog = (entry: SeguimientoEntry) => {
     if (entry.status === 'completado') {
@@ -221,8 +223,6 @@ export function SeguimientoPanel() {
     'otro': { icon: <HelpCircle className="h-4 w-4 text-blue-600" />, text: 'Otro' },
   };
 
-  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
-  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-120px)]">
@@ -490,5 +490,7 @@ export function SeguimientoPanel() {
     </div>
   );
 }
+
+    
 
     
