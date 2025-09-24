@@ -19,13 +19,13 @@ import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry } from '
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDPkqLHSfu5eHfKWb2eC0dbcM2kbbb65pk",
+  apiKey: "AIzaSyCV7o_NfeFq1xT1nF1hBfXW8Gj-A9gW6tQ",
   authDomain: "tecmilenio-mdea.firebaseapp.com",
   databaseURL: "https://tecmilenio-mdea-default-rtdb.firebaseio.com",
   projectId: "tecmilenio-mdea",
   storageBucket: "tecmilenio-mdea.appspot.com",
   messagingSenderId: "576664692340",
-  appId: "1:576664692340:web:6669b709986d62d94d5321"
+  appId: "1:576664692340:web:968f70092f6f4c3a4d5321"
 };
 
 
@@ -43,6 +43,7 @@ const BITACORA_COLLECTION = 'bitacora';
 const TEAM_TASKS_COLLECTION = 'teamTasks';
 const CONTACTS_COLLECTION = 'contacts';
 const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
+const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
 
 
 /**
@@ -275,5 +276,47 @@ export const getSeguimientoEntries = async (): Promise<Record<string, Seguimient
   } catch (error) {
     console.error("Error al obtener seguimientos: ", error);
     return {};
+  }
+};
+
+
+// --- Funciones para Seguimientos (Piloto) ---
+export interface SeguimientoPilotEntry {
+  id?: string;
+  createdAt: any;
+  studentId: string;
+  studentName: string;
+  attendedBy: string;
+  topic: string;
+  notes?: string;
+  parentsContacted: boolean;
+  absencesAtFollowUp: number;
+  missedAssignmentsAtFollowUp: number;
+}
+
+export const addSeguimientoPilotEntry = async (entry: Omit<SeguimientoPilotEntry, 'id' | 'createdAt'>): Promise<void> => {
+  try {
+    await addDoc(collection(db, SEGUIMIENTOS_PILOT_COLLECTION), {
+      ...entry,
+      createdAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error("Error al añadir seguimiento piloto: ", error);
+    throw new Error("No se pudo guardar el registro de seguimiento piloto.");
+  }
+};
+
+export const getSeguimientoPilotEntries = async (): Promise<SeguimientoPilotEntry[]> => {
+  try {
+    const q = query(collection(db, SEGUIMIENTOS_PILOT_COLLECTION), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    const entries: SeguimientoPilotEntry[] = [];
+    querySnapshot.forEach(doc => {
+      entries.push({ id: doc.id, ...doc.data() } as SeguimientoPilotEntry);
+    });
+    return entries;
+  } catch (error) {
+    console.error("Error al obtener seguimientos piloto: ", error);
+    return [];
   }
 };
