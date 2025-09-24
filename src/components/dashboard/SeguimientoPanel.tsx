@@ -27,10 +27,22 @@ import { cn } from '@/lib/utils';
 type RiskCategory = 'ne' | 'faltas' | 'both' | 'other';
 type FilterTopic = 'all' | RiskCategory;
 
-function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTaskAdded: () => void }) {
+const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
+    'ne': 'Riesgo por NE',
+    'faltas': 'Riesgo por Faltas',
+    'both': 'Riesgo por Faltas y NE',
+    'other': 'Otro'
+};
+
+function AddSeguimientoForm({ student, riskCategory, onTaskAdded }: { student: Student, riskCategory: RiskCategory, onTaskAdded: () => void }) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<{ attendedBy: string, topic: string, notes: string }>();
+  
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<{ attendedBy: string, topic: string, notes: string }>({
+    defaultValues: {
+      topic: RISK_CATEGORY_TEXT[riskCategory] || 'Otro'
+    }
+  });
   
   const highRiskSubjects = useMemo(() => {
     return student.subjectSummaries?.filter(s => {
@@ -99,7 +111,21 @@ function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTask
       </div>
       <div className="space-y-2">
         <Label htmlFor="topic">Tema</Label>
-        <Input id="topic" {...register('topic', { required: 'Este campo es requerido' })} placeholder="Ej. Aumento de Faltas" />
+        <Controller
+            name="topic"
+            control={control}
+            rules={{ required: 'Este campo es requerido' }}
+            render={({ field }) => (
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {Object.values(RISK_CATEGORY_TEXT).map(text => (
+                             <SelectItem key={text} value={text}>{text}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
+        />
         {errors.topic && <p className="text-sm text-destructive">{errors.topic.message}</p>}
       </div>
       <div className="space-y-2">
@@ -126,12 +152,16 @@ export function SeguimientoPanel() {
   }, [fetchSeguimientoEntries]);
   
   const studentList = useMemo(() => {
+    let studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
+
+    if (searchTerm) {
+        const lowercasedSearch = searchTerm.toLowerCase();
+        studentSource = allStudents.filter(s => s.name.toLowerCase().includes(lowercasedSearch) || s.id.toLowerCase().includes(lowercasedSearch));
+    }
+
     const studentsWithRisk: { student: Student; riskCategory: RiskCategory }[] = [];
     const processedIds = new Set<string>();
 
-    const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
-
-    // 1. Clasificar todos los alumnos por su mayor riesgo
     studentSource.forEach(student => {
       if (!student.subjectSummaries || student.subjectSummaries.length === 0) return;
 
@@ -162,7 +192,6 @@ export function SeguimientoPanel() {
       }
     });
 
-    // 2. Añadir alumnos con seguimiento previo que no están en la lista de riesgo
     Object.keys(seguimientoEntries).forEach(studentId => {
       if (!processedIds.has(studentId)) {
         const student = studentSource.find(s => s.id === studentId);
@@ -173,19 +202,13 @@ export function SeguimientoPanel() {
       }
     });
     
-    // 3. Aplicar filtro de búsqueda
-    let finalFilteredList = studentsWithRisk;
-    if (searchTerm) {
-        const lowercasedSearch = searchTerm.toLowerCase();
-        finalFilteredList = allStudents
-            .filter(s => s.name.toLowerCase().includes(lowercasedSearch) || s.id.toLowerCase().includes(lowercasedSearch))
-            .map(s => {
-                const existing = studentsWithRisk.find(sr => sr.student.id === s.id);
-                return existing || { student: s, riskCategory: 'other' };
-            });
-    }
+    let finalFilteredList = searchTerm 
+      ? studentSource.map(s => {
+          const existing = studentsWithRisk.find(sr => sr.student.id === s.id);
+          return existing || { student: s, riskCategory: 'other' };
+        })
+      : studentsWithRisk;
 
-    // 4. Aplicar filtro de tema
     if (filterTopic !== 'all') {
         finalFilteredList = finalFilteredList.filter(item => item.riskCategory === filterTopic);
     }
@@ -323,7 +346,7 @@ export function SeguimientoPanel() {
                                 Se registrarán las faltas y NE actuales del alumno.
                             </DialogDescription>
                         </DialogHeader>
-                        <AddSeguimientoForm student={student} onTaskAdded={fetchSeguimientoEntries} />
+                        <AddSeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} />
                     </DialogContent>
                   </Dialog>
                 </div>
@@ -343,7 +366,5 @@ export function SeguimientoPanel() {
     </TooltipProvider>
   );
 }
-
-    
 
     
