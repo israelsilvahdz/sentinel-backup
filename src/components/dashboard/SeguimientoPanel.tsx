@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info, Filter } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
@@ -32,6 +32,14 @@ function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTask
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<{ attendedBy: string, topic: string, notes: string }>();
+  
+  const highRiskSubjects = useMemo(() => {
+    return student.subjectSummaries?.filter(s => {
+      const isHighRiskNE = s.missedAssignmentLimit > 0 && (s.missedAssignments / s.missedAssignmentLimit) >= 0.5;
+      const isHighRiskFaltas = s.absenceLimit > 0 && (s.absences / s.absenceLimit) >= 0.5;
+      return isHighRiskFaltas || isHighRiskNE;
+    }) || [];
+  }, [student.subjectSummaries]);
 
   const onSubmit = async (data: { attendedBy: string, topic: string, notes: string }) => {
     setIsSubmitting(true);
@@ -63,6 +71,28 @@ function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTask
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+       {highRiskSubjects.length > 0 && (
+         <div className="space-y-2">
+            <Label className="font-semibold">Contexto del Riesgo</Label>
+            <Card className="p-3 bg-muted/50 max-h-32 overflow-y-auto">
+              <div className="space-y-2">
+                  {highRiskSubjects.map(s => {
+                      const isHighRiskNE = s.missedAssignmentLimit > 0 && (s.missedAssignments / s.missedAssignmentLimit) >= 0.5;
+                      const isHighRiskFaltas = s.absenceLimit > 0 && (s.absences / s.absenceLimit) >= 0.5;
+                      return (
+                        <div key={s.id} className="text-sm flex justify-between items-center">
+                          <span>{s.name}</span>
+                          <div className="flex gap-2">
+                            {isHighRiskFaltas && <Badge variant="secondary">F: {s.absences}</Badge>}
+                            {isHighRiskNE && <Badge variant="destructive">NE: {s.missedAssignments}</Badge>}
+                          </div>
+                        </div>
+                      )
+                  })}
+              </div>
+            </Card>
+         </div>
+       )}
       <div className="space-y-2">
         <Label htmlFor="attendedBy">Atendido por</Label>
         <Input id="attendedBy" {...register('attendedBy', { required: 'Este campo es requerido' })} placeholder="Ej. Líder de Generación" />
@@ -162,13 +192,14 @@ export function SeguimientoPanel() {
     return finalFilteredList;
 
   }, [allStudents, seguimientoEntries, searchTerm, filterTopic]);
-
-  const categoryStyles: Record<RiskCategory, string> = {
-    ne: 'border-red-500',
-    faltas: 'border-yellow-400',
-    both: 'border-orange-500',
-    other: 'border-transparent',
+  
+  const riskDisplayInfo: Record<RiskCategory, { text: string; badgeClass: string; borderClass: string; }> = {
+    ne: { text: 'Riesgo por NE', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
+    faltas: { text: 'Riesgo por Faltas', badgeClass: 'bg-yellow-100 text-yellow-800', borderClass: 'border-yellow-400' },
+    both: { text: 'Riesgo por Faltas y NE', badgeClass: 'bg-orange-100 text-orange-800', borderClass: 'border-orange-500' },
+    other: { text: 'Otro Caso', badgeClass: 'bg-gray-100 text-gray-800', borderClass: 'border-transparent' },
   };
+
 
   if (isLoading) {
     return (
@@ -218,12 +249,16 @@ export function SeguimientoPanel() {
         <div className="space-y-6">
           {studentList.length > 0 ? studentList.map(({ student, riskCategory }) => {
             const studentSeguimientos = seguimientoEntries[student.id] || [];
+            const displayInfo = riskDisplayInfo[riskCategory];
             return (
               <div key={student.id} className="grid grid-cols-[250px_1fr] items-start gap-4 border-b pb-6">
-                <Card className={cn("sticky top-20 border-l-4", categoryStyles[riskCategory])}>
+                <Card className={cn("sticky top-20 border-l-4", displayInfo.borderClass)}>
                     <CardHeader className="p-4">
                        <CardTitle className="text-base">{student.name}</CardTitle>
                        <CardDescription>{student.id}</CardDescription>
+                       <div className="pt-2">
+                          <Badge className={cn("font-medium", displayInfo.badgeClass)}>{displayInfo.text}</Badge>
+                       </div>
                     </CardHeader>
                 </Card>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -307,3 +342,5 @@ export function SeguimientoPanel() {
     </TooltipProvider>
   );
 }
+
+    
