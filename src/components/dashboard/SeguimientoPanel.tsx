@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Loader2, Trash2, Printer, AlertTriangle, FileWarning, HelpCircle, ClipboardList, MessageSquare, Phone, Copy, Check, FileCheck2, Info } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
@@ -221,6 +221,8 @@ export function SeguimientoPanel() {
     'otro': { icon: <HelpCircle className="h-4 w-4 text-blue-600" />, text: 'Otro' },
   };
 
+  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
+  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-120px)]">
@@ -356,8 +358,6 @@ export function SeguimientoPanel() {
     }
   };
 
-  const pendingCount = useMemo(() => filteredEntries.filter(e => e.status === 'pendiente').length, [filteredEntries]);
-  
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
       <header className="flex items-center justify-between flex-wrap gap-4">
@@ -406,6 +406,9 @@ export function SeguimientoPanel() {
                 </div>
                 <div className="flex items-center gap-1">
                      <Dialog>
+                        <DialogTrigger asChild>
+                           <Button variant="outline" size="sm"><MessageSquare className="h-4 w-4 mr-2" />Notificar Padres</Button>
+                        </DialogTrigger>
                         <DialogContent>
                             <NotifyParentsDialog entry={entry} subjectsInCase={subjectsInCase} contact={studentContact} />
                         </DialogContent>
@@ -477,13 +480,15 @@ export function SeguimientoPanel() {
                     <Label htmlFor="completionNotes">Notas de Cierre (Opcional)</Label>
                     <Textarea id="completionNotes" {...registerCompletion('completionNotes')} placeholder="Ej. Se contactó a los padres, el alumno se comprometió a..." />
                 </div>
-                <AlertDialogFooter>
+                <DialogFooter>
                      <Button type="button" variant="ghost" onClick={() => setCompletingTask(null)}>Cancelar</Button>
                      <Button type="submit">Marcar como Completada</Button>
-                </AlertDialogFooter>
+                </DialogFooter>
             </form>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+    
