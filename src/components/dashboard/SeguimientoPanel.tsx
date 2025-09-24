@@ -1,14 +1,13 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useDashboardFilters, type CaseType } from './DashboardClient';
+import { useDashboardFilters } from './DashboardClient';
 import type { Student, SeguimientoEntry } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { addSeguimientoEntry } from '@/lib/firebase-services';
-import { findUrgentCases, findLostCases } from '@/lib/dataProcessor';
+import { getStudentOverallRisk } from '@/lib/dataProcessor';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,9 +18,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { cn } from '@/lib/utils';
+
+
+type RiskCategory = 'ne' | 'faltas' | 'both' | 'other';
+type FilterTopic = 'all' | RiskCategory;
 
 function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTaskAdded: () => void }) {
   const { toast } = useToast();
@@ -85,37 +90,85 @@ function AddSeguimientoForm({ student, onTaskAdded }: { student: Student, onTask
 export function SeguimientoPanel() {
   const { allStudents, seguimientoEntries, fetchSeguimientoEntries, isLoading } = useDashboardFilters();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterTopic, setFilterTopic] = useState<FilterTopic>('all');
   
   useEffect(() => {
     fetchSeguimientoEntries();
   }, [fetchSeguimientoEntries]);
   
   const studentList = useMemo(() => {
-    const urgentCaseStudents = findUrgentCases(allStudents, new Set(findLostCases(allStudents).map(s => s.id)));
-    const urgentCaseIds = new Set(urgentCaseStudents.map(s => s.id));
-    
-    // Add any student who already has a seguimiento entry, if not already included
-    const studentsWithEntries = new Set(Object.keys(seguimientoEntries));
-    
-    let combinedStudents = [...urgentCaseStudents];
-    studentsWithEntries.forEach(studentId => {
-      if (!urgentCaseIds.has(studentId)) {
-        const student = allStudents.find(s => s.id === studentId);
-        if (student) {
-          combinedStudents.push(student);
+    const studentsWithRisk: { student: Student; riskCategory: RiskCategory }[] = [];
+    const processedIds = new Set<string>();
+
+    // 1. Clasificar todos los alumnos por su mayor riesgo
+    allStudents.forEach(student => {
+      if (!student.subjectSummaries || student.subjectSummaries.length === 0) return;
+
+      let highRiskNE = false;
+      let highRiskFaltas = false;
+
+      student.subjectSummaries.forEach(subject => {
+        if (subject.missedAssignmentLimit > 0 && (subject.missedAssignments / subject.missedAssignmentLimit) >= 0.8) {
+          highRiskNE = true;
         }
+        if (subject.absenceLimit > 0 && (subject.absences / subject.absenceLimit) >= 0.8) {
+          highRiskFaltas = true;
+        }
+      });
+      
+      let riskCategory: RiskCategory | null = null;
+      if (highRiskNE && highRiskFaltas) {
+        riskCategory = 'both';
+      } else if (highRiskNE) {
+        riskCategory = 'ne';
+      } else if (highRiskFaltas) {
+        riskCategory = 'faltas';
+      }
+
+      if (riskCategory) {
+        studentsWithRisk.push({ student, riskCategory });
+        processedIds.add(student.id);
       }
     });
 
+    // 2. Añadir alumnos con seguimiento previo que no están en la lista de riesgo
+    Object.keys(seguimientoEntries).forEach(studentId => {
+      if (!processedIds.has(studentId)) {
+        const student = allStudents.find(s => s.id === studentId);
+        if (student) {
+          studentsWithRisk.push({ student, riskCategory: 'other' });
+          processedIds.add(student.id);
+        }
+      }
+    });
+    
+    // 3. Aplicar filtro de búsqueda
+    let finalFilteredList = studentsWithRisk;
     if (searchTerm) {
-      return allStudents.filter(s => 
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        s.id.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+        const lowercasedSearch = searchTerm.toLowerCase();
+        finalFilteredList = allStudents
+            .filter(s => s.name.toLowerCase().includes(lowercasedSearch) || s.id.toLowerCase().includes(lowercasedSearch))
+            .map(s => {
+                const existing = studentsWithRisk.find(sr => sr.student.id === s.id);
+                return existing || { student: s, riskCategory: 'other' };
+            });
+    }
+
+    // 4. Aplicar filtro de tema
+    if (filterTopic !== 'all') {
+        finalFilteredList = finalFilteredList.filter(item => item.riskCategory === filterTopic);
     }
     
-    return combinedStudents;
-  }, [allStudents, seguimientoEntries, searchTerm]);
+    return finalFilteredList;
+
+  }, [allStudents, seguimientoEntries, searchTerm, filterTopic]);
+
+  const categoryStyles: Record<RiskCategory, string> = {
+    ne: 'border-red-500',
+    faltas: 'border-yellow-400',
+    both: 'border-orange-500',
+    other: 'border-transparent',
+  };
 
   if (isLoading) {
     return (
@@ -130,25 +183,44 @@ export function SeguimientoPanel() {
       <div className="space-y-8 p-4 md:p-8 pt-6">
         <header>
           <h1 className="text-3xl font-bold tracking-tight">Seguimientos</h1>
-          <p className="text-muted-foreground">Tablero de seguimiento de casos por alumno.</p>
+          <p className="text-muted-foreground">Tablero de seguimiento para casos de riesgo y alumnos específicos.</p>
         </header>
 
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar alumno por nombre o matrícula para añadirlo al tablero..."
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        <Card className="p-4 bg-muted/50">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative md:col-span-2">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                        placeholder="Buscar alumno por nombre o matrícula para añadirlo al tablero..."
+                        className="pl-10"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                   <Filter className="h-5 w-5 text-muted-foreground" />
+                   <Select value={filterTopic} onValueChange={(val) => setFilterTopic(val as FilterTopic)}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filtrar por tema..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos los Casos de Riesgo</SelectItem>
+                            <SelectItem value="faltas">Riesgo por Faltas</SelectItem>
+                            <SelectItem value="ne">Riesgo por NE</SelectItem>
+                            <SelectItem value="both">Riesgo por Faltas y NE</SelectItem>
+                            <SelectItem value="other">Otros Casos (manuales)</SelectItem>
+                        </SelectContent>
+                   </Select>
+                </div>
+            </div>
+        </Card>
         
         <div className="space-y-6">
-          {studentList.length > 0 ? studentList.map(student => {
+          {studentList.length > 0 ? studentList.map(({ student, riskCategory }) => {
             const studentSeguimientos = seguimientoEntries[student.id] || [];
             return (
-              <div key={student.id} className="grid grid-cols-[200px_1fr] items-start gap-4 border-b pb-6">
-                <Card className="sticky top-20">
+              <div key={student.id} className="grid grid-cols-[250px_1fr] items-start gap-4 border-b pb-6">
+                <Card className={cn("sticky top-20 border-l-4", categoryStyles[riskCategory])}>
                     <CardHeader className="p-4">
                        <CardTitle className="text-base">{student.name}</CardTitle>
                        <CardDescription>{student.id}</CardDescription>
@@ -225,8 +297,8 @@ export function SeguimientoPanel() {
             <Card className="text-center p-12 col-span-full">
               <Info className="mx-auto h-12 w-12 text-muted-foreground" />
               <CardTitle className="mt-4">Tablero de Seguimiento Vacío</CardTitle>
-              <CardDescription className="mt-2">
-                Los alumnos con casos urgentes aparecerán aquí automáticamente. También puedes buscar un alumno para añadirlo manualmente al tablero.
+              <CardDescription className="mt-2 max-w-md mx-auto">
+                No se encontraron alumnos con los criterios de riesgo alto o los filtros seleccionados. Puedes usar el buscador para añadir manualmente un alumno y registrar un seguimiento.
               </CardDescription>
             </Card>
           )}
