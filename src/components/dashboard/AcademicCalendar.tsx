@@ -55,7 +55,7 @@ const CATEGORY_BG_TEXT_COLORS: Record<AcademicEventCategory, string> = {
 };
 
 export function AcademicCalendar() {
-  const [date, setDate] = useState<Date | undefined>(new Date(2026, 0, 12));
+  const [date, setDate] = useState<Date | undefined>(new Date());
   const [calendarType, setCalendarType] = useState<CalendarType>('tetra');
 
   const { eventsByDate, currentEvents } = useMemo(() => {
