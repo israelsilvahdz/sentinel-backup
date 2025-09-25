@@ -192,13 +192,15 @@ export function SeguimientoPanel() {
   }, [fetchSeguimientoEntries, fetchTeamTasks]);
   
   const studentList = useMemo(() => {
-    let studentSource = searchTerm ? allStudents : (filteredStudents.length > 0 ? filteredStudents : allStudents);
-
     if (searchTerm) {
         const lowercasedSearch = searchTerm.toLowerCase();
-        studentSource = allStudents.filter(s => s.name.toLowerCase().includes(lowercasedSearch) || s.id.toLowerCase().includes(lowercasedSearch));
+        return allStudents
+            .filter(s => s.name.toLowerCase().includes(lowercasedSearch) || s.id.toLowerCase().includes(lowercasedSearch))
+            .map(student => ({ student, riskCategory: 'other' as RiskCategory }));
     }
 
+    let studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
+    
     const studentsWithItems: { student: Student; riskCategory: RiskCategory }[] = [];
     const processedIds = new Set<string>();
 
@@ -252,14 +254,8 @@ export function SeguimientoPanel() {
         }
     });
     
-    // If searching, just map the search results to have a category
-    let finalFilteredList = searchTerm 
-      ? studentSource.map(s => {
-          const existing = studentsWithItems.find(sr => sr.student.id === s.id);
-          return existing || { student: s, riskCategory: 'other' };
-        })
-      : studentsWithItems;
-
+    let finalFilteredList = studentsWithItems;
+    
     // Filter by topic
     if (filterTopic !== 'all') {
         finalFilteredList = finalFilteredList.filter(item => {
@@ -543,7 +539,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {!isBitacora && (
                         <>
-                            <DialogTrigger asChild>
+                             <DialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button>
                             </DialogTrigger>
                             <AlertDialog>
@@ -559,7 +555,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                         </>
                     )}
                 </div>
-                {!isBitacora && (
+                 {!isBitacora && (
                     <DialogContent>
                         <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
                         <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
