@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -389,6 +390,12 @@ export function SeguimientoPanel() {
                         </Card>
                     </DialogTrigger>
                     <DialogContent className="max-w-7xl h-[90vh] flex flex-col">
+                        <DialogHeader>
+                          <DialogTitle>Expediente del Alumno</DialogTitle>
+                          <DialogDescription>
+                            {student.name} ({student.id})
+                          </DialogDescription>
+                        </DialogHeader>
                         <StudentCard student={student} startOpen={true} isDialog={true} />
                     </DialogContent>
                 </Dialog>
@@ -510,9 +517,11 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
     const cardTitle = isBitacora ? 'Reporte de Bitácora' : 'Registro de Interacción';
     
     const contentToShow = () => {
-        if (isBitacora) return (entry as BitacoraEntry).description;
-        if ((entry as SeguimientoEntry).topic === 'Otro') return (entry as SeguimientoEntry).notes;
-        return `Tema: ${(entry as SeguimientoEntry).topic}`;
+      if (isBitacora) {
+          return (entry as BitacoraEntry).description;
+      }
+      const seguimiento = entry as SeguimientoEntry;
+      return seguimiento.topic === 'Otro' ? seguimiento.notes : `Tema: ${seguimiento.topic}`;
     };
 
     return (
@@ -731,3 +740,6 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
         </Dialog>
     );
 }
+
+
+    
