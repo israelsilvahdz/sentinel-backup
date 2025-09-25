@@ -6,6 +6,7 @@ import { useDashboardFilters } from './DashboardClient';
 import type { Student, SeguimientoEntry, BitacoraEntry, TeamTask } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry, addTeamTask, updateTeamTaskStatus } from '@/lib/firebase-services';
+import { StudentCard } from './StudentCard';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -270,9 +271,14 @@ export function SeguimientoPanel() {
     if (!showCompleted) {
         finalFilteredList = finalFilteredList.filter(item => {
             const hasPendingTasks = teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente');
-            const hasInteractions = (seguimientoEntries[item.student.id] || []).length > 0;
             const hasRisk = item.riskCategory === 'faltas' || item.riskCategory === 'ne' || item.riskCategory === 'both';
-            return hasPendingTasks || hasInteractions || hasRisk;
+            
+            // Si hay riesgo pero no interacciones/pendientes, debería mostrarse
+            const hasInteractions = (seguimientoEntries[item.student.id] || []).length > 0;
+            if (hasRisk && !hasInteractions && !hasPendingTasks) return true;
+
+            // Si hay pendientes o interacciones, se muestra
+            return hasPendingTasks || hasInteractions;
         });
     }
     
@@ -370,15 +376,23 @@ export function SeguimientoPanel() {
 
             return (
               <div key={student.id} className="grid grid-cols-[250px_1fr] items-start gap-4 border-b pb-6">
-                <Card className={cn("sticky top-20 border-l-4", displayInfo.borderClass)}>
-                    <CardHeader className="p-4">
-                       <CardTitle className="text-base">{student.name}</CardTitle>
-                       <CardDescription>{student.id}</CardDescription>
-                       <div className="pt-2">
-                          <Badge className={cn("font-medium", displayInfo.badgeClass)}>{displayInfo.text}</Badge>
-                       </div>
-                    </CardHeader>
-                </Card>
+                 <Dialog>
+                    <DialogTrigger asChild>
+                        <Card className={cn("sticky top-20 border-l-4 cursor-pointer hover:shadow-md transition-shadow", displayInfo.borderClass)}>
+                            <CardHeader className="p-4">
+                            <CardTitle className="text-base">{student.name}</CardTitle>
+                            <CardDescription>{student.id}</CardDescription>
+                            <div className="pt-2">
+                                <Badge className={cn("font-medium", displayInfo.badgeClass)}>{displayInfo.text}</Badge>
+                            </div>
+                            </CardHeader>
+                        </Card>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-7xl h-[90vh] flex flex-col">
+                        <StudentCard student={student} startOpen={true} isDialog={true} />
+                    </DialogContent>
+                </Dialog>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {allItems.map((item) => {
                     const isTask = 'situation' in item;
@@ -395,7 +409,7 @@ export function SeguimientoPanel() {
               <Info className="mx-auto h-12 w-12 text-muted-foreground" />
               <CardTitle className="mt-4">Tablero Vacío</CardTitle>
               <CardDescription className="mt-2 max-w-md mx-auto">
-                No se encontraron alumnos con los criterios de riesgo o los filtros seleccionados. Puedes usar el buscador para añadir manually un alumno y registrar un seguimiento.
+                No se encontraron alumnos con los criterios de riesgo o los filtros seleccionados. Puedes usar el buscador para añadir manualmente un alumno y registrar un seguimiento.
               </CardDescription>
             </Card>
           )}
@@ -494,13 +508,11 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
     }
 
     const cardTitle = isBitacora ? 'Reporte de Bitácora' : 'Registro de Interacción';
-    const cardContent = isBitacora ? (entry as BitacoraEntry).description : (entry as SeguimientoEntry).notes;
-    const topic = isBitacora ? (entry as BitacoraEntry).caseType : (entry as SeguimientoEntry).topic;
     
     const contentToShow = () => {
-        if (isBitacora) return cardContent;
-        if (topic === 'Otro') return cardContent;
-        return `Tema: ${topic}`;
+        if (isBitacora) return (entry as BitacoraEntry).description;
+        if ((entry as SeguimientoEntry).topic === 'Otro') return (entry as SeguimientoEntry).notes;
+        return `Tema: ${(entry as SeguimientoEntry).topic}`;
     };
 
     return (

@@ -27,6 +27,7 @@ import { ChangeHistory } from './ChangeHistory';
 interface StudentCardProps {
   student: Student;
   startOpen?: boolean;
+  isDialog?: boolean;
 }
 
 function RiskCell({ value, limit }: { value: number; limit: number; }) {
@@ -219,8 +220,30 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     );
 }
 
-export function StudentCard({ student, startOpen = false }: StudentCardProps) {
+export function StudentCard({ student, startOpen = false, isDialog = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
+
+  if (isDialog) {
+    // Render content directly without collapsible for Dialog view
+    return (
+      <Card className="h-full flex flex-col border-none shadow-none">
+        <CardHeader>
+            <div className="flex justify-between items-start">
+                <div>
+                    <CardTitle className="flex items-center text-lg">
+                        {student.name}
+                        {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
+                    </CardTitle>
+                    <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
+                </div>
+            </div>
+        </CardHeader>
+        <ScrollArea className="flex-1 pr-6 -mr-6">
+            <StudentSubjects student={student} isOpen={true} />
+        </ScrollArea>
+      </Card>
+    )
+  }
 
   return (
     <Card>
