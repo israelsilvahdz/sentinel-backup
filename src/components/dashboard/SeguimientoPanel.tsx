@@ -114,7 +114,7 @@ function SeguimientoForm({
                       return (
                         <div key={s.id} className="text-sm flex justify-between items-center">
                           <span className="font-medium">{s.name}</span>
-                          <div className="flex gap-2">
+                           <div className="flex gap-2">
                             {isHighRiskFaltas && <Badge variant="secondary">F: {s.absences} / {s.absenceLimit}</Badge>}
                             {isHighRiskNE && <Badge variant="destructive">NE: {s.missedAssignments} / {s.missedAssignmentLimit}</Badge>}
                           </div>
@@ -376,8 +376,11 @@ export function SeguimientoPanel() {
                            </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
-                          <p><strong>Tema:</strong> {entry.topic}</p>
-                          <p><strong>Notas:</strong> <pre className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md">{entry.notes || "N/A"}</pre></p>
+                          <div><strong>Tema:</strong> {entry.topic}</div>
+                          <div>
+                            <strong>Notas:</strong>
+                            <pre className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{entry.notes || "N/A"}</pre>
+                          </div>
                           <div className="flex items-center gap-4 text-sm">
                              <Badge>Faltas en ese momento: {entry.absencesAtFollowUp}</Badge>
                              <Badge>NE en ese momento: {entry.missedAssignmentsAtFollowUp}</Badge>
