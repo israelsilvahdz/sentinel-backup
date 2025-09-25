@@ -395,7 +395,7 @@ export function SeguimientoPanel() {
               <Info className="mx-auto h-12 w-12 text-muted-foreground" />
               <CardTitle className="mt-4">Tablero Vacío</CardTitle>
               <CardDescription className="mt-2 max-w-md mx-auto">
-                No se encontraron alumnos con los criterios de riesgo o los filtros seleccionados. Puedes usar el buscador para añadir manualmente un alumno y registrar un seguimiento.
+                No se encontraron alumnos con los criterios de riesgo o los filtros seleccionados. Puedes usar el buscador para añadir manually un alumno y registrar un seguimiento.
               </CardDescription>
             </Card>
           )}
@@ -497,6 +497,12 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
     const cardContent = isBitacora ? (entry as BitacoraEntry).description : (entry as SeguimientoEntry).notes;
     const topic = isBitacora ? (entry as BitacoraEntry).caseType : (entry as SeguimientoEntry).topic;
     
+    const contentToShow = () => {
+        if (isBitacora) return cardContent;
+        if (topic === 'Otro') return cardContent;
+        return `Tema: ${topic}`;
+    };
+
     return (
         <Card className="h-full flex flex-col group relative">
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
@@ -504,7 +510,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                     <CardTitle className="text-sm">{cardTitle}</CardTitle>
                     <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
                     <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
-                        {topic === 'Otro' ? cardContent : `Tema: ${topic}`}
+                        {contentToShow()}
                     </div>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
