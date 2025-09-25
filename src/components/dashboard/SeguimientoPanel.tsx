@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useDashboardFilters } from './DashboardClient';
-import type { Student, SeguimientoEntry, BitacoraEntry, TeamTask } from '@/types/student';
+import type { Student, SeguimientoEntry, BitacoraEntry, TeamTask, Subject } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry, addTeamTask, updateTeamTaskStatus } from '@/lib/firebase-services';
 import { StudentCard } from './StudentCard';
@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote, ClipboardCheck, FileCheck2, FileText as FileTextIcon, Phone } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote, ClipboardCheck, FileCheck2, FileText as FileTextIcon, Phone, HelpCircle, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
@@ -45,7 +45,7 @@ const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
 const SITUATION_MAP: Record<TeamTask['situation'], { icon: React.ReactNode, text: string }> = {
   'faltas': { icon: <FileWarning className="h-4 w-4 text-yellow-600" />, text: 'Faltas' },
   'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
-  'otro': { icon: <StickyNote className="h-4 w-4 text-blue-600" />, text: 'Pendiente' },
+  'otro': { icon: <HelpCircle className="h-4 w-4 text-blue-600" />, text: 'Pendiente' },
 };
 
 
@@ -272,7 +272,6 @@ export function SeguimientoPanel() {
             const hasRisk = item.riskCategory === 'faltas' || item.riskCategory === 'ne' || item.riskCategory === 'both';
             const hasInteractions = seguimientoEntries[item.student.id] && seguimientoEntries[item.student.id].length > 0;
             
-            // Show if: has risk and no interactions/pendientes, OR has pending tasks, OR has interactions.
             if (hasRisk && !hasPendingTasks && !hasInteractions) return true;
             
             return hasPendingTasks || hasInteractions;
@@ -400,7 +399,7 @@ export function SeguimientoPanel() {
                   {allItems.map((item) => {
                     const isTask = 'situation' in item;
                     return isTask 
-                      ? <TaskCard key={item.id} task={item as TeamTask} onUpdate={fetchTeamTasks} />
+                      ? <TaskCard key={item.id} task={item as TeamTask} student={student} onUpdate={fetchTeamTasks} />
                       : <InteractionCard key={item.id} entry={item as SeguimientoEntry | BitacoraEntry} student={student} onUpdate={fetchSeguimientoEntries} />;
                   })}
                   <NewItemCard student={student} riskCategory={riskCategory} onUpdate={() => {fetchSeguimientoEntries(); fetchTeamTasks();}} />
@@ -425,12 +424,13 @@ export function SeguimientoPanel() {
 
 // --- Components for cards ---
 
-function TaskCard({ task, onUpdate }: { task: TeamTask, onUpdate: () => void }) {
+function TaskCard({ task, student, onUpdate }: { task: TeamTask, student: Student, onUpdate: () => void }) {
     const { toast } = useToast();
     const [isCompleting, setIsCompleting] = useState(false);
     const { register, handleSubmit, reset } = useForm<{ completionNotes: string }>();
 
-    const handleStatusChange = async (checked: boolean) => {
+    const handleStatusChange = async (e: React.MouseEvent, checked: boolean) => {
+        e.stopPropagation();
         if (!checked) { // Re-opening task
             await updateTeamTaskStatus(task.id, 'pendiente');
             onUpdate();
@@ -446,29 +446,78 @@ function TaskCard({ task, onUpdate }: { task: TeamTask, onUpdate: () => void }) 
         reset();
         onUpdate();
     };
+    
+    const subjectsInCase = task.subjects.map(subjectId => 
+            student?.subjects?.find(s => s.id === subjectId)
+          ).filter(Boolean) as Subject[];
+
 
     return (
-        <Card className={cn("h-full flex flex-col group relative", task.status === 'completado' && 'bg-muted/50')}>
-             <CardHeader className="p-4 flex flex-row items-start gap-3 space-y-0">
-                <Checkbox checked={task.status === 'completado'} onCheckedChange={handleStatusChange} />
-                <div className="grid gap-1">
-                    <CardTitle className={cn("text-sm", task.status === 'completado' && 'line-through text-muted-foreground')}>
-                      {SITUATION_MAP[task.situation].text}
-                    </CardTitle>
-                    <CardDescription>
-                       {format(task.createdAt.toDate(), "d MMM, yyyy", {locale: es})}
-                    </CardDescription>
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className={cn("h-full flex flex-col group relative cursor-pointer hover:bg-muted/50 transition-colors", task.status === 'completado' && 'bg-muted/50')}>
+                    <CardHeader className="p-4 flex flex-row items-start gap-3 space-y-0">
+                        <div onClick={(e) => handleStatusChange(e, !(task.status === 'completado'))}>
+                            <Checkbox checked={task.status === 'completado'} className="mt-1" />
+                        </div>
+                        <div className="grid gap-1">
+                            <CardTitle className={cn("text-sm", task.status === 'completado' && 'line-through text-muted-foreground')}>
+                                {SITUATION_MAP[task.situation].text}
+                            </CardTitle>
+                            <CardDescription>
+                                {format(task.createdAt.toDate(), "d MMM, yyyy", { locale: es })}
+                            </CardDescription>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
+                        <p className="text-foreground/80 line-clamp-3">{task.notes}</p>
+                        {task.status === 'completado' && task.completionNotes && (
+                        <div className="pt-2">
+                            <p className="font-semibold text-primary flex items-center gap-1"><FileCheck2 className="h-4 w-4" /> Cierre:</p>
+                            <p className="text-muted-foreground pl-1 line-clamp-2">{task.completionNotes}</p>
+                        </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+            
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        {SITUATION_MAP[task.situation].icon}
+                        {SITUATION_MAP[task.situation].text}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Pendiente para {task.studentName} | Creado: {format(task.createdAt.toDate(), "d 'de' LLLL, yyyy", { locale: es })}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                     <div className="flex items-center gap-2">
+                         <Badge variant="outline">Asignado a: {task.assignedTo === 'both' ? 'Ambos' : task.assignedTo}</Badge>
+                         <Badge variant={task.status === 'pendiente' ? 'destructive' : 'default'}>{task.status}</Badge>
+                     </div>
+
+                    <div><p className="font-semibold">Notas:</p><p className="whitespace-pre-wrap text-muted-foreground">{task.notes}</p></div>
+                    
+                    {subjectsInCase.length > 0 && (
+                        <div>
+                            <h4 className="font-semibold">Materias involucradas:</h4>
+                            <div className="flex flex-col gap-2 mt-2">
+                                {subjectsInCase.map(s => <Badge key={s.id} variant="secondary" className="w-fit">{s.name}</Badge>)}
+                            </div>
+                        </div>
+                    )}
+                    
+                    {task.status === 'completado' && (
+                        <div className="border-t pt-4">
+                            <h4 className="font-semibold flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-primary"/>Notas de Cierre:</h4>
+                            <p className="text-muted-foreground whitespace-pre-wrap mt-1">{task.completionNotes || 'Sin notas.'}</p>
+                            <p className="text-xs text-muted-foreground mt-2">Completado el: {task.completedAt ? format(task.completedAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es }) : 'N/A'}</p>
+                        </div>
+                    )}
                 </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
-                <p className="text-foreground/80 line-clamp-3">{task.notes}</p>
-                {task.status === 'completado' && task.completionNotes && (
-                   <div className="pt-2">
-                     <p className="font-semibold text-primary flex items-center gap-1"><FileCheck2 className="h-4 w-4" /> Cierre:</p>
-                     <p className="text-muted-foreground pl-1">{task.completionNotes}</p>
-                   </div>
-                )}
-            </CardContent>
+            </DialogContent>
+
              <Dialog open={isCompleting} onOpenChange={setIsCompleting}>
                 <DialogContent>
                     <DialogHeader>
@@ -487,14 +536,13 @@ function TaskCard({ task, onUpdate }: { task: TeamTask, onUpdate: () => void }) 
                     </form>
                 </DialogContent>
             </Dialog>
-        </Card>
+        </Dialog>
     )
 }
 
 function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry | BitacoraEntry, student: Student, onUpdate: () => void }) {
     const { toast } = useToast();
     const [isEditOpen, setIsEditOpen] = useState(false);
-    const [isDetailOpen, setIsDetailOpen] = useState(false);
     const isBitacora = 'description' in entry;
 
     const handleDelete = async () => {
@@ -516,7 +564,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
     const contentToShow = isBitacora ? (entry as BitacoraEntry).description : (entry as SeguimientoEntry).notes;
     
     return (
-        <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <Dialog>
             <DialogTrigger asChild>
                 <Card className="h-full flex flex-col group relative cursor-pointer hover:bg-muted/50 transition-colors">
                     <CardHeader className="p-4 flex-grow">
@@ -775,3 +823,6 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
 
 
 
+
+
+      
