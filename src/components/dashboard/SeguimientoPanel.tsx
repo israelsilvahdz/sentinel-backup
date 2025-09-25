@@ -1,13 +1,11 @@
-
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useDashboardFilters } from './DashboardClient';
-import type { Student, SeguimientoEntry, BitacoraEntry } from '@/types/student';
+import type { Student, SeguimientoEntry, BitacoraEntry, TeamTask } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
-import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry } from '@/lib/firebase-services';
+import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry, addTeamTask, updateTeamTaskStatus } from '@/lib/firebase-services';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,14 +17,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote, ClipboardCheck, FileCheck2, FileText as FileTextIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '../ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Switch } from '../ui/switch';
 
 
-type RiskCategory = 'ne' | 'faltas' | 'both' | 'other' | 'reporte';
+type RiskCategory = 'ne' | 'faltas' | 'both' | 'other' | 'reporte' | 'pendiente';
 type FilterTopic = 'all' | RiskCategory;
 
 const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
@@ -34,19 +35,29 @@ const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
     'faltas': 'Riesgo por Faltas',
     'both': 'Riesgo por Faltas y NE',
     'reporte': 'Reporte',
+    'pendiente': 'Pendiente',
     'other': 'Otro'
 };
+
+const SITUATION_MAP: Record<TeamTask['situation'], { icon: React.ReactNode, text: string }> = {
+  'faltas': { icon: <FileWarning className="h-4 w-4 text-yellow-600" />, text: 'Faltas' },
+  'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
+  'otro': { icon: <StickyNote className="h-4 w-4 text-blue-600" />, text: 'Otro' },
+};
+
 
 function SeguimientoForm({ 
   student, 
   riskCategory, 
   onTaskAdded,
   existingEntry,
+  onClose,
 }: { 
   student: Student, 
   riskCategory: RiskCategory, 
   onTaskAdded: () => void,
   existingEntry?: SeguimientoEntry,
+  onClose: () => void;
 }) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +104,7 @@ function SeguimientoForm({
         toast({ title: 'Seguimiento añadido', description: `Se ha añadido un nuevo seguimiento para ${student.name}.` });
       }
       onTaskAdded();
+      onClose(); // Close the dialog on success
       reset();
     } catch (error) {
       console.error("Error saving seguimiento entry", error);
@@ -141,7 +153,7 @@ function SeguimientoForm({
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                        {Object.values(RISK_CATEGORY_TEXT).map(text => (
+                        {Object.values(RISK_CATEGORY_TEXT).filter(t => !['Pendiente', 'Reporte'].includes(t)).map(text => (
                              <SelectItem key={text} value={text}>{text}</SelectItem>
                         ))}
                     </SelectContent>
@@ -155,9 +167,10 @@ function SeguimientoForm({
         <Textarea id="notes" {...register('notes')} placeholder="Detalles del seguimiento, si se contactó a los padres, etc." />
       </div>
       <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-          {existingEntry ? 'Actualizar Seguimiento' : 'Guardar Seguimiento'}
+          {existingEntry ? 'Actualizar Registro' : 'Guardar Registro'}
         </Button>
       </DialogFooter>
     </form>
@@ -165,101 +178,115 @@ function SeguimientoForm({
 }
 
 export function SeguimientoPanel() {
-  const { filteredStudents, allStudents, seguimientoEntries, fetchSeguimientoEntries, isLoading } = useDashboardFilters();
+  const { filteredStudents, allStudents, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, isLoading, loadStudentSubjects } = useDashboardFilters();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTopic, setFilterTopic] = useState<FilterTopic>('all');
-  
+  const [showCompleted, setShowCompleted] = useState(false);
+
   useEffect(() => {
     fetchSeguimientoEntries();
-  }, [fetchSeguimientoEntries]);
+    fetchTeamTasks();
+  }, [fetchSeguimientoEntries, fetchTeamTasks]);
   
   const studentList = useMemo(() => {
-    let studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
+    let studentSource = searchTerm ? allStudents : (filteredStudents.length > 0 ? filteredStudents : allStudents);
 
     if (searchTerm) {
         const lowercasedSearch = searchTerm.toLowerCase();
         studentSource = allStudents.filter(s => s.name.toLowerCase().includes(lowercasedSearch) || s.id.toLowerCase().includes(lowercasedSearch));
     }
 
-    const studentsWithRisk: { student: Student; riskCategory: RiskCategory }[] = [];
+    const studentsWithItems: { student: Student; riskCategory: RiskCategory }[] = [];
     const processedIds = new Set<string>();
 
-    studentSource.forEach(student => {
-      if (!student.subjectSummaries || student.subjectSummaries.length === 0) return;
-
-      let highRiskNE = false;
-      let highRiskFaltas = false;
-
-      student.subjectSummaries.forEach(subject => {
-        if (subject.missedAssignmentLimit > 0 && (subject.missedAssignments / subject.missedAssignmentLimit) >= 0.5) {
-          highRiskNE = true;
-        }
-        if (subject.absenceLimit > 0 && (subject.absences / subject.absenceLimit) >= 0.5) {
-          highRiskFaltas = true;
-        }
-      });
-      
-      let riskCategory: RiskCategory | null = null;
-      if (highRiskNE && highRiskFaltas) {
-        riskCategory = 'both';
-      } else if (highRiskNE) {
-        riskCategory = 'ne';
-      } else if (highRiskFaltas) {
-        riskCategory = 'faltas';
-      }
-
-      if (riskCategory) {
-        studentsWithRisk.push({ student, riskCategory });
+    const addStudent = (student: Student, category: RiskCategory) => {
+        if (processedIds.has(student.id)) return;
+        studentsWithItems.push({ student, riskCategory: category });
         processedIds.add(student.id);
-      }
-    });
+    };
 
-    Object.keys(seguimientoEntries).forEach(studentId => {
-        const hasExistingRiskCategory = processedIds.has(studentId);
-        const student = studentSource.find(s => s.id === studentId);
-
-        if (student) {
-            // Check if any seguimiento is of type 'reporte'
-            const isReporte = seguimientoEntries[studentId].some(e => e.topic === 'Reporte');
-            
-            if (isReporte && !hasExistingRiskCategory) {
-                studentsWithRisk.push({ student, riskCategory: 'reporte' });
-                processedIds.add(studentId);
-            } else if (!hasExistingRiskCategory) {
-                studentsWithRisk.push({ student, riskCategory: 'other' });
-                processedIds.add(studentId);
-            }
+    // 1. Prioritize by pending tasks
+    teamTasks.forEach(task => {
+        if (task.status === 'pendiente') {
+            const student = studentSource.find(s => s.id === task.studentId);
+            if (student) addStudent(student, 'pendiente');
         }
     });
     
+    // 2. Add students with bitacora reports
+    Object.keys(seguimientoEntries).forEach(studentId => {
+        const hasReporte = seguimientoEntries[studentId].some(e => ('description' in e));
+        if(hasReporte) {
+            const student = studentSource.find(s => s.id === studentId);
+            if (student) addStudent(student, 'reporte');
+        }
+    });
+
+    // 3. Add students with risk
+    studentSource.forEach(student => {
+      if (!student.subjectSummaries || student.subjectSummaries.length === 0) return;
+      let highRiskNE = false;
+      let highRiskFaltas = false;
+      student.subjectSummaries.forEach(subject => {
+        if (subject.missedAssignmentLimit > 0 && (subject.missedAssignments / subject.missedAssignmentLimit) >= 0.5) highRiskNE = true;
+        if (subject.absenceLimit > 0 && (subject.absences / subject.absenceLimit) >= 0.5) highRiskFaltas = true;
+      });
+      if (highRiskNE && highRiskFaltas) addStudent(student, 'both');
+      else if (highRiskNE) addStudent(student, 'ne');
+      else if (highRiskFaltas) addStudent(student, 'faltas');
+    });
+
+    // 4. Add students with any other interaction (seguimiento, completed tasks)
+    const allInteractionIds = new Set([
+        ...Object.keys(seguimientoEntries),
+        ...teamTasks.map(t => t.studentId)
+    ]);
+
+    allInteractionIds.forEach(studentId => {
+        const student = studentSource.find(s => s.id === studentId);
+        if (student) {
+            addStudent(student, 'other');
+        }
+    });
+    
+    // If searching, just map the search results to have a category
     let finalFilteredList = searchTerm 
       ? studentSource.map(s => {
-          const existing = studentsWithRisk.find(sr => sr.student.id === s.id);
+          const existing = studentsWithItems.find(sr => sr.student.id === s.id);
           return existing || { student: s, riskCategory: 'other' };
         })
-      : studentsWithRisk;
+      : studentsWithItems;
 
+    // Filter by topic
     if (filterTopic !== 'all') {
-        if (filterTopic === 'reporte') {
-            finalFilteredList = finalFilteredList.filter(item => 
-                (seguimientoEntries[item.student.id] || []).some(e => e.topic === 'Reporte')
-            );
-        } else {
-            finalFilteredList = finalFilteredList.filter(item => item.riskCategory === filterTopic);
-        }
+        finalFilteredList = finalFilteredList.filter(item => {
+            if (filterTopic === 'pendiente') return (teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente'));
+            if (filterTopic === 'reporte') return item.riskCategory === 'reporte';
+            return item.riskCategory === filterTopic;
+        });
+    }
+
+    if (!showCompleted) {
+        finalFilteredList = finalFilteredList.filter(item => {
+            const hasPendingTasks = teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente');
+            // Check for seguimientos or bitacora entries
+            const hasInteractions = (seguimientoEntries[item.student.id] || []).length > 0;
+            return hasPendingTasks || hasInteractions;
+        });
     }
     
     return finalFilteredList;
 
-  }, [filteredStudents, allStudents, seguimientoEntries, searchTerm, filterTopic]);
+  }, [filteredStudents, allStudents, seguimientoEntries, teamTasks, searchTerm, filterTopic, showCompleted]);
   
   const riskDisplayInfo: Record<RiskCategory, { text: string; badgeClass: string; borderClass: string; }> = {
     ne: { text: 'Riesgo por NE', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
     faltas: { text: 'Riesgo por Faltas', badgeClass: 'bg-yellow-100 text-yellow-800', borderClass: 'border-yellow-400' },
     both: { text: 'Riesgo por Faltas y NE', badgeClass: 'bg-orange-100 text-orange-800', borderClass: 'border-orange-500' },
     reporte: { text: 'Reporte de Bitácora', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
-    other: { text: 'Otro Caso', badgeClass: 'bg-gray-100 text-gray-800', borderClass: 'border-transparent' },
+    pendiente: { text: 'Pendiente', badgeClass: 'bg-blue-100 text-blue-800', borderClass: 'border-blue-500' },
+    other: { text: 'Con Seguimiento', badgeClass: 'bg-gray-100 text-gray-800', borderClass: 'border-transparent' },
   };
 
   const handleDelete = useCallback(async (id: string, isBitacora: boolean) => {
@@ -289,46 +316,57 @@ export function SeguimientoPanel() {
     <TooltipProvider>
       <div className="space-y-8 p-4 md:p-8 pt-6">
         <header>
-          <h1 className="text-3xl font-bold tracking-tight">Seguimientos</h1>
-          <p className="text-muted-foreground">Tablero de seguimiento para casos de riesgo y alumnos específicos.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Seguimientos y Pendientes</h1>
+          <p className="text-muted-foreground">Tablero unificado para registrar interacciones y gestionar tareas pendientes por alumno.</p>
         </header>
 
         <Card className="p-4 bg-muted/50">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                 <div className="relative md:col-span-2">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input 
-                        placeholder="Buscar alumno por nombre o matrícula para añadirlo al tablero..."
+                        placeholder="Buscar alumno por nombre o matrícula..."
                         className="pl-10"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="flex items-center gap-2">
-                   <Filter className="h-5 w-5 text-muted-foreground" />
-                   <Select value={filterTopic} onValueChange={(val) => setFilterTopic(val as FilterTopic)}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Filtrar por tema..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos los Casos de Riesgo</SelectItem>
-                            <SelectItem value="faltas">Riesgo por Faltas</SelectItem>
-                            <SelectItem value="ne">Riesgo por NE</SelectItem>
-                            <SelectItem value="both">Riesgo por Faltas y NE</SelectItem>
-                            <SelectItem value="reporte">Reporte de Bitácora</SelectItem>
-                            <SelectItem value="other">Otros Casos (manuales)</SelectItem>
-                        </SelectContent>
-                   </Select>
+                <div className="flex items-center gap-4">
+                   <div className="flex items-center gap-2">
+                     <Filter className="h-5 w-5 text-muted-foreground" />
+                     <Select value={filterTopic} onValueChange={(val) => setFilterTopic(val as FilterTopic)}>
+                          <SelectTrigger>
+                              <SelectValue placeholder="Filtrar por tema..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="all">Todos los Casos</SelectItem>
+                              <SelectItem value="pendiente">Pendientes</SelectItem>
+                              <SelectItem value="reporte">Reportes de Bitácora</SelectItem>
+                              <SelectItem value="faltas">Riesgo por Faltas</SelectItem>
+                              <SelectItem value="ne">Riesgo por NE</SelectItem>
+                              <SelectItem value="both">Riesgo por Faltas y NE</SelectItem>
+                              <SelectItem value="other">Otros Casos</SelectItem>
+                          </SelectContent>
+                     </Select>
+                   </div>
+                   <div className="flex items-center space-x-2">
+                     <Switch id="show-completed" checked={showCompleted} onCheckedChange={setShowCompleted} />
+                     <Label htmlFor="show-completed">Mostrar completados</Label>
+                    </div>
                 </div>
             </div>
         </Card>
         
         <div className="space-y-6">
           {studentList.length > 0 ? studentList.map(({ student, riskCategory }) => {
-            const studentSeguimientos = seguimientoEntries[student.id] || [];
-            
-            const isReporteTopic = studentSeguimientos.some(e => e.topic === 'Reporte');
-            const displayInfo = riskDisplayInfo[isReporteTopic ? 'reporte' : riskCategory];
+            const studentInteractions = seguimientoEntries[student.id] || [];
+            const studentTasks = teamTasks.filter(t => t.studentId === student.id);
+            const allItems = [...studentInteractions, ...studentTasks]
+              .filter(item => showCompleted || !('status' in item) || item.status === 'pendiente')
+              .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime());
+
+            const hasPendingTask = studentTasks.some(t => t.status === 'pendiente');
+            const displayInfo = riskDisplayInfo[hasPendingTask ? 'pendiente' : riskCategory];
 
             return (
               <div key={student.id} className="grid grid-cols-[250px_1fr] items-start gap-4 border-b pb-6">
@@ -342,127 +380,22 @@ export function SeguimientoPanel() {
                     </CardHeader>
                 </Card>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {studentSeguimientos.map((entry, index) => {
-                    const isBitacora = 'description' in entry;
-                    return (
-                        <Dialog key={entry.id}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                            <DialogTrigger asChild>
-                                <Card className="cursor-pointer hover:bg-muted/50 transition-colors h-full flex flex-col group relative">
-                                <CardHeader className="p-4">
-                                    <CardTitle className="text-sm">
-                                        {isBitacora ? 'Reporte de Bitácora' : `Seguimiento #${index + 1}`}
-                                    </CardTitle>
-                                    <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
-                                    <p><strong className="text-muted-foreground">Atendido por:</strong> {entry.attendedBy}</p>
-                                    <p><strong className="text-muted-foreground">Tema:</strong> {entry.topic}</p>
-                                    
-                                    {entry.topic === RISK_CATEGORY_TEXT['other'] || isBitacora ? (
-                                        <div className="flex items-start gap-2 text-muted-foreground pt-2">
-                                            <StickyNote className="h-4 w-4 mt-0.5 shrink-0" />
-                                            <p className="line-clamp-2 text-xs text-foreground/80">{isBitacora ? (entry as unknown as BitacoraEntry).description : entry.notes || 'Sin notas.'}</p>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2 text-muted-foreground pt-2">
-                                            <Badge variant="secondary">F: {entry.absencesAtFollowUp}</Badge>
-                                            <Badge variant="destructive">NE: {entry.missedAssignmentsAtFollowUp}</Badge>
-                                        </div>
-                                    )}
-                                </CardContent>
-                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {!isBitacora && (
-                                        <>
-                                            <Dialog onOpenChange={(isOpen) => { if (isOpen) { event.stopPropagation(); } else { fetchSeguimientoEntries(); }}}>
-                                            <DialogTrigger asChild onClick={e => e.stopPropagation()}>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                <DialogTitle>Editar Seguimiento #{index + 1}</DialogTitle>
-                                                </DialogHeader>
-                                                <SeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} existingEntry={entry} />
-                                            </DialogContent>
-                                            </Dialog>
-                                            <AlertDialog onOpenChange={(isOpen) => { if (isOpen) event.stopPropagation(); }}>
-                                            <AlertDialogTrigger asChild onClick={e => e.stopPropagation()}>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDelete(entry.id, isBitacora)}>Eliminar</AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                            </AlertDialog>
-                                        </>
-                                    )}
-                                </div>
-                                </Card>
-                            </DialogTrigger>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                            <p className="max-w-xs text-sm">{isBitacora ? (entry as unknown as BitacoraEntry).description : entry.notes || "Sin notas adicionales."}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <DialogContent>
-                            <DialogHeader>
-                            <DialogTitle>Detalle del Seguimiento #{index + 1} - {student.name}</DialogTitle>
-                            <DialogDescription>
-                                Registrado por {entry.attendedBy} el {format(entry.createdAt.toDate(), "PPPP", {locale: es})}.
-                            </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                            <div><strong>Tema:</strong> {entry.topic}</div>
-                            {isBitacora ? (
-                                <>
-                                <div><strong>Descripción:</strong><div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{(entry as unknown as BitacoraEntry).description || "N/A"}</div></div>
-                                <div><strong>Acuerdos:</strong><div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{(entry as unknown as BitacoraEntry).agreements || "N/A"}</div></div>
-                                </>
-                            ) : (
-                                <div><strong>Notas:</strong><div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{entry.notes || "N/A"}</div></div>
-                            )}
-                            <div className="flex items-center gap-4 text-sm">
-                                <Badge>Faltas en ese momento: {entry.absencesAtFollowUp}</Badge>
-                                <Badge>NE en ese momento: {entry.missedAssignmentsAtFollowUp}</Badge>
-                            </div>
-                            </div>
-                        </DialogContent>
-                        </Dialog>
-                    );
-                    })}
-
-                  <Dialog onOpenChange={(isOpen) => !isOpen && fetchSeguimientoEntries()}>
-                    <DialogTrigger asChild>
-                       <Card className="border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer min-h-[160px] flex items-center justify-center">
-                          <div className="text-center text-muted-foreground">
-                              <PlusCircle className="mx-auto h-8 w-8" />
-                              <p className="mt-2 font-medium">Añadir Nuevo Seguimiento</p>
-                          </div>
-                       </Card>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Nuevo Seguimiento para {student.name}</DialogTitle>
-                            <DialogDescription>
-                                Se registrarán las faltas y NE actuales del alumno.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <SeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} />
-                    </DialogContent>
-                  </Dialog>
+                  {allItems.map((item) => {
+                    const isTask = 'situation' in item;
+                    return isTask 
+                      ? <TaskCard key={item.id} task={item as TeamTask} onUpdate={fetchTeamTasks} />
+                      : <InteractionCard key={item.id} entry={item as SeguimientoEntry | BitacoraEntry} student={student} onUpdate={fetchSeguimientoEntries} />;
+                  })}
+                  <NewItemCard student={student} riskCategory={riskCategory} onUpdate={() => {fetchSeguimientoEntries(); fetchTeamTasks();}} />
                 </div>
               </div>
             );
           }) : (
             <Card className="text-center p-12 col-span-full">
               <Info className="mx-auto h-12 w-12 text-muted-foreground" />
-              <CardTitle className="mt-4">Tablero de Seguimiento Vacío</CardTitle>
+              <CardTitle className="mt-4">Tablero Vacío</CardTitle>
               <CardDescription className="mt-2 max-w-md mx-auto">
-                No se encontraron alumnos con los criterios de riesgo alto o los filtros seleccionados. Puedes usar el buscador para añadir manualmente un alumno y registrar un seguimiento.
+                No se encontraron alumnos con los criterios de riesgo o los filtros seleccionados. Puedes usar el buscador para añadir manualmente un alumno y registrar un seguimiento.
               </CardDescription>
             </Card>
           )}
@@ -472,3 +405,307 @@ export function SeguimientoPanel() {
   );
 }
 
+
+// --- Components for cards ---
+
+function TaskCard({ task, onUpdate }: { task: TeamTask, onUpdate: () => void }) {
+    const { toast } = useToast();
+    const [isCompleting, setIsCompleting] = useState(false);
+    const { register, handleSubmit, reset } = useForm<{ completionNotes: string }>();
+
+    const handleStatusChange = async (checked: boolean) => {
+        if (!checked) { // Re-opening task
+            await updateTeamTaskStatus(task.id, 'pendiente');
+            onUpdate();
+        } else { // Completing task
+            setIsCompleting(true);
+        }
+    };
+    
+    const onCompleteSubmit = async (data: { completionNotes: string }) => {
+        await updateTeamTaskStatus(task.id, 'completado', data.completionNotes);
+        toast({ title: "Pendiente completado" });
+        setIsCompleting(false);
+        reset();
+        onUpdate();
+    };
+
+    return (
+        <Card className={cn("h-full flex flex-col group relative", task.status === 'completado' && 'bg-muted/50')}>
+             <CardHeader className="p-4 flex flex-row items-start gap-3 space-y-0">
+                <Checkbox checked={task.status === 'completado'} onCheckedChange={handleStatusChange} />
+                <div className="grid gap-1">
+                    <CardTitle className={cn("text-sm", task.status === 'completado' && 'line-through text-muted-foreground')}>
+                      {SITUATION_MAP[task.situation].text}
+                    </CardTitle>
+                    <CardDescription>
+                      Creado: {format(task.createdAt.toDate(), "d MMM, yyyy", {locale: es})}
+                    </CardDescription>
+                </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
+                <p className="text-foreground/80 line-clamp-3">{task.notes}</p>
+                {task.status === 'completado' && task.completionNotes && (
+                   <div className="pt-2">
+                     <p className="font-semibold text-primary flex items-center gap-1"><FileCheck2 className="h-4 w-4" /> Cierre:</p>
+                     <p className="text-muted-foreground pl-1">{task.completionNotes}</p>
+                   </div>
+                )}
+            </CardContent>
+             <Dialog open={isCompleting} onOpenChange={setIsCompleting}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Completar Pendiente</DialogTitle>
+                        <DialogDescription>Añade una nota de cierre para documentar la resolución.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit(onCompleteSubmit)}>
+                        <div className="py-4 space-y-2">
+                            <Label htmlFor="completionNotes">Notas de Cierre (Opcional)</Label>
+                            <Textarea id="completionNotes" {...register('completionNotes')} placeholder="Ej. Se contactó a los padres, el alumno se comprometió a..." />
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsCompleting(false)}>Cancelar</Button>
+                            <Button type="submit">Marcar como Completado</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    )
+}
+
+function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry | BitacoraEntry, student: Student, onUpdate: () => void }) {
+    const { toast } = useToast();
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const isBitacora = 'description' in entry;
+    
+    const handleDelete = async () => {
+        if (isBitacora) {
+            toast({ variant: 'destructive', title: "Acción no permitida", description: "Los reportes de bitácora no se pueden eliminar desde aquí." });
+            return;
+        }
+        try {
+            await deleteSeguimientoEntry(entry.id);
+            toast({ title: "Registro eliminado" });
+            onUpdate();
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error", description: "No se pudo eliminar el registro." });
+        }
+    }
+
+    const cardTitle = isBitacora ? 'Reporte de Bitácora' : 'Registro de Interacción';
+    const cardContent = isBitacora ? (entry as BitacoraEntry).description : (entry as SeguimientoEntry).notes;
+    const topic = isBitacora ? (entry as BitacoraEntry).caseType : (entry as SeguimientoEntry).topic;
+    
+    return (
+        <Card className="h-full flex flex-col group relative">
+            <CardHeader className="p-4 flex-grow">
+                <CardTitle className="text-sm">{cardTitle}</CardTitle>
+                <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
+                <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
+                    {topic === 'Otro' ? cardContent : `Tema: ${topic}`}
+                </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+                <div className="flex items-center text-xs text-muted-foreground gap-2">
+                    <FileWarning className="h-4 w-4" /> F: {entry.absencesAtFollowUp ?? 0}
+                    <AlertTriangle className="h-4 w-4" /> NE: {entry.missedAssignmentsAtFollowUp ?? 0}
+                </div>
+            </CardContent>
+            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {!isBitacora && (
+                    <>
+                        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                            <DialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button></DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
+                                <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
+                            </DialogContent>
+                        </Dialog>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </>
+                )}
+            </div>
+        </Card>
+    );
+}
+
+function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, riskCategory: RiskCategory, onUpdate: () => void }) {
+    const { loadStudentSubjects } = useDashboardFilters();
+    const [creationType, setCreationType] = useState<'interaction' | 'task' | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [studentSubjects, setStudentSubjects] = useState<Student['subjects']>([]);
+    const { toast } = useToast();
+    
+    // Form states for the new task
+    const [situation, setSituation] = useState<'faltas' | 'no-entregados' | 'otro'>('otro');
+    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+    const [notes, setNotes] = useState('');
+    const [assignedTo, setAssignedTo] = useState<'leader' | 'tutor' | 'both'>('leader');
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const handleOpen = async (type: 'interaction' | 'task') => {
+        setCreationType(type);
+        if (type === 'task') {
+            const subjects = await loadStudentSubjects(student.id);
+            setStudentSubjects(subjects);
+        }
+        setIsDialogOpen(true);
+    }
+    
+    const handleClose = () => {
+        setIsDialogOpen(false);
+        // Reset form after a delay to allow animation
+        setTimeout(() => {
+            setCreationType(null);
+            setSituation('otro');
+            setSelectedSubjects([]);
+            setNotes('');
+            setAssignedTo('leader');
+        }, 300);
+    }
+
+    const handleSituationChange = useCallback((value: 'faltas' | 'no-entregados' | 'otro') => {
+        setSituation(value);
+        if (value === 'faltas' || value === 'no-entregados') {
+            const subjectsToSelect = (studentSubjects || [])
+                .filter(s => (value === 'faltas' ? s.absences > 0 : s.missedAssignments > 0))
+                .map(s => s.id);
+            setSelectedSubjects(subjectsToSelect);
+        } else {
+            setSelectedSubjects([]);
+        }
+    }, [studentSubjects]);
+    
+    const handleSubjectToggle = (subjectId: string) => {
+        setSelectedSubjects(prev => 
+            prev.includes(subjectId) ? prev.filter(id => id !== subjectId) : [...prev, subjectId]
+        );
+    };
+
+     const relevantSubjects = (studentSubjects || []).filter(s => {
+        if (situation === 'faltas') return s.absences > 0;
+        if (situation === 'no-entregados') return s.missedAssignments > 0;
+        return false;
+    });
+
+    const handleCreateTask = async () => {
+        setIsSubmitting(true);
+        try {
+            const entry: Omit<TeamTask, 'id' | 'createdAt' | 'status'> = {
+                studentId: student.id, studentName: student.name, leader: student.leader, tutor: student.tutor,
+                situation, subjects: selectedSubjects, notes: notes.trim(), assignedTo,
+            };
+            await addTeamTask(entry);
+            toast({ title: 'Éxito', description: `Se ha creado un nuevo pendiente.` });
+            handleClose();
+            onUpdate();
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el pendiente.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) handleClose(); else setIsDialogOpen(true); }}>
+            <DialogTrigger asChild>
+                <Card className="border-dashed border-2 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors cursor-pointer min-h-[160px] flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                        <PlusCircle className="mx-auto h-8 w-8" />
+                        Añadir
+                    </div>
+                </Card>
+            </DialogTrigger>
+            <DialogContent>
+                {creationType === null ? (
+                    <>
+                        <DialogHeader><DialogTitle>¿Qué deseas añadir?</DialogTitle></DialogHeader>
+                        <div className="grid grid-cols-2 gap-4 py-4">
+                            <Button variant="outline" className="h-24 flex-col" onClick={() => handleOpen('interaction')}>
+                                <FileTextIcon className="h-6 w-6 mb-2"/>
+                                Registro de Interacción
+                            </Button>
+                            <Button variant="outline" className="h-24 flex-col" onClick={() => handleOpen('task')}>
+                                <ClipboardCheck className="h-6 w-6 mb-2"/>
+                                Nuevo Pendiente
+                            </Button>
+                        </div>
+                    </>
+                ) : creationType === 'interaction' ? (
+                     <>
+                        <DialogHeader><DialogTitle>Nuevo Registro de Interacción</DialogTitle></DialogHeader>
+                        <SeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={onUpdate} onClose={handleClose} />
+                     </>
+                ) : (
+                    <>
+                         <DialogHeader>
+                            <DialogTitle>Crear Nuevo Pendiente</DialogTitle>
+                            <DialogDescription>Asigna una tarea para {student.name}.</DialogDescription>
+                         </DialogHeader>
+                         <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label>1. Asignar Tarea a</Label>
+                                <Select value={assignedTo} onValueChange={(value) => setAssignedTo(value as any)}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="leader">Líder de Generación</SelectItem>
+                                        <SelectItem value="tutor">Tutor/a</SelectItem>
+                                        <SelectItem value="both">Ambos</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>2. Situación a reportar</Label>
+                                <RadioGroup value={situation} onValueChange={handleSituationChange} className="flex gap-4">
+                                    <div className="flex items-center space-x-2"><RadioGroupItem value="faltas" id="faltas-new" /><Label htmlFor="faltas-new">Faltas</Label></div>
+                                    <div className="flex items-center space-x-2"><RadioGroupItem value="no-entregados" id="no-entregados-new" /><Label htmlFor="no-entregados-new">Tareas NE</Label></div>
+                                    <div className="flex items-center space-x-2"><RadioGroupItem value="otro" id="otro-new" /><Label htmlFor="otro-new">Otro</Label></div>
+                                </RadioGroup>
+                            </div>
+                            {situation !== 'otro' && (
+                                <div className="space-y-2">
+                                    <Label>3. Materias con riesgo</Label>
+                                    {relevantSubjects.length > 0 ? (
+                                        <Card className="p-3 max-h-36 overflow-y-auto">
+                                            <div className="space-y-2">
+                                                {relevantSubjects.map(s => (
+                                                    <div key={s.id} className="flex items-center space-x-2">
+                                                        <Checkbox id={`subject-new-${s.id}`} checked={selectedSubjects.includes(s.id)} onCheckedChange={() => handleSubjectToggle(s.id)} />
+                                                        <Label htmlFor={`subject-new-${s.id}`} className="font-normal w-full flex justify-between">
+                                                            <span>{s.name}</span>
+                                                            <Badge variant="secondary">{situation === 'faltas' ? `${s.absences} Faltas` : `${s.missedAssignments} NE`}</Badge>
+                                                        </Label>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </Card>
+                                    ) : <p className="text-sm text-muted-foreground italic">No se encontraron materias con riesgo.</p>}
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="notes-new">4. Notas adicionales</Label>
+                                <Textarea id="notes-new" placeholder="Describe el contexto, acuerdos o información relevante..." value={notes} onChange={(e) => setNotes(e.target.value)} />
+                            </div>
+                         </div>
+                         <DialogFooter>
+                             <Button variant="ghost" onClick={handleClose}>Cancelar</Button>
+                             <Button onClick={handleCreateTask} disabled={isSubmitting}>
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : 'Crear Pendiente'}
+                             </Button>
+                         </DialogFooter>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
