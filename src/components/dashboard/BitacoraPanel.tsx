@@ -120,15 +120,15 @@ export function BitacoraPanel() {
   }, [studentIdValue, allStudents, setValue]);
 
   const reporters = useMemo(() => {
-    const reporterSet = new Set(bitacoraEntries.map(e => e.reportedBy));
+    const reporterSet = new Set((bitacoraEntries || []).map(e => e.reportedBy));
     return Array.from(reporterSet).sort();
   }, [bitacoraEntries]);
 
   const filteredEntries = useMemo(() => {
       const hasActiveFilters = searchTerm || selectedLeader || selectedTutor || selectedReporter || selectedDate;
-      if (!hasActiveFilters) return bitacoraEntries;
+      if (!hasActiveFilters) return bitacoraEntries || [];
 
-      return bitacoraEntries.filter(entry => {
+      return (bitacoraEntries || []).filter(entry => {
           const student = allStudentsMap.get(entry.studentId);
           const lowercasedSearch = searchTerm.toLowerCase();
 
