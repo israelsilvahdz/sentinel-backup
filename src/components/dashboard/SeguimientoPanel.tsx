@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
@@ -331,10 +331,18 @@ export function SeguimientoPanel() {
                               <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
                                 <p><strong className="text-muted-foreground">Atendido por:</strong> {entry.attendedBy}</p>
                                 <p><strong className="text-muted-foreground">Tema:</strong> {entry.topic}</p>
-                                <div className="flex items-center gap-2 text-muted-foreground pt-2">
-                                  <Badge variant="secondary">F: {entry.absencesAtFollowUp}</Badge>
-                                  <Badge variant="destructive">NE: {entry.missedAssignmentsAtFollowUp}</Badge>
-                                </div>
+                                
+                                {entry.topic === RISK_CATEGORY_TEXT['other'] ? (
+                                    <div className="flex items-start gap-2 text-muted-foreground pt-2">
+                                        <StickyNote className="h-4 w-4 mt-0.5 shrink-0" />
+                                        <p className="line-clamp-2 text-xs text-foreground/80">{entry.notes || 'Sin notas.'}</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 text-muted-foreground pt-2">
+                                        <Badge variant="secondary">F: {entry.absencesAtFollowUp}</Badge>
+                                        <Badge variant="destructive">NE: {entry.missedAssignmentsAtFollowUp}</Badge>
+                                    </div>
+                                )}
                               </CardContent>
                               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Dialog onOpenChange={(isOpen) => { if (isOpen) { event.stopPropagation(); } else { fetchSeguimientoEntries(); }}}>
@@ -379,7 +387,7 @@ export function SeguimientoPanel() {
                           <div><strong>Tema:</strong> {entry.topic}</div>
                           <div>
                             <strong>Notas:</strong>
-                            <pre className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{entry.notes || "N/A"}</pre>
+                            <div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{entry.notes || "N/A"}</div>
                           </div>
                           <div className="flex items-center gap-4 text-sm">
                              <Badge>Faltas en ese momento: {entry.absencesAtFollowUp}</Badge>
@@ -426,3 +434,4 @@ export function SeguimientoPanel() {
     </TooltipProvider>
   );
 }
+
