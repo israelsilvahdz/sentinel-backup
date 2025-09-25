@@ -111,9 +111,8 @@ export function AcademicCalendar() {
   }
 
   const defaultMonth = useMemo(() => {
-    const firstEventDate = currentEvents.length > 0 ? currentEvents[0].date : new Date(2026, 0, 1);
-    return firstEventDate;
-  }, [currentEvents]);
+    return new Date();
+  }, []);
 
 
   return (
