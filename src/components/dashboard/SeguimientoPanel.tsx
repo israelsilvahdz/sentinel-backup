@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry, addTeamTask, updateTeamTaskStatus } from '@/lib/firebase-services';
 import { StudentCard } from './StudentCard';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '../ui/alert-dialog';
@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote, ClipboardCheck, FileCheck2, FileText as FileTextIcon } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote, ClipboardCheck, FileCheck2, FileText as FileTextIcon, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
@@ -270,12 +270,12 @@ export function SeguimientoPanel() {
         finalFilteredList = finalFilteredList.filter(item => {
             const hasPendingTasks = teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente');
             const hasRisk = item.riskCategory === 'faltas' || item.riskCategory === 'ne' || item.riskCategory === 'both';
+            const hasInteractions = seguimientoEntries[item.student.id] && seguimientoEntries[item.student.id].length > 0;
             
-            // If there's risk but no interactions/pendientes, should be shown.
-            if (hasRisk && !hasPendingTasks && (!seguimientoEntries[item.student.id] || seguimientoEntries[item.student.id].length === 0)) return true;
-
-            // If there are pending tasks or interactions, show it.
-            return hasPendingTasks || (seguimientoEntries[item.student.id] && seguimientoEntries[item.student.id].length > 0);
+            // Show if: has risk and no interactions/pendientes, OR has pending tasks, OR has interactions.
+            if (hasRisk && !hasPendingTasks && !hasInteractions) return true;
+            
+            return hasPendingTasks || hasInteractions;
         });
     }
     
@@ -456,7 +456,7 @@ function TaskCard({ task, onUpdate }: { task: TeamTask, onUpdate: () => void }) 
                       {SITUATION_MAP[task.situation].text}
                     </CardTitle>
                     <CardDescription>
-                      {format(task.createdAt.toDate(), "d MMM, yyyy", {locale: es})}
+                       {format(task.createdAt.toDate(), "d MMM, yyyy", {locale: es})}
                     </CardDescription>
                 </div>
             </CardHeader>
@@ -494,8 +494,9 @@ function TaskCard({ task, onUpdate }: { task: TeamTask, onUpdate: () => void }) 
 function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry | BitacoraEntry, student: Student, onUpdate: () => void }) {
     const { toast } = useToast();
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
     const isBitacora = 'description' in entry;
-    
+
     const handleDelete = async () => {
         if (isBitacora) {
             toast({ variant: 'destructive', title: "Acción no permitida", description: "Los reportes de bitácora no se pueden eliminar desde aquí." });
@@ -509,74 +510,94 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
             toast({ variant: 'destructive', title: "Error", description: "No se pudo eliminar el registro." });
         }
     }
-
-    const cardTitle = isBitacora ? 'Reporte de Bitácora' : 'Registro de Interacción';
     
-    const contentToShow = () => {
-        if (isBitacora) {
-            return (entry as BitacoraEntry).description;
-        }
-        const seguimiento = entry as SeguimientoEntry;
-        return seguimiento.notes;
-    };
+    const cardTitle = isBitacora ? 'Reporte de Bitácora' : (entry.topic || 'Registro de Interacción');
 
-    const hasRiskInfo = entry.absencesAtFollowUp !== undefined || entry.missedAssignmentsAtFollowUp !== undefined;
-
+    const contentToShow = isBitacora ? (entry as BitacoraEntry).description : (entry as SeguimientoEntry).notes;
+    
     return (
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-            <Card className="h-full flex flex-col group relative">
-                <CardHeader className="p-4 flex-grow">
-                    <CardTitle className="text-sm">{cardTitle}</CardTitle>
-                    <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
-                    <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
-                        {contentToShow()}
-                    </div>
-                </CardHeader>
-                {hasRiskInfo && (
-                    <CardContent className="p-4 pt-0">
-                        <div className="flex items-center text-xs text-muted-foreground gap-2">
-                            <FileWarning className="h-4 w-4" /> F: {entry.absencesAtFollowUp ?? 0}
-                            <AlertTriangle className="h-4 w-4" /> NE: {entry.missedAssignmentsAtFollowUp ?? 0}
+        <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+            <DialogTrigger asChild>
+                <Card className="h-full flex flex-col group relative cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardHeader className="p-4 flex-grow">
+                        <CardTitle className="text-sm">{cardTitle}</CardTitle>
+                        <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", { locale: es })}</CardDescription>
+                        <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
+                            {contentToShow}
                         </div>
-                    </CardContent>
-                )}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {!isBitacora && (
-                        <>
-                             <Tooltip>
+                    </CardHeader>
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {!isBitacora && (
+                            <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditOpen(true)}><Edit className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); }}><Edit className="h-4 w-4" /></Button>
                                 </TooltipTrigger>
                                 <TooltipContent><p>Editar</p></TooltipContent>
                             </Tooltip>
-                            <AlertDialog>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                                    </TooltipTrigger>
-                                    <TooltipContent><p>Eliminar</p></TooltipContent>
-                                </Tooltip>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </>
+                        )}
+                        <AlertDialog onOpenChange={(e) => e.stopPropagation()}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Eliminar</p></TooltipContent>
+                            </Tooltip>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                </Card>
+            </DialogTrigger>
+
+            {/* Dialog for Detailed View */}
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{cardTitle}</DialogTitle>
+                    <DialogDescription>
+                        {student.name} | {format(entry.createdAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    {isBitacora ? (
+                        <div className="space-y-3 text-sm">
+                            <div><p className="font-semibold">Descripción:</p><p className="whitespace-pre-wrap text-muted-foreground">{contentToShow}</p></div>
+                            <div><p className="font-semibold">Acuerdos:</p><p className="whitespace-pre-wrap text-muted-foreground">{(entry as BitacoraEntry).agreements}</p></div>
+                             <div className="flex gap-4 pt-2">
+                                {(entry as BitacoraEntry).academicCommittee && <Badge variant="destructive">En Comité Académico</Badge>}
+                                {(entry as BitacoraEntry).parentsContacted && <Badge variant="outline" className="text-blue-600 border-blue-600"><Phone className="mr-1 h-3 w-3"/>Padres Contactados</Badge>}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3 text-sm">
+                            <div><p className="font-semibold">Notas:</p><p className="whitespace-pre-wrap text-muted-foreground">{contentToShow}</p></div>
+                        </div>
                     )}
+
+                    <div className="flex items-center text-sm text-muted-foreground gap-4 border-t pt-4">
+                        <div className="flex items-center gap-1"><FileWarning className="h-4 w-4" /> Faltas al momento: <span className="font-bold">{entry.absencesAtFollowUp ?? 0}</span></div>
+                        <div className="flex items-center gap-1"><AlertTriangle className="h-4 w-4" /> NE al momento: <span className="font-bold">{entry.missedAssignmentsAtFollowUp ?? 0}</span></div>
+                    </div>
                 </div>
-            </Card>
+            </DialogContent>
+            
+            {/* Dialog for Editing (only for non-bitacora) */}
             {!isBitacora && (
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
-                    <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
-                </DialogContent>
+                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                    <DialogContent>
+                        <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
+                        <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
+                    </DialogContent>
+                </Dialog>
             )}
         </Dialog>
     );
 }
+
 
 function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, riskCategory: RiskCategory, onUpdate: () => void }) {
     const { loadStudentSubjects } = useDashboardFilters();
@@ -751,5 +772,6 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
 
 
     
+
 
 
