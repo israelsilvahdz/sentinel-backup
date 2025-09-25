@@ -181,7 +181,7 @@ function SeguimientoForm({
 }
 
 export function SeguimientoPanel() {
-  const { filteredStudents, allStudents, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, isLoading, loadStudentSubjects } = useDashboardFilters();
+  const { filteredStudents, allStudents, allStudentsMap, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, isLoading, loadStudentSubjects } = useDashboardFilters();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTopic, setFilterTopic] = useState<FilterTopic>('all');
@@ -270,13 +270,12 @@ export function SeguimientoPanel() {
         finalFilteredList = finalFilteredList.filter(item => {
             const hasPendingTasks = teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente');
             const hasRisk = item.riskCategory === 'faltas' || item.riskCategory === 'ne' || item.riskCategory === 'both';
-            const hasInteractions = (seguimientoEntries[item.student.id] || []).length > 0;
             
-            // Si hay riesgo pero no interacciones/pendientes, debería mostrarse
-            if (hasRisk && !hasInteractions && !hasPendingTasks) return true;
+            // If there's risk but no interactions/pendientes, should be shown.
+            if (hasRisk && !hasPendingTasks && (!seguimientoEntries[item.student.id] || seguimientoEntries[item.student.id].length === 0)) return true;
 
-            // Si hay pendientes o interacciones, se muestra
-            return hasPendingTasks || hasInteractions;
+            // If there are pending tasks or interactions, show it.
+            return hasPendingTasks || (seguimientoEntries[item.student.id] && seguimientoEntries[item.student.id].length > 0);
         });
     }
     
@@ -518,10 +517,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
             return (entry as BitacoraEntry).description;
         }
         const seguimiento = entry as SeguimientoEntry;
-        if (seguimiento.topic === 'Otro') {
-            return seguimiento.notes;
-        }
-        return `Tema: ${seguimiento.topic}`;
+        return seguimiento.notes;
     };
 
     const hasRiskInfo = entry.absencesAtFollowUp !== undefined || entry.missedAssignmentsAtFollowUp !== undefined;
@@ -755,4 +751,5 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
 
 
     
+
 
