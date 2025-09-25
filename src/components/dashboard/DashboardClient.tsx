@@ -60,12 +60,10 @@ interface DashboardContextType {
   setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
   studentContacts: Record<string, StudentContact>;
   setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
-  bitacoraEntries: BitacoraEntry[];
-  fetchBitacoraEntries: () => Promise<void>;
+  seguimientoEntries: Record<string, (SeguimientoEntry | BitacoraEntry)[]>;
+  fetchSeguimientoEntries: () => Promise<void>;
   teamTasks: TeamTask[];
   fetchTeamTasks: () => Promise<void>;
-  seguimientoEntries: Record<string, SeguimientoEntry[]>;
-  fetchSeguimientoEntries: () => Promise<void>;
   setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
   isLoading: boolean;
   hasData: boolean;
@@ -116,9 +114,8 @@ export function DashboardClient() {
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
-  const [bitacoraEntries, setBitacoraEntries] = useState<BitacoraEntry[]>([]);
+  const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
-  const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, SeguimientoEntry[]>>({});
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -134,15 +131,47 @@ export function DashboardClient() {
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('welcome');
   
-  const fetchBitacoraEntries = useCallback(async () => {
+  const fetchSeguimientoEntries = useCallback(async () => {
     try {
-        const entries = await getBitacoraEntries();
-        setBitacoraEntries(entries);
+        const [seguimientos, bitacora] = await Promise.all([
+            getSeguimientoEntries(),
+            getBitacoraEntries()
+        ]);
+        
+        const combined: Record<string, (SeguimientoEntry | BitacoraEntry)[]> = {};
+
+        // Process seguimientos
+        for (const studentId in seguimientos) {
+            if (!combined[studentId]) combined[studentId] = [];
+            combined[studentId].push(...seguimientos[studentId]);
+        }
+
+        // Process and adapt bitacora entries
+        bitacora.forEach(entry => {
+            if (!combined[entry.studentId]) combined[entry.studentId] = [];
+            const adaptedEntry: BitacoraEntry & { attendedBy: string; topic: string; createdAt: any; notes: string; absencesAtFollowUp: number; missedAssignmentsAtFollowUp: number; } = {
+                ...entry,
+                attendedBy: entry.reportedBy,
+                topic: 'Reporte', // Standardized topic for bitacora entries
+                createdAt: entry.timestamp, // Use bitacora's own creation timestamp
+                notes: entry.description, // Use description as notes for display
+                absencesAtFollowUp: entry.absencesAtFollowUp ?? 0,
+                missedAssignmentsAtFollowUp: entry.missedAssignmentsAtFollowUp ?? 0,
+            };
+            combined[entry.studentId].push(adaptedEntry);
+        });
+
+        // Sort entries for each student
+        for (const studentId in combined) {
+            combined[studentId].sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime());
+        }
+
+        setSeguimientoEntries(combined);
     } catch (error) {
-        console.error("Failed to fetch bitacora entries:", error);
-        toast({ variant: "destructive", title: "Error de Bitácora", description: "No se pudieron cargar los registros de la bitácora." });
+        console.error("Failed to fetch seguimiento/bitacora entries:", error);
+        toast({ variant: "destructive", title: "Error de Seguimiento", description: "No se pudieron cargar los registros." });
     }
-  }, [toast]);
+}, [toast]);
   
   const fetchTeamTasks = useCallback(async () => {
     try {
@@ -151,16 +180,6 @@ export function DashboardClient() {
     } catch (error) {
         console.error("Failed to fetch team tasks:", error);
         toast({ variant: "destructive", title: "Error de Tareas de Equipo", description: "No se pudieron cargar las tareas." });
-    }
-  }, [toast]);
-  
-  const fetchSeguimientoEntries = useCallback(async () => {
-    try {
-        const entries = await getSeguimientoEntries();
-        setSeguimientoEntries(entries);
-    } catch (error) {
-        console.error("Failed to fetch seguimiento entries:", error);
-        toast({ variant: "destructive", title: "Error de Seguimientos", description: "No se pudieron cargar los seguimientos." });
     }
   }, [toast]);
 
@@ -184,9 +203,8 @@ export function DashboardClient() {
           setStudentContacts(contactsFromDb);
           
           await Promise.all([
-            fetchBitacoraEntries(),
+            fetchSeguimientoEntries(),
             fetchTeamTasks(),
-            fetchSeguimientoEntries()
           ]);
 
 
@@ -201,7 +219,7 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, [fetchBitacoraEntries, fetchTeamTasks, fetchSeguimientoEntries]);
+  }, [fetchSeguimientoEntries, fetchTeamTasks]);
 
   // Persist data to local storage whenever it changes (contacts are now in DB)
   useEffect(() => {
@@ -491,7 +509,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, bitacoraEntries, fetchBitacoraEntries, teamTasks, fetchTeamTasks, seguimientoEntries, fetchSeguimientoEntries, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,

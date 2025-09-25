@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useDashboardFilters } from './DashboardClient';
-import type { Student, SeguimientoEntry } from '@/types/student';
+import type { Student, SeguimientoEntry, BitacoraEntry } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry } from '@/lib/firebase-services';
 
@@ -26,13 +26,14 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { cn } from '@/lib/utils';
 
 
-type RiskCategory = 'ne' | 'faltas' | 'both' | 'other';
+type RiskCategory = 'ne' | 'faltas' | 'both' | 'other' | 'reporte';
 type FilterTopic = 'all' | RiskCategory;
 
 const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
     'ne': 'Riesgo por NE',
     'faltas': 'Riesgo por Faltas',
     'both': 'Riesgo por Faltas y NE',
+    'reporte': 'Reporte',
     'other': 'Otro'
 };
 
@@ -215,13 +216,21 @@ export function SeguimientoPanel() {
     });
 
     Object.keys(seguimientoEntries).forEach(studentId => {
-      if (!processedIds.has(studentId)) {
+        const hasExistingRiskCategory = processedIds.has(studentId);
         const student = studentSource.find(s => s.id === studentId);
+
         if (student) {
-          studentsWithRisk.push({ student, riskCategory: 'other' });
-          processedIds.add(student.id);
+            // Check if any seguimiento is of type 'reporte'
+            const isReporte = seguimientoEntries[studentId].some(e => e.topic === 'Reporte');
+            
+            if (isReporte && !hasExistingRiskCategory) {
+                studentsWithRisk.push({ student, riskCategory: 'reporte' });
+                processedIds.add(studentId);
+            } else if (!hasExistingRiskCategory) {
+                studentsWithRisk.push({ student, riskCategory: 'other' });
+                processedIds.add(studentId);
+            }
         }
-      }
     });
     
     let finalFilteredList = searchTerm 
@@ -232,7 +241,13 @@ export function SeguimientoPanel() {
       : studentsWithRisk;
 
     if (filterTopic !== 'all') {
-        finalFilteredList = finalFilteredList.filter(item => item.riskCategory === filterTopic);
+        if (filterTopic === 'reporte') {
+            finalFilteredList = finalFilteredList.filter(item => 
+                (seguimientoEntries[item.student.id] || []).some(e => e.topic === 'Reporte')
+            );
+        } else {
+            finalFilteredList = finalFilteredList.filter(item => item.riskCategory === filterTopic);
+        }
     }
     
     return finalFilteredList;
@@ -243,10 +258,15 @@ export function SeguimientoPanel() {
     ne: { text: 'Riesgo por NE', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
     faltas: { text: 'Riesgo por Faltas', badgeClass: 'bg-yellow-100 text-yellow-800', borderClass: 'border-yellow-400' },
     both: { text: 'Riesgo por Faltas y NE', badgeClass: 'bg-orange-100 text-orange-800', borderClass: 'border-orange-500' },
+    reporte: { text: 'Reporte de Bitácora', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
     other: { text: 'Otro Caso', badgeClass: 'bg-gray-100 text-gray-800', borderClass: 'border-transparent' },
   };
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string, isBitacora: boolean) => {
+    if (isBitacora) {
+        toast({ variant: 'destructive', title: "Acción no permitida", description: "Los reportes de bitácora no se pueden eliminar desde este panel." });
+        return;
+    }
     try {
       await deleteSeguimientoEntry(id);
       toast({ title: "Registro eliminado", description: "El seguimiento ha sido borrado." });
@@ -295,6 +315,7 @@ export function SeguimientoPanel() {
                             <SelectItem value="faltas">Riesgo por Faltas</SelectItem>
                             <SelectItem value="ne">Riesgo por NE</SelectItem>
                             <SelectItem value="both">Riesgo por Faltas y NE</SelectItem>
+                            <SelectItem value="reporte">Reporte de Bitácora</SelectItem>
                             <SelectItem value="other">Otros Casos (manuales)</SelectItem>
                         </SelectContent>
                    </Select>
@@ -305,7 +326,10 @@ export function SeguimientoPanel() {
         <div className="space-y-6">
           {studentList.length > 0 ? studentList.map(({ student, riskCategory }) => {
             const studentSeguimientos = seguimientoEntries[student.id] || [];
-            const displayInfo = riskDisplayInfo[riskCategory];
+            
+            const isReporteTopic = studentSeguimientos.some(e => e.topic === 'Reporte');
+            const displayInfo = riskDisplayInfo[isReporteTopic ? 'reporte' : riskCategory];
+
             return (
               <div key={student.id} className="grid grid-cols-[250px_1fr] items-start gap-4 border-b pb-6">
                 <Card className={cn("sticky top-20 border-l-4", displayInfo.borderClass)}>
@@ -318,85 +342,98 @@ export function SeguimientoPanel() {
                     </CardHeader>
                 </Card>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {studentSeguimientos.map((entry, index) => (
-                    <Dialog key={entry.id}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <DialogTrigger asChild>
-                            <Card className="cursor-pointer hover:bg-muted/50 transition-colors h-full flex flex-col group relative">
-                              <CardHeader className="p-4">
-                                <CardTitle className="text-sm">Seguimiento #{index + 1}</CardTitle>
-                                <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
-                              </CardHeader>
-                              <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
-                                <p><strong className="text-muted-foreground">Atendido por:</strong> {entry.attendedBy}</p>
-                                <p><strong className="text-muted-foreground">Tema:</strong> {entry.topic}</p>
-                                
-                                {entry.topic === RISK_CATEGORY_TEXT['other'] ? (
-                                    <div className="flex items-start gap-2 text-muted-foreground pt-2">
-                                        <StickyNote className="h-4 w-4 mt-0.5 shrink-0" />
-                                        <p className="line-clamp-2 text-xs text-foreground/80">{entry.notes || 'Sin notas.'}</p>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-2 text-muted-foreground pt-2">
-                                        <Badge variant="secondary">F: {entry.absencesAtFollowUp}</Badge>
-                                        <Badge variant="destructive">NE: {entry.missedAssignmentsAtFollowUp}</Badge>
-                                    </div>
-                                )}
-                              </CardContent>
-                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Dialog onOpenChange={(isOpen) => { if (isOpen) { event.stopPropagation(); } else { fetchSeguimientoEntries(); }}}>
-                                  <DialogTrigger asChild onClick={e => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button>
-                                  </DialogTrigger>
-                                  <DialogContent>
-                                    <DialogHeader>
-                                      <DialogTitle>Editar Seguimiento #{index + 1}</DialogTitle>
-                                    </DialogHeader>
-                                    <SeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} existingEntry={entry} />
-                                  </DialogContent>
-                                </Dialog>
-                                <AlertDialog onOpenChange={(isOpen) => { if (isOpen) event.stopPropagation(); }}>
-                                  <AlertDialogTrigger asChild onClick={e => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDelete(entry.id)}>Eliminar</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </Card>
-                          </DialogTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p className="max-w-xs text-sm">{entry.notes || "Sin notas adicionales."}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Detalle del Seguimiento #{index + 1} - {student.name}</DialogTitle>
-                           <DialogDescription>
-                             Registrado por {entry.attendedBy} el {format(entry.createdAt.toDate(), "PPPP", {locale: es})}.
-                           </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div><strong>Tema:</strong> {entry.topic}</div>
-                          <div>
-                            <strong>Notas:</strong>
-                            <div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{entry.notes || "N/A"}</div>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm">
-                             <Badge>Faltas en ese momento: {entry.absencesAtFollowUp}</Badge>
-                             <Badge>NE en ese momento: {entry.missedAssignmentsAtFollowUp}</Badge>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  ))}
+                  {studentSeguimientos.map((entry, index) => {
+                    const isBitacora = 'description' in entry;
+                    return (
+                        <Dialog key={entry.id}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                            <DialogTrigger asChild>
+                                <Card className="cursor-pointer hover:bg-muted/50 transition-colors h-full flex flex-col group relative">
+                                <CardHeader className="p-4">
+                                    <CardTitle className="text-sm">
+                                        {isBitacora ? 'Reporte de Bitácora' : `Seguimiento #${index + 1}`}
+                                    </CardTitle>
+                                    <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
+                                    <p><strong className="text-muted-foreground">Atendido por:</strong> {entry.attendedBy}</p>
+                                    <p><strong className="text-muted-foreground">Tema:</strong> {entry.topic}</p>
+                                    
+                                    {entry.topic === RISK_CATEGORY_TEXT['other'] || isBitacora ? (
+                                        <div className="flex items-start gap-2 text-muted-foreground pt-2">
+                                            <StickyNote className="h-4 w-4 mt-0.5 shrink-0" />
+                                            <p className="line-clamp-2 text-xs text-foreground/80">{isBitacora ? (entry as unknown as BitacoraEntry).description : entry.notes || 'Sin notas.'}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-muted-foreground pt-2">
+                                            <Badge variant="secondary">F: {entry.absencesAtFollowUp}</Badge>
+                                            <Badge variant="destructive">NE: {entry.missedAssignmentsAtFollowUp}</Badge>
+                                        </div>
+                                    )}
+                                </CardContent>
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {!isBitacora && (
+                                        <>
+                                            <Dialog onOpenChange={(isOpen) => { if (isOpen) { event.stopPropagation(); } else { fetchSeguimientoEntries(); }}}>
+                                            <DialogTrigger asChild onClick={e => e.stopPropagation()}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                <DialogTitle>Editar Seguimiento #{index + 1}</DialogTitle>
+                                                </DialogHeader>
+                                                <SeguimientoForm student={student} riskCategory={riskCategory} onTaskAdded={fetchSeguimientoEntries} existingEntry={entry} />
+                                            </DialogContent>
+                                            </Dialog>
+                                            <AlertDialog onOpenChange={(isOpen) => { if (isOpen) event.stopPropagation(); }}>
+                                            <AlertDialogTrigger asChild onClick={e => e.stopPropagation()}>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDelete(entry.id, isBitacora)}>Eliminar</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                            </AlertDialog>
+                                        </>
+                                    )}
+                                </div>
+                                </Card>
+                            </DialogTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                            <p className="max-w-xs text-sm">{isBitacora ? (entry as unknown as BitacoraEntry).description : entry.notes || "Sin notas adicionales."}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                        <DialogContent>
+                            <DialogHeader>
+                            <DialogTitle>Detalle del Seguimiento #{index + 1} - {student.name}</DialogTitle>
+                            <DialogDescription>
+                                Registrado por {entry.attendedBy} el {format(entry.createdAt.toDate(), "PPPP", {locale: es})}.
+                            </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                            <div><strong>Tema:</strong> {entry.topic}</div>
+                            {isBitacora ? (
+                                <>
+                                <div><strong>Descripción:</strong><div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{(entry as unknown as BitacoraEntry).description || "N/A"}</div></div>
+                                <div><strong>Acuerdos:</strong><div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{(entry as unknown as BitacoraEntry).agreements || "N/A"}</div></div>
+                                </>
+                            ) : (
+                                <div><strong>Notas:</strong><div className="whitespace-pre-wrap font-sans bg-muted/50 p-2 rounded-md mt-1">{entry.notes || "N/A"}</div></div>
+                            )}
+                            <div className="flex items-center gap-4 text-sm">
+                                <Badge>Faltas en ese momento: {entry.absencesAtFollowUp}</Badge>
+                                <Badge>NE en ese momento: {entry.missedAssignmentsAtFollowUp}</Badge>
+                            </div>
+                            </div>
+                        </DialogContent>
+                        </Dialog>
+                    );
+                    })}
 
                   <Dialog onOpenChange={(isOpen) => !isOpen && fetchSeguimientoEntries()}>
                     <DialogTrigger asChild>
