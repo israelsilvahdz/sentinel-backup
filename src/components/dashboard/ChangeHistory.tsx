@@ -39,11 +39,14 @@ function formatFieldName(fieldName: string): string {
 }
 
 export function ChangeHistory({ studentId }: ChangeHistoryProps) {
-  const { getStudentChanges, bitacoraEntries, allStudents } = useDashboardFilters();
+  const { getStudentChanges, seguimientoEntries, allStudents } = useDashboardFilters();
   const [history, setHistory] = useState<(Change | BitacoraEntry)[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const student = allStudents.find(s => s.id === studentId);
+  const bitacoraEntries = useMemo(() => {
+    return (seguimientoEntries[studentId] || []).filter(e => 'description' in e) as BitacoraEntry[];
+  }, [seguimientoEntries, studentId]);
 
   useEffect(() => {
     async function loadHistory() {

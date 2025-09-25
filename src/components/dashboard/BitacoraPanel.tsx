@@ -46,7 +46,7 @@ const bitacoraSchema = z.object({
 type BitacoraFormValues = z.infer<typeof bitacoraSchema>;
 
 export function BitacoraPanel() {
-  const { allStudents, bitacoraEntries, leaders, tutors, fetchBitacoraEntries, allStudentsMap } = useDashboardFilters();
+  const { allStudents, seguimientoEntries, leaders, tutors, fetchSeguimientoEntries, allStudentsMap } = useDashboardFilters();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,6 +56,10 @@ export function BitacoraPanel() {
   const [selectedTutor, setSelectedTutor] = useState<string | null>(null);
   const [selectedReporter, setSelectedReporter] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+
+  const bitacoraEntries = useMemo(() => {
+    return Object.values(seguimientoEntries).flat().filter(e => 'description' in e) as BitacoraEntry[];
+  }, [seguimientoEntries]);
 
 
   const { register, handleSubmit, control, reset, setValue, watch, formState: { errors } } = useForm<BitacoraFormValues>({
@@ -69,8 +73,8 @@ export function BitacoraPanel() {
 
 
   useEffect(() => {
-    fetchBitacoraEntries();
-  }, [fetchBitacoraEntries]);
+    fetchSeguimientoEntries();
+  }, [fetchSeguimientoEntries]);
 
   const onSubmit = async (data: BitacoraFormValues) => {
     setIsSubmitting(true);
@@ -82,7 +86,7 @@ export function BitacoraPanel() {
           caseType: 'academica', academicCommittee: false, parentsContacted: false, eventDate: new Date(),
           absencesAtFollowUp: 0, missedAssignmentsAtFollowUp: 0,
       });
-      fetchBitacoraEntries(); // Refresh the list
+      fetchSeguimientoEntries(); // Refresh the list
     } catch (error) {
       console.error("Error saving bitácora entry:", error);
       toast({ variant: 'destructive', title: 'Error al guardar', description: 'No se pudo guardar el reporte en la base de datos.', });
@@ -95,7 +99,7 @@ export function BitacoraPanel() {
     try {
       await deleteBitacoraEntry(id);
       toast({ title: 'Registro Eliminado', description: 'La entrada de la bitácora ha sido eliminada.', });
-      fetchBitacoraEntries(); // Refresh the list
+      fetchSeguimientoEntries(); // Refresh the list
     } catch (error) {
       console.error("Error deleting bitácora entry:", error);
       toast({ variant: 'destructive', title: 'Error al eliminar', description: 'No se pudo eliminar el registro.', });
@@ -120,7 +124,8 @@ export function BitacoraPanel() {
   }, [studentIdValue, allStudents, setValue]);
 
   const reporters = useMemo(() => {
-    const reporterSet = new Set((bitacoraEntries || []).map(e => e.reportedBy));
+    if (!bitacoraEntries) return [];
+    const reporterSet = new Set(bitacoraEntries.map(e => e.reportedBy));
     return Array.from(reporterSet).sort();
   }, [bitacoraEntries]);
 
