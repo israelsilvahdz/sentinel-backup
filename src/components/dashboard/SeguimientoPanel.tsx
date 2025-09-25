@@ -270,9 +270,9 @@ export function SeguimientoPanel() {
     if (!showCompleted) {
         finalFilteredList = finalFilteredList.filter(item => {
             const hasPendingTasks = teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente');
-            // Check for seguimientos or bitacora entries
             const hasInteractions = (seguimientoEntries[item.student.id] || []).length > 0;
-            return hasPendingTasks || hasInteractions;
+            const hasRisk = item.riskCategory === 'faltas' || item.riskCategory === 'ne' || item.riskCategory === 'both';
+            return hasPendingTasks || hasInteractions || hasRisk;
         });
     }
     
@@ -499,42 +499,46 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
     
     return (
         <Card className="h-full flex flex-col group relative">
-            <CardHeader className="p-4 flex-grow">
-                <CardTitle className="text-sm">{cardTitle}</CardTitle>
-                <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
-                <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
-                    {topic === 'Otro' ? cardContent : `Tema: ${topic}`}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <CardHeader className="p-4 flex-grow">
+                    <CardTitle className="text-sm">{cardTitle}</CardTitle>
+                    <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
+                    <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
+                        {topic === 'Otro' ? cardContent : `Tema: ${topic}`}
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                    <div className="flex items-center text-xs text-muted-foreground gap-2">
+                        <FileWarning className="h-4 w-4" /> F: {entry.absencesAtFollowUp ?? 0}
+                        <AlertTriangle className="h-4 w-4" /> NE: {entry.missedAssignmentsAtFollowUp ?? 0}
+                    </div>
+                </CardContent>
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {!isBitacora && (
+                        <>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button>
+                            </DialogTrigger>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </>
+                    )}
                 </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-                <div className="flex items-center text-xs text-muted-foreground gap-2">
-                    <FileWarning className="h-4 w-4" /> F: {entry.absencesAtFollowUp ?? 0}
-                    <AlertTriangle className="h-4 w-4" /> NE: {entry.missedAssignmentsAtFollowUp ?? 0}
-                </div>
-            </CardContent>
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 {!isBitacora && (
-                    <>
-                        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                            <DialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button></DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
-                                <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
-                            </DialogContent>
-                        </Dialog>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </>
+                    <DialogContent>
+                        <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
+                        <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
+                    </DialogContent>
                 )}
-            </div>
+            </Dialog>
         </Card>
     );
 }
