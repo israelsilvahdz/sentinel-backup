@@ -272,8 +272,10 @@ export function SeguimientoPanel() {
             const hasRisk = item.riskCategory === 'faltas' || item.riskCategory === 'ne' || item.riskCategory === 'both';
             const hasInteractions = seguimientoEntries[item.student.id] && seguimientoEntries[item.student.id].length > 0;
             
+            // Show if it has risk but no interactions/tasks yet
             if (hasRisk && !hasPendingTasks && !hasInteractions) return true;
             
+            // Show if it has pending tasks or any kind of interaction history
             return hasPendingTasks || hasInteractions;
         });
     }
@@ -371,7 +373,7 @@ export function SeguimientoPanel() {
             const displayInfo = riskDisplayInfo[hasPendingTask ? 'pendiente' : riskCategory];
 
             return (
-              <div key={student.id} className="grid grid-cols-[250px_1fr] items-start gap-4 border-b pb-6">
+              <div key={student.id} className="grid grid-cols-1 md:grid-cols-[250px_1fr] items-start gap-4 border-b pb-6">
                  <Dialog>
                     <DialogTrigger asChild>
                         <Card className={cn("sticky top-20 border-l-4 cursor-pointer hover:shadow-md transition-shadow", displayInfo.borderClass)}>
@@ -453,72 +455,74 @@ function TaskCard({ task, student, onUpdate }: { task: TeamTask, student: Studen
 
 
     return (
-        <Dialog>
-            <DialogTrigger asChild>
-                <Card className={cn("h-full flex flex-col group relative cursor-pointer hover:bg-muted/50 transition-colors", task.status === 'completado' && 'bg-muted/50')}>
-                    <CardHeader className="p-4 flex flex-row items-start gap-3 space-y-0">
-                        <div onClick={(e) => handleStatusChange(e, !(task.status === 'completado'))}>
-                            <Checkbox checked={task.status === 'completado'} className="mt-1" />
-                        </div>
-                        <div className="grid gap-1">
-                            <CardTitle className={cn("text-sm", task.status === 'completado' && 'line-through text-muted-foreground')}>
-                                {SITUATION_MAP[task.situation].text}
-                            </CardTitle>
-                            <CardDescription>
-                                {format(task.createdAt.toDate(), "d MMM, yyyy", { locale: es })}
-                            </CardDescription>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
-                        <p className="text-foreground/80 line-clamp-3">{task.notes}</p>
-                        {task.status === 'completado' && task.completionNotes && (
-                        <div className="pt-2">
-                            <p className="font-semibold text-primary flex items-center gap-1"><FileCheck2 className="h-4 w-4" /> Cierre:</p>
-                            <p className="text-muted-foreground pl-1 line-clamp-2">{task.completionNotes}</p>
-                        </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </DialogTrigger>
-            
-            <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        {SITUATION_MAP[task.situation].icon}
-                        {SITUATION_MAP[task.situation].text}
-                    </DialogTitle>
-                    <DialogDescription>
-                        Pendiente para {task.studentName} | Creado: {format(task.createdAt.toDate(), "d 'de' LLLL, yyyy", { locale: es })}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                     <div className="flex items-center gap-2">
-                         <Badge variant="outline">Asignado a: {task.assignedTo === 'both' ? 'Ambos' : task.assignedTo}</Badge>
-                         <Badge variant={task.status === 'pendiente' ? 'destructive' : 'default'}>{task.status}</Badge>
-                     </div>
-
-                    <div><p className="font-semibold">Notas:</p><p className="whitespace-pre-wrap text-muted-foreground">{task.notes}</p></div>
-                    
-                    {subjectsInCase.length > 0 && (
-                        <div>
-                            <h4 className="font-semibold">Materias involucradas:</h4>
-                            <div className="flex flex-col gap-2 mt-2">
-                                {subjectsInCase.map(s => <Badge key={s.id} variant="secondary" className="w-fit">{s.name}</Badge>)}
+        <>
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Card className={cn("h-full flex flex-col group relative cursor-pointer hover:bg-muted/50 transition-colors", task.status === 'completado' && 'bg-muted/50')}>
+                        <CardHeader className="p-4 flex flex-row items-start gap-3 space-y-0">
+                            <div onClick={(e) => handleStatusChange(e, !(task.status === 'completado'))}>
+                                <Checkbox checked={task.status === 'completado'} className="mt-1" />
                             </div>
+                            <div className="grid gap-1">
+                                <CardTitle className={cn("text-sm", task.status === 'completado' && 'line-through text-muted-foreground')}>
+                                    {SITUATION_MAP[task.situation].text}
+                                </CardTitle>
+                                <CardDescription>
+                                    {format(task.createdAt.toDate(), "d MMM, yyyy", { locale: es })}
+                                </CardDescription>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0 space-y-2 text-xs flex-grow">
+                            <p className="text-foreground/80 line-clamp-3">{task.notes}</p>
+                            {task.status === 'completado' && task.completionNotes && (
+                            <div className="pt-2">
+                                <p className="font-semibold text-primary flex items-center gap-1"><FileCheck2 className="h-4 w-4" /> Cierre:</p>
+                                <p className="text-muted-foreground pl-1 line-clamp-2">{task.completionNotes}</p>
+                            </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </DialogTrigger>
+                
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            {SITUATION_MAP[task.situation].icon}
+                            {SITUATION_MAP[task.situation].text}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Pendiente para {task.studentName} | {format(task.createdAt.toDate(), "d 'de' LLLL, yyyy", { locale: es })}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Badge variant="outline">Asignado a: {task.assignedTo === 'both' ? 'Ambos' : task.assignedTo}</Badge>
+                            <Badge variant={task.status === 'pendiente' ? 'destructive' : 'default'}>{task.status}</Badge>
                         </div>
-                    )}
-                    
-                    {task.status === 'completado' && (
-                        <div className="border-t pt-4">
-                            <h4 className="font-semibold flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-primary"/>Notas de Cierre:</h4>
-                            <p className="text-muted-foreground whitespace-pre-wrap mt-1">{task.completionNotes || 'Sin notas.'}</p>
-                            <p className="text-xs text-muted-foreground mt-2">Completado el: {task.completedAt ? format(task.completedAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es }) : 'N/A'}</p>
-                        </div>
-                    )}
-                </div>
-            </DialogContent>
 
-             <Dialog open={isCompleting} onOpenChange={setIsCompleting}>
+                        <div><p className="font-semibold">Notas:</p><p className="whitespace-pre-wrap text-muted-foreground">{task.notes}</p></div>
+                        
+                        {subjectsInCase.length > 0 && (
+                            <div>
+                                <h4 className="font-semibold">Materias involucradas:</h4>
+                                <div className="flex flex-col gap-2 mt-2">
+                                    {subjectsInCase.map(s => <Badge key={s.id} variant="secondary" className="w-fit">{s.name}</Badge>)}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {task.status === 'completado' && (
+                            <div className="border-t pt-4">
+                                <h4 className="font-semibold flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-primary"/>Notas de Cierre:</h4>
+                                <p className="text-muted-foreground whitespace-pre-wrap mt-1">{task.completionNotes || 'Sin notas.'}</p>
+                                <p className="text-xs text-muted-foreground mt-2">Completado el: {task.completedAt ? format(task.completedAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es }) : 'N/A'}</p>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isCompleting} onOpenChange={setIsCompleting}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Completar Pendiente</DialogTitle>
@@ -536,7 +540,7 @@ function TaskCard({ task, student, onUpdate }: { task: TeamTask, student: Studen
                     </form>
                 </DialogContent>
             </Dialog>
-        </Dialog>
+        </>
     )
 }
 
@@ -560,7 +564,6 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
     }
     
     const cardTitle = isBitacora ? 'Reporte de Bitácora' : (entry.topic || 'Registro de Interacción');
-
     const contentToShow = isBitacora ? (entry as BitacoraEntry).description : (entry as SeguimientoEntry).notes;
     
     return (
@@ -583,14 +586,14 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                                 <TooltipContent><p>Editar</p></TooltipContent>
                             </Tooltip>
                         )}
-                        <AlertDialog onOpenChange={(e) => e.stopPropagation()}>
+                        <AlertDialog>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                                 </TooltipTrigger>
                                 <TooltipContent><p>Eliminar</p></TooltipContent>
                             </Tooltip>
-                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                            <AlertDialogContent>
                                 <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -826,3 +829,5 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
 
 
       
+
+    
