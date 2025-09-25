@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -44,7 +45,7 @@ const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
 const SITUATION_MAP: Record<TeamTask['situation'], { icon: React.ReactNode, text: string }> = {
   'faltas': { icon: <FileWarning className="h-4 w-4 text-yellow-600" />, text: 'Faltas' },
   'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
-  'otro': { icon: <StickyNote className="h-4 w-4 text-blue-600" />, text: 'Otro' },
+  'otro': { icon: <StickyNote className="h-4 w-4 text-blue-600" />, text: 'Pendiente' },
 };
 
 
@@ -269,9 +270,9 @@ export function SeguimientoPanel() {
         finalFilteredList = finalFilteredList.filter(item => {
             const hasPendingTasks = teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente');
             const hasRisk = item.riskCategory === 'faltas' || item.riskCategory === 'ne' || item.riskCategory === 'both';
+            const hasInteractions = (seguimientoEntries[item.student.id] || []).length > 0;
             
             // Si hay riesgo pero no interacciones/pendientes, debería mostrarse
-            const hasInteractions = (seguimientoEntries[item.student.id] || []).length > 0;
             if (hasRisk && !hasInteractions && !hasPendingTasks) return true;
 
             // Si hay pendientes o interacciones, se muestra
@@ -456,7 +457,7 @@ function TaskCard({ task, onUpdate }: { task: TeamTask, onUpdate: () => void }) 
                       {SITUATION_MAP[task.situation].text}
                     </CardTitle>
                     <CardDescription>
-                      Creado: {format(task.createdAt.toDate(), "d MMM, yyyy", {locale: es})}
+                      {format(task.createdAt.toDate(), "d MMM, yyyy", {locale: es})}
                     </CardDescription>
                 </div>
             </CardHeader>
@@ -513,16 +514,21 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
     const cardTitle = isBitacora ? 'Reporte de Bitácora' : 'Registro de Interacción';
     
     const contentToShow = () => {
-      if (isBitacora) {
-          return (entry as BitacoraEntry).description;
-      }
-      const seguimiento = entry as SeguimientoEntry;
-      return seguimiento.topic === 'Otro' ? seguimiento.notes : `Tema: ${seguimiento.topic}`;
+        if (isBitacora) {
+            return (entry as BitacoraEntry).description;
+        }
+        const seguimiento = entry as SeguimientoEntry;
+        if (seguimiento.topic === 'Otro') {
+            return seguimiento.notes;
+        }
+        return `Tema: ${seguimiento.topic}`;
     };
 
+    const hasRiskInfo = entry.absencesAtFollowUp !== undefined || entry.missedAssignmentsAtFollowUp !== undefined;
+
     return (
-        <Card className="h-full flex flex-col group relative">
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <Card className="h-full flex flex-col group relative">
                 <CardHeader className="p-4 flex-grow">
                     <CardTitle className="text-sm">{cardTitle}</CardTitle>
                     <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", {locale: es})}</CardDescription>
@@ -530,20 +536,30 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                         {contentToShow()}
                     </div>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
-                    <div className="flex items-center text-xs text-muted-foreground gap-2">
-                        <FileWarning className="h-4 w-4" /> F: {entry.absencesAtFollowUp ?? 0}
-                        <AlertTriangle className="h-4 w-4" /> NE: {entry.missedAssignmentsAtFollowUp ?? 0}
-                    </div>
-                </CardContent>
+                {hasRiskInfo && (
+                    <CardContent className="p-4 pt-0">
+                        <div className="flex items-center text-xs text-muted-foreground gap-2">
+                            <FileWarning className="h-4 w-4" /> F: {entry.absencesAtFollowUp ?? 0}
+                            <AlertTriangle className="h-4 w-4" /> NE: {entry.missedAssignmentsAtFollowUp ?? 0}
+                        </div>
+                    </CardContent>
+                )}
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {!isBitacora && (
                         <>
-                             <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4" /></Button>
-                            </DialogTrigger>
+                             <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditOpen(true)}><Edit className="h-4 w-4" /></Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Editar</p></TooltipContent>
+                            </Tooltip>
                             <AlertDialog>
-                                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Eliminar</p></TooltipContent>
+                                </Tooltip>
                                 <AlertDialogContent>
                                     <AlertDialogHeader><AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle><AlertDialogDescription>Esta acción es permanente.</AlertDialogDescription></AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -555,14 +571,14 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                         </>
                     )}
                 </div>
-                 {!isBitacora && (
-                    <DialogContent>
-                        <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
-                        <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
-                    </DialogContent>
-                )}
-            </Dialog>
-        </Card>
+            </Card>
+            {!isBitacora && (
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
+                    <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
+                </DialogContent>
+            )}
+        </Dialog>
     );
 }
 
@@ -739,3 +755,4 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
 
 
     
+
