@@ -26,7 +26,6 @@ import { PonderacionesDashboard } from './PonderacionesDashboard';
 import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
 import { MapPlanner } from './MapPlanner';
 import { AcademicCalendar } from './AcademicCalendar';
-import { WelcomeDashboard } from './WelcomeDashboard';
 import { DashboardFilters } from './DashboardFilters';
 import { BitacoraPanel } from './BitacoraPanel';
 import { TeamTasksPanel } from './TeamTasksPanel';
@@ -46,7 +45,7 @@ import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries } 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento';
+export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -129,7 +128,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('welcome');
+  const [activeView, setActiveView] = useState<ActiveView>('seguimiento');
   
   const fetchSeguimientoEntries = useCallback(async () => {
     try {
@@ -526,7 +525,6 @@ export function DashboardClient() {
 
   const renderActiveView = () => {
     switch (activeView) {
-        case 'welcome': return <WelcomeDashboard />;
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'change-stats': return <ChangeStats />;
@@ -538,7 +536,7 @@ export function DashboardClient() {
         case 'bitacora': return <BitacoraPanel />;
         case 'team-tasks': return <TeamTasksPanel />;
         case 'seguimiento': return <SeguimientoPanel />;
-        default: return <WelcomeDashboard />;
+        default: return <SeguimientoPanel />;
     }
   }
 
@@ -556,15 +554,15 @@ export function DashboardClient() {
             <SidebarGroup>
               <SidebarMenu>
                  <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')}>
-                    <Home />
-                    <span>Inicio</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Calendario Académico" isActive={activeView === 'academic-calendar'} onClick={() => handleSetActiveView('academic-calendar')}>
                     <CalendarDays />
                     <span>Calendario Académico</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Tablero de Seguimiento" isActive={activeView === 'seguimiento'} onClick={() => handleSetActiveView('seguimiento')}>
+                    <FileText />
+                    <span>Tablero de Seguimiento</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
@@ -595,12 +593,6 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Tareas de Equipo" isActive={activeView === 'team-tasks'} onClick={() => handleSetActiveView('team-tasks')}>
                     <ClipboardList />
                     <span>Tareas de Equipo</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Seguimientos" isActive={activeView === 'seguimiento'} onClick={() => handleSetActiveView('seguimiento')}>
-                    <FileText />
-                    <span>Seguimientos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
