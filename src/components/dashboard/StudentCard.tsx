@@ -278,7 +278,7 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
                         </DialogContent>
                     </Dialog>
                     <AddToTeamTaskDialog student={student}>
-                        <Button variant="outline" size="sm">CREAR TAREA</Button>
+                        <Button variant="outline" size="sm">AÑADIR PENDIENTE</Button>
                     </AddToTeamTaskDialog>
                     <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="w-9 p-0">

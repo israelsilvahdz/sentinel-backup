@@ -122,7 +122,7 @@ export function AddToTeamTaskDialog({ student, children }: { student: Student, c
             </AlertDialogTrigger>
             <AlertDialogContent className="sm:max-w-xl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Crear Tarea de Equipo</AlertDialogTitle>
+                    <AlertDialogTitle>Crear Pendiente de Seguimiento</AlertDialogTitle>
                     <AlertDialogDescription>
                         Crea un nuevo caso para {student.name} ({student.id})
                     </AlertDialogDescription>
@@ -185,7 +185,7 @@ export function AddToTeamTaskDialog({ student, children }: { student: Student, c
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={handleSubmit} disabled={isSubmitting}>
-                        {isSubmitting ? 'Guardando...' : 'Crear Tarea'}
+                        {isSubmitting ? 'Guardando...' : 'Crear Pendiente'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
