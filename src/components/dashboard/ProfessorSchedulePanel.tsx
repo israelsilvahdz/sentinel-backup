@@ -126,6 +126,17 @@ export function ProfessorSchedulePanel() {
       });
     });
   };
+  
+  const handleCopyEmail = (email: string) => {
+    navigator.clipboard.writeText(email).then(() => {
+      toast({
+        title: '¡Correo copiado!',
+        description: 'La dirección de correo se ha copiado al portapapeles.',
+      });
+    });
+  };
+
+  const professorEmail = selectedProfessor ? getProfessorEmail(selectedProfessor) : null;
 
 
   return (
@@ -183,6 +194,15 @@ export function ProfessorSchedulePanel() {
         <Card>
           <CardHeader>
             <CardTitle>Horario de {selectedProfessor}</CardTitle>
+            {professorEmail && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Mail className="h-4 w-4" />
+                    <span>{professorEmail}</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyEmail(professorEmail)}>
+                        <Copy className="h-4 w-4" />
+                    </Button>
+                </div>
+            )}
           </CardHeader>
           <CardContent>
             {professorSchedule.length > 0 ? (
