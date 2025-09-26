@@ -90,6 +90,15 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'tochito': 'IGNORE'
 };
 
+function normalizeHeader(header: string): string {
+    return header
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toUpperCase();
+}
+
+
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
     let cleanedName = name.toLowerCase().replace(/"/g, '').trim();
@@ -139,7 +148,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             return;
         }
         
-        const headers: string[] = jsonData[0].map((h: any) => String(h).trim().toUpperCase());
+        const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
         const headerMap: Record<string, number> = {};
         headers.forEach((header, index) => {
             headerMap[header] = index;
@@ -149,7 +158,8 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 
         const requiredCols = [COLUMNS.STUDENT_ID, COLUMNS.STUDENT_NAME, COLUMNS.SUBJECT_CRN, COLUMNS.SUBJECT_NAME];
         for (const col of requiredCols) {
-            const mappedKey = Object.keys(headerMap).find(key => key.toUpperCase() === col.toUpperCase());
+            const normalizedCol = normalizeHeader(col);
+            const mappedKey = Object.keys(headerMap).find(key => key === normalizedCol);
             if (!mappedKey) {
                 console.error(`Error de formato: Falta la columna requerida '${col}'.`);
                 resolve(null);
@@ -161,26 +171,32 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         const dataRows = jsonData.slice(1);
 
         for (const row of dataRows) {
-            if (!row || row.length === 0 || !row[headerMap[COLUMNS.STUDENT_ID.toUpperCase()]]) {
+            const getColumnValue = (columnName: string) => {
+                const upperColName = normalizeHeader(columnName);
+                const index = headerMap[upperColName];
+                return index !== undefined ? String(row[index] || '').trim() : '';
+            }
+            
+            if (!row || row.length === 0 || !getColumnValue(COLUMNS.STUDENT_ID)) {
                 continue; 
             }
             
-            const rawSubjectName = String(row[headerMap[COLUMNS.SUBJECT_NAME.toUpperCase()]] || 'N/A').trim();
+            const rawSubjectName = getColumnValue(COLUMNS.SUBJECT_NAME);
             const normalizedSubjectName = normalizeSubjectName(rawSubjectName);
 
             if (normalizedSubjectName === 'IGNORE') {
                 continue; // Saltar materias extracurriculares
             }
 
-            const studentId = String(row[headerMap[COLUMNS.STUDENT_ID.toUpperCase()]]).trim();
+            const studentId = getColumnValue(COLUMNS.STUDENT_ID);
 
             if (!studentData[studentId]) {
                 studentData[studentId] = {
                     id: studentId,
-                    name: String(row[headerMap[COLUMNS.STUDENT_NAME.toUpperCase()]] || 'N/A').trim(),
-                    leader: String(row[headerMap[COLUMNS.LEADER.toUpperCase()]] || 'N/A').trim(),
-                    tutor: String(row[headerMap[COLUMNS.TUTOR.toUpperCase()]] || 'N/A').trim(),
-                    isGraduationCandidate: String(row[headerMap[COLUMNS.IS_GRADUATION_CANDIDATE.toUpperCase()]] || 'No').trim().toLowerCase() === 'si',
+                    name: getColumnValue(COLUMNS.STUDENT_NAME),
+                    leader: getColumnValue(COLUMNS.LEADER),
+                    tutor: getColumnValue(COLUMNS.TUTOR),
+                    isGraduationCandidate: getColumnValue(COLUMNS.IS_GRADUATION_CANDIDATE).toLowerCase() === 'si',
                     subjects: [],
                 };
             }
@@ -199,13 +215,6 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                     // Guarda el día tal como está en la lista `dayHeadersInFile` sin normalizar
                     scheduleDays.push(dayHeader);
                 }
-            }
-
-
-            const getColumnValue = (columnName: string) => {
-                const upperColName = columnName.toUpperCase();
-                const index = headerMap[upperColName];
-                return index !== undefined ? String(row[index] || '').trim() : '';
             }
 
             const subject: Subject = {
@@ -300,15 +309,16 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                     return resolve(null);
                 }
 
-                const headers: string[] = jsonData[0].map((h: any) => String(h).trim());
+                const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
                 const headerMap: Record<string, number> = {};
                 headers.forEach((header, index) => {
-                    headerMap[header.toUpperCase()] = index;
+                    headerMap[header] = index;
                 });
                 
                 const getColumnIndex = (possibleNames: string[]): number | undefined => {
                     for(const name of possibleNames) {
-                        const idx = headerMap[name.toUpperCase()];
+                        const normalizedName = normalizeHeader(name);
+                        const idx = headerMap[normalizedName];
                         if (idx !== undefined) return idx;
                     }
                     return undefined;
