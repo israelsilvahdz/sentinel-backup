@@ -1,8 +1,8 @@
 
 
 import * as XLSX from 'xlsx';
-import type { StudentData, Subject, Student, StudentContact } from '@/types/student';
-import { bulkAddOrUpdateContacts } from './firebase-services';
+import type { StudentData, Subject, Student, StudentContact, ProfessorContact } from '@/types/student';
+import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts } from './firebase-services';
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -369,6 +369,78 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
 
             } catch (error) {
                 console.error("Error al procesar el archivo de directorio:", error);
+                reject(error);
+            }
+        };
+
+        reader.onerror = (error) => reject(error);
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+
+const PROFESSOR_DIRECTORY_COLUMNS = {
+  NAME: 'Nombre del profesor',
+  EMAIL: 'Correo',
+};
+
+export async function parseProfessorDirectoryExcel(file: File): Promise<Record<string, ProfessorContact> | null> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = async (e: ProgressEvent<FileReader>) => {
+            try {
+                const data = e.target?.result;
+                if (!data) {
+                    return resolve(null);
+                }
+
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                
+                const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+                if (jsonData.length < 2) {
+                    return resolve(null);
+                }
+
+                const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
+                const headerMap: Record<string, number> = {};
+                headers.forEach((header, index) => {
+                    headerMap[header] = index;
+                });
+
+                const nameIndex = headers.indexOf(normalizeHeader(PROFESSOR_DIRECTORY_COLUMNS.NAME));
+                const emailIndex = headers.indexOf(normalizeHeader(PROFESSOR_DIRECTORY_COLUMNS.EMAIL));
+
+                if (nameIndex === -1 || emailIndex === -1) {
+                    throw new Error(`Faltan columnas requeridas: '${PROFESSOR_DIRECTORY_COLUMNS.NAME}' y '${PROFESSOR_DIRECTORY_COLUMNS.EMAIL}'`);
+                }
+
+                const contacts: Record<string, ProfessorContact> = {};
+                const dataRows = jsonData.slice(1);
+
+                for (const row of dataRows) {
+                    const name = String(row[nameIndex]).trim();
+                    const email = String(row[emailIndex]).trim();
+                    if (!name || !email) {
+                        continue;
+                    }
+
+                    const id = name.toLowerCase().replace(/\s+/g, '');
+                    contacts[id] = {
+                        id,
+                        name,
+                        email,
+                    };
+                }
+                
+                await bulkAddOrUpdateProfessorContacts(contacts);
+                resolve(contacts);
+
+            } catch (error) {
+                console.error("Error al procesar el directorio de profesores:", error);
                 reject(error);
             }
         };

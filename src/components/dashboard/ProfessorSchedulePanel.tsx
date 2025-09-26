@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDashboardFilters } from './DashboardClient';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,6 +14,8 @@ import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
 import { addOrUpdateProfessorContact } from '@/lib/firebase-services';
+import { FileUpload } from './FileUpload';
+import { parseProfessorDirectoryExcel } from '@/lib/excelParser';
 
 
 interface ProfessorClass {
@@ -34,7 +36,41 @@ export function ProfessorSchedulePanel() {
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [isEditing, setIsEditing] = useState(false);
   const [editedEmail, setEditedEmail] = useState('');
+  const [directoryFile, setDirectoryFile] = useState<File | null>(null);
+  const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
+
   const { toast } = useToast();
+
+  const handleDirectoryUpload = useCallback(async (file: File | null) => {
+    if (!file) {
+      setDirectoryFile(null);
+      return;
+    }
+    setDirectoryFile(file);
+    setIsProcessingDirectory(true);
+    try {
+      const contacts = await parseProfessorDirectoryExcel(file);
+      if (contacts) {
+        setProfessorContacts(prev => ({ ...prev, ...contacts }));
+        toast({
+          title: "Directorio de Profesores Guardado",
+          description: `Se procesaron y guardaron ${Object.keys(contacts).length} contactos en la base de datos.`,
+        });
+      } else {
+        throw new Error("El archivo no tiene el formato esperado o está vacío.");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al cargar directorio de profesores",
+        description: error.message || "No se pudo procesar el archivo Excel.",
+      });
+    } finally {
+      setIsProcessingDirectory(false);
+      setDirectoryFile(null);
+    }
+  }, [setProfessorContacts, toast]);
+
 
   const professorList = useMemo(() => {
     const studentSource = selectedValue ? filteredStudents : allStudents;
@@ -164,7 +200,7 @@ export function ProfessorSchedulePanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" />
-            Seleccionar Profesor
+            Seleccionar Profesor y Filtros
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
@@ -198,6 +234,14 @@ export function ProfessorSchedulePanel() {
                 <Mail className="mr-2 h-4 w-4" />
                 Copiar Correos
             </Button>
+            <FileUpload
+              onFileSelect={handleDirectoryUpload}
+              selectedFile={directoryFile}
+              isLoading={isProcessingDirectory}
+              label="Cargar Directorio de Profes"
+              icon={<Contact />}
+              variant="secondary"
+            />
           </div>
         </CardContent>
       </Card>
