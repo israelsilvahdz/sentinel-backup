@@ -15,7 +15,7 @@ import {
   setDoc,
   writeBatch
 } from 'firebase/firestore';
-import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry } from '@/types/student';
+import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact } from '@/types/student';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -42,6 +42,7 @@ const db = getFirestore(app);
 const BITACORA_COLLECTION = 'bitacora';
 const TEAM_TASKS_COLLECTION = 'teamTasks';
 const CONTACTS_COLLECTION = 'contacts';
+const PROFESSOR_CONTACTS_COLLECTION = 'professorContacts';
 const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
 const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
 
@@ -192,7 +193,7 @@ export const deleteTeamTask = async (id: string): Promise<void> => {
 };
 
 
-// --- Funciones para Directorio de Contactos ---
+// --- Funciones para Directorio de Contactos de Alumnos---
 
 /**
  * Añade o actualiza la información de contacto de un alumno.
@@ -210,7 +211,7 @@ export const addOrUpdateContact = async (contact: StudentContact): Promise<void>
 };
 
 /**
- * Guarda múltiples contactos en un solo lote para mayor eficiencia.
+ * Guarda múltiples contactos de alumnos en un solo lote para mayor eficiencia.
  * @param contacts Objeto donde la clave es el studentId y el valor es el StudentContact.
  */
 export const bulkAddOrUpdateContacts = async (contacts: Record<string, StudentContact>): Promise<void> => {
@@ -229,7 +230,7 @@ export const bulkAddOrUpdateContacts = async (contacts: Record<string, StudentCo
 
 
 /**
- * Obtiene todos los contactos de Firestore.
+ * Obtiene todos los contactos de alumnos de Firestore.
  * @returns Un objeto donde la clave es el studentId y el valor es la información de contacto.
  */
 export const getContacts = async (): Promise<Record<string, StudentContact>> => {
@@ -245,6 +246,41 @@ export const getContacts = async (): Promise<Record<string, StudentContact>> => 
         return {};
     }
 };
+
+// --- Funciones para Contactos de Profesores ---
+
+/**
+ * Añade o actualiza la información de contacto de un profesor.
+ * @param contact El objeto de contacto del profesor.
+ */
+export const addOrUpdateProfessorContact = async (contact: ProfessorContact): Promise<void> => {
+  try {
+    const docRef = doc(db, PROFESSOR_CONTACTS_COLLECTION, contact.id);
+    await setDoc(docRef, contact, { merge: true });
+  } catch (error) {
+    console.error("Error al guardar el contacto del profesor: ", error);
+    throw new Error("No se pudo guardar la información de contacto del profesor.");
+  }
+};
+
+/**
+ * Obtiene todos los contactos de profesores de Firestore.
+ * @returns Un objeto donde la clave es el nombre normalizado y el valor es la información de contacto.
+ */
+export const getProfessorContacts = async (): Promise<Record<string, ProfessorContact>> => {
+    try {
+        const querySnapshot = await getDocs(collection(db, PROFESSOR_CONTACTS_COLLECTION));
+        const contacts: Record<string, ProfessorContact> = {};
+        querySnapshot.forEach(doc => {
+            contacts[doc.id] = doc.data() as ProfessorContact;
+        });
+        return contacts;
+    } catch (error) {
+        console.error("Error al obtener contactos de profesores de Firestore: ", error);
+        return {};
+    }
+};
+
 
 // --- Funciones para Seguimientos Kanban ---
 

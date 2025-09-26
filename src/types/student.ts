@@ -121,3 +121,9 @@ export interface StudentContact {
     momEmail: string;
     mentoringId: string;
 }
+
+export interface ProfessorContact {
+    id: string; // Normalized name
+    name: string;
+    email: string;
+}

@@ -1,17 +1,19 @@
 
+
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDashboardFilters } from './DashboardClient';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { type Subject } from '@/types/student';
-import { Contact, Search, Copy, Mail, CalendarDays } from 'lucide-react';
+import { type Subject, type ProfessorContact } from '@/types/student';
+import { Contact, Search, Copy, Mail, CalendarDays, Edit, Save, XCircle, PlusCircle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
-import professorContacts from '@/lib/professor-contacts.json';
+import { Input } from '../ui/input';
+import { addOrUpdateProfessorContact } from '@/lib/firebase-services';
 
 
 interface ProfessorClass {
@@ -22,24 +24,16 @@ interface ProfessorClass {
   studentCount: number;
 }
 
-const contactsMap = new Map<string, string>(
-  Object.entries(professorContacts).map(([name, email]) => [
-    name.toLowerCase().replace(/\s+/g, ''),
-    email,
-  ])
-);
-
-const getProfessorEmail = (name: string): string | null => {
-    if (!name) return null;
-    const normalizedName = name.toLowerCase().replace(/\s+/g, '');
-    return contactsMap.get(normalizedName) || null;
+const getProfessorId = (name: string): string => {
+    return name.toLowerCase().replace(/\s+/g, '');
 }
 
-
 export function ProfessorSchedulePanel() {
-  const { allStudents, filteredStudents, isLoading, selectedValue } = useDashboardFilters();
-  const [selectedProfessor, setSelectedProfessor] = useState<string | null>(null);
+  const { allStudents, filteredStudents, isLoading, selectedValue, professorContacts, setProfessorContacts } = useDashboardFilters();
+  const [selectedProfessorName, setSelectedProfessorName] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('all');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedEmail, setEditedEmail] = useState('');
   const { toast } = useToast();
 
   const professorList = useMemo(() => {
@@ -57,7 +51,7 @@ export function ProfessorSchedulePanel() {
 
 
   const professorSchedule = useMemo(() => {
-    if (!selectedProfessor || !allStudents) {
+    if (!selectedProfessorName || !allStudents) {
       return [];
     }
 
@@ -65,7 +59,7 @@ export function ProfessorSchedulePanel() {
 
     allStudents.forEach(student => {
       student.subjects?.forEach(subject => {
-        if (subject.professorName === selectedProfessor && subject.schedule) {
+        if (subject.professorName === selectedProfessorName && subject.schedule) {
           const classKey = `${subject.name}-${subject.group}-${subject.schedule.startTime || 'N/A'}`;
           
           if (classesMap.has(classKey)) {
@@ -85,7 +79,18 @@ export function ProfessorSchedulePanel() {
     });
 
     return Array.from(classesMap.values());
-  }, [selectedProfessor, allStudents]);
+  }, [selectedProfessorName, allStudents]);
+
+  const selectedProfessorId = selectedProfessorName ? getProfessorId(selectedProfessorName) : null;
+  const professorEmail = selectedProfessorId ? professorContacts[selectedProfessorId]?.email : null;
+
+  useEffect(() => {
+    if (professorEmail) {
+        setEditedEmail(professorEmail);
+    } else {
+        setEditedEmail('');
+    }
+  }, [professorEmail]);
   
   const handleCopyEmails = () => {
     let professorsToGetEmailsFrom = professorList;
@@ -94,7 +99,6 @@ export function ProfessorSchedulePanel() {
         const professorsForDay = new Set<string>();
         allStudents.forEach(student => {
             student.subjects?.forEach(subject => {
-                // Check if this subject is on the selected day and taught by a professor in our current list
                 if (subject.professorName && 
                     professorList.includes(subject.professorName) && 
                     subject.schedule?.days.includes(selectedDay)) 
@@ -107,8 +111,8 @@ export function ProfessorSchedulePanel() {
     }
     
     const emails = professorsToGetEmailsFrom
-      .map(prof => getProfessorEmail(prof))
-      .filter(Boolean); // Filtra los nulos o vacíos
+      .map(prof => professorContacts[getProfessorId(prof)]?.email)
+      .filter(Boolean);
 
     if (emails.length === 0) {
       toast({
@@ -127,16 +131,24 @@ export function ProfessorSchedulePanel() {
     });
   };
   
-  const handleCopyEmail = (email: string) => {
-    navigator.clipboard.writeText(email).then(() => {
-      toast({
-        title: '¡Correo copiado!',
-        description: 'La dirección de correo se ha copiado al portapapeles.',
-      });
-    });
-  };
+  const handleSaveEmail = async () => {
+    if (!selectedProfessorId || !selectedProfessorName) return;
 
-  const professorEmail = selectedProfessor ? getProfessorEmail(selectedProfessor) : null;
+    const newContact: ProfessorContact = {
+        id: selectedProfessorId,
+        name: selectedProfessorName,
+        email: editedEmail,
+    };
+    
+    try {
+        await addOrUpdateProfessorContact(newContact);
+        setProfessorContacts(prev => ({ ...prev, [selectedProfessorId]: newContact }));
+        toast({ title: 'Éxito', description: 'El correo del profesor ha sido actualizado.' });
+        setIsEditing(false);
+    } catch(error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo guardar el correo.' });
+    }
+  };
 
 
   return (
@@ -144,7 +156,7 @@ export function ProfessorSchedulePanel() {
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Horarios de Profesores</h1>
         <p className="text-muted-foreground">
-          Selecciona un profesor para ver su horario de clases y el número de alumnos por grupo. La lista se filtra según el Líder o Tutor seleccionado.
+          Selecciona un profesor para ver su horario de clases, número de alumnos y gestionar su información de contacto.
         </p>
       </header>
 
@@ -156,7 +168,7 @@ export function ProfessorSchedulePanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
-          <Select onValueChange={setSelectedProfessor} value={selectedProfessor || ''} disabled={isLoading}>
+          <Select onValueChange={setSelectedProfessorName} value={selectedProfessorName || ''} disabled={isLoading}>
             <SelectTrigger className="w-full md:w-[300px]">
               <SelectValue placeholder={isLoading ? "Cargando..." : "Elige un profesor..."} />
             </SelectTrigger>
@@ -190,19 +202,34 @@ export function ProfessorSchedulePanel() {
         </CardContent>
       </Card>
 
-      {selectedProfessor && (
+      {selectedProfessorName && (
         <Card>
           <CardHeader>
-            <CardTitle>Horario de {selectedProfessor}</CardTitle>
-            {professorEmail && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Mail className="h-4 w-4" />
-                    <span>{professorEmail}</span>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyEmail(professorEmail)}>
-                        <Copy className="h-4 w-4" />
-                    </Button>
+            <CardTitle>Horario de {selectedProfessorName}</CardTitle>
+             <div className="flex items-center gap-2 pt-2">
+              <Mail className="h-5 w-5 text-muted-foreground" />
+              {isEditing ? (
+                <div className="flex items-center gap-2 flex-1">
+                   <Input 
+                     type="email" 
+                     value={editedEmail} 
+                     onChange={(e) => setEditedEmail(e.target.value)} 
+                     placeholder="correo@ejemplo.com"
+                     className="max-w-xs"
+                    />
+                    <Button size="sm" onClick={handleSaveEmail}><Save className="mr-2 h-4 w-4"/> Guardar</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}><XCircle className="mr-2 h-4 w-4"/> Cancelar</Button>
                 </div>
-            )}
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="font-mono">{professorEmail || 'No disponible'}</span>
+                  <Button variant="outline" size="sm" className="h-8" onClick={() => setIsEditing(true)}>
+                    {professorEmail ? <Edit className="mr-2 h-4 w-4"/> : <PlusCircle className="mr-2 h-4 w-4"/>}
+                    {professorEmail ? 'Editar' : 'Añadir Correo'}
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {professorSchedule.length > 0 ? (

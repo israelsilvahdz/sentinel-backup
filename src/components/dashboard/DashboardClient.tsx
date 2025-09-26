@@ -37,11 +37,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts } from '@/lib/firebase-services';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
@@ -59,6 +59,8 @@ interface DashboardContextType {
   setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
   studentContacts: Record<string, StudentContact>;
   setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
+  professorContacts: Record<string, ProfessorContact>;
+  setProfessorContacts: React.Dispatch<React.SetStateAction<Record<string, ProfessorContact>>>;
   seguimientoEntries: Record<string, (SeguimientoEntry | BitacoraEntry)[]>;
   fetchSeguimientoEntries: () => Promise<void>;
   teamTasks: TeamTask[];
@@ -112,6 +114,7 @@ export function DashboardClient() {
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
+  const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
@@ -198,8 +201,11 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
-          const contactsFromDb = await getContacts();
-          setStudentContacts(contactsFromDb);
+          const studentContactsFromDb = await getContacts();
+          setStudentContacts(studentContactsFromDb);
+          
+          const professorContactsFromDb = await getProfessorContacts();
+          setProfessorContacts(professorContactsFromDb);
           
           await Promise.all([
             fetchSeguimientoEntries(),
@@ -508,7 +514,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
