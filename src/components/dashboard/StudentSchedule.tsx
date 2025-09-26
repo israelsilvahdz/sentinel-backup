@@ -1,12 +1,13 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { type Subject } from '@/types/student';
+import { type Subject, type ProfessorContact } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Copy, Mail, Clock, Users, Link as LinkIcon, Check } from 'lucide-react';
+import { Copy, Mail, Clock, Users, Link as LinkIcon, Check, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Label } from '../ui/label';
@@ -20,8 +21,9 @@ import type { DateRange } from 'react-day-picker';
 import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
-import professorContacts from '@/lib/professor-contacts.json';
 import { Switch } from '../ui/switch';
+import { useDashboardFilters } from './DashboardClient';
+
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -78,21 +80,10 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string },
     return subject.schedule.startTime === slot.start;
 }
 
-const contactsMap = new Map<string, string>(
-  Object.entries(professorContacts).map(([name, email]) => [
-    name.toLowerCase().replace(/\s+/g, ''),
-    email,
-  ])
-);
-
-const getProfessorEmail = (name: string): string | null => {
-    if (!name) return null;
-    const normalizedName = name.toLowerCase().replace(/\s+/g, '');
-    return contactsMap.get(normalizedName) || null;
-}
 
 export function StudentSchedule({ subjects, studentName, planType }: StudentScheduleProps) {
   const { toast } = useToast();
+  const { professorContacts } = useDashboardFilters();
   const [notificationReason, setNotificationReason] = useState("Ausencia");
   const [customNotes, setCustomNotes] = useState("");
   const [isFutureNotice, setIsFutureNotice] = useState(false);
@@ -104,6 +95,12 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
   const [selectedClasses, setSelectedClasses] = useState<Set<string>>(new Set());
 
   const TIME_SLOTS = planType === 'semestral' ? TIME_SLOTS_SEMESTRAL : TIME_SLOTS_TETRA;
+  
+  const getProfessorEmail = (name: string): string | null => {
+      if (!name) return null;
+      const normalizedNameId = name.toLowerCase().replace(/\s+/g, '');
+      return professorContacts[normalizedNameId]?.email || null;
+  }
 
   useEffect(() => {
     if (dateRange?.from) {
@@ -410,7 +407,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
                                           {teachersToNotify.map(teacher => (
                                             <li key={teacher.name}>
                                               {teacher.name}
-                                              {teacher.email && <span className="text-xs text-primary"> ({teacher.email})</span>}
+                                              {!teacher.email && <span className="text-xs text-destructive font-semibold"> (Sin correo)</span>}
                                             </li>
                                           ))}
                                       </ul>
@@ -490,3 +487,5 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
     </TooltipProvider>
   );
 }
+
+  

@@ -264,6 +264,26 @@ export const addOrUpdateProfessorContact = async (contact: ProfessorContact): Pr
 };
 
 /**
+ * Guarda múltiples contactos de profesores en un solo lote para mayor eficiencia.
+ * @param contacts Objeto donde la clave es el ID del profesor y el valor es el ProfessorContact.
+ */
+export const bulkAddOrUpdateProfessorContacts = async (contacts: Record<string, ProfessorContact>): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    Object.values(contacts).forEach(contact => {
+      if (contact.id) {
+        const docRef = doc(db, PROFESSOR_CONTACTS_COLLECTION, contact.id);
+        batch.set(docRef, contact, { merge: true });
+      }
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Error al guardar contactos de profesores en lote en Firestore: ", error);
+    throw new Error("No se pudieron guardar los contactos de profesores en la base de datos.");
+  }
+};
+
+/**
  * Obtiene todos los contactos de profesores de Firestore.
  * @returns Un objeto donde la clave es el nombre normalizado y el valor es la información de contacto.
  */
@@ -376,3 +396,5 @@ export const getSeguimientoPilotEntries = async (): Promise<SeguimientoPilotEntr
     return [];
   }
 };
+
+  

@@ -41,7 +41,9 @@ import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSumma
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts } from '@/lib/firebase-services';
+import professorContactsData from '@/lib/professor-contacts.json';
+
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
@@ -106,6 +108,7 @@ const LOCAL_STORAGE_KEYS = {
     HISTORY: 'academic_sentinel_history',
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
+    PROFESSOR_CONTACTS_MIGRATED: 'academic_sentinel_prof_contacts_migrated',
 };
 
 
@@ -204,8 +207,25 @@ export function DashboardClient() {
           const studentContactsFromDb = await getContacts();
           setStudentContacts(studentContactsFromDb);
           
-          const professorContactsFromDb = await getProfessorContacts();
-          setProfessorContacts(professorContactsFromDb);
+          let profContactsFromDb = await getProfessorContacts();
+
+          // One-time migration from JSON to Firestore
+          const migrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED);
+          if (!migrationDone && Object.keys(professorContactsData).length > 0) {
+              console.log("Migrating professor contacts from JSON to Firestore...");
+              const contactsToMigrate = professorContactsData as Record<string, string>;
+              const formattedContacts: Record<string, ProfessorContact> = {};
+              for (const name in contactsToMigrate) {
+                  const normalizedId = name.toLowerCase().replace(/\s+/g, '');
+                  formattedContacts[normalizedId] = { id: normalizedId, name, email: contactsToMigrate[name] };
+              }
+              await bulkAddOrUpdateProfessorContacts(formattedContacts);
+              localStorage.setItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED, 'true');
+              console.log("Migration complete.");
+              profContactsFromDb = await getProfessorContacts(); // Re-fetch after migration
+          }
+          
+          setProfessorContacts(profContactsFromDb);
           
           await Promise.all([
             fetchSeguimientoEntries(),
@@ -682,3 +702,5 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
+  
