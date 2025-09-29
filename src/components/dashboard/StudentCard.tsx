@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { ActivityBreakdown } from './ActivityBreakdown';
+import { GradesTable } from './GradesTable';
 
 
 interface StudentCardProps {
@@ -143,6 +144,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
         <CardHeader className="flex-row items-center justify-between pt-0 px-6">
             <TabsList>
                 <TabsTrigger value="materias">Materias</TabsTrigger>
+                <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
                 <TabsTrigger value="horario">Horario</TabsTrigger>
                 <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
             </TabsList>
@@ -231,6 +233,9 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                   </TableBody>
               </Table>
           </div>
+        </TabsContent>
+         <TabsContent value="calificaciones">
+          <GradesTable subjects={subjects} />
         </TabsContent>
         <TabsContent value="horario">
           <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} />
