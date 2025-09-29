@@ -181,16 +181,16 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                   </TableHeader>
                   <TableBody>
                       {subjects.map((subject) => (
-                        <Collapsible asChild key={subject.id} open={openSubject === subject.id} onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)}>
+                        <Collapsible key={subject.id} open={openSubject === subject.id} onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)} asChild>
                            <>
                             <TableRow className="cursor-pointer">
                               <TableCell>
-                                  <CollapsibleTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="w-9 p-0">
-                                        {openSubject === subject.id ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                                        <span className="sr-only">Toggle</span>
-                                      </Button>
-                                  </CollapsibleTrigger>
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="w-9 p-0">
+                                    {openSubject === subject.id ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                                    <span className="sr-only">Toggle</span>
+                                  </Button>
+                                </CollapsibleTrigger>
                               </TableCell>
                               <TableCell className="font-medium">
                                   {subject.name}
@@ -322,5 +322,3 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
     </Card>
   );
 }
-
-    
