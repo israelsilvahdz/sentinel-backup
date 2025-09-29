@@ -6,7 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Clock } from 'lucide-react';
 import { type Subject } from "@/types/student";
-import { calculateFinalGrade } from "@/lib/ponderaciones";
 
 interface GradesTableProps {
     subjects: Subject[];
@@ -32,7 +31,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
         const tableRows = subjects.map(subject => {
             const rowData: Record<string, string | number> = {
                 subjectName: subject.name,
-                ponderado: calculateFinalGrade(subject).toFixed(2),
+                ponderado: subject.grade.toFixed(2), // Usar la calificación del reporte
             };
             sortedHeaders.forEach(header => {
                 rowData[header] = subject.activities[header] ?? '';
@@ -84,4 +83,3 @@ export function GradesTable({ subjects }: GradesTableProps) {
         </div>
     );
 }
-
