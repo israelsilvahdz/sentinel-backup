@@ -182,7 +182,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                   <TableBody>
                       {subjects.map((subject) => (
                         <Collapsible asChild key={subject.id} open={openSubject === subject.id} onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)}>
-                          <React.Fragment>
+                           <>
                             <TableRow className="cursor-pointer">
                               <TableCell>
                                   <CollapsibleTrigger asChild>
@@ -226,7 +226,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                                     </TableCell>
                                 </TableRow>
                             </CollapsibleContent>
-                          </React.Fragment>
+                          </>
                         </Collapsible>
                       ))}
                   </TableBody>
