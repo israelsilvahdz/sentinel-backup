@@ -158,6 +158,9 @@ function AthleteNotificationDialog({ students, sports, filterType, selectedLeade
                                 <Label htmlFor="filter-by-leader">Filtrar solo por mi líder seleccionado ({selectedLeader})</Label>
                             </div>
                         )}
+                        <p className="text-sm text-muted-foreground pt-2">
+                            <span className="font-bold">{filteredAthletes.length}</span> alumno(s) seleccionado(s).
+                        </p>
                     </div>
                     <Label className="font-semibold pt-4">2. Selecciona el rango de fechas</Label>
                     <Calendar
