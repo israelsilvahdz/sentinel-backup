@@ -5,10 +5,9 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDashboardFilters } from './DashboardClient';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type Subject, type ProfessorContact } from '@/types/student';
-import { Contact, Search, Copy, Mail, CalendarDays, Edit, Save, XCircle, PlusCircle } from 'lucide-react';
+import { Contact, Search, Copy, Mail, CalendarDays, Edit, Save, XCircle, PlusCircle, User } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +15,10 @@ import { Input } from '../ui/input';
 import { addOrUpdateProfessorContact } from '@/lib/firebase-services';
 import { FileUpload } from './FileUpload';
 import { parseProfessorDirectoryExcel } from '@/lib/excelParser';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface ProfessorClass {
@@ -29,6 +32,47 @@ interface ProfessorClass {
 const getProfessorId = (name: string): string => {
     return name.toLowerCase().replace(/\s+/g, '');
 }
+
+function ProfessorSearchPopover({ professorList, onProfessorSelect, selectedProfessorName }: { professorList: string[], onProfessorSelect: (name: string | null) => void, selectedProfessorName: string | null }) {
+    const [open, setOpen] = useState(false);
+    const [searchValue, setSearchValue] = useState("");
+
+    const filteredProfessors = useMemo(() => {
+        if (!searchValue) return professorList;
+        const lowercasedFilter = searchValue.toLowerCase();
+        return professorList.filter(prof => prof.toLowerCase().includes(lowercasedFilter));
+    }, [searchValue, professorList]);
+
+    const handleSelect = (profName: string) => {
+        onProfessorSelect(profName);
+        setOpen(false);
+    };
+    
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={open} className="w-full md:w-[300px] justify-between">
+                   {selectedProfessorName ? <><User className="mr-2 h-4 w-4" />{selectedProfessorName}</> : "Elige un profesor..."}
+                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                    <CommandInput placeholder="Escribe para buscar..." value={searchValue} onValueChange={setSearchValue} />
+                    <CommandEmpty>No se encontraron profesores.</CommandEmpty>
+                    <CommandGroup>
+                        {filteredProfessors.slice(0, 100).map((prof) => (
+                            <CommandItem key={prof} onSelect={() => handleSelect(prof)}>
+                                {prof}
+                            </CommandItem>
+                        ))}
+                    </CommandGroup>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
 
 export function ProfessorSchedulePanel() {
   const { allStudents, filteredStudents, isLoading, selectedValue, professorContacts, setProfessorContacts } = useDashboardFilters();
@@ -204,18 +248,11 @@ export function ProfessorSchedulePanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-4">
-          <Select onValueChange={setSelectedProfessorName} value={selectedProfessorName || ''} disabled={isLoading}>
-            <SelectTrigger className="w-full md:w-[300px]">
-              <SelectValue placeholder={isLoading ? "Cargando..." : "Elige un profesor..."} />
-            </SelectTrigger>
-            <SelectContent>
-              {professorList.map(prof => (
-                <SelectItem key={prof} value={prof}>
-                  {prof}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ProfessorSearchPopover 
+            professorList={professorList}
+            onProfessorSelect={setSelectedProfessorName}
+            selectedProfessorName={selectedProfessorName}
+          />
           <div className="flex items-center gap-2 flex-wrap">
             <Select value={selectedDay} onValueChange={setSelectedDay}>
                 <SelectTrigger className="w-full md:w-[180px]">

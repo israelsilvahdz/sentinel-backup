@@ -259,10 +259,15 @@ export function StudentPanel() {
       return initialFilteredStudents;
     }
     const lowercasedFilter = searchTerm.toLowerCase();
-    const numericFilter = searchTerm.replace(/\D/g, ''); // For phone number search
+    const searchWords = lowercasedFilter.split(' ').filter(Boolean); // Split search term into words
+    const numericFilter = searchTerm.replace(/\D/g, '');
 
     return initialFilteredStudents.filter((student: Student) => {
-      const nameMatch = student.name.toLowerCase().includes(lowercasedFilter);
+      const studentNameLower = student.name.toLowerCase();
+      
+      // Flexible name search: checks if all search words are in the student's name
+      const nameMatch = searchWords.every(word => studentNameLower.includes(word));
+      
       const idMatch = student.id.toLowerCase().includes(lowercasedFilter);
       
       let phoneMatch = false;
