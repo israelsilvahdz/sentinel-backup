@@ -91,17 +91,24 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
 };
 
 
-function AthleteNotificationDialog({ students }: { students: Student[] }) {
+function AthleteNotificationDialog({ students, sports }: { students: Student[], sports: string[] }) {
     const { loadStudentSubjects, professorContacts } = useDashboardFilters();
     const { toast } = useToast();
+    const [selectedSport, setSelectedSport] = useState<string>('all');
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [reason, setReason] = useState("Competencia Deportiva");
     const [notes, setNotes] = useState("");
     const [teachers, setTeachers] = useState<{name: string, email: string | null}[]>([]);
 
+    const filteredAthletes = useMemo(() => {
+        if (selectedSport === 'all') return students;
+        return students.filter(s => s.sport === selectedSport);
+    }, [students, selectedSport]);
+
+
     useEffect(() => {
         const findTeachers = async () => {
-            if (!dateRange?.from) {
+            if (!dateRange?.from || filteredAthletes.length === 0) {
                 setTeachers([]);
                 return;
             }
@@ -121,7 +128,7 @@ function AthleteNotificationDialog({ students }: { students: Student[] }) {
 
             const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
             
-            for (const student of students) {
+            for (const student of filteredAthletes) {
                 const studentSubjects = await loadStudentSubjects(student.id);
                 const classesOnAffectedDays = studentSubjects.filter(subject =>
                     subject.professorName &&
@@ -140,11 +147,11 @@ function AthleteNotificationDialog({ students }: { students: Student[] }) {
         };
 
         findTeachers();
-    }, [dateRange, students, loadStudentSubjects, professorContacts]);
+    }, [dateRange, filteredAthletes, loadStudentSubjects, professorContacts]);
 
     const generateMailto = () => {
         if (teachers.length === 0 || !dateRange?.from) {
-            toast({ variant: "destructive", title: "Faltan datos", description: "Selecciona un rango de fechas y asegúrate de que haya profesores." });
+            toast({ variant: "destructive", title: "Faltan datos", description: "Selecciona un deporte, un rango de fechas y asegúrate de que haya profesores." });
             return;
         }
 
@@ -155,7 +162,7 @@ function AthleteNotificationDialog({ students }: { students: Student[] }) {
             dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
         }
         
-        const studentNames = students.map(s => s.name).join(', ');
+        const studentNames = filteredAthletes.map(s => s.name).join(', ');
         
         let body = `Estimados profesores,\n\n`;
         body += `Les notifico que los siguientes alumnos se ausentarán ${dateText} por motivo de: ${reason}.\n\n`;
@@ -181,28 +188,40 @@ function AthleteNotificationDialog({ students }: { students: Student[] }) {
             </DialogHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                 <div className="flex flex-col items-center space-y-4">
-                    <Label className="font-semibold">1. Selecciona el rango de fechas</Label>
+                     <div className="w-full space-y-2">
+                        <Label htmlFor="sport-select" className="font-semibold">1. Selecciona el Deporte</Label>
+                        <Select value={selectedSport} onValueChange={setSelectedSport}>
+                            <SelectTrigger id="sport-select">
+                                <SelectValue placeholder="Seleccionar deporte..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos los deportes</SelectItem>
+                                {sports.map(sport => <SelectItem key={sport} value={sport}>{sport}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Label className="font-semibold pt-4">2. Selecciona el rango de fechas</Label>
                     <Calendar
                         mode="range"
                         selected={dateRange}
                         onSelect={setDateRange}
                         locale={es}
                     />
-                    <div className="w-full space-y-2">
-                        <Label htmlFor="reason">2. Motivo</Label>
+                </div>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="reason">3. Motivo</Label>
                         <RadioGroup id="reason" value={reason} onValueChange={setReason} className="mt-2">
                             <div className="flex items-center space-x-2"><RadioGroupItem value="Competencia Deportiva" id="r1" /><Label htmlFor="r1">Competencia Deportiva</Label></div>
                             <div className="flex items-center space-x-2"><RadioGroupItem value="Otro" id="r2" /><Label htmlFor="r2">Otro (especificar en notas)</Label></div>
                         </RadioGroup>
                     </div>
-                </div>
-                <div className="space-y-4">
                     <div>
-                        <Label htmlFor="notes">3. Notas Adicionales (Opcional)</Label>
+                        <Label htmlFor="notes">4. Notas Adicionales (Opcional)</Label>
                         <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. El torneo es en la ciudad de..." />
                     </div>
                     <div>
-                        <Label className="font-semibold">4. Profesores a Notificar</Label>
+                        <Label className="font-semibold">5. Profesores a Notificar</Label>
                         <Card className="mt-2 p-3 bg-muted/50 max-h-48 overflow-y-auto">
                             {teachers.length > 0 ? (
                                 <ul className="text-sm list-disc list-inside">
@@ -211,7 +230,7 @@ function AthleteNotificationDialog({ students }: { students: Student[] }) {
                                     ))}
                                 </ul>
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center">Selecciona una fecha para ver los profesores.</p>
+                                <p className="text-sm text-muted-foreground text-center">Selecciona un deporte y fecha para ver los profesores.</p>
                             )}
                         </Card>
                     </div>
@@ -235,7 +254,7 @@ function AthleteNotificationDialog({ students }: { students: Student[] }) {
 }
 
 export function ProfessorSchedulePanel() {
-  const { allStudents, filteredStudents, isLoading, selectedValue, professorContacts, setProfessorContacts } = useDashboardFilters();
+  const { allStudents, filteredStudents, isLoading, selectedValue, professorContacts, setProfessorContacts, athletes } = useDashboardFilters();
   const [selectedProfessorName, setSelectedProfessorName] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [isEditing, setIsEditing] = useState(false);
@@ -390,7 +409,8 @@ export function ProfessorSchedulePanel() {
     }
   };
 
-  const athletes = useMemo(() => allStudents.filter(s => s.sport), [allStudents]);
+  const athleteStudents = useMemo(() => allStudents.filter(s => s.sport), [allStudents]);
+  const sportList = useMemo(() => Array.from(new Set(athleteStudents.map(s => s.sport!))), [athleteStudents]);
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -434,11 +454,11 @@ export function ProfessorSchedulePanel() {
             </Button>
             <Dialog>
                 <DialogTrigger asChild>
-                    <Button variant="outline" disabled={athletes.length === 0}>
+                    <Button variant="outline" disabled={athleteStudents.length === 0}>
                         <Mail className="mr-2 h-4 w-4"/> Notificar Ausencia de Atletas
                     </Button>
                 </DialogTrigger>
-                <AthleteNotificationDialog students={athletes} />
+                <AthleteNotificationDialog students={athleteStudents} sports={sportList} />
             </Dialog>
             <FileUpload
               onFileSelect={handleDirectoryUpload}

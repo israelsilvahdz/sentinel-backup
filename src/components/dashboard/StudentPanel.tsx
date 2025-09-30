@@ -268,11 +268,6 @@ export function StudentPanel() {
       const parsedAthletes = await parseAthletesExcel(file);
       if (parsedAthletes) {
         setAthletes(parsedAthletes);
-        // We also need to update the `sport` property on the currently loaded students
-        const updatedStudents = allStudents.map(student => ({
-            ...student,
-            sport: parsedAthletes[student.name] || student.sport,
-        }));
         // This is tricky, because useDashboardFilters doesn't expose setAllStudents directly
         // For now, we rely on the fact that the next main report load will pick this up.
         toast({
@@ -292,7 +287,7 @@ export function StudentPanel() {
       setIsProcessingAthletes(false);
       setAthletesFile(null);
     }
-  }, [setAthletes, toast, allStudents]);
+  }, [setAthletes, toast]);
 
 
   const filteredStudents = useMemo(() => {
@@ -510,6 +505,7 @@ export function StudentPanel() {
     </div>
   );
 }
+
 
 
 
