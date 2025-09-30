@@ -21,10 +21,6 @@ import { Label } from '../ui/label';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { curriculum } from '@/lib/curriculum';
-import { Calendar } from '../ui/calendar';
-import type { DateRange } from 'react-day-picker';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Textarea } from '../ui/textarea';
 
 
 interface PrintOptions {
@@ -44,15 +40,6 @@ const onlineFlexSubjects = new Set(
 onlineFlexSubjects.add('Ciencias de la Vida');
 onlineFlexSubjects.add('El mundo contemporáneo');
 
-
-// JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
-const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
-    1: 'LUN',
-    2: 'MAR',
-    3: 'MIER',
-    4: 'JUE',
-    5: 'VIER',
-};
 
 function PrintListDialog({ students, contacts }: { students: Student[], contacts: Record<string, StudentContact>}) {
     const [options, setOptions] = useState<PrintOptions>({
@@ -215,150 +202,6 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
     );
 }
 
-function AthleteNotificationDialog({ students }: { students: Student[] }) {
-    const { loadStudentSubjects, professorContacts } = useDashboardFilters();
-    const { toast } = useToast();
-    const [dateRange, setDateRange] = useState<DateRange | undefined>();
-    const [reason, setReason] = useState("Competencia Deportiva");
-    const [notes, setNotes] = useState("");
-    const [teachers, setTeachers] = useState<{name: string, email: string | null}[]>([]);
-
-    useEffect(() => {
-        const findTeachers = async () => {
-            if (!dateRange?.from) {
-                setTeachers([]);
-                return;
-            }
-
-            const affectedDays = new Set<string>();
-            const start = dateRange.from;
-            const end = dateRange.to || start;
-
-            let currentDate = start;
-            while (currentDate <= end) {
-                const dayOfWeek = currentDate.getDay();
-                if (DATE_FNS_DAY_TO_KEY[dayOfWeek]) {
-                    affectedDays.add(DATE_FNS_DAY_TO_KEY[dayOfWeek]);
-                }
-                currentDate = new Date(currentDate.valueOf() + 86400000);
-            }
-
-            const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
-            
-            for (const student of students) {
-                const studentSubjects = await loadStudentSubjects(student.id);
-                const classesOnAffectedDays = studentSubjects.filter(subject =>
-                    subject.professorName &&
-                    subject.schedule?.days.some(day => affectedDays.has(day))
-                );
-
-                classesOnAffectedDays.forEach(subject => {
-                    if (!uniqueTeachers.has(subject.professorName!)) {
-                        const normalizedId = subject.professorName!.toLowerCase().replace(/\s+/g, '');
-                        const email = professorContacts[normalizedId]?.email || null;
-                        uniqueTeachers.set(subject.professorName!, { name: subject.professorName!, email });
-                    }
-                });
-            }
-            setTeachers(Array.from(uniqueTeachers.values()));
-        };
-
-        findTeachers();
-    }, [dateRange, students, loadStudentSubjects, professorContacts]);
-
-    const generateMailto = () => {
-        if (teachers.length === 0 || !dateRange?.from) {
-            toast({ variant: "destructive", title: "Faltan datos", description: "Selecciona un rango de fechas y asegúrate de que haya profesores." });
-            return;
-        }
-
-        let dateText;
-        if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
-            dateText = `del ${format(dateRange.from, "d 'de' LLLL", { locale: es })} al ${format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })}`;
-        } else {
-            dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
-        }
-        
-        const studentNames = students.map(s => s.name).join(', ');
-        
-        let body = `Estimados profesores,\n\n`;
-        body += `Les notifico que los siguientes alumnos se ausentarán ${dateText} por motivo de: ${reason}.\n\n`;
-        body += `Alumnos: ${studentNames}\n\n`;
-        if (notes) {
-            body += `Notas adicionales: ${notes}\n\n`;
-        }
-        body += `Agradezco de antemano su apoyo y comprensión.\n\nSaludos cordiales,`;
-
-        const recipients = teachers.map(t => t.email).filter(Boolean).join(',');
-        const subject = `Notificación de Ausencia por Competencia Deportiva`;
-        
-        return `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    };
-
-    return (
-        <DialogContent className="sm:max-w-3xl">
-            <DialogHeader>
-                <DialogTitle>Notificar Ausencia de Atletas</DialogTitle>
-                <DialogDescription>
-                    Genera un correo para notificar a los profesores sobre la ausencia de los atletas seleccionados.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                <div className="flex flex-col items-center space-y-4">
-                    <Label className="font-semibold">1. Selecciona el rango de fechas</Label>
-                    <Calendar
-                        mode="range"
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        locale={es}
-                    />
-                    <div className="w-full space-y-2">
-                        <Label htmlFor="reason">2. Motivo</Label>
-                        <RadioGroup id="reason" value={reason} onValueChange={setReason} className="mt-2">
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="Competencia Deportiva" id="r1" /><Label htmlFor="r1">Competencia Deportiva</Label></div>
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="Otro" id="r2" /><Label htmlFor="r2">Otro (especificar en notas)</Label></div>
-                        </RadioGroup>
-                    </div>
-                </div>
-                <div className="space-y-4">
-                    <div>
-                        <Label htmlFor="notes">3. Notas Adicionales (Opcional)</Label>
-                        <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. El torneo es en la ciudad de..." />
-                    </div>
-                    <div>
-                        <Label className="font-semibold">4. Profesores a Notificar</Label>
-                        <Card className="mt-2 p-3 bg-muted/50 max-h-48 overflow-y-auto">
-                            {teachers.length > 0 ? (
-                                <ul className="text-sm list-disc list-inside">
-                                    {teachers.map(t => (
-                                        <li key={t.name}>{t.name} {!t.email && <span className="text-destructive text-xs">(Sin correo)</span>}</li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center">Selecciona una fecha para ver los profesores.</p>
-                            )}
-                        </Card>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="outline" onClick={() => {
-                            const link = generateMailto();
-                            if (link) {
-                                navigator.clipboard.writeText(link);
-                                toast({ title: "Enlace copiado", description: "Pega el enlace en tu navegador para abrir el correo." });
-                            }
-                        }}> <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Enlace</Button>
-                        <Button onClick={() => {
-                            const link = generateMailto();
-                            if (link) window.location.href = link;
-                        }}> <Mail className="mr-2 h-4 w-4" /> Abrir en App de Correo</Button>
-                    </div>
-                </div>
-            </div>
-        </DialogContent>
-    );
-}
-
-
 export function StudentPanel() {
   const { 
     allStudents,
@@ -376,7 +219,6 @@ export function StudentPanel() {
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSport, setSelectedSport] = useState<string>('all');
   const [isCopied, setIsCopied] = useState(false);
   const [directoryFile, setDirectoryFile] = useState<File | null>(null);
   const [athletesFile, setAthletesFile] = useState<File | null>(null);
@@ -385,8 +227,6 @@ export function StudentPanel() {
 
   const { toast } = useToast();
   
-  const sportsList = useMemo(() => ['all', ...new Set(Object.values(athletes))], [athletes]);
-
   const handleDirectoryUpload = useCallback(async (file: File | null) => {
     if (!file) {
       setDirectoryFile(null);
@@ -457,10 +297,6 @@ export function StudentPanel() {
 
   const filteredStudents = useMemo(() => {
     let students = initialFilteredStudents;
-    
-    if (selectedSport !== 'all') {
-        students = students.filter(s => s.sport === selectedSport);
-    }
 
     if (!searchTerm) {
       return students;
@@ -489,7 +325,7 @@ export function StudentPanel() {
       
       return nameMatch || idMatch || phoneMatch;
     });
-  }, [searchTerm, initialFilteredStudents, studentContacts, selectedSport]);
+  }, [searchTerm, initialFilteredStudents, studentContacts]);
 
   const handleCopyDirectory = () => {
     if (filteredStudents.length === 0) {
@@ -582,14 +418,6 @@ export function StudentPanel() {
                 </div>
             </div>
              <div className="flex items-center gap-2 flex-wrap">
-                <Dialog>
-                    <DialogTrigger asChild>
-                       <Button variant="outline" disabled={filteredStudents.filter(s => s.sport).length === 0}>
-                           <Mail className="mr-2 h-4 w-4"/> Notificar Ausencia de Atletas
-                       </Button>
-                    </DialogTrigger>
-                    <AthleteNotificationDialog students={filteredStudents.filter(s => s.sport)} />
-                </Dialog>
                 <FileUpload 
                   onFileSelect={handleDirectoryUpload}
                   selectedFile={directoryFile}
@@ -647,20 +475,6 @@ export function StudentPanel() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-muted-foreground"/>
-                 <select
-                    value={selectedSport}
-                    onChange={(e) => setSelectedSport(e.target.value)}
-                    className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                    {sportsList.map(sport => (
-                        <option key={sport} value={sport}>
-                            {sport === 'all' ? 'Todos los Deportes' : sport}
-                        </option>
-                    ))}
-                </select>
-              </div>
           </div>
 
           {filteredStudents.length > 0 ? (
@@ -696,5 +510,6 @@ export function StudentPanel() {
     </div>
   );
 }
+
 
 
