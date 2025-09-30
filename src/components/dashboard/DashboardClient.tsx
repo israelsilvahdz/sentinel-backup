@@ -63,6 +63,8 @@ interface DashboardContextType {
   setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
   professorContacts: Record<string, ProfessorContact>;
   setProfessorContacts: React.Dispatch<React.SetStateAction<Record<string, ProfessorContact>>>;
+  athletes: Record<string, string>;
+  setAthletes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   seguimientoEntries: Record<string, (SeguimientoEntry | BitacoraEntry)[]>;
   fetchSeguimientoEntries: () => Promise<void>;
   teamTasks: TeamTask[];
@@ -108,6 +110,7 @@ const LOCAL_STORAGE_KEYS = {
     HISTORY: 'academic_sentinel_history',
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
+    ATHLETES: 'academic_sentinel_athletes',
     PROFESSOR_CONTACTS_MIGRATED: 'academic_sentinel_prof_contacts_migrated',
 };
 
@@ -118,6 +121,7 @@ export function DashboardClient() {
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
+  const [athletes, setAthletes] = useState<Record<string, string>>({});
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
@@ -197,6 +201,9 @@ export function DashboardClient() {
 
           const storedHistory = localStorage.getItem(LOCAL_STORAGE_KEYS.HISTORY);
           if (storedHistory) setStudentHistory(JSON.parse(storedHistory));
+          
+          const storedAthletes = localStorage.getItem(LOCAL_STORAGE_KEYS.ATHLETES);
+          if (storedAthletes) setAthletes(JSON.parse(storedAthletes));
 
           const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
           if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
@@ -239,6 +246,7 @@ export function DashboardClient() {
             localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
             localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.ATHLETES);
         } finally {
             setIsLoading(false);
         }
@@ -255,6 +263,9 @@ export function DashboardClient() {
         if(Object.keys(studentHistory).length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.HISTORY, JSON.stringify(studentHistory));
         }
+         if(Object.keys(athletes).length > 0) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.ATHLETES, JSON.stringify(athletes));
+        }
         if(uploadHistory.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
         }
@@ -268,7 +279,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, studentHistory, uploadHistory, planType, toast]);
+  }, [allStudents, studentHistory, uploadHistory, planType, athletes, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -335,7 +346,7 @@ export function DashboardClient() {
         setIsProcessing(true);
         setProgress(10);
         try {
-            const studentData = await parseExcel(currentFile);
+            const studentData = await parseExcel(currentFile, athletes);
             setProgress(50);
             
             if (!studentData) {
@@ -380,7 +391,7 @@ export function DashboardClient() {
     };
     processFile();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentFile, toast]);
+  }, [currentFile, toast, athletes]);
 
 
   const handleDeleteAllData = () => {
@@ -394,6 +405,7 @@ export function DashboardClient() {
       localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.ATHLETES);
       
       // NOTE: This does NOT clear Firebase data (bitacora, seguimiento, contacts).
       // This is intentional to prevent accidental deletion of important cloud data.
@@ -404,6 +416,7 @@ export function DashboardClient() {
       setCurrentFile(null);
       setPlanType('tetramestral');
       setStudentContacts({}); // Clear local state, but not DB
+      setAthletes({});
       
       setProgress(100);
       toast({
@@ -534,7 +547,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, athletes, setAthletes, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -702,5 +715,3 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
-
-  

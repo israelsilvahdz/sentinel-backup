@@ -3,7 +3,6 @@
 import * as XLSX from 'xlsx';
 import type { StudentData, Subject, Student, StudentContact, ProfessorContact } from '@/types/student';
 import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts } from './firebase-services';
-import { athletes } from './athletes';
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -121,7 +120,7 @@ function normalizeSubjectName(name: string): string {
 }
 
 
-export async function parseExcel(file: File): Promise<StudentData | null> {
+export async function parseExcel(file: File, athletes: Record<string, string>): Promise<StudentData | null> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -446,6 +445,59 @@ export async function parseProfessorDirectoryExcel(file: File): Promise<Record<s
 
             } catch (error) {
                 console.error("Error al procesar el directorio de profesores:", error);
+                reject(error);
+            }
+        };
+
+        reader.onerror = (error) => reject(error);
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+const ATHLETES_COLUMNS = {
+  NAME: 'Nombre Completo',
+  SPORT: 'Deporte',
+};
+
+export async function parseAthletesExcel(file: File): Promise<Record<string, string> | null> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = async (e: ProgressEvent<FileReader>) => {
+            try {
+                const data = e.target?.result;
+                if (!data) return resolve(null);
+
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+                if (jsonData.length < 2) return resolve(null);
+
+                const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
+                const nameIndex = headers.indexOf(normalizeHeader(ATHLETES_COLUMNS.NAME));
+                const sportIndex = headers.indexOf(normalizeHeader(ATHLETES_COLUMNS.SPORT));
+
+                if (nameIndex === -1 || sportIndex === -1) {
+                    throw new Error(`Faltan columnas requeridas: '${ATHLETES_COLUMNS.NAME}' y '${ATHLETES_COLUMNS.SPORT}'`);
+                }
+
+                const athletes: Record<string, string> = {};
+                const dataRows = jsonData.slice(1);
+
+                for (const row of dataRows) {
+                    const name = String(row[nameIndex]).trim();
+                    const sport = String(row[sportIndex]).trim();
+                    if (name && sport) {
+                        athletes[name] = sport;
+                    }
+                }
+                
+                resolve(athletes);
+
+            } catch (error) {
+                console.error("Error al procesar el archivo de atletas:", error);
                 reject(error);
             }
         };

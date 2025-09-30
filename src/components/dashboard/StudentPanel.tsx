@@ -5,7 +5,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
@@ -14,7 +14,7 @@ import type { Student, StudentContact } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileUpload } from './FileUpload';
-import { parseDirectoryExcel } from '@/lib/excelParser';
+import { parseDirectoryExcel, parseAthletesExcel } from '@/lib/excelParser';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
@@ -208,6 +208,7 @@ export function StudentPanel() {
     filteredStudents: initialFilteredStudents, 
     studentContacts,
     setStudentContacts,
+    setAthletes,
     hasData, 
     isLoading, 
     caseType, 
@@ -219,7 +220,9 @@ export function StudentPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [directoryFile, setDirectoryFile] = useState<File | null>(null);
+  const [athletesFile, setAthletesFile] = useState<File | null>(null);
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
+  const [isProcessingAthletes, setIsProcessingAthletes] = useState(false);
 
   const { toast } = useToast();
 
@@ -252,6 +255,36 @@ export function StudentPanel() {
       setDirectoryFile(null);
     }
   }, [setStudentContacts, toast]);
+  
+  const handleAthletesUpload = useCallback(async (file: File | null) => {
+    if (!file) {
+      setAthletesFile(null);
+      return;
+    }
+    setAthletesFile(file);
+    setIsProcessingAthletes(true);
+    try {
+      const parsedAthletes = await parseAthletesExcel(file);
+      if (parsedAthletes) {
+        setAthletes(parsedAthletes);
+        toast({
+          title: "Lista de Atletas Actualizada",
+          description: `Se procesaron ${Object.keys(parsedAthletes).length} atletas. La lista se aplicará en la próxima carga de reporte diario.`,
+        });
+      } else {
+        throw new Error("El archivo de atletas no tiene el formato esperado o está vacío.");
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error al cargar atletas",
+        description: error.message || "No se pudo procesar el archivo Excel.",
+      });
+    } finally {
+      setIsProcessingAthletes(false);
+      setAthletesFile(null);
+    }
+  }, [setAthletes, toast]);
 
 
   const filteredStudents = useMemo(() => {
@@ -383,6 +416,14 @@ export function StudentPanel() {
                   isLoading={isProcessingDirectory}
                   label="Cargar Directorio"
                   icon={<Contact />}
+                  variant="secondary"
+                />
+                 <FileUpload 
+                  onFileSelect={handleAthletesUpload}
+                  selectedFile={athletesFile}
+                  isLoading={isProcessingAthletes}
+                  label="Cargar Atletas"
+                  icon={<Award />}
                   variant="secondary"
                 />
                  <Dialog>
