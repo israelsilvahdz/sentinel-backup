@@ -2,7 +2,7 @@
 
 import * as XLSX from 'xlsx';
 import type { StudentData, Subject, Student, StudentContact, ProfessorContact } from '@/types/student';
-import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts } from './firebase-services';
+import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateAthletes } from './firebase-services';
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -494,6 +494,7 @@ export async function parseAthletesExcel(file: File): Promise<Record<string, str
                     }
                 }
                 
+                await bulkAddOrUpdateAthletes(athletes);
                 resolve(athletes);
 
             } catch (error) {

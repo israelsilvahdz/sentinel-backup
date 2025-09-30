@@ -13,7 +13,8 @@ import {
   deleteDoc,
   updateDoc,
   setDoc,
-  writeBatch
+  writeBatch,
+  getDoc
 } from 'firebase/firestore';
 import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact } from '@/types/student';
 
@@ -43,6 +44,7 @@ const BITACORA_COLLECTION = 'bitacora';
 const TEAM_TASKS_COLLECTION = 'teamTasks';
 const CONTACTS_COLLECTION = 'contacts';
 const PROFESSOR_CONTACTS_COLLECTION = 'professorContacts';
+const ATHLETES_COLLECTION = 'athletes';
 const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
 const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
 
@@ -297,6 +299,40 @@ export const getProfessorContacts = async (): Promise<Record<string, ProfessorCo
         return contacts;
     } catch (error) {
         console.error("Error al obtener contactos de profesores de Firestore: ", error);
+        return {};
+    }
+};
+
+// --- Funciones para Atletas ---
+
+/**
+ * Guarda una lista de atletas en un único documento en Firestore.
+ * @param athletes Objeto donde la clave es el nombre del alumno y el valor es su deporte.
+ */
+export const bulkAddOrUpdateAthletes = async (athletes: Record<string, string>): Promise<void> => {
+  try {
+    const docRef = doc(db, ATHLETES_COLLECTION, 'all-athletes');
+    await setDoc(docRef, { athletes }, { merge: true }); // Guarda el mapa completo en un documento.
+  } catch (error) {
+    console.error("Error al guardar atletas en Firestore: ", error);
+    throw new Error("No se pudieron guardar los atletas en la base de datos.");
+  }
+};
+
+/**
+ * Obtiene la lista de todos los atletas de Firestore.
+ * @returns Un objeto donde la clave es el nombre del alumno y el valor es su deporte.
+ */
+export const getAthletes = async (): Promise<Record<string, string>> => {
+    try {
+        const docRef = doc(db, ATHLETES_COLLECTION, 'all-athletes');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return docSnap.data().athletes || {};
+        }
+        return {};
+    } catch (error) {
+        console.error("Error al obtener atletas de Firestore: ", error);
         return {};
     }
 };
