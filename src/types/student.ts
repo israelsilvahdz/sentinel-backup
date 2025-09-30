@@ -43,6 +43,7 @@ export interface Student {
   isGraduationCandidate: boolean;
   subjects?: Subject[]; // Full subjects, loaded on demand
   subjectSummaries?: SubjectSummary[]; // Summaries for dashboard performance
+  sport?: string;
 }
 
 export type StudentData = Record<string, Student>;

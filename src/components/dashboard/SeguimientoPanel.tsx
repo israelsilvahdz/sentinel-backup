@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote, ClipboardCheck, FileCheck2, FileText as FileTextIcon, Phone, HelpCircle, Users } from 'lucide-react';
+import { PlusCircle, Loader2, FileWarning, Search, Info, Filter, AlertTriangle, Edit, Trash2, StickyNote, ClipboardCheck, FileCheck2, FileText as FileTextIcon, Phone, HelpCircle, Users, Award } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
@@ -39,7 +39,7 @@ const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
     'both': 'Riesgo por Faltas y NE',
     'reporte': 'Reporte',
     'pendiente': 'Pendiente',
-    'other': 'Otro'
+    'other': 'Con Seguimiento'
 };
 
 const SITUATION_MAP: Record<TeamTask['situation'], { icon: React.ReactNode, text: string }> = {
@@ -378,7 +378,17 @@ export function SeguimientoPanel() {
                     <DialogTrigger asChild>
                         <Card className={cn("sticky top-20 border-l-4 cursor-pointer hover:shadow-md transition-shadow", displayInfo.borderClass)}>
                             <CardHeader className="p-4">
-                            <CardTitle className="text-base">{student.name}</CardTitle>
+                            <CardTitle className="text-base flex items-center">
+                              {student.name}
+                              {student.sport && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="ml-2"><Award className="h-4 w-4 text-blue-600" /></span>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Equipo Representativo: {student.sport}</p></TooltipContent>
+                                </Tooltip>
+                              )}
+                            </CardTitle>
                             <CardDescription>{student.id}</CardDescription>
                             <div className="pt-2">
                                 <Badge className={cn("font-medium", displayInfo.badgeClass)}>{displayInfo.text}</Badge>

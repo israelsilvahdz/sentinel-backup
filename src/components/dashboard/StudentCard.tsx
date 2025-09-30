@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText, Plus, Minus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText, Plus, Minus, Award } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
@@ -180,53 +180,57 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                       </TableRow>
                   </TableHeader>
                   {subjects.map((subject) => (
-                    <Collapsible asChild key={subject.id} open={openSubject === subject.id} onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)}>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell>
+                    <tbody key={subject.id}>
+                        <Collapsible asChild
+                           open={openSubject === subject.id} 
+                           onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)}
+                        >
+                            <>
                             <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="sm" className="w-9 p-0">
-                                {openSubject === subject.id ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                                <span className="sr-only">Toggle</span>
-                              </Button>
-                            </CollapsibleTrigger>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                              {subject.name}
-                              <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                  <span>{subject.professorName}</span>
-                                  {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
-                              </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                              <div className='inline-block'>
-                                  <RiskCell value={subject.absences} limit={subject.absenceLimit} />
-                              </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                              <div className='inline-block'>
-                                  <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
-                              </div>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                              {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-bold text-primary">
-                              {calculateFinalGrade(subject).toFixed(2)}
-                          </TableCell>
-                        </TableRow>
-                        <CollapsibleContent asChild>
-                            <TableRow>
-                                <TableCell colSpan={7} className="p-0">
-                                  <ActivityBreakdown subject={subject} />
-                                </TableCell>
-                            </TableRow>
-                        </CollapsibleContent>
-                      </TableBody>
-                    </Collapsible>
+                                <TableRow className="cursor-pointer">
+                                    <TableCell>
+                                        <div className="flex items-center justify-center">
+                                            {openSubject === subject.id ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                        {subject.name}
+                                        <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                        <div className="flex items-center gap-1">
+                                            <span>{subject.professorName}</span>
+                                            {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <div className='inline-block'>
+                                            <RiskCell value={subject.absences} limit={subject.absenceLimit} />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <div className='inline-block'>
+                                            <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono">
+                                        {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono font-bold text-primary">
+                                        {calculateFinalGrade(subject).toFixed(2)}
+                                    </TableCell>
+                                </TableRow>
+                             </CollapsibleTrigger>
+                            <CollapsibleContent asChild>
+                                <TableRow>
+                                    <TableCell colSpan={7} className="p-0">
+                                      <ActivityBreakdown subject={subject} />
+                                    </TableCell>
+                                </TableRow>
+                            </CollapsibleContent>
+                            </>
+                        </Collapsible>
+                    </tbody>
                   ))}
               </Table>
           </div>
@@ -247,6 +251,27 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 export function StudentCard({ student, startOpen = false, isDialog = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
 
+  const cardTitleContent = (
+    <div className="flex items-center">
+      {student.name}
+      {student.sport && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="ml-2">
+                <Award className="h-5 w-5 text-blue-600" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Equipo Representativo: {student.sport}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+      {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
+    </div>
+  );
+
   if (isDialog) {
     // Render content directly without collapsible for Dialog view
     return (
@@ -255,8 +280,7 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
             <div className="flex justify-between items-start">
                 <div>
                     <CardTitle className="flex items-center text-lg">
-                        {student.name}
-                        {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
+                      {cardTitleContent}
                     </CardTitle>
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
                 </div>
@@ -276,8 +300,7 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
             <div className="flex justify-between items-start">
                 <div>
                     <CardTitle className="flex items-center text-lg">
-                        {student.name}
-                        {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
+                      {cardTitleContent}
                     </CardTitle>
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
                 </div>

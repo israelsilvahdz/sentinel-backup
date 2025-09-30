@@ -3,6 +3,7 @@
 import * as XLSX from 'xlsx';
 import type { StudentData, Subject, Student, StudentContact, ProfessorContact } from '@/types/student';
 import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts } from './firebase-services';
+import { athletes } from './athletes';
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -189,15 +190,19 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             }
 
             const studentId = getColumnValue(COLUMNS.STUDENT_ID);
+            const studentName = getColumnValue(COLUMNS.STUDENT_NAME);
+            const studentSport = athletes[studentName];
+
 
             if (!studentData[studentId]) {
                 studentData[studentId] = {
                     id: studentId,
-                    name: getColumnValue(COLUMNS.STUDENT_NAME),
+                    name: studentName,
                     leader: getColumnValue(COLUMNS.LEADER),
                     tutor: getColumnValue(COLUMNS.TUTOR),
                     isGraduationCandidate: getColumnValue(COLUMNS.IS_GRADUATION_CANDIDATE).toLowerCase() === 'si',
                     subjects: [],
+                    sport: studentSport,
                 };
             }
 
