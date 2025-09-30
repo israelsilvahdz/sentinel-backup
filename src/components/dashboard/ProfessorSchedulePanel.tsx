@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
+import { Checkbox } from '../ui/checkbox';
 
 
 interface ProfessorClass {
@@ -91,7 +92,7 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
 };
 
 
-function AthleteNotificationDialog({ students, sports }: { students: Student[], sports: string[] }) {
+function AthleteNotificationDialog({ students, sports, filterType, selectedLeader }: { students: Student[], sports: string[], filterType: string | null, selectedLeader: string | null }) {
     const { loadStudentSubjects, professorContacts } = useDashboardFilters();
     const { toast } = useToast();
     const [selectedSport, setSelectedSport] = useState<string>('all');
@@ -99,11 +100,16 @@ function AthleteNotificationDialog({ students, sports }: { students: Student[], 
     const [reason, setReason] = useState("Competencia Deportiva");
     const [notes, setNotes] = useState("");
     const [teachers, setTeachers] = useState<{name: string, email: string | null}[]>([]);
+    const [filterByLeader, setFilterByLeader] = useState(false);
 
     const filteredAthletes = useMemo(() => {
-        if (selectedSport === 'all') return students;
-        return students.filter(s => s.sport === selectedSport);
-    }, [students, selectedSport]);
+        let tempAthletes = students;
+        if (filterByLeader && selectedLeader) {
+            tempAthletes = tempAthletes.filter(s => s.leader === selectedLeader);
+        }
+        if (selectedSport === 'all') return tempAthletes;
+        return tempAthletes.filter(s => s.sport === selectedSport);
+    }, [students, selectedSport, filterByLeader, selectedLeader]);
 
 
     useEffect(() => {
@@ -199,6 +205,12 @@ function AthleteNotificationDialog({ students, sports }: { students: Student[], 
                                 {sports.map(sport => <SelectItem key={sport} value={sport}>{sport}</SelectItem>)}
                             </SelectContent>
                         </Select>
+                        {filterType === 'leader' && selectedLeader && (
+                            <div className="flex items-center space-x-2 pt-2">
+                                <Checkbox id="filter-by-leader" checked={filterByLeader} onCheckedChange={(checked) => setFilterByLeader(!!checked)} />
+                                <Label htmlFor="filter-by-leader">Filtrar solo por mi líder seleccionado ({selectedLeader})</Label>
+                            </div>
+                        )}
                     </div>
                     <Label className="font-semibold pt-4">2. Selecciona el rango de fechas</Label>
                     <Calendar
@@ -254,7 +266,7 @@ function AthleteNotificationDialog({ students, sports }: { students: Student[], 
 }
 
 export function ProfessorSchedulePanel() {
-  const { allStudents, filteredStudents, isLoading, selectedValue, professorContacts, setProfessorContacts, athletes } = useDashboardFilters();
+  const { allStudents, filteredStudents, isLoading, selectedValue, filterType, professorContacts, setProfessorContacts, athletes } = useDashboardFilters();
   const [selectedProfessorName, setSelectedProfessorName] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [isEditing, setIsEditing] = useState(false);
@@ -458,7 +470,7 @@ export function ProfessorSchedulePanel() {
                         <Mail className="mr-2 h-4 w-4"/> Notificar Ausencia de Atletas
                     </Button>
                 </DialogTrigger>
-                <AthleteNotificationDialog students={athleteStudents} sports={sportList} />
+                <AthleteNotificationDialog students={athleteStudents} sports={sportList} filterType={filterType} selectedLeader={selectedValue} />
             </Dialog>
             <FileUpload
               onFileSelect={handleDirectoryUpload}
