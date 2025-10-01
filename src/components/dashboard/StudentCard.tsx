@@ -137,6 +137,10 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
             });
         }
     };
+    
+    const handleToggleSubject = (subjectId: string) => {
+      setOpenSubject(prev => (prev === subjectId ? null : subjectId));
+    };
 
     return (
       <Tabs defaultValue="materias" className="w-full">
@@ -181,55 +185,48 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                   </TableHeader>
                   <TableBody>
                   {subjects.map((subject) => (
-                    <Collapsible asChild key={subject.id}
-                           open={openSubject === subject.id} 
-                           onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)}
-                        >
-                            <React.Fragment>
-                            <CollapsibleTrigger asChild>
-                                <TableRow className="cursor-pointer">
-                                    <TableCell>
-                                        <div className="flex items-center justify-center">
-                                            {openSubject === subject.id ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="font-medium">
-                                        {subject.name}
-                                        <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground">
-                                        <div className="flex items-center gap-1">
-                                            <span>{subject.professorName}</span>
-                                            {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                        <div className='inline-block'>
-                                            <RiskCell value={subject.absences} limit={subject.absenceLimit} />
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                        <div className='inline-block'>
-                                            <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">
-                                        {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono font-bold text-primary">
-                                        {calculateFinalGrade(subject).toFixed(2)}
-                                    </TableCell>
-                                </TableRow>
-                             </CollapsibleTrigger>
-                            <CollapsibleContent asChild>
-                                <TableRow>
-                                    <TableCell colSpan={7} className="p-0">
-                                      <ActivityBreakdown subject={subject} />
-                                    </TableCell>
-                                </TableRow>
-                            </CollapsibleContent>
-                            </React.Fragment>
-                        </Collapsible>
+                    <React.Fragment key={subject.id}>
+                      <TableRow className="cursor-pointer" onClick={() => handleToggleSubject(subject.id)}>
+                          <TableCell>
+                              <div className="flex items-center justify-center">
+                                  {openSubject === subject.id ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                              </div>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                              {subject.name}
+                              <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                  <span>{subject.professorName}</span>
+                                  {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                              <div className='inline-block'>
+                                  <RiskCell value={subject.absences} limit={subject.absenceLimit} />
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                              <div className='inline-block'>
+                                  <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                              {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-primary">
+                              {calculateFinalGrade(subject).toFixed(2)}
+                          </TableCell>
+                      </TableRow>
+                      {openSubject === subject.id && (
+                        <TableRow>
+                            <TableCell colSpan={7} className="p-0">
+                              <ActivityBreakdown subject={subject} />
+                            </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   ))}
                   </TableBody>
               </Table>
@@ -353,9 +350,5 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
     </Card>
   );
 }
-
-
-
-
 
     
