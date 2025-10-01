@@ -16,7 +16,7 @@ import {
   writeBatch,
   getDoc
 } from 'firebase/firestore';
-import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact } from '@/types/student';
+import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team } from '@/types/student';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -47,6 +47,7 @@ const PROFESSOR_CONTACTS_COLLECTION = 'professorContacts';
 const ATHLETES_COLLECTION = 'athletes';
 const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
 const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
+const TEAMS_COLLECTION = 'teams';
 
 
 /**
@@ -433,4 +434,58 @@ export const getSeguimientoPilotEntries = async (): Promise<SeguimientoPilotEntr
   }
 };
 
+// --- Teams Management Functions ---
+
+export const getTeams = async (): Promise<Team[]> => {
+    try {
+        const querySnapshot = await getDocs(collection(db, TEAMS_COLLECTION));
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+    } catch (error) {
+        console.error("Error getting teams:", error);
+        return [];
+    }
+};
+
+export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }): Promise<void> => {
+    try {
+        if (team.id) {
+            const docRef = doc(db, TEAMS_COLLECTION, team.id);
+            await setDoc(docRef, team, { merge: true });
+        } else {
+            await addDoc(collection(db, TEAMS_COLLECTION), team);
+        }
+    } catch (error) {
+        console.error("Error adding/updating team:", error);
+        throw error;
+    }
+};
+
+export const bulkAddOrUpdateTeams = async (teams: Team[]): Promise<void> => {
+    const batch = writeBatch(db);
+    teams.forEach(team => {
+        const docRef = doc(db, TEAMS_COLLECTION, team.id);
+        batch.set(docRef, team, { merge: true });
+    });
+    await batch.commit();
+};
+
+export const deleteTeam = async (teamId: string): Promise<void> => {
+    try {
+        await deleteDoc(doc(db, TEAMS_COLLECTION, teamId));
+    } catch (error) {
+        console.error("Error deleting team:", error);
+        throw error;
+    }
+};
+
+export const removeStudentFromTeam = async (team: Team, studentId: string): Promise<void> => {
+    try {
+        const updatedMembers = team.members.filter(member => member.id !== studentId);
+        await updateDoc(doc(db, TEAMS_COLLECTION, team.id), { members: updatedMembers });
+    } catch (error) {
+        console.error("Error removing student from team:", error);
+        throw error;
+    }
+};
   
+

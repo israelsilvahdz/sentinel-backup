@@ -30,24 +30,26 @@ import { DashboardFilters } from './DashboardFilters';
 import { BitacoraPanel } from './BitacoraPanel';
 import { TeamTasksPanel } from './TeamTasksPanel';
 import { SeguimientoPanel } from './SeguimientoPanel';
+import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, Team } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getAthletes } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getAthletes, getTeams, bulkAddOrUpdateTeams } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
+import initialTeamsData from '@/lib/teams-seed.json';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
-export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento';
+export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -65,6 +67,8 @@ interface DashboardContextType {
   setProfessorContacts: React.Dispatch<React.SetStateAction<Record<string, ProfessorContact>>>;
   athletes: Record<string, string>;
   setAthletes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  teams: Team[];
+  fetchTeams: () => Promise<void>;
   seguimientoEntries: Record<string, (SeguimientoEntry | BitacoraEntry)[]>;
   fetchSeguimientoEntries: () => Promise<void>;
   teamTasks: TeamTask[];
@@ -111,6 +115,7 @@ const LOCAL_STORAGE_KEYS = {
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
     PROFESSOR_CONTACTS_MIGRATED: 'academic_sentinel_prof_contacts_migrated',
+    TEAMS_MIGRATED: 'academic_sentinel_teams_migrated_v2', // Use a new key for the new structure
 };
 
 
@@ -121,6 +126,7 @@ export function DashboardClient() {
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
   const [athletes, setAthletes] = useState<Record<string, string>>({});
+  const [teams, setTeams] = useState<Team[]>([]);
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
@@ -138,6 +144,16 @@ export function DashboardClient() {
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('seguimiento');
+
+  const fetchTeams = useCallback(async () => {
+      try {
+          const fetchedTeams = await getTeams();
+          setTeams(fetchedTeams);
+      } catch (error) {
+          console.error("Failed to fetch teams:", error);
+          toast({ variant: "destructive", title: "Error de Equipos", description: "No se pudieron cargar los equipos." });
+      }
+  }, [toast]);
   
   const fetchSeguimientoEntries = useCallback(async () => {
     try {
@@ -216,9 +232,9 @@ export function DashboardClient() {
           
           let profContactsFromDb = await getProfessorContacts();
 
-          // One-time migration from JSON to Firestore
-          const migrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED);
-          if (!migrationDone && Object.keys(professorContactsData).length > 0) {
+          // One-time migration from JSON to Firestore for professors
+          const profMigrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED);
+          if (!profMigrationDone && Object.keys(professorContactsData).length > 0) {
               console.log("Migrating professor contacts from JSON to Firestore...");
               const contactsToMigrate = professorContactsData as Record<string, string>;
               const formattedContacts: Record<string, ProfessorContact> = {};
@@ -228,30 +244,39 @@ export function DashboardClient() {
               }
               await bulkAddOrUpdateProfessorContacts(formattedContacts);
               localStorage.setItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED, 'true');
-              console.log("Migration complete.");
+              console.log("Professor contacts migration complete.");
               profContactsFromDb = await getProfessorContacts(); // Re-fetch after migration
           }
-          
           setProfessorContacts(profContactsFromDb);
           
+          // One-time migration for teams
+          const teamsMigrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.TEAMS_MIGRATED);
+          if (!teamsMigrationDone) {
+              const initialTeams = initialTeamsData as Team[];
+              if (initialTeams.length > 0) {
+                  console.log("Migrating initial teams from JSON to Firestore...");
+                  await bulkAddOrUpdateTeams(initialTeams);
+                  localStorage.setItem(LOCAL_STORAGE_KEYS.TEAMS_MIGRATED, 'true');
+                  console.log("Teams migration complete.");
+              }
+          }
+
           await Promise.all([
             fetchSeguimientoEntries(),
             fetchTeamTasks(),
+            fetchTeams(),
           ]);
 
 
         } catch (error) {
             console.error("Error loading data from Local Storage or DB", error);
-            localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
-            localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
-            localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
-            localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+            localStorage.clear(); // Clear all local storage on critical error
         } finally {
             setIsLoading(false);
         }
     }
     loadInitialData();
-  }, [fetchSeguimientoEntries, fetchTeamTasks]);
+  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams]);
 
   // Persist data to local storage whenever it changes (contacts are now in DB)
   useEffect(() => {
@@ -342,7 +367,17 @@ export function DashboardClient() {
         setIsProcessing(true);
         setProgress(10);
         try {
-            const studentData = await parseExcel(currentFile, athletes);
+            // Pass the current teams to the parser
+            const athletesMap = teams.reduce((acc, team) => {
+                if (Array.isArray(team.members)) {
+                    team.members.forEach(member => {
+                        acc[member.name] = team.name;
+                    });
+                }
+                return acc;
+            }, {} as Record<string, string>);
+
+            const studentData = await parseExcel(currentFile, athletesMap);
             setProgress(50);
             
             if (!studentData) {
@@ -387,7 +422,7 @@ export function DashboardClient() {
     };
     processFile();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentFile, toast, athletes]);
+  }, [currentFile, toast, teams]);
 
 
   const handleDeleteAllData = () => {
@@ -402,21 +437,15 @@ export function DashboardClient() {
       localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
       
-      // NOTE: This does NOT clear Firebase data (bitacora, seguimiento, contacts).
-      // This is intentional to prevent accidental deletion of important cloud data.
-
       setAllStudents([]);
       setStudentHistory({});
       setUploadHistory([]);
       setCurrentFile(null);
       setPlanType('tetramestral');
-      setStudentContacts({}); // Clear local state, but not DB
-      setAthletes({});
-      
-      setProgress(100);
+      // No se borran datos de Firebase intencionadamente
       toast({
           title: 'Datos Locales Eliminados',
-          description: 'Todos los datos guardados en el navegador han sido borrados. Los datos en la nube (bitácora, seguimiento, contactos, atletas) permanecen.',
+          description: 'Los datos guardados en el navegador han sido borrados. Los datos en la nube (bitácora, tareas, equipos, contactos, etc.) permanecen.',
       });
     } catch (error) {
        console.error("Error clearing Local Storage", error);
@@ -542,7 +571,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, athletes, setAthletes, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, athletes, setAthletes, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -570,6 +599,7 @@ export function DashboardClient() {
         case 'bitacora': return <BitacoraPanel />;
         case 'team-tasks': return <TeamTasksPanel />;
         case 'seguimiento': return <SeguimientoPanel />;
+        case 'teams-management': return <TeamsManagementPanel />;
         default: return <SeguimientoPanel />;
     }
   }
@@ -627,6 +657,12 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Tareas de Equipo" isActive={activeView === 'team-tasks'} onClick={() => handleSetActiveView('team-tasks')}>
                     <ClipboardList />
                     <span>Tareas de Equipo</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Equipos" isActive={activeView === 'teams-management'} onClick={() => handleSetActiveView('teams-management')}>
+                    <Shield />
+                    <span>Equipos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
@@ -710,3 +746,5 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
+

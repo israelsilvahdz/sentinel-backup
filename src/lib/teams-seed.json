@@ -1,0 +1,47 @@
+
+[
+  {
+    "id": "FUTBOL",
+    "name": "FUTBOL",
+    "members": [
+      { "id": "A00835222", "name": "CAMARILLO CRUZ ROGELIO" },
+      { "id": "A00835561", "name": "DIAZ ARMENGOL DANIEL ALEJANDRO" },
+      { "id": "A00835695", "name": "FONSECA HERNANDEZ EMILIO" },
+      { "id": "A00835848", "name": "HERNANDEZ GLORIA PEDRO" },
+      { "id": "A00835948", "name": "LIRA FLORES MARCELO" },
+      { "id": "A00836261", "name": "PALOMARES RAMIREZ LEILANI YARETZI" },
+      { "id": "A00836287", "name": "PEÑA ORTIZ REGINA" },
+      { "id": "A00836487", "name": "SANCHEZ DE LA ROSA JUAN PABLO" },
+      { "id": "A00836521", "name": "TOSCANO MARTINEZ DAVID" },
+      { "id": "A00836647", "name": "ZAMORA RAMIREZ RICARDO" },
+      { "id": "A00836671", "name": "ESQUIVEL LOPEZ JOSE ARMANDO" },
+      { "id": "A00836709", "name": "MORALES RAMIREZ ERICK" },
+      { "id": "A00836746", "name": "PEREZ DE LA CRUZ CRISTIAN" },
+      { "id": "A00836774", "name": "MARTINEZ REYES MARIANA" },
+      { "id": "A00836814", "name": "GUADARRAMA SOSA JOSE ANGEL" },
+      { "id": "A00836815", "name": "HERNANDEZ GUZMAN ERICK" },
+      { "id": "A00836830", "name": "HERNANDEZ TREJO DIANA" },
+      { "id": "A00836856", "name": "LOPEZ MORALES MIGUEL ANGEL" },
+      { "id": "A00836923", "name": "ORTEGA ROSAS LUIS ALBERTO" },
+      { "id": "A00836932", "name": "PAZARAN HERNANDEZ LUIS GILBERTO" },
+      { "id": "A00836998", "name": "REYES CRUZ DAVID" },
+      { "id": "A00837000", "name": "REYES GOMEZ SERGIO" },
+      { "id": "A00837130", "name": "CRUZ SARABIA LUIS ALBERTO" },
+      { "id": "A00837166", "name": "GARCIA RUIZ RICARDO GUADALUPE" },
+      { "id": "A00837222", "name": "GUTIERREZ ZARATE ALDO" },
+      { "id": "A00837228", "name": "HERNANDEZ CRUZ MIGUEL ANGEL" },
+      { "id": "A00837305", "name": "MARQUEZ GUADARRAMA JONATHAN ALDAIR" },
+      { "id": "A00837327", "name": "MARTINEZ FLORES SAUL" },
+      { "id": "A00837424", "name": "PEREZ DURAN ALEXA SOFIA" },
+      { "id": "A00837473", "name": "RAMIREZ LOPEZ ERICK SAID" },
+      { "id": "A00837583", "name": "SANCHEZ HERNANDEZ LUIS FERNANDO" },
+      { "id": "A00837651", "name": "CRUZ CALLEJAS ANGEL DE JESUS" },
+      { "id": "A00837704", "name": "ESTRADA ZARAGOZA FERNANDO" },
+      { "id": "A00837746", "name": "GARCIA SALAZAR IAN" },
+      { "id": "A00837759", "name": "GOMEZ CAMACHO FERNANDA LIZETH" },
+      { "id": "A00837837", "name": "HERNANDEZ PEREZ ANGEL YAHIR" },
+      { "id": "A00837920", "name": "MARTINEZ SALGADO SERGIO" },
+      { "id": "A00838112", "name": "SANCHEZ GALVAN SANTIAGO" }
+    ]
+  }
+]

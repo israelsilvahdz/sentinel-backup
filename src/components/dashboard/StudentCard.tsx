@@ -251,10 +251,12 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
 export function StudentCard({ student, startOpen = false, isDialog = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
-  const { allStudentsWithTeams } = useDashboardFilters();
+  const { teams } = useDashboardFilters();
   
-  const studentWithTeam = allStudentsWithTeams.find(s => s.id === student.id);
-  const teamName = studentWithTeam?.team;
+  const studentTeam = teams.find(team => 
+    Array.isArray(team.members) && team.members.some(member => member.id === student.id)
+  );
+  const teamName = studentTeam?.name;
 
 
   const cardTitleContent = (
@@ -349,3 +351,4 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
     </Card>
   );
 }
+
