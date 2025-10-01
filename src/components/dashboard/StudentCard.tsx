@@ -180,13 +180,13 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                       <TableHead className="text-right">Calif. Calculada</TableHead>
                       </TableRow>
                   </TableHeader>
+                  <TableBody>
                   {subjects.map((subject) => (
-                    <tbody key={subject.id}>
-                        <Collapsible asChild
+                    <Collapsible asChild key={subject.id}
                            open={openSubject === subject.id} 
                            onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)}
                         >
-                            <>
+                            <tbody >
                             <CollapsibleTrigger asChild>
                                 <TableRow className="cursor-pointer">
                                     <TableCell>
@@ -229,10 +229,10 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                                     </TableCell>
                                 </TableRow>
                             </CollapsibleContent>
-                            </>
+                            </tbody>
                         </Collapsible>
-                    </tbody>
                   ))}
+                  </TableBody>
               </Table>
           </div>
         </TabsContent>
@@ -351,4 +351,5 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
     </Card>
   );
 }
+
 
