@@ -186,7 +186,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                            open={openSubject === subject.id} 
                            onOpenChange={() => setOpenSubject(prev => prev === subject.id ? null : subject.id)}
                         >
-                            <>
+                            <React.Fragment>
                             <CollapsibleTrigger asChild>
                                 <TableRow className="cursor-pointer">
                                     <TableCell>
@@ -229,7 +229,7 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
                                     </TableCell>
                                 </TableRow>
                             </CollapsibleContent>
-                            </>
+                            </React.Fragment>
                         </Collapsible>
                   ))}
                   </TableBody>
@@ -253,10 +253,13 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
   const [isOpen, setIsOpen] = useState(startOpen);
   const { teams } = useDashboardFilters();
   
-  const studentTeam = teams.find(team => 
-    Array.isArray(team.members) && team.members.some(member => member.id === student.id)
-  );
-  const teamName = studentTeam?.name;
+  const teamName = useMemo(() => {
+    if (!teams || teams.length === 0) return null;
+    const studentTeam = teams.find(team => 
+        Array.isArray(team.members) && team.members.some(member => member.id === student.id)
+    );
+    return studentTeam?.name;
+  }, [teams, student.id]);
 
 
   const cardTitleContent = (
@@ -315,7 +318,7 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
                 <div className="flex items-center gap-2">
                     <Dialog>
                         <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">EXPEDIENTE</Button>
+                            <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>EXPEDIENTE</Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
                              <DialogHeader>
@@ -333,7 +336,7 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
                         </DialogContent>
                     </Dialog>
                     <AddToTeamTaskDialog student={student}>
-                        <Button variant="outline" size="sm">AÑADIR PENDIENTE</Button>
+                        <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>AÑADIR PENDIENTE</Button>
                     </AddToTeamTaskDialog>
                     <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="w-9 p-0">
@@ -354,3 +357,6 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
 
 
 
+
+
+    
