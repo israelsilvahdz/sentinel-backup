@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -250,11 +251,16 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
 
 export function StudentCard({ student, startOpen = false, isDialog = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
+  const { allStudentsWithTeams } = useDashboardFilters();
+  
+  const studentWithTeam = allStudentsWithTeams.find(s => s.id === student.id);
+  const teamName = studentWithTeam?.team;
+
 
   const cardTitleContent = (
     <div className="flex items-center">
       {student.name}
-      {student.sport && (
+      {teamName && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -263,7 +269,7 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Equipo Representativo: {student.sport}</p>
+              <p>Equipo: {teamName}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
