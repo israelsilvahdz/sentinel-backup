@@ -350,5 +350,3 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
     </Card>
   );
 }
-
-    

@@ -446,13 +446,15 @@ export const getTeams = async (): Promise<Team[]> => {
     }
 };
 
-export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }): Promise<void> => {
+export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }): Promise<string> => {
     try {
         if (team.id) {
             const docRef = doc(db, TEAMS_COLLECTION, team.id);
             await setDoc(docRef, team, { merge: true });
+            return team.id;
         } else {
-            await addDoc(collection(db, TEAMS_COLLECTION), team);
+            const docRef = await addDoc(collection(db, TEAMS_COLLECTION), team);
+            return docRef.id;
         }
     } catch (error) {
         console.error("Error adding/updating team:", error);
@@ -488,4 +490,5 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
