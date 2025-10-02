@@ -441,6 +441,10 @@ export const getTeams = async (allStudentsMap: Map<string, Student>): Promise<Te
         // 1. Get manually created teams from the 'teams' collection
         const teamsQuerySnapshot = await getDocs(collection(db, TEAMS_COLLECTION));
         const manualTeams = teamsQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+        const manualTeamsMap: Record<string, Team> = {};
+        manualTeams.forEach(team => {
+            manualTeamsMap[team.name] = team;
+        });
 
         // 2. Get athlete data from the 'athletes/all-athletes' document
         const athletesDocRef = doc(db, ATHLETES_COLLECTION, 'all-athletes');
@@ -462,7 +466,7 @@ export const getTeams = async (allStudentsMap: Map<string, Student>): Promise<Te
                 if (teamName && studentId) {
                     if (!teamsFromAthletes[teamName]) {
                         teamsFromAthletes[teamName] = {
-                            id: teamName, // Use sport name as ID for these dynamic teams
+                            id: teamName, // Use sport name as a temporary ID
                             name: teamName,
                             members: []
                         };
@@ -472,31 +476,32 @@ export const getTeams = async (allStudentsMap: Map<string, Student>): Promise<Te
             }
         }
         
-        // 3. Merge manual and dynamic teams
-        const combinedTeams: Record<string, Team> = {};
+        // 3. Merge manual and dynamic teams, giving precedence to manual teams
+        const combinedTeams: Record<string, Team> = { ...teamsFromAthletes, ...manualTeamsMap };
 
-        // Add teams from athletes first
-        Object.values(teamsFromAthletes).forEach(team => {
-            combinedTeams[team.name] = team;
-        });
+        Object.keys(combinedTeams).forEach(teamName => {
+            const manualTeam = manualTeamsMap[teamName];
+            const athleteTeam = teamsFromAthletes[teamName];
 
-        // Add or merge manual teams
-        manualTeams.forEach(manualTeam => {
-            if (combinedTeams[manualTeam.name]) {
-                // Merge members if a team with the same name exists from athletes
-                const existingMembers = new Map((combinedTeams[manualTeam.name].members || []).map(m => [m.id, m]));
-                (manualTeam.members || []).forEach(member => {
-                    if (!existingMembers.has(member.id)) {
-                        combinedTeams[manualTeam.name].members.push(member);
+            if (manualTeam && athleteTeam) {
+                // Team exists in both. Merge members, giving precedence to manual team's list but adding unique athletes.
+                const memberIds = new Set((manualTeam.members || []).map(m => m.id));
+                const mergedMembers = [...(manualTeam.members || [])];
+                
+                (athleteTeam.members || []).forEach(athleteMember => {
+                    if (!memberIds.has(athleteMember.id)) {
+                        mergedMembers.push(athleteMember);
                     }
                 });
-                // Ensure the manual team's ID (from firestore) is preserved
-                combinedTeams[manualTeam.name].id = manualTeam.id;
-            } else {
-                // Add as a new team
-                combinedTeams[manualTeam.name] = manualTeam;
+                combinedTeams[teamName].members = mergedMembers;
+            }
+            // Ensure teams created from athletes have a proper ID if they become manual
+             if (!combinedTeams[teamName].id || combinedTeams[teamName].id === teamName) {
+                const manual = manualTeams.find(t => t.name === teamName);
+                if(manual) combinedTeams[teamName].id = manual.id;
             }
         });
+
 
         return Object.values(combinedTeams);
 
@@ -558,6 +563,7 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
 
 
