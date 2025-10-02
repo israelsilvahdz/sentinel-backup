@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -57,6 +56,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             tempAthletes = tempAthletes.filter(s => s.leader === selectedLeader);
         }
         if (selectedSport === 'all') return tempAthletes;
+        
         return tempAthletes.filter(s => {
             return teams.some(team => team.name === selectedSport && Array.isArray(team.members) && team.members.some(member => member.id === s.id));
         });
@@ -691,6 +691,7 @@ export function StudentPanel() {
                   <StudentCard 
                     key={student.id} 
                     student={student} 
+                    teams={teams}
                     startOpen={false} 
                   />
                 ))}
@@ -715,3 +716,5 @@ export function StudentPanel() {
     </div>
   );
 }
+
+    

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -8,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText, Plus, Minus, Award } from 'lucide-react';
-import { type Student, type Subject, type SubjectSummary } from "@/types/student";
+import { type Student, type Subject, type SubjectSummary, type Team } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,6 +27,7 @@ import { GradesTable } from './GradesTable';
 
 interface StudentCardProps {
   student: Student;
+  teams: Team[];
   startOpen?: boolean;
   isDialog?: boolean;
 }
@@ -246,9 +246,8 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     );
 }
 
-export function StudentCard({ student, startOpen = false, isDialog = false }: StudentCardProps) {
+export function StudentCard({ student, teams, startOpen = false, isDialog = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
-  const { teams } = useDashboardFilters();
   
   const teamName = useMemo(() => {
     if (!teams || teams.length === 0) return null;
@@ -351,3 +350,5 @@ export function StudentCard({ student, startOpen = false, isDialog = false }: St
     </Card>
   );
 }
+
+    
