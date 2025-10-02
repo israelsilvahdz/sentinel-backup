@@ -141,7 +141,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
         setTeachersToNotify([]);
         setAffectedClasses([]);
     }
-  }, [dateRange, subjects, isPartialAbsence]);
+  }, [dateRange, subjects, isPartialAbsence, professorContacts]);
   
   useEffect(() => {
     if (isPartialAbsence && affectedClasses.length > 0) {
@@ -156,7 +156,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
       });
       setTeachersToNotify(Array.from(uniqueTeachers.values()));
     }
-  }, [isPartialAbsence, selectedClasses, affectedClasses]);
+  }, [isPartialAbsence, selectedClasses, affectedClasses, getProfessorEmail]);
 
 
   const scheduleByDayAndSlot = useMemo(() => {

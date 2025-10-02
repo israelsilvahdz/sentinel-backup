@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -17,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Trash2, UserPlus, PlusCircle, UserX, Shield, Users } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 
-function AddStudentToTeamDialog({ team, onUpdate, allStudentsMap }: { team: Team; onUpdate: () => void, allStudentsMap: Map<string, Student> }) {
+function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,8 +50,6 @@ function AddStudentToTeamDialog({ team, onUpdate, allStudentsMap }: { team: Team
       setIsSubmitting(false);
     }
   };
-  
-  const allStudentsList = Array.from(allStudentsMap.values());
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -82,7 +81,7 @@ function AddStudentToTeamDialog({ team, onUpdate, allStudentsMap }: { team: Team
 
 
 export function TeamsManagementPanel() {
-  const { teams, fetchTeams, allStudentsMap } = useDashboardFilters();
+  const { teams, fetchTeams } = useDashboardFilters();
   const [isNewTeamFormOpen, setIsNewTeamFormOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,7 +166,7 @@ export function TeamsManagementPanel() {
                         <CardDescription>{team.members?.length || 0} miembro(s)</CardDescription>
                     </div>
                      <div className="flex items-center gap-1">
-                        <AddStudentToTeamDialog team={team} onUpdate={fetchTeams} allStudentsMap={allStudentsMap} />
+                        <AddStudentToTeamDialog team={team} onUpdate={fetchTeams} />
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
@@ -224,4 +223,3 @@ export function TeamsManagementPanel() {
     </div>
   );
 }
-

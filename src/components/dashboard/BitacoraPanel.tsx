@@ -12,7 +12,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDashboardFilters } from './DashboardClient';
-import type { BitacoraEntry } from '@/types/student';
+import type { BitacoraEntry, Student } from '@/types/student';
 import { addBitacoraEntry, deleteBitacoraEntry } from '@/lib/firebase-services';
 import { useToast } from '@/hooks/use-toast';
 import { format, isSameDay } from 'date-fns';
@@ -381,9 +381,11 @@ export function BitacoraPanel() {
 }
 
 export function StudentSearchPopover({ onStudentSelect }: { onStudentSelect: (student: { id: string, name: string }) => void }) {
-  const { allStudents } = useDashboardFilters();
+  const { allStudentsMap } = useDashboardFilters();
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+
+  const allStudents = useMemo(() => Array.from(allStudentsMap.values()), [allStudentsMap]);
 
   const filteredStudents = useMemo(() => {
     if (!searchValue) return allStudents;
@@ -420,5 +422,3 @@ export function StudentSearchPopover({ onStudentSelect }: { onStudentSelect: (st
     </Popover>
   );
 }
-
-    
