@@ -14,7 +14,8 @@ import {
   updateDoc,
   setDoc,
   writeBatch,
-  getDoc
+  getDoc,
+  where
 } from 'firebase/firestore';
 import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student } from '@/types/student';
 
@@ -44,7 +45,6 @@ const BITACORA_COLLECTION = 'bitacora';
 const TEAM_TASKS_COLLECTION = 'teamTasks';
 const CONTACTS_COLLECTION = 'contacts';
 const PROFESSOR_CONTACTS_COLLECTION = 'professorContacts';
-const ATHLETES_COLLECTION = 'athletes';
 const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
 const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
 const TEAMS_COLLECTION = 'teams';
@@ -304,47 +304,6 @@ export const getProfessorContacts = async (): Promise<Record<string, ProfessorCo
     }
 };
 
-// --- Funciones para Atletas (ahora parte de Equipos) ---
-
-/**
- * Guarda una lista de atletas como equipos en la colección 'teams'.
- * @param athletes Objeto donde la clave es el nombre del alumno y el valor es su deporte.
- */
-export const bulkAddOrUpdateAthletes = async (athletes: Record<string, string>, allStudentsMap: Map<string, Student>): Promise<void> => {
-    try {
-        const studentNameToIdMap = new Map<string, string>();
-        allStudentsMap.forEach(student => {
-            studentNameToIdMap.set(student.name.toUpperCase(), student.id);
-        });
-
-        const teamsToUpdate: Record<string, Team> = {};
-
-        for (const studentName in athletes) {
-            const teamName = athletes[studentName];
-            const studentId = studentNameToIdMap.get(studentName.toUpperCase());
-
-            if (teamName && studentId) {
-                if (!teamsToUpdate[teamName]) {
-                    // Prepara un nuevo equipo si no existe en este lote
-                    teamsToUpdate[teamName] = {
-                        id: teamName, // Usa el nombre como ID temporal para agrupar
-                        name: teamName,
-                        members: []
-                    };
-                }
-                teamsToUpdate[teamName].members.push({ id: studentId, name: studentName });
-            }
-        }
-
-        if (Object.keys(teamsToUpdate).length > 0) {
-            await bulkAddOrUpdateTeams(Object.values(teamsToUpdate));
-        }
-    } catch (error) {
-        console.error("Error al guardar atletas como equipos en Firestore: ", error);
-        throw new Error("No se pudieron guardar los equipos de atletas en la base de datos.");
-    }
-};
-
 // --- Funciones para Seguimientos Kanban ---
 
 export const addSeguimientoEntry = async (entry: Omit<SeguimientoEntry, 'id' | 'createdAt'>): Promise<void> => {
@@ -457,28 +416,27 @@ export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }):
     try {
         const teamData = {
             name: team.name,
-            members: team.members || [], // Ensure members is always an array
+            members: team.members || [], // Asegurar que members es un array
         };
         
         // Si el equipo ya tiene un ID, se trata de una actualización.
-        // Si no, Firestore generará uno nuevo al usar addDoc.
         if (team.id) {
             const docRef = doc(db, TEAMS_COLLECTION, team.id);
             await setDoc(docRef, teamData, { merge: true });
             return team.id;
-        } else {
-            // Para equipos nuevos, podemos intentar usar el nombre como ID si no existe
-            const existingTeamQuery = query(collection(db, TEAMS_COLLECTION), where("name", "==", team.name));
-            const existingTeamSnapshot = await getDocs(existingTeamQuery);
-            if (!existingTeamSnapshot.empty) {
-                // El equipo ya existe, actualízalo
-                const existingTeamDoc = existingTeamSnapshot.docs[0];
-                await updateDoc(existingTeamDoc.ref, {
-                    members: team.members
-                });
-                return existingTeamDoc.id;
-            }
+        } 
+        
+        // Para equipos nuevos, buscar si ya existe uno con el mismo nombre.
+        const q = query(collection(db, TEAMS_COLLECTION), where("name", "==", team.name));
+        const querySnapshot = await getDocs(q);
 
+        if (!querySnapshot.empty) {
+            // El equipo ya existe, actualízalo
+            const existingDoc = querySnapshot.docs[0];
+            await updateDoc(existingDoc.ref, { members: team.members });
+            return existingDoc.id;
+        } else {
+            // El equipo es nuevo, créalo
             const docRef = await addDoc(collection(db, TEAMS_COLLECTION), teamData);
             return docRef.id;
         }
@@ -489,31 +447,39 @@ export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }):
 };
 
 
-export const bulkAddOrUpdateTeams = async (teams: Team[]): Promise<void> => {
-  const batch = writeBatch(db);
-  const existingTeamsSnapshot = await getDocs(collection(db, TEAMS_COLLECTION));
-  const existingTeamsMap = new Map(existingTeamsSnapshot.docs.map(doc => [doc.data().name, { id: doc.id, ...doc.data() } as Team]));
+export const bulkAddOrUpdateTeams = async (teamsFromExcel: Team[]): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    const existingTeamsSnapshot = await getDocs(collection(db, TEAMS_COLLECTION));
+    const existingTeamsMap = new Map(existingTeamsSnapshot.docs.map(doc => [doc.data().name, { id: doc.id, ...doc.data() } as Team]));
 
-  teams.forEach(newTeam => {
-      const existingTeam = existingTeamsMap.get(newTeam.name);
-      if (existingTeam) {
-          // El equipo ya existe, fusiona los miembros
-          const existingMembers = new Map((existingTeam.members || []).map(m => [m.id, m]));
-          (newTeam.members || []).forEach(newMember => {
-              if (!existingMembers.has(newMember.id)) {
-                  existingTeam.members.push(newMember);
-              }
-          });
-          const docRef = doc(db, TEAMS_COLLECTION, existingTeam.id);
-          batch.set(docRef, { name: existingTeam.name, members: existingTeam.members }, { merge: true });
-      } else {
-          // El equipo es nuevo, créalo
-          const docRef = doc(collection(db, TEAMS_COLLECTION));
-          batch.set(docRef, { name: newTeam.name, members: newTeam.members || [] });
-      }
-  });
+    for (const newTeam of teamsFromExcel) {
+        const existingTeam = existingTeamsMap.get(newTeam.name);
+        
+        if (existingTeam) {
+            // El equipo ya existe, fusionar miembros
+            const existingMembersMap = new Map((existingTeam.members || []).map(m => [m.id, m]));
+            
+            (newTeam.members || []).forEach(newMember => {
+                if (!existingMembersMap.has(newMember.id)) {
+                    existingTeam.members.push(newMember);
+                }
+            });
 
-  await batch.commit();
+            const docRef = doc(db, TEAMS_COLLECTION, existingTeam.id);
+            batch.set(docRef, { name: existingTeam.name, members: existingTeam.members }, { merge: true });
+        } else {
+            // El equipo es nuevo, créalo
+            const docRef = doc(collection(db, TEAMS_COLLECTION));
+            batch.set(docRef, { name: newTeam.name, members: newTeam.members || [] });
+        }
+    }
+    
+    await batch.commit();
+  } catch (error) {
+      console.error("Error in bulkAddOrUpdateTeams:", error);
+      throw new Error("Failed to bulk update teams in Firestore.");
+  }
 };
 
 
@@ -536,6 +502,7 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
 
 
