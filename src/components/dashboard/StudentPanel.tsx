@@ -488,7 +488,7 @@ export function StudentPanel() {
     }
   }, [allStudentsMap, toast]);
 
-  const athleteStudents = useMemo(() => allStudents.filter(s => teams.some(team => team.members.some(member => member.id === s.id))), [allStudents, teams]);
+  const athleteStudents = useMemo(() => allStudents.filter(s => teams.some(team => Array.isArray(team.members) && team.members.some(member => member.id === s.id))), [allStudents, teams]);
   const sportList = useMemo(() => Array.from(new Set(teams.map(team => team.name))), [teams]);
 
   const filteredStudents = useMemo(() => {
