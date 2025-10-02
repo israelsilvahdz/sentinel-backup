@@ -31,8 +31,8 @@ const caseSchema = z.object({
   NOMBRE_ALUMNO: z.string(),
   MATRICULA_ALUMNO: z.string().min(1, 'Requerido'),
   SEMESTRE_ALUMNO: z.string().min(1, 'Requerido'),
-  NOMBRE_TUTOR: z.string().min(1, 'Requerido'),
-  PARENTESCO_TUTOR: z.string().min(1, 'Requerido'),
+  NOMBRE_TUTOR: z.string().optional(),
+  PARENTESCO_TUTOR: z.string().optional(),
   DESCRIPCION_HECHOS: z.string().min(1, 'Requerido'),
   ARTICULOS_PRESUNTOS: z.string().min(1, 'Requerido'),
   PRESIDENTE_COMITE: z.string().min(1, 'Requerido'),
@@ -174,8 +174,6 @@ export function AcademicCommitteePanel() {
                         <div className="space-y-2"><Label>Fecha del Reporte</Label><Input type="date" {...register('FECHA_REPORTE', { valueAsDate: true })} /></div>
                     </div>
                     <div className="space-y-2"><Label>Reportado por</Label><Input {...register('NOMBRE_REPORTANTE')} /></div>
-                    <div className="space-y-2"><Label>Nombre del Padre/Tutor</Label><Input {...register('NOMBRE_TUTOR')} /></div>
-                    <div className="space-y-2"><Label>Parentesco</Label><Input {...register('PARENTESCO_TUTOR')} /></div>
                     <div className="space-y-2"><Label>Presidente del Comité</Label><Input {...register('PRESIDENTE_COMITE')} /></div>
                     <div className="space-y-2"><Label>Cargo del Presidente</Label><Input {...register('CARGO_PRESIDENTE')} /></div>
                     <div className="space-y-2"><Label>Artículos Presuntos</Label><Input {...register('ARTICULOS_PRESUNTOS')} placeholder="Ej. 1, 2 y 3"/></div>

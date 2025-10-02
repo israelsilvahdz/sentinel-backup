@@ -66,8 +66,8 @@ Como Presidente del Comité`
 
 En ${data.LUGAR || '{{LUGAR}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
 
-Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}
-${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
+Sr (a) {{NOMBRE_TUTOR}}
+{{PARENTESCO_TUTOR}} de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
 
 ${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}, con fundamento en el artículo 153 del Reglamento Escolar de Preparatoria de Universidad Tecmilenio (“Reglamento”) se le notifica a usted a través del presente escrito, sobre la integración de un Comité Disciplinario derivado de reporte en donde se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matricula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} constituye una falta de disciplina prevista en el Reglamento.
 
@@ -86,7 +86,7 @@ Como Presidente del Comité`;
 
 En ${data.LUGAR || '{{LUGAR}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
 
-Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}
+Sr (a) {{NOMBRE_TUTOR}}
 Padre de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
 
 ${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}, con fundamento en el artículo 153 del Reglamento Escolar de Preparatoria de Universidad Tecmilenio (“Reglamento”) se le notifica a usted a través del presente escrito, sobre la integración de un Comité Disciplinario derivado de reporte en donde se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matricula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} constituye una falta de disciplina prevista en el Reglamento.
@@ -158,7 +158,7 @@ ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}`
 EXPEDIENTE N° ${data.NUMERO_EXPEDIENTE || '{{NUMERO_EXPEDIENTE}}'}
 En ${data.LUGAR || '{{LUGAR}}'} a ${data.FECHA_RESOLUCION ? format(data.FECHA_RESOLUCION, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_RESOLUCION}}'}
 
-Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}, ${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de
+Sr (a) {{NOMBRE_TUTOR}}, {{PARENTESCO_TUTOR}} de
 ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'}
 
 Se procede a notificarle de manera electrónica la resolución del Comité Disciplinario que se adjunta al presente correo electrónico.
