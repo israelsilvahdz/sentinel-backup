@@ -496,8 +496,9 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
                     if (name && sport && studentId) {
                          if (!teamsToUpdate[sport]) {
                             teamsToUpdate[sport] = {
-                                id: sport, // Use sport name as a temporary ID for grouping
+                                id: sport, 
                                 name: sport,
+                                type: 'deportivo',
                                 members: []
                             };
                         }

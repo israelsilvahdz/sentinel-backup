@@ -416,27 +416,27 @@ export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }):
     try {
         const teamData = {
             name: team.name,
-            members: team.members || [], // Asegurar que members es un array
+            type: team.type,
+            members: team.members || [],
         };
         
-        // Si el equipo ya tiene un ID, se trata de una actualización.
         if (team.id) {
             const docRef = doc(db, TEAMS_COLLECTION, team.id);
             await setDoc(docRef, teamData, { merge: true });
             return team.id;
         } 
         
-        // Para equipos nuevos, buscar si ya existe uno con el mismo nombre.
         const q = query(collection(db, TEAMS_COLLECTION), where("name", "==", team.name));
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-            // El equipo ya existe, actualízalo
             const existingDoc = querySnapshot.docs[0];
-            await updateDoc(existingDoc.ref, { members: team.members });
+            await updateDoc(existingDoc.ref, { 
+              type: team.type,
+              members: team.members 
+            });
             return existingDoc.id;
         } else {
-            // El equipo es nuevo, créalo
             const docRef = await addDoc(collection(db, TEAMS_COLLECTION), teamData);
             return docRef.id;
         }
@@ -456,22 +456,32 @@ export const bulkAddOrUpdateTeams = async (teamsFromExcel: Team[]): Promise<void
     for (const newTeam of teamsFromExcel) {
         const existingTeam = existingTeamsMap.get(newTeam.name);
         
+        const membersToAdd = newTeam.members || [];
+        
         if (existingTeam) {
             // El equipo ya existe, fusionar miembros
             const existingMembersMap = new Map((existingTeam.members || []).map(m => [m.id, m]));
             
-            (newTeam.members || []).forEach(newMember => {
+            membersToAdd.forEach(newMember => {
                 if (!existingMembersMap.has(newMember.id)) {
                     existingTeam.members.push(newMember);
                 }
             });
 
             const docRef = doc(db, TEAMS_COLLECTION, existingTeam.id);
-            batch.set(docRef, { name: existingTeam.name, members: existingTeam.members }, { merge: true });
+            batch.set(docRef, { 
+                name: existingTeam.name, 
+                type: 'deportivo', // Assume excel teams are 'deportivo'
+                members: existingTeam.members 
+            }, { merge: true });
         } else {
             // El equipo es nuevo, créalo
             const docRef = doc(collection(db, TEAMS_COLLECTION));
-            batch.set(docRef, { name: newTeam.name, members: newTeam.members || [] });
+            batch.set(docRef, { 
+                name: newTeam.name, 
+                type: 'deportivo',
+                members: membersToAdd
+            });
         }
     }
     
@@ -502,6 +512,7 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
 
 

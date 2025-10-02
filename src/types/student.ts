@@ -43,7 +43,7 @@ export interface Student {
   isGraduationCandidate: boolean;
   subjects?: Subject[]; // Full subjects, loaded on demand
   subjectSummaries?: SubjectSummary[]; // Summaries for dashboard performance
-  team?: string; // e.g., 'FUTBOL', 'DEBATE'
+  sport?: string; // e.g., 'FUTBOL', 'DEBATE'
 }
 
 export type StudentData = Record<string, Student>;
@@ -130,7 +130,8 @@ export interface ProfessorContact {
 }
 
 export interface Team {
-    id: string; // e.g., 'FUTBOL'
+    id: string;
     name: string;
-    members: { id: string; name: string }[]; // Array of student members
+    type?: 'deportivo' | 'cultural'; // Nuevo campo para clasificar el equipo
+    members: { id: string; name: string }[];
 }

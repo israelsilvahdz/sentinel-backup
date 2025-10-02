@@ -15,8 +15,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Trash2, UserPlus, PlusCircle, UserX, Shield, Users } from 'lucide-react';
+import { Loader2, Trash2, UserPlus, PlusCircle, UserX, Shield, Users, Edit } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
+import { Badge } from '../ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -79,11 +81,80 @@ function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () =
   );
 }
 
+function EditTeamDialog({ team, onUpdate, children }: { team: Team, onUpdate: () => void, children: React.ReactNode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [teamName, setTeamName] = useState(team.name);
+  const [teamType, setTeamType] = useState<Team['type']>(team.type);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (isOpen) {
+      setTeamName(team.name);
+      setTeamType(team.type);
+    }
+  }, [isOpen, team]);
+
+  const handleUpdateTeam = async () => {
+    if (!teamName.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'El nombre del equipo no puede estar vacío.' });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await addOrUpdateTeam({ ...team, name: teamName, type: teamType });
+      toast({ title: 'Éxito', description: `El equipo ha sido actualizado.` });
+      onUpdate();
+      setIsOpen(false);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el equipo.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Editar Equipo</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-team-name">Nombre del Equipo</Label>
+            <Input id="edit-team-name" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-team-type">Tipo de Equipo</Label>
+            <Select value={teamType} onValueChange={(value) => setTeamType(value as Team['type'])}>
+              <SelectTrigger id="edit-team-type">
+                <SelectValue placeholder="Seleccionar tipo..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="deportivo">Deportivo</SelectItem>
+                <SelectItem value="cultural">Cultural</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setIsOpen(false)}>Cancelar</Button>
+          <Button onClick={handleUpdateTeam} disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Guardar Cambios'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 export function TeamsManagementPanel() {
   const { teams, fetchTeams } = useDashboardFilters();
   const [isNewTeamFormOpen, setIsNewTeamFormOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
+  const [newTeamType, setNewTeamType] = useState<Team['type']>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -110,6 +181,7 @@ export function TeamsManagementPanel() {
     try {
         const newTeam: Omit<Team, 'id'> = {
             name: newTeamName.trim(),
+            type: newTeamType,
             members: []
         };
         await addOrUpdateTeam(newTeam);
@@ -117,6 +189,7 @@ export function TeamsManagementPanel() {
         fetchTeams();
         setIsNewTeamFormOpen(false);
         setNewTeamName('');
+        setNewTeamType(undefined);
     } catch(error) {
         toast({ variant: 'destructive', title: 'Error', description: 'No se pudo crear el equipo.' });
     } finally {
@@ -141,11 +214,25 @@ export function TeamsManagementPanel() {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Crear un Nuevo Equipo</DialogTitle>
-                    <DialogDescription>Dale un nombre al nuevo equipo (ej. "Debate", "Robótica", "Fútbol Femenil").</DialogDescription>
+                    <DialogDescription>Dale un nombre y un tipo al nuevo equipo.</DialogDescription>
                 </DialogHeader>
-                <div className="py-4 space-y-2">
-                    <Label htmlFor="new-team-name">Nombre del Equipo</Label>
-                    <Input id="new-team-name" value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} />
+                <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="new-team-name">Nombre del Equipo</Label>
+                        <Input id="new-team-name" value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="new-team-type">Tipo de Equipo</Label>
+                        <Select value={newTeamType} onValueChange={(value) => setNewTeamType(value as Team['type'])}>
+                          <SelectTrigger id="new-team-type">
+                            <SelectValue placeholder="Seleccionar tipo..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="deportivo">Deportivo</SelectItem>
+                            <SelectItem value="cultural">Cultural</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => setIsNewTeamFormOpen(false)}>Cancelar</Button>
@@ -162,11 +249,17 @@ export function TeamsManagementPanel() {
             <Card key={team.id} className="flex flex-col">
                 <CardHeader className="flex flex-row items-start justify-between">
                     <div>
-                        <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5 text-primary" /> {team.name}</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                          <Shield className="h-5 w-5 text-primary" /> {team.name}
+                          {team.type && <Badge variant={team.type === 'deportivo' ? 'default' : 'secondary'}>{team.type}</Badge>}
+                        </CardTitle>
                         <CardDescription>{team.members?.length || 0} miembro(s)</CardDescription>
                     </div>
                      <div className="flex items-center gap-1">
                         <AddStudentToTeamDialog team={team} onUpdate={fetchTeams} />
+                        <EditTeamDialog team={team} onUpdate={fetchTeams}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8"><Edit className="h-4 w-4"/></Button>
+                        </EditTeamDialog>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
