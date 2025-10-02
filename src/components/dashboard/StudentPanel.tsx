@@ -10,7 +10,7 @@ import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import type { Student, StudentContact, Subject } from '@/types/student';
+import type { Student, StudentContact, Subject, Team } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileUpload } from './FileUpload';
@@ -55,8 +55,11 @@ function AthleteNotificationDialog({ students, sports, filterType, selectedLeade
             tempAthletes = tempAthletes.filter(s => s.leader === selectedLeader);
         }
         if (selectedSport === 'all') return tempAthletes;
-        return tempAthletes.filter(s => s.sport === selectedSport);
-    }, [students, selectedSport, filterByLeader, selectedLeader]);
+        return tempAthletes.filter(s => {
+            const team = sports.find(team => team === s.team);
+            return team;
+        });
+    }, [students, sports, selectedSport, filterByLeader, selectedLeader]);
 
 
     useEffect(() => {
@@ -403,11 +406,11 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
 export function StudentPanel() {
   const { 
     allStudents,
+    allStudentsMap,
     filteredStudents: initialFilteredStudents, 
     studentContacts,
     setStudentContacts,
-    athletes,
-    setAthletes,
+    teams,
     hasData, 
     isLoading, 
     caseType, 
@@ -465,16 +468,14 @@ export function StudentPanel() {
     setAthletesFile(file);
     setIsProcessingAthletes(true);
     try {
-      const parsedAthletes = await parseAthletesExcel(file);
-      if (parsedAthletes) {
-        setAthletes(parsedAthletes);
-        toast({
+        if (allStudentsMap.size === 0) {
+            throw new Error("Carga primero el reporte diario de alumnos.");
+        }
+      await parseAthletesExcel(file, allStudentsMap);
+      toast({
           title: "Lista de Atletas Actualizada",
-          description: `Se procesaron y guardaron ${Object.keys(parsedAthletes).length} atletas en la base de datos. La lista se aplicará en la próxima carga de reporte diario.`,
-        });
-      } else {
-        throw new Error("El archivo de atletas no tiene el formato esperado o está vacío.");
-      }
+          description: `Se han procesado y guardado los equipos de atletas en la base de datos.`,
+      });
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -485,10 +486,10 @@ export function StudentPanel() {
       setIsProcessingAthletes(false);
       setAthletesFile(null);
     }
-  }, [setAthletes, toast]);
+  }, [allStudentsMap, toast]);
 
-  const athleteStudents = useMemo(() => allStudents.filter(s => s.sport), [allStudents]);
-  const sportList = useMemo(() => Array.from(new Set(athleteStudents.map(s => s.sport!))), [athleteStudents]);
+  const athleteStudents = useMemo(() => allStudents.filter(s => teams.some(team => team.members.some(member => member.id === s.id))), [allStudents, teams]);
+  const sportList = useMemo(() => Array.from(new Set(teams.map(team => team.name))), [teams]);
 
   const filteredStudents = useMemo(() => {
     let students = initialFilteredStudents;

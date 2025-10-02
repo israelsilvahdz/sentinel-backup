@@ -1,8 +1,8 @@
 
 
 import * as XLSX from 'xlsx';
-import type { StudentData, Subject, Student, StudentContact, ProfessorContact } from '@/types/student';
-import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateAthletes } from './firebase-services';
+import type { StudentData, Subject, Student, StudentContact, ProfessorContact, Team } from '@/types/student';
+import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams } from './firebase-services';
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -120,7 +120,7 @@ function normalizeSubjectName(name: string): string {
 }
 
 
-export async function parseExcel(file: File, athletes: Record<string, string>): Promise<StudentData | null> {
+export async function parseExcel(file: File): Promise<StudentData | null> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -190,8 +190,6 @@ export async function parseExcel(file: File, athletes: Record<string, string>): 
 
             const studentId = getColumnValue(COLUMNS.STUDENT_ID);
             const studentName = getColumnValue(COLUMNS.STUDENT_NAME);
-            const studentSport = athletes[studentName];
-
 
             if (!studentData[studentId]) {
                 studentData[studentId] = {
@@ -201,7 +199,6 @@ export async function parseExcel(file: File, athletes: Record<string, string>): 
                     tutor: getColumnValue(COLUMNS.TUTOR),
                     isGraduationCandidate: getColumnValue(COLUMNS.IS_GRADUATION_CANDIDATE).toLowerCase() === 'si',
                     subjects: [],
-                    sport: studentSport,
                 };
             }
 
@@ -459,21 +456,21 @@ const ATHLETES_COLUMNS = {
   SPORT: 'Deporte',
 };
 
-export async function parseAthletesExcel(file: File): Promise<Record<string, string> | null> {
+export async function parseAthletesExcel(file: File, allStudentsMap: Map<string, Student>): Promise<void> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
         reader.onload = async (e: ProgressEvent<FileReader>) => {
             try {
                 const data = e.target?.result;
-                if (!data) return resolve(null);
+                if (!data) return resolve();
 
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
-                if (jsonData.length < 2) return resolve(null);
+                if (jsonData.length < 2) return resolve();
 
                 const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
                 const nameIndex = headers.indexOf(normalizeHeader(ATHLETES_COLUMNS.NAME));
@@ -482,20 +479,37 @@ export async function parseAthletesExcel(file: File): Promise<Record<string, str
                 if (nameIndex === -1 || sportIndex === -1) {
                     throw new Error(`Faltan columnas requeridas: '${ATHLETES_COLUMNS.NAME}' y '${ATHLETES_COLUMNS.SPORT}'`);
                 }
+                
+                const studentNameToIdMap = new Map<string, string>();
+                allStudentsMap.forEach(student => {
+                    studentNameToIdMap.set(student.name.toUpperCase(), student.id);
+                });
 
-                const athletes: Record<string, string> = {};
+                const teamsToUpdate: Record<string, Team> = {};
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
                     const name = String(row[nameIndex]).trim();
                     const sport = String(row[sportIndex]).trim();
-                    if (name && sport) {
-                        athletes[name] = sport;
+                    const studentId = studentNameToIdMap.get(name.toUpperCase());
+
+                    if (name && sport && studentId) {
+                         if (!teamsToUpdate[sport]) {
+                            teamsToUpdate[sport] = {
+                                id: sport, // Use sport name as a temporary ID for grouping
+                                name: sport,
+                                members: []
+                            };
+                        }
+                        teamsToUpdate[sport].members.push({ id: studentId, name });
                     }
                 }
                 
-                await bulkAddOrUpdateAthletes(athletes);
-                resolve(athletes);
+                if (Object.keys(teamsToUpdate).length > 0) {
+                    await bulkAddOrUpdateTeams(Object.values(teamsToUpdate));
+                }
+
+                resolve();
 
             } catch (error) {
                 console.error("Error al procesar el archivo de atletas:", error);

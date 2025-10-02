@@ -42,7 +42,7 @@ import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSumma
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getAthletes, getTeams, bulkAddOrUpdateTeams } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
 
 
@@ -64,8 +64,6 @@ interface DashboardContextType {
   setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
   professorContacts: Record<string, ProfessorContact>;
   setProfessorContacts: React.Dispatch<React.SetStateAction<Record<string, ProfessorContact>>>;
-  athletes: Record<string, string>;
-  setAthletes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   teams: Team[];
   fetchTeams: () => Promise<void>;
   seguimientoEntries: Record<string, (SeguimientoEntry | BitacoraEntry)[]>;
@@ -123,7 +121,6 @@ export function DashboardClient() {
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
-  const [athletes, setAthletes] = useState<Record<string, string>>({});
   const [teams, setTeams] = useState<Team[]>([]);
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
@@ -147,13 +144,13 @@ export function DashboardClient() {
 
   const fetchTeams = useCallback(async () => {
       try {
-          const fetchedTeams = await getTeams(allStudentsMap);
+          const fetchedTeams = await getTeams();
           setTeams(fetchedTeams);
       } catch (error) {
           console.error("Failed to fetch teams:", error);
           toast({ variant: "destructive", title: "Error de Equipos", description: "No se pudieron cargar los equipos." });
       }
-  }, [toast, allStudentsMap]);
+  }, [toast]);
   
   const fetchSeguimientoEntries = useCallback(async () => {
     try {
@@ -223,12 +220,8 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
-          const [studentContactsFromDb, athletesFromDb] = await Promise.all([
-            getContacts(),
-            getAthletes(),
-          ]);
+          const studentContactsFromDb = await getContacts();
           setStudentContacts(studentContactsFromDb);
-          setAthletes(athletesFromDb);
           
           let profContactsFromDb = await getProfessorContacts();
 
@@ -361,17 +354,7 @@ export function DashboardClient() {
         setIsProcessing(true);
         setProgress(10);
         try {
-            // Pass the current teams to the parser
-            const athletesMap = teams.reduce((acc, team) => {
-                if (Array.isArray(team.members)) {
-                    team.members.forEach(member => {
-                        acc[member.name] = team.name;
-                    });
-                }
-                return acc;
-            }, {} as Record<string, string>);
-
-            const studentData = await parseExcel(currentFile, athletesMap);
+            const studentData = await parseExcel(currentFile);
             setProgress(50);
             
             if (!studentData) {
@@ -563,7 +546,7 @@ export function DashboardClient() {
   }
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, athletes, setAthletes, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -738,6 +721,7 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
 
 
 
