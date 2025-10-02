@@ -44,7 +44,6 @@ import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
 import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getAthletes, getTeams, bulkAddOrUpdateTeams } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
-import initialTeamsData from '@/lib/teams-seed.json';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
@@ -115,7 +114,6 @@ const LOCAL_STORAGE_KEYS = {
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
     PROFESSOR_CONTACTS_MIGRATED: 'academic_sentinel_prof_contacts_migrated',
-    TEAMS_MIGRATED: 'academic_sentinel_teams_migrated_v2', // Use a new key for the new structure
 };
 
 
@@ -144,16 +142,18 @@ export function DashboardClient() {
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('seguimiento');
+  
+  const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
   const fetchTeams = useCallback(async () => {
       try {
-          const fetchedTeams = await getTeams();
+          const fetchedTeams = await getTeams(allStudentsMap);
           setTeams(fetchedTeams);
       } catch (error) {
           console.error("Failed to fetch teams:", error);
           toast({ variant: "destructive", title: "Error de Equipos", description: "No se pudieron cargar los equipos." });
       }
-  }, [toast]);
+  }, [toast, allStudentsMap]);
   
   const fetchSeguimientoEntries = useCallback(async () => {
     try {
@@ -248,23 +248,10 @@ export function DashboardClient() {
               profContactsFromDb = await getProfessorContacts(); // Re-fetch after migration
           }
           setProfessorContacts(profContactsFromDb);
-          
-          // One-time migration for teams
-          const teamsMigrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.TEAMS_MIGRATED);
-          if (!teamsMigrationDone) {
-              const initialTeams = initialTeamsData as Team[];
-              if (initialTeams.length > 0) {
-                  console.log("Migrating initial teams from JSON to Firestore...");
-                  await bulkAddOrUpdateTeams(initialTeams);
-                  localStorage.setItem(LOCAL_STORAGE_KEYS.TEAMS_MIGRATED, 'true');
-                  console.log("Teams migration complete.");
-              }
-          }
 
           await Promise.all([
             fetchSeguimientoEntries(),
             fetchTeamTasks(),
-            fetchTeams(),
           ]);
 
 
@@ -276,7 +263,14 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams]);
+  }, [fetchSeguimientoEntries, fetchTeamTasks]);
+
+  useEffect(() => {
+    // Fetch teams whenever student data changes (so we can map names to IDs)
+    if(allStudents.length > 0) {
+        fetchTeams();
+    }
+  }, [allStudents, fetchTeams]);
 
   // Persist data to local storage whenever it changes (contacts are now in DB)
   useEffect(() => {
@@ -492,8 +486,6 @@ export function DashboardClient() {
     return Array.from(groupsSet).sort();
   }, [allStudents]);
   
-  const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
-
 
   const filteredStudents = useMemo(() => {
     let students = allStudents;
@@ -746,5 +738,6 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
 
 

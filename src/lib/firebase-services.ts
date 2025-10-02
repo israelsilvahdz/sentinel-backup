@@ -16,7 +16,7 @@ import {
   writeBatch,
   getDoc
 } from 'firebase/firestore';
-import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team } from '@/types/student';
+import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student } from '@/types/student';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -66,7 +66,7 @@ export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 
     // Clean up undefined fields before sending to Firestore
     Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
 
-    await addDoc(collection(db, BITACORA_COLLECTION), docData);
+    await addDoc(collection(db, BITACora_COLLECTION), docData);
 
   } catch (error) {
     console.error("Error al añadir documento a Firestore: ", error);
@@ -304,7 +304,7 @@ export const getProfessorContacts = async (): Promise<Record<string, ProfessorCo
     }
 };
 
-// --- Funciones para Atletas ---
+// --- Funciones para Atletas (ahora parte de Equipos) ---
 
 /**
  * Guarda una lista de atletas en un único documento en Firestore.
@@ -436,15 +436,76 @@ export const getSeguimientoPilotEntries = async (): Promise<SeguimientoPilotEntr
 
 // --- Teams Management Functions ---
 
-export const getTeams = async (): Promise<Team[]> => {
+export const getTeams = async (allStudentsMap: Map<string, Student>): Promise<Team[]> => {
     try {
-        const querySnapshot = await getDocs(collection(db, TEAMS_COLLECTION));
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+        // 1. Get manually created teams from the 'teams' collection
+        const teamsQuerySnapshot = await getDocs(collection(db, TEAMS_COLLECTION));
+        const manualTeams = teamsQuerySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+
+        // 2. Get athlete data from the 'athletes/all-athletes' document
+        const athletesDocRef = doc(db, ATHLETES_COLLECTION, 'all-athletes');
+        const athletesDocSnap = await getDoc(athletesDocRef);
+        
+        const teamsFromAthletes: Record<string, Team> = {};
+
+        if (athletesDocSnap.exists()) {
+            const athletesData = athletesDocSnap.data().athletes || {};
+            const studentNameToIdMap = new Map<string, string>();
+            allStudentsMap.forEach(student => {
+                studentNameToIdMap.set(student.name.toUpperCase(), student.id);
+            });
+
+            for (const studentName in athletesData) {
+                const teamName = athletesData[studentName];
+                const studentId = studentNameToIdMap.get(studentName.toUpperCase());
+
+                if (teamName && studentId) {
+                    if (!teamsFromAthletes[teamName]) {
+                        teamsFromAthletes[teamName] = {
+                            id: teamName, // Use sport name as ID for these dynamic teams
+                            name: teamName,
+                            members: []
+                        };
+                    }
+                    teamsFromAthletes[teamName].members.push({ id: studentId, name: studentName });
+                }
+            }
+        }
+        
+        // 3. Merge manual and dynamic teams
+        const combinedTeams: Record<string, Team> = {};
+
+        // Add teams from athletes first
+        Object.values(teamsFromAthletes).forEach(team => {
+            combinedTeams[team.name] = team;
+        });
+
+        // Add or merge manual teams
+        manualTeams.forEach(manualTeam => {
+            if (combinedTeams[manualTeam.name]) {
+                // Merge members if a team with the same name exists from athletes
+                const existingMembers = new Map(combinedTeams[manualTeam.name].members.map(m => [m.id, m]));
+                manualTeam.members.forEach(member => {
+                    if (!existingMembers.has(member.id)) {
+                        combinedTeams[manualTeam.name].members.push(member);
+                    }
+                });
+                // Ensure the manual team's ID (from firestore) is preserved
+                combinedTeams[manualTeam.name].id = manualTeam.id;
+            } else {
+                // Add as a new team
+                combinedTeams[manualTeam.name] = manualTeam;
+            }
+        });
+
+        return Object.values(combinedTeams);
+
     } catch (error) {
         console.error("Error getting teams:", error);
         return [];
     }
 };
+
 
 export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }): Promise<string> => {
     try {
@@ -465,11 +526,13 @@ export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }):
 export const bulkAddOrUpdateTeams = async (teams: Team[]): Promise<void> => {
     const batch = writeBatch(db);
     teams.forEach(team => {
-        const docRef = doc(db, TEAMS_COLLECTION, team.id);
+        const docId = team.id; // Use the predefined ID
+        const docRef = doc(db, TEAMS_COLLECTION, docId);
         batch.set(docRef, team, { merge: true });
     });
     await batch.commit();
 };
+
 
 export const deleteTeam = async (teamId: string): Promise<void> => {
     try {
@@ -490,5 +553,6 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
 
