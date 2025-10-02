@@ -174,16 +174,18 @@ function TeamList({ teams, type }: { teams: Team[], type: string }) {
         <Accordion type="multiple" className="w-full">
             {teams.map(team => (
                 <AccordionItem value={team.id} key={team.id}>
-                    <AccordionTrigger>
-                        <div className="flex items-center gap-4 flex-1">
-                            <Shield className="h-5 w-5 text-primary" />
-                            <span className="font-semibold">{team.name}</span>
-                            <Badge variant="secondary">{team.members?.length || 0} miembro(s)</Badge>
-                        </div>
-                         <div className="flex items-center gap-1 pr-4">
+                    <div className="flex items-center w-full">
+                        <AccordionTrigger className="flex-1">
+                            <div className="flex items-center gap-4">
+                                <Shield className="h-5 w-5 text-primary" />
+                                <span className="font-semibold">{team.name}</span>
+                                <Badge variant="secondary">{team.members?.length || 0} miembro(s)</Badge>
+                            </div>
+                        </AccordionTrigger>
+                        <div className="flex items-center gap-1 pr-4">
                             <AddStudentToTeamDialog team={team} onUpdate={fetchTeams} />
                             <EditTeamDialog team={team} onUpdate={fetchTeams}>
-                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}><Edit className="h-4 w-4"/></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}><Edit className="h-4 w-4"/></Button>
                             </EditTeamDialog>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -196,7 +198,8 @@ function TeamList({ teams, type }: { teams: Team[], type: string }) {
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={async () => {
+                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={async (e) => {
+                                            e.stopPropagation();
                                             await deleteTeam(team.id);
                                             fetchTeams();
                                         }}>Sí, eliminar</AlertDialogAction>
@@ -204,7 +207,7 @@ function TeamList({ teams, type }: { teams: Team[], type: string }) {
                                 </AlertDialogContent>
                             </AlertDialog>
                         </div>
-                    </AccordionTrigger>
+                    </div>
                     <AccordionContent>
                         <ScrollArea className="h-64 pr-4">
                             {team.members && team.members.length > 0 ? (
@@ -286,7 +289,7 @@ export function TeamsManagementPanel() {
         const newTeam: Omit<Team, 'id'> = {
             name: newTeamName.trim(),
             type: newTeamType,
-            members: []
+            members: [],
         };
         await addOrUpdateTeam(newTeam);
         toast({ title: 'Éxito', description: `El equipo "${newTeamName}" ha sido creado.` });
@@ -367,5 +370,3 @@ export function TeamsManagementPanel() {
     </div>
   );
 }
-
-    
