@@ -457,7 +457,7 @@ const ATHLETES_COLUMNS = {
 };
 
 export async function parseAthletesExcel(file: File, allStudentsMap: Map<string, Student>): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         const reader = new FileReader();
 
         reader.onload = async (e: ProgressEvent<FileReader>) => {
@@ -522,3 +522,5 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
         reader.readAsArrayBuffer(file);
     });
 }
+
+    

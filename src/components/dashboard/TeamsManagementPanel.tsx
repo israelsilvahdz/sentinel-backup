@@ -19,6 +19,9 @@ import { Loader2, Trash2, UserPlus, PlusCircle, UserX, Shield, Users, Edit } fro
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -56,7 +59,7 @@ function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () =
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary">
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => e.stopPropagation()}>
           <UserPlus className="h-4 w-4" />
         </Button>
       </DialogTrigger>
@@ -149,6 +152,98 @@ function EditTeamDialog({ team, onUpdate, children }: { team: Team, onUpdate: ()
   );
 }
 
+function TeamList({ teams, type }: { teams: Team[], type: string }) {
+    const { fetchTeams } = useDashboardFilters();
+    const { toast } = useToast();
+
+    const handleRemoveStudent = async (team: Team, studentId: string) => {
+        try {
+            await removeStudentFromTeam(team, studentId);
+            toast({ title: 'Alumno Eliminado', description: 'El alumno ha sido eliminado del equipo.' });
+            fetchTeams();
+        } catch(error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar al alumno.' });
+        }
+    }
+
+    if (teams.length === 0) {
+        return <p className="text-center text-muted-foreground p-8">No hay equipos de tipo {type}.</p>
+    }
+
+    return (
+        <Accordion type="multiple" className="w-full">
+            {teams.map(team => (
+                <AccordionItem value={team.id} key={team.id}>
+                    <AccordionTrigger>
+                        <div className="flex items-center gap-4 flex-1">
+                            <Shield className="h-5 w-5 text-primary" />
+                            <span className="font-semibold">{team.name}</span>
+                            <Badge variant="secondary">{team.members?.length || 0} miembro(s)</Badge>
+                        </div>
+                         <div className="flex items-center gap-1 pr-4">
+                            <AddStudentToTeamDialog team={team} onUpdate={fetchTeams} />
+                            <EditTeamDialog team={team} onUpdate={fetchTeams}>
+                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}><Edit className="h-4 w-4"/></Button>
+                            </EditTeamDialog>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => e.stopPropagation()}><Trash2 className="h-4 w-4"/></Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar equipo "{team.name}"?</AlertDialogTitle>
+                                        <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará el equipo y todos sus miembros de la base de datos.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={async () => {
+                                            await deleteTeam(team.id);
+                                            fetchTeams();
+                                        }}>Sí, eliminar</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <ScrollArea className="h-64 pr-4">
+                            {team.members && team.members.length > 0 ? (
+                            <div className="space-y-2">
+                                {team.members.map(member => (
+                                    <div key={member.id} className="flex items-center justify-between text-sm p-2 rounded-md hover:bg-muted/50">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-4 w-4 text-muted-foreground" />
+                                            <span>{member.name} ({member.id})</span>
+                                        </div>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive"><UserX className="h-4 w-4" /></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>¿Eliminar a {member.name}?</AlertDialogTitle>
+                                                    <AlertDialogDescription>Se eliminará al alumno del equipo "{team.name}".</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleRemoveStudent(team, member.id)}>Sí, eliminar</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                ))}
+                            </div>
+                            ) : (
+                                <p className="text-center text-muted-foreground pt-16">Este equipo aún no tiene miembros.</p>
+                            )}
+                        </ScrollArea>
+                    </AccordionContent>
+                </AccordionItem>
+            ))}
+        </Accordion>
+    );
+}
+
 
 export function TeamsManagementPanel() {
   const { teams, fetchTeams } = useDashboardFilters();
@@ -162,15 +257,24 @@ export function TeamsManagementPanel() {
     fetchTeams();
   }, [fetchTeams]);
   
-  const handleRemoveStudent = async (team: Team, studentId: string) => {
-    try {
-        await removeStudentFromTeam(team, studentId);
-        toast({ title: 'Alumno Eliminado', description: 'El alumno ha sido eliminado del equipo.' });
-        fetchTeams();
-    } catch(error) {
-        toast({ variant: 'destructive', title: 'Error', description: 'No se pudo eliminar al alumno.' });
-    }
-  }
+  const { deportivoTeams, culturalTeams, unclassifiedTeams } = useMemo(() => {
+    const deportivo: Team[] = [];
+    const cultural: Team[] = [];
+    const unclassified: Team[] = [];
+    
+    teams.forEach(team => {
+        if (team.type === 'deportivo') deportivo.push(team);
+        else if (team.type === 'cultural') cultural.push(team);
+        else unclassified.push(team);
+    });
+
+    return { 
+        deportivoTeams: deportivo, 
+        culturalTeams: cultural,
+        unclassifiedTeams: unclassified,
+    };
+  }, [teams]);
+
 
   const handleCreateNewTeam = async () => {
     if (!newTeamName.trim()) {
@@ -244,75 +348,24 @@ export function TeamsManagementPanel() {
         </Dialog>
       </header>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {teams.map(team => (
-            <Card key={team.id} className="flex flex-col">
-                <CardHeader className="flex flex-row items-start justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <Shield className="h-5 w-5 text-primary" /> {team.name}
-                          {team.type && <Badge variant={team.type === 'deportivo' ? 'default' : 'secondary'}>{team.type}</Badge>}
-                        </CardTitle>
-                        <CardDescription>{team.members?.length || 0} miembro(s)</CardDescription>
-                    </div>
-                     <div className="flex items-center gap-1">
-                        <AddStudentToTeamDialog team={team} onUpdate={fetchTeams} />
-                        <EditTeamDialog team={team} onUpdate={fetchTeams}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8"><Edit className="h-4 w-4"/></Button>
-                        </EditTeamDialog>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Eliminar equipo "{team.name}"?</AlertDialogTitle>
-                                    <AlertDialogDescription>Esta acción no se puede deshacer. Se eliminará el equipo y todos sus miembros de la base de datos.</AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => deleteTeam(team.id).then(fetchTeams)}>Sí, eliminar</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                     </div>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                    <ScrollArea className="h-64 pr-4">
-                        {team.members && team.members.length > 0 ? (
-                           <div className="space-y-2">
-                            {team.members.map(member => (
-                                <div key={member.id} className="flex items-center justify-between text-sm p-2 rounded-md hover:bg-muted/50">
-                                    <div className="flex items-center gap-2">
-                                        <Users className="h-4 w-4 text-muted-foreground" />
-                                        <span>{member.name} ({member.id})</span>
-                                    </div>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/70 hover:text-destructive"><UserX className="h-4 w-4" /></Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>¿Eliminar a {member.name}?</AlertDialogTitle>
-                                                <AlertDialogDescription>Se eliminará al alumno del equipo "{team.name}".</AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                             <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleRemoveStudent(team, member.id)}>Sí, eliminar</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </div>
-                            ))}
-                           </div>
-                        ) : (
-                            <p className="text-center text-muted-foreground pt-16">Este equipo aún no tiene miembros.</p>
-                        )}
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        ))}
-       </div>
+       <Tabs defaultValue="deportivo" className="w-full">
+            <TabsList>
+                <TabsTrigger value="deportivo">Deportivos</TabsTrigger>
+                <TabsTrigger value="cultural">Culturales</TabsTrigger>
+                <TabsTrigger value="unclassified">Sin Clasificar</TabsTrigger>
+            </TabsList>
+            <TabsContent value="deportivo">
+                <TeamList teams={deportivoTeams} type="deportivo" />
+            </TabsContent>
+            <TabsContent value="cultural">
+                 <TeamList teams={culturalTeams} type="cultural" />
+            </TabsContent>
+            <TabsContent value="unclassified">
+                 <TeamList teams={unclassifiedTeams} type="sin clasificar" />
+            </TabsContent>
+        </Tabs>
     </div>
   );
 }
+
+    
