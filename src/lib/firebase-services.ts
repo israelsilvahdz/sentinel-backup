@@ -66,7 +66,7 @@ export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 
     // Clean up undefined fields before sending to Firestore
     Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
 
-    await addDoc(collection(db, BITACora_COLLECTION), docData);
+    await addDoc(collection(db, BITACORA_COLLECTION), docData);
 
   } catch (error) {
     console.error("Error al añadir documento a Firestore: ", error);
@@ -484,8 +484,8 @@ export const getTeams = async (allStudentsMap: Map<string, Student>): Promise<Te
         manualTeams.forEach(manualTeam => {
             if (combinedTeams[manualTeam.name]) {
                 // Merge members if a team with the same name exists from athletes
-                const existingMembers = new Map(combinedTeams[manualTeam.name].members.map(m => [m.id, m]));
-                manualTeam.members.forEach(member => {
+                const existingMembers = new Map((combinedTeams[manualTeam.name].members || []).map(m => [m.id, m]));
+                (manualTeam.members || []).forEach(member => {
                     if (!existingMembers.has(member.id)) {
                         combinedTeams[manualTeam.name].members.push(member);
                     }
@@ -509,12 +509,17 @@ export const getTeams = async (allStudentsMap: Map<string, Student>): Promise<Te
 
 export const addOrUpdateTeam = async (team: Omit<Team, 'id'> & { id?: string }): Promise<string> => {
     try {
+        const teamData = {
+            name: team.name,
+            members: team.members || [], // Ensure members is always an array
+        };
+        
         if (team.id) {
             const docRef = doc(db, TEAMS_COLLECTION, team.id);
-            await setDoc(docRef, team, { merge: true });
+            await setDoc(docRef, teamData, { merge: true });
             return team.id;
         } else {
-            const docRef = await addDoc(collection(db, TEAMS_COLLECTION), team);
+            const docRef = await addDoc(collection(db, TEAMS_COLLECTION), teamData);
             return docRef.id;
         }
     } catch (error) {
@@ -545,7 +550,7 @@ export const deleteTeam = async (teamId: string): Promise<void> => {
 
 export const removeStudentFromTeam = async (team: Team, studentId: string): Promise<void> => {
     try {
-        const updatedMembers = team.members.filter(member => member.id !== studentId);
+        const updatedMembers = (team.members || []).filter(member => member.id !== studentId);
         await updateDoc(doc(db, TEAMS_COLLECTION, team.id), { members: updatedMembers });
     } catch (error) {
         console.error("Error removing student from team:", error);
@@ -553,6 +558,7 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
 
 
