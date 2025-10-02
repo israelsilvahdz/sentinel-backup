@@ -39,7 +39,7 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
 };
 
 
-function AthleteNotificationDialog({ students, sports, filterType, selectedLeader }: { students: Student[], sports: string[], filterType: string | null, selectedLeader: string | null }) {
+function AthleteNotificationDialog({ students, teams, filterType, selectedLeader }: { students: Student[], teams: Team[], filterType: string | null, selectedLeader: string | null }) {
     const { loadStudentSubjects, professorContacts } = useDashboardFilters();
     const { toast } = useToast();
     const [selectedSport, setSelectedSport] = useState<string>('all');
@@ -49,6 +49,8 @@ function AthleteNotificationDialog({ students, sports, filterType, selectedLeade
     const [teachers, setTeachers] = useState<{name: string, email: string | null}[]>([]);
     const [filterByLeader, setFilterByLeader] = useState(false);
 
+    const sportList = useMemo(() => Array.from(new Set(teams.map(team => team.name))), [teams]);
+
     const filteredAthletes = useMemo(() => {
         let tempAthletes = students;
         if (filterByLeader && selectedLeader) {
@@ -56,10 +58,9 @@ function AthleteNotificationDialog({ students, sports, filterType, selectedLeade
         }
         if (selectedSport === 'all') return tempAthletes;
         return tempAthletes.filter(s => {
-            const team = sports.find(team => team === s.team);
-            return team;
+            return teams.some(team => team.name === selectedSport && Array.isArray(team.members) && team.members.some(member => member.id === s.id));
         });
-    }, [students, sports, selectedSport, filterByLeader, selectedLeader]);
+    }, [students, teams, selectedSport, filterByLeader, selectedLeader]);
 
 
     useEffect(() => {
@@ -152,7 +153,7 @@ function AthleteNotificationDialog({ students, sports, filterType, selectedLeade
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">Todos los deportes</SelectItem>
-                                {sports.map(sport => <SelectItem key={sport} value={sport}>{sport}</SelectItem>)}
+                                {sportList.map(sport => <SelectItem key={sport} value={sport}>{sport}</SelectItem>)}
                             </SelectContent>
                         </Select>
                         {filterType === 'leader' && selectedLeader && (
@@ -636,7 +637,7 @@ export function StudentPanel() {
                             <Mail className="mr-2 h-4 w-4"/> Notificar Ausencia de Atletas
                         </Button>
                     </DialogTrigger>
-                    <AthleteNotificationDialog students={athleteStudents} sports={sportList} filterType={filterType} selectedLeader={selectedValue} />
+                    <AthleteNotificationDialog students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
                 </Dialog>
                  <Dialog>
                     <DialogTrigger asChild>
