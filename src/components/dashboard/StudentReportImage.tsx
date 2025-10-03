@@ -10,33 +10,31 @@ import { type Student, type SubjectSummary } from "@/types/student";
 interface StudentReportImageProps {
   student: Student;
   subjects: SubjectSummary[] | undefined;
-  fontStyle?: string;
 }
 
 export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReportImageProps>(
-  ({ student, subjects, fontStyle }, ref) => {
+  ({ student, subjects }, ref) => {
     return (
-      <div ref={ref} className="bg-white p-6 rounded-lg border-2 border-primary" style={{ width: '600px' }}>
-        {fontStyle && <div dangerouslySetInnerHTML={{ __html: fontStyle }} />}
+      <div ref={ref} className="bg-white p-6 rounded-lg border-2 border-primary" style={{ width: '600px', fontFamily: "'Inter', sans-serif" }}>
         <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold text-primary" style={{ fontFamily: "'Inter', sans-serif"}}>{student.name}</h1>
-            <p className="text-md text-muted-foreground" style={{ fontFamily: "'Inter', sans-serif"}}>{student.id}</p>
+            <h1 className="text-2xl font-bold text-primary">{student.name}</h1>
+            <p className="text-md text-muted-foreground">{student.id}</p>
         </div>
         <Card>
             <CardContent className="p-0">
                  <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[250px]" style={{ fontFamily: "'Inter', sans-serif"}}>Materia</TableHead>
-                            <TableHead className="text-center" style={{ fontFamily: "'Inter', sans-serif"}}>Faltas (Límite)</TableHead>
-                            <TableHead className="text-center" style={{ fontFamily: "'Inter', sans-serif"}}>Tareas NE (Límite)</TableHead>
-                            <TableHead className="text-right font-bold" style={{ fontFamily: "'Inter', sans-serif"}}>Ponderado</TableHead>
+                            <TableHead className="w-[250px]">Materia</TableHead>
+                            <TableHead className="text-center">Faltas (Límite)</TableHead>
+                            <TableHead className="text-center">Tareas NE (Límite)</TableHead>
+                            <TableHead className="text-right font-bold">Ponderado</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {(subjects || []).map((subject) => (
                             <TableRow key={subject.id}>
-                                <TableCell className="font-medium" style={{ fontFamily: "'Inter', sans-serif"}}>{subject.name}</TableCell>
+                                <TableCell className="font-medium">{subject.name}</TableCell>
                                 <TableCell className="text-center font-mono">{subject.absences} / {subject.absenceLimit}</TableCell>
                                 <TableCell className="text-center font-mono">{subject.missedAssignments} / {subject.missedAssignmentLimit}</TableCell>
                                 <TableCell className="text-right font-mono font-bold text-primary">
