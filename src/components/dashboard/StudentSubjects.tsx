@@ -23,23 +23,24 @@ import { RiskCell, CopyButton } from './StudentCardShared';
 
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleDownload = () => {
-        if (reportRef.current === null) {
-            return;
+    useEffect(() => {
+        if (reportRef.current) {
+            setIsLoading(true);
+            htmlToImage.toPng(reportRef.current, { cacheBust: true, pixelRatio: 2 })
+                .then((dataUrl) => {
+                    setImageUrl(dataUrl);
+                })
+                .catch((err) => {
+                    console.error('oops, something went wrong!', err);
+                })
+                .finally(() => {
+                    setIsLoading(false);
+                });
         }
-
-        htmlToImage.toPng(reportRef.current, { cacheBust: true, pixelRatio: 2 })
-            .then((dataUrl) => {
-                const link = document.createElement('a');
-                link.download = `reporte_${student.id}.png`;
-                link.href = dataUrl;
-                link.click();
-            })
-            .catch((err) => {
-                console.error('oops, something went wrong!', err);
-            });
-    };
+    }, [subjects, student]);
     
     const subjectSummaries = subjects?.map(s => ({
         id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
@@ -56,10 +57,29 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
                 </DialogDescription>
             </DialogHeader>
             <div className="py-4">
-                <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
+                <div className="absolute -left-[9999px] top-0">
+                  <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
+                </div>
+                 {imageUrl ? (
+                    <img src={imageUrl} alt={`Reporte de ${student.name}`} className="w-full h-auto rounded-md border" />
+                ) : (
+                    <Skeleton className="w-full aspect-[4/3]" />
+                )}
             </div>
             <DialogFooter>
-                <Button onClick={handleDownload}><Download className="mr-2 h-4 w-4" />Descargar Imagen</Button>
+                {imageUrl ? (
+                    <Button asChild>
+                        <a href={imageUrl} download={`reporte_${student.id}.png`}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Descargar Imagen
+                        </a>
+                    </Button>
+                ) : (
+                    <Button disabled>
+                        <Download className="mr-2 h-4 w-4" />
+                        Generando imagen...
+                    </Button>
+                )}
             </DialogFooter>
         </DialogContent>
     );
