@@ -21,26 +21,35 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { RiskCell, CopyButton } from './StudentCardShared';
 
 
-function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
+function ReportImageDialog({ student, subjects, isOpen }: { student: Student, subjects: Subject[] | undefined, isOpen: boolean }) {
     const reportRef = useRef<HTMLDivElement>(null);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        if (reportRef.current) {
+        if (isOpen && reportRef.current) {
             setIsLoading(true);
-            htmlToImage.toPng(reportRef.current, { cacheBust: true, pixelRatio: 2 })
-                .then((dataUrl) => {
-                    setImageUrl(dataUrl);
-                })
-                .catch((err) => {
-                    console.error('oops, something went wrong!', err);
-                })
-                .finally(() => {
-                    setIsLoading(false);
-                });
+            setImageUrl(null);
+            
+            // Give the browser a moment to render the off-screen element
+            const timer = setTimeout(() => {
+                if (reportRef.current) {
+                    htmlToImage.toPng(reportRef.current, { cacheBust: true, pixelRatio: 2 })
+                        .then((dataUrl) => {
+                            setImageUrl(dataUrl);
+                        })
+                        .catch((err) => {
+                            console.error('oops, something went wrong!', err);
+                        })
+                        .finally(() => {
+                            setIsLoading(false);
+                        });
+                }
+            }, 100); // 100ms delay
+
+            return () => clearTimeout(timer);
         }
-    }, [subjects, student]);
+    }, [isOpen, subjects, student]);
     
     const subjectSummaries = subjects?.map(s => ({
         id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
@@ -60,14 +69,13 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
                 <div className="absolute -left-[9999px] top-0">
                   <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
                 </div>
-                 {imageUrl ? (
+                 {isLoading && <Skeleton className="w-full aspect-[4/3]" />}
+                 {imageUrl && !isLoading && (
                     <img src={imageUrl} alt={`Reporte de ${student.name}`} className="w-full h-auto rounded-md border" />
-                ) : (
-                    <Skeleton className="w-full aspect-[4/3]" />
                 )}
             </div>
             <DialogFooter>
-                {imageUrl ? (
+                {imageUrl && !isLoading ? (
                     <Button asChild>
                         <a href={imageUrl} download={`reporte_${student.id}.png`}>
                             <Download className="mr-2 h-4 w-4" />
@@ -92,6 +100,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
     const [isLoading, setIsLoading] = useState(false);
     const [isAllCopied, setIsAllCopied] = useState(false);
     const [openSubject, setOpenSubject] = useState<string | null>(null);
+    const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
     useEffect(() => {
         async function loadSubjects() {
@@ -146,11 +155,11 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                 <TabsTrigger value="horario">Horario</TabsTrigger>
                 <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
             </TabsList>
-            <Dialog>
+            <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
                 <DialogTrigger asChild>
                     <Button variant="outline" size="sm"><Camera className="mr-2 h-4 w-4"/>Generar Reporte</Button>
                 </DialogTrigger>
-                <ReportImageDialog student={student} subjects={subjects} />
+                <ReportImageDialog student={student} subjects={subjects} isOpen={isReportDialogOpen}/>
             </Dialog>
         </div>
         <TabsContent value="materias">
