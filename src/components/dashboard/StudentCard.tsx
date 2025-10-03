@@ -11,7 +11,7 @@ import { type Student, type Subject, type SubjectSummary, type Team } from "@/ty
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -256,7 +256,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
             return;
         }
 
-        htmlToImage.toPng(reportRef.current, { cacheBust: true })
+        htmlToImage.toPng(reportRef.current, { cacheBust: true, pixelRatio: 2 })
             .then((dataUrl) => {
                 const link = document.createElement('a');
                 link.download = `reporte_${student.id}.png`;
@@ -396,3 +396,5 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
     </Card>
   );
 }
+
+    
