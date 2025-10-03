@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -407,12 +408,47 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
     );
 }
 
+const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+
+async function embedGoogleFont(fontUrl: string): Promise<string> {
+    try {
+        const cssText = await fetch(fontUrl).then(res => res.text());
+        const resourceUrls = cssText.match(/url\((.+?)\)/g)?.map(match => match.replace(/url\(['"]?(.+?)['"]?\)/, '$1'));
+
+        if (!resourceUrls) return `<style>${cssText}</style>`;
+
+        const settledPromises = await Promise.allSettled(resourceUrls.map(url => fetch(url).then(res => res.blob())));
+
+        let embeddedCssText = cssText;
+        for (let i = 0; i < resourceUrls.length; i++) {
+            const promiseResult = settledPromises[i];
+            if (promiseResult.status === 'fulfilled') {
+                const blob = promiseResult.value;
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+                embeddedCssText = embeddedCssText.replace(resourceUrls[i], base64);
+            }
+        }
+        return `<style>${embeddedCssText}</style>`;
+    } catch (error) {
+        console.error("Failed to embed google font:", error);
+        return `<link href="${fontUrl}" rel="stylesheet" />`;
+    }
+}
+
+
 const generateImageForStudent = async (student: Student, subjects: SubjectSummary[] | undefined): Promise<Blob | null> => {
   const node = document.createElement('div');
   node.style.position = 'fixed';
   node.style.top = '-9999px';
   document.body.appendChild(node);
   
+  const fontStyle = await embedGoogleFont(FONT_URL);
+
   const promise = new Promise<Blob | null>((resolve) => {
     const Component = () => {
       const ref = useRef<HTMLDivElement>(null);
@@ -422,9 +458,6 @@ const generateImageForStudent = async (student: Student, subjects: SubjectSummar
           setTimeout(() => { // Short delay to ensure rendering
             htmlToImage.toPng(ref.current, { 
                 pixelRatio: 2,
-                fetchRequestInit: {
-                    mode: 'no-cors',
-                },
              })
               .then((dataUrl) => {
                 fetch(dataUrl).then(res => res.blob()).then(blob => resolve(blob));
@@ -440,7 +473,7 @@ const generateImageForStudent = async (student: Student, subjects: SubjectSummar
         }
       }, []);
 
-      return <StudentReportImage ref={ref} student={student} subjects={subjects} />;
+      return <StudentReportImage ref={ref} student={student} subjects={subjects} fontStyle={fontStyle} />;
     };
     
     const root = (async () => {
