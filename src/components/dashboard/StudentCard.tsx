@@ -18,7 +18,7 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { AddToTeamTaskDialog } from './StudentActions';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { ActivityBreakdown } from './ActivityBreakdown';
@@ -396,5 +396,3 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
     </Card>
   );
 }
-
-    
