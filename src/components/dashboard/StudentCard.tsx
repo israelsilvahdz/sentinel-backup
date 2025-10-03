@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { StudentSubjects } from './StudentSubjects';
@@ -152,3 +152,5 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
     </Card>
   );
 }
+
+    

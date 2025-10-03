@@ -438,8 +438,12 @@ const generateImageForStudent = async (student: Student, subjects: SubjectSummar
       return <StudentReportImage ref={ref} student={student} subjects={subjects} />;
     };
     
-    const root = (await import('react-dom/client')).createRoot(node);
-    root.render(<Component />);
+    const root = (async () => {
+        const { createRoot } = await import('react-dom/client');
+        return createRoot(node);
+    })();
+      
+    root.then(r => r.render(<Component />));
   });
 
   return promise;
@@ -864,3 +868,5 @@ export function StudentPanel() {
     </div>
   );
 }
+
+    
