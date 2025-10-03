@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, FileText, Award } from 'lucide-react';
@@ -141,3 +141,5 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
     </Card>
   );
 }
+
+    

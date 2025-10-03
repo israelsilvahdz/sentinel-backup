@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Minus, Plus, Phone, Camera, Download, ClipboardCopy, Check } from 'lucide-react';
+import { Minus, Plus, Phone, Camera } from 'lucide-react';
 import { type Student, type Subject } from "@/types/student";
 import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,42 +14,14 @@ import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { ActivityBreakdown } from './ActivityBreakdown';
 import { GradesTable } from './GradesTable';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import * as htmlToImage from 'html-to-image';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { RiskCell, CopyButton } from './StudentCardShared';
 
 
-function ReportImageDialog({ student, subjects, isOpen }: { student: Student, subjects: Subject[] | undefined, isOpen: boolean }) {
+function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        if (isOpen && reportRef.current) {
-            setIsLoading(true);
-            setImageUrl(null);
-            
-            // Give the browser a moment to render the off-screen element
-            const timer = setTimeout(() => {
-                if (reportRef.current) {
-                    htmlToImage.toPng(reportRef.current, { cacheBust: true, pixelRatio: 2 })
-                        .then((dataUrl) => {
-                            setImageUrl(dataUrl);
-                        })
-                        .catch((err) => {
-                            console.error('oops, something went wrong!', err);
-                        })
-                        .finally(() => {
-                            setIsLoading(false);
-                        });
-                }
-            }, 100); // 100ms delay
-
-            return () => clearTimeout(timer);
-        }
-    }, [isOpen, subjects, student]);
     
     const subjectSummaries = subjects?.map(s => ({
         id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
@@ -62,33 +34,12 @@ function ReportImageDialog({ student, subjects, isOpen }: { student: Student, su
             <DialogHeader>
                 <DialogTitle>Reporte Rápido del Alumno</DialogTitle>
                 <DialogDescription>
-                    Esta es una previsualización de la imagen que se descargará.
+                    Esta es una previsualización del reporte del alumno. Puedes tomar una captura de pantalla.
                 </DialogDescription>
             </DialogHeader>
             <div className="py-4">
-                <div className="absolute -left-[9999px] top-0">
-                  <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
-                </div>
-                 {isLoading && <Skeleton className="w-full aspect-[4/3]" />}
-                 {imageUrl && !isLoading && (
-                    <img src={imageUrl} alt={`Reporte de ${student.name}`} className="w-full h-auto rounded-md border" />
-                )}
+                <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
             </div>
-            <DialogFooter>
-                {imageUrl && !isLoading ? (
-                    <Button asChild>
-                        <a href={imageUrl} download={`reporte_${student.id}.png`}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Descargar Imagen
-                        </a>
-                    </Button>
-                ) : (
-                    <Button disabled>
-                        <Download className="mr-2 h-4 w-4" />
-                        Generando imagen...
-                    </Button>
-                )}
-            </DialogFooter>
         </DialogContent>
     );
 }
@@ -98,7 +49,6 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
     const { loadStudentSubjects, planType } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const [isAllCopied, setIsAllCopied] = useState(false);
     const [openSubject, setOpenSubject] = useState<string | null>(null);
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
@@ -127,21 +77,6 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
        return <p className="text-muted-foreground text-sm px-6 pb-4">No se encontraron materias para este alumno.</p>
     }
 
-    const handleCopyAllTeachers = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const teacherNames = subjects
-            .map(s => s.professorName)
-            .filter(Boolean) // Remove empty names
-            .join('\n');
-        
-        if (teacherNames) {
-            navigator.clipboard.writeText(teacherNames).then(() => {
-                setIsAllCopied(true);
-                setTimeout(() => setIsAllCopied(false), 2500);
-            });
-        }
-    };
-    
     const handleToggleSubject = (subjectId: string) => {
       setOpenSubject(prev => (prev === subjectId ? null : subjectId));
     };
@@ -159,7 +94,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                 <DialogTrigger asChild>
                     <Button variant="outline" size="sm"><Camera className="mr-2 h-4 w-4"/>Generar Reporte</Button>
                 </DialogTrigger>
-                <ReportImageDialog student={student} subjects={subjects} isOpen={isReportDialogOpen}/>
+                <ReportImageDialog student={student} subjects={subjects}/>
             </Dialog>
         </div>
         <TabsContent value="materias">
@@ -172,19 +107,10 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                       <TableHead>
                           <div className="flex items-center gap-2">
                               Profesor
-                              <TooltipProvider>
-                                  <Tooltip open={isAllCopied}>
-                                      <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyAllTeachers}>
-                                              {isAllCopied ? <Check className="h-4 w-4 text-primary" /> : <ClipboardCopy className="h-4 w-4" />}
-                                              <span className="sr-only">Copiar todos los profesores</span>
-                                          </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                          <p>{isAllCopied ? '¡Copiado!' : 'Copiar todos los profesores'}</p>
-                                      </TooltipContent>
-                                  </Tooltip>
-                              </TooltipProvider>
+                              <CopyButton 
+                                textToCopy={subjects.map(s => s.professorName).filter(Boolean).join('\n')} 
+                                tooltipText='Copiar todos los profesores'
+                              />
                           </div>
                       </TableHead>
                       <TableHead className="text-center">Faltas</TableHead>
@@ -254,3 +180,5 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
       </Tabs>
     );
 }
+
+    
