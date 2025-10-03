@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download } from 'lucide-react';
@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { StudentReportImage } from './StudentReportImage';
+import { StudentGradesReportImage } from './StudentGradesReportImage';
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -410,26 +411,29 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
 const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
 
 
-const generateImageForStudent = async (student: Student, subjects: SubjectSummary[] | undefined): Promise<Blob | null> => {
+const generateImage = async (
+  ReportComponent: React.ElementType,
+  student: Student,
+  subjects: Subject[]
+): Promise<Blob | null> => {
   const node = document.createElement('div');
   node.style.position = 'fixed';
   node.style.top = '-9999px';
   document.body.appendChild(node);
-  
+
   const promise = new Promise<Blob | null>((resolve) => {
     const Component = () => {
       const ref = useRef<HTMLDivElement>(null);
 
       useEffect(() => {
         if (ref.current) {
-          setTimeout(() => { 
-            htmlToImage.toPng(ref.current, { 
+          setTimeout(() => {
+            htmlToImage.toPng(ref.current, {
                 pixelRatio: 2,
                 fontEmbedCSS: FONT_URL,
-             })
-              .then((dataUrl) => {
-                fetch(dataUrl).then(res => res.blob()).then(blob => resolve(blob));
               })
+              .then((dataUrl) => fetch(dataUrl).then(res => res.blob()))
+              .then(resolve)
               .catch((error) => {
                 console.error('Error generating image:', error);
                 resolve(null);
@@ -441,7 +445,7 @@ const generateImageForStudent = async (student: Student, subjects: SubjectSummar
         }
       }, []);
 
-      return <StudentReportImage ref={ref} student={student} subjects={subjects} />;
+      return <ReportComponent ref={ref} student={student} subjects={subjects} />;
     };
     
     const root = (async () => {
@@ -644,55 +648,46 @@ export function StudentPanel() {
     });
 
     const zip = new JSZip();
-    const imagePromises: Promise<{ name: string; blob: Blob | null }>[] = [];
+    
+    const imagePromises: Promise<{ name: string; type: 'riesgo' | 'calificaciones'; blob: Blob | null }>[] = [];
 
     for (const studentId of Array.from(selectedStudents)) {
       const student = allStudentsMap.get(studentId);
       if (student) {
         const subjects = await loadStudentSubjects(studentId);
-        const summaries = subjects.map(s => ({
-          id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-          missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-          grade: s.grade, finalGrade: s.finalGrade, group: s.group,
-        }));
-        const promise = generateImageForStudent(student, summaries).then(blob => ({
-          name: student.name,
-          blob,
-        }));
-        imagePromises.push(promise);
+        
+        imagePromises.push(
+            generateImage(StudentReportImage, student, subjects).then(blob => ({
+              name: student.name,
+              type: 'riesgo',
+              blob,
+            }))
+        );
+
+        imagePromises.push(
+            generateImage(StudentGradesReportImage, student, subjects).then(blob => ({
+              name: student.name,
+              type: 'calificaciones',
+              blob,
+            }))
+        );
       }
     }
 
     const results = await Promise.all(imagePromises);
     let successfulCount = 0;
 
-    for (const { name, blob } of results) {
+    for (const { name, type, blob } of results) {
       if (blob) {
         const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        zip.file(`reporte_${sanitizedName}.png`, blob);
+        zip.file(`${type}_${sanitizedName}.png`, blob);
         successfulCount++;
       } else {
-        console.error(`Failed to generate image for student ${name}`);
+        console.error(`Failed to generate ${type} image for student ${name}`);
       }
     }
 
     if (successfulCount > 0) {
-      if (successfulCount === 1) {
-        // Si es un solo archivo, descárgalo directamente sin ZIP
-        const { name, blob } = results.find(r => r.blob)!;
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob!);
-        const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        link.download = `reporte_${sanitizedName}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-         toast({
-            title: "Descarga Completa",
-            description: `Se ha descargado el reporte de ${name}.`,
-        });
-      } else {
-        // Si son varios, crea un ZIP
         zip.generateAsync({ type: "blob" }).then(content => {
             const link = document.createElement('a');
             link.href = URL.createObjectURL(content);
@@ -702,10 +697,9 @@ export function StudentPanel() {
             document.body.removeChild(link);
             toast({
                 title: "Descarga Completa",
-                description: `Se han descargado ${successfulCount} reportes en un archivo ZIP.`,
+                description: `Se han descargado ${successfulCount} imágenes en un archivo ZIP.`,
             });
         });
-      }
     } else {
       toast({
         variant: "destructive",
@@ -895,5 +889,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
-    

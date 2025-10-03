@@ -22,12 +22,34 @@ import { RiskCell, CopyButton } from './StudentCardShared';
 
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
     
     const subjectSummaries = subjects?.map(s => ({
         id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
         missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
         grade: s.grade, finalGrade: s.finalGrade, group: s.group,
     }));
+    
+    useEffect(() => {
+        if (!reportRef.current) {
+            setIsLoading(true);
+            const timeoutId = setTimeout(async () => {
+                if (reportRef.current) {
+                    try {
+                        const dataUrl = await import('html-to-image').then(lib => lib.toPng(reportRef.current!, { pixelRatio: 2 }));
+                        setImageUrl(dataUrl);
+                    } catch (error) {
+                       console.error("Error generating image:", error);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                }
+            }, 100);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [reportRef, subjects]);
+
 
     return (
         <DialogContent className="max-w-2xl">
