@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { StudentSubjects } from './StudentSubjects';
+import { Checkbox } from '../ui/checkbox';
 
 
 interface StudentCardProps {
@@ -22,6 +23,8 @@ interface StudentCardProps {
   teams: Team[];
   startOpen?: boolean;
   isDialog?: boolean;
+  isSelected: boolean;
+  onSelectionChange: (studentId: string, isSelected: boolean) => void;
 }
 
 function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (SubjectSummary[]) }) {
@@ -40,7 +43,7 @@ function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (
     return <Badge variant="outline" className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
 }
 
-export function StudentCard({ student, teams, startOpen = false, isDialog = false }: StudentCardProps) {
+export function StudentCard({ student, teams, startOpen = false, isDialog = false, isSelected, onSelectionChange }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
   
   const teamName = useMemo(() => {
@@ -95,15 +98,23 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
   }
 
   return (
-    <Card>
+    <Card className={isSelected ? 'ring-2 ring-primary' : ''}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
             <div className="flex justify-between items-start">
-                <div>
-                    <CardTitle className="flex items-center text-lg">
-                      {cardTitleContent}
-                    </CardTitle>
-                    <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
+                <div className="flex items-center gap-4">
+                    <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => onSelectionChange(student.id, !!checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1"
+                    />
+                    <div>
+                        <CardTitle className="flex items-center text-lg">
+                        {cardTitleContent}
+                        </CardTitle>
+                        <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <Dialog>
@@ -141,5 +152,3 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
     </Card>
   );
 }
-
-    

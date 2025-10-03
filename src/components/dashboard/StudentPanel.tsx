@@ -1,15 +1,15 @@
 
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import type { Student, StudentContact, Subject, Team } from '@/types/student';
+import type { Student, StudentContact, Subject, Team, SubjectSummary } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileUpload } from './FileUpload';
@@ -26,6 +26,9 @@ import type { DateRange } from 'react-day-picker';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
 import { cn } from '@/lib/utils';
+import * as htmlToImage from 'html-to-image';
+import JSZip from 'jszip';
+import { StudentReportImage } from './StudentReportImage';
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -404,6 +407,45 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
     );
 }
 
+const generateImageForStudent = async (student: Student, subjects: SubjectSummary[] | undefined): Promise<Blob | null> => {
+  const node = document.createElement('div');
+  node.style.position = 'fixed';
+  node.style.top = '-9999px';
+  document.body.appendChild(node);
+  
+  const promise = new Promise<Blob | null>((resolve) => {
+    const Component = () => {
+      const ref = useRef<HTMLDivElement>(null);
+
+      useEffect(() => {
+        if (ref.current) {
+          setTimeout(() => { // Short delay to ensure rendering
+            htmlToImage.toPng(ref.current, { pixelRatio: 2 })
+              .then((dataUrl) => {
+                fetch(dataUrl).then(res => res.blob()).then(blob => resolve(blob));
+              })
+              .catch((error) => {
+                console.error('Error generating image:', error);
+                resolve(null);
+              })
+              .finally(() => {
+                document.body.removeChild(node);
+              });
+          }, 100);
+        }
+      }, []);
+
+      return <StudentReportImage ref={ref} student={student} subjects={subjects} />;
+    };
+    
+    const root = (await import('react-dom/client')).createRoot(node);
+    root.render(<Component />);
+  });
+
+  return promise;
+};
+
+
 export function StudentPanel() {
   const { 
     allStudents,
@@ -419,7 +461,8 @@ export function StudentPanel() {
     subjectRiskFilter,
     setSubjectRiskFilter,
     selectedValue,
-    filterType
+    filterType,
+    loadStudentSubjects
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -428,6 +471,7 @@ export function StudentPanel() {
   const [athletesFile, setAthletesFile] = useState<File | null>(null);
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
   const [isProcessingAthletes, setIsProcessingAthletes] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
   
@@ -560,6 +604,86 @@ export function StudentPanel() {
     });
   };
 
+  const handleSelectionChange = (studentId: string, isSelected: boolean) => {
+    setSelectedStudents(prev => {
+      const newSet = new Set(prev);
+      if (isSelected) {
+        newSet.add(studentId);
+      } else {
+        newSet.delete(studentId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (select: boolean) => {
+    if (select) {
+      const allVisibleIds = new Set(filteredStudents.map(s => s.id));
+      setSelectedStudents(allVisibleIds);
+    } else {
+      setSelectedStudents(new Set());
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    if (selectedStudents.size === 0) return;
+    
+    toast({
+        title: "Iniciando descarga...",
+        description: `Generando reportes para ${selectedStudents.size} alumnos.`,
+    });
+
+    const zip = new JSZip();
+    const imagePromises: Promise<{ id: string, blob: Blob | null }>[] = [];
+
+    for (const studentId of Array.from(selectedStudents)) {
+        const student = allStudentsMap.get(studentId);
+        if (student) {
+            const subjects = await loadStudentSubjects(studentId);
+            const summaries = subjects.map(s => ({
+                id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+                missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+                grade: s.grade, finalGrade: s.finalGrade, group: s.group
+            }));
+            const promise = generateImageForStudent(student, summaries).then(blob => ({ id: student.id, blob }));
+            imagePromises.push(promise);
+        }
+    }
+
+    const results = await Promise.all(imagePromises);
+    let successfulCount = 0;
+    
+    for (const { id, blob } of results) {
+        if (blob) {
+            zip.file(`reporte_${id}.png`, blob);
+            successfulCount++;
+        } else {
+            console.error(`Failed to generate image for student ${id}`);
+        }
+    }
+
+    if (successfulCount > 0) {
+        zip.generateAsync({ type: "blob" }).then(content => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = "reportes_alumnos.zip";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast({
+                title: "Descarga Completa",
+                description: `Se han descargado ${successfulCount} reportes en un archivo ZIP.`,
+            });
+        });
+    } else {
+         toast({
+            variant: "destructive",
+            title: "Error en la descarga",
+            description: "No se pudo generar ningún reporte. Revisa la consola para más detalles.",
+        });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -681,6 +805,28 @@ export function StudentPanel() {
                 />
               </div>
           </div>
+          
+           {filteredStudents.length > 0 && (
+            <div className="flex items-center justify-between bg-muted/50 p-3 rounded-lg">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center space-x-2">
+                        <Checkbox 
+                            id="select-all" 
+                            checked={selectedStudents.size === filteredStudents.length && filteredStudents.length > 0}
+                            onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                        />
+                        <Label htmlFor="select-all">Seleccionar Todos ({selectedStudents.size})</Label>
+                    </div>
+                </div>
+                <Button 
+                    onClick={handleDownloadZip}
+                    disabled={selectedStudents.size === 0}
+                >
+                    <Download className="mr-2 h-4 w-4" />
+                    Descargar Reportes (.zip)
+                </Button>
+            </div>
+           )}
 
           {filteredStudents.length > 0 ? (
             <div className="space-y-4">
@@ -693,6 +839,8 @@ export function StudentPanel() {
                     student={student} 
                     teams={teams}
                     startOpen={false} 
+                    isSelected={selectedStudents.has(student.id)}
+                    onSelectionChange={handleSelectionChange}
                   />
                 ))}
             </div>
@@ -716,5 +864,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
-    

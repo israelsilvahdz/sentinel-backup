@@ -4,8 +4,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Minus, Plus, Phone, Camera } from 'lucide-react';
-import { type Student, type Subject } from "@/types/student";
+import { Minus, Plus, Phone, Camera, Download } from 'lucide-react';
+import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '../ui/button';
@@ -14,7 +14,7 @@ import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { ActivityBreakdown } from './ActivityBreakdown';
 import { GradesTable } from './GradesTable';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { RiskCell, CopyButton } from './StudentCardShared';
@@ -180,5 +180,3 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
       </Tabs>
     );
 }
-
-    
