@@ -420,7 +420,12 @@ const generateImageForStudent = async (student: Student, subjects: SubjectSummar
       useEffect(() => {
         if (ref.current) {
           setTimeout(() => { // Short delay to ensure rendering
-            htmlToImage.toPng(ref.current, { pixelRatio: 2 })
+            htmlToImage.toPng(ref.current, { 
+                pixelRatio: 2,
+                fetchRequestInit: {
+                    mode: 'no-cors',
+                },
+             })
               .then((dataUrl) => {
                 fetch(dataUrl).then(res => res.blob()).then(blob => resolve(blob));
               })
