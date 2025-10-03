@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -423,7 +422,7 @@ const generateImageForStudent = async (student: Student, subjects: SubjectSummar
 
       useEffect(() => {
         if (ref.current) {
-          setTimeout(() => { // Short delay to ensure rendering
+          setTimeout(() => { 
             htmlToImage.toPng(ref.current, { 
                 pixelRatio: 2,
                 fontEmbedCSS: FONT_URL,
@@ -638,42 +637,62 @@ export function StudentPanel() {
 
   const handleDownloadZip = async () => {
     if (selectedStudents.size === 0) return;
-    
+
     toast({
-        title: "Iniciando descarga...",
-        description: `Generando reportes para ${selectedStudents.size} alumnos.`,
+      title: "Iniciando descarga...",
+      description: `Generando reportes para ${selectedStudents.size} alumnos.`,
     });
 
     const zip = new JSZip();
-    const imagePromises: Promise<{ id: string, blob: Blob | null }>[] = [];
+    const imagePromises: Promise<{ name: string; blob: Blob | null }>[] = [];
 
     for (const studentId of Array.from(selectedStudents)) {
-        const student = allStudentsMap.get(studentId);
-        if (student) {
-            const subjects = await loadStudentSubjects(studentId);
-            const summaries = subjects.map(s => ({
-                id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-                missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-                grade: s.grade, finalGrade: s.finalGrade, group: s.group
-            }));
-            const promise = generateImageForStudent(student, summaries).then(blob => ({ id: student.id, blob }));
-            imagePromises.push(promise);
-        }
+      const student = allStudentsMap.get(studentId);
+      if (student) {
+        const subjects = await loadStudentSubjects(studentId);
+        const summaries = subjects.map(s => ({
+          id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+          missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+          grade: s.grade, finalGrade: s.finalGrade, group: s.group,
+        }));
+        const promise = generateImageForStudent(student, summaries).then(blob => ({
+          name: student.name,
+          blob,
+        }));
+        imagePromises.push(promise);
+      }
     }
 
     const results = await Promise.all(imagePromises);
     let successfulCount = 0;
-    
-    for (const { id, blob } of results) {
-        if (blob) {
-            zip.file(`reporte_${id}.png`, blob);
-            successfulCount++;
-        } else {
-            console.error(`Failed to generate image for student ${id}`);
-        }
+
+    for (const { name, blob } of results) {
+      if (blob) {
+        const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        zip.file(`reporte_${sanitizedName}.png`, blob);
+        successfulCount++;
+      } else {
+        console.error(`Failed to generate image for student ${name}`);
+      }
     }
 
     if (successfulCount > 0) {
+      if (successfulCount === 1) {
+        // Si es un solo archivo, descárgalo directamente sin ZIP
+        const { name, blob } = results.find(r => r.blob)!;
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob!);
+        const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        link.download = `reporte_${sanitizedName}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+         toast({
+            title: "Descarga Completa",
+            description: `Se ha descargado el reporte de ${name}.`,
+        });
+      } else {
+        // Si son varios, crea un ZIP
         zip.generateAsync({ type: "blob" }).then(content => {
             const link = document.createElement('a');
             link.href = URL.createObjectURL(content);
@@ -686,12 +705,13 @@ export function StudentPanel() {
                 description: `Se han descargado ${successfulCount} reportes en un archivo ZIP.`,
             });
         });
+      }
     } else {
-         toast({
-            variant: "destructive",
-            title: "Error en la descarga",
-            description: "No se pudo generar ningún reporte. Revisa la consola para más detalles.",
-        });
+      toast({
+        variant: "destructive",
+        title: "Error en la descarga",
+        description: "No se pudo generar ningún reporte. Revisa la consola para más detalles.",
+      });
     }
   };
 
@@ -834,7 +854,7 @@ export function StudentPanel() {
                     disabled={selectedStudents.size === 0}
                 >
                     <Download className="mr-2 h-4 w-4" />
-                    Descargar Reportes (.zip)
+                    Descargar Reportes ({selectedStudents.size})
                 </Button>
             </div>
            )}
