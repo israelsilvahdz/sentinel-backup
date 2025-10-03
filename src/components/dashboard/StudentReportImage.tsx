@@ -27,6 +27,7 @@ export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReport
                             <TableHead className="w-[250px]">Materia</TableHead>
                             <TableHead className="text-center">Faltas (Límite)</TableHead>
                             <TableHead className="text-center">Tareas NE (Límite)</TableHead>
+                            <TableHead className="text-right font-bold">Ponderado</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -35,6 +36,9 @@ export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReport
                                 <TableCell className="font-medium">{subject.name}</TableCell>
                                 <TableCell className="text-center font-mono">{subject.absences} / {subject.absenceLimit}</TableCell>
                                 <TableCell className="text-center font-mono">{subject.missedAssignments} / {subject.missedAssignmentLimit}</TableCell>
+                                <TableCell className="text-right font-mono font-bold text-primary">
+                                    {(subject.grade || 0).toFixed(2)}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
