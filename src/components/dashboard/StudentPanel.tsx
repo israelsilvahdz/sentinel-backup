@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -419,9 +420,10 @@ const generateImage = async (
   const node = document.createElement('div');
   node.style.position = 'fixed';
   node.style.top = '-9999px';
+  node.style.left = '0px';
   document.body.appendChild(node);
 
-  const promise = new Promise<Blob | null>((resolve) => {
+  const promise = new Promise<Blob | null>((resolve, reject) => {
     const Component = () => {
       const ref = useRef<HTMLDivElement>(null);
 
@@ -431,15 +433,20 @@ const generateImage = async (
             htmlToImage.toPng(ref.current, {
                 pixelRatio: 2,
                 fontEmbedCSS: FONT_URL,
+                fetchRequestInit: {
+                    mode: 'no-cors', // Use no-cors to avoid CORS issues with fonts
+                },
               })
               .then((dataUrl) => fetch(dataUrl).then(res => res.blob()))
               .then(resolve)
               .catch((error) => {
                 console.error('Error generating image:', error);
-                resolve(null);
+                reject(error);
               })
               .finally(() => {
-                document.body.removeChild(node);
+                if (document.body.contains(node)) {
+                    document.body.removeChild(node);
+                }
               });
           }, 100);
         }
@@ -679,8 +686,9 @@ export function StudentPanel() {
 
     for (const { name, type, blob } of results) {
       if (blob) {
-        const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        zip.file(`${type}_${sanitizedName}.png`, blob);
+        const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+        const fileNumber = type === 'riesgo' ? '1' : '2';
+        zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
         successfulCount++;
       } else {
         console.error(`Failed to generate ${type} image for student ${name}`);
@@ -697,7 +705,7 @@ export function StudentPanel() {
             document.body.removeChild(link);
             toast({
                 title: "Descarga Completa",
-                description: `Se han descargado ${successfulCount} imágenes en un archivo ZIP.`,
+                description: `Se han descargado ${successfulCount / 2} pares de imágenes en un archivo ZIP.`,
             });
         });
     } else {
@@ -889,3 +897,4 @@ export function StudentPanel() {
     </div>
   );
 }
+
