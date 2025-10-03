@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText, Plus, Minus, Award } from 'lucide-react';
+import { ChevronDown, ChevronUp, Copy, Check, ClipboardCopy, Phone, FileText, Plus, Minus, Award, Camera, Download } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary, type Team } from "@/types/student";
 import { getRisk, getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { calculateFinalGrade } from '@/lib/ponderaciones';
@@ -23,6 +23,8 @@ import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { ActivityBreakdown } from './ActivityBreakdown';
 import { GradesTable } from './GradesTable';
+import * as htmlToImage from 'html-to-image';
+import { StudentReportImage } from './StudentReportImage';
 
 
 interface StudentCardProps {
@@ -246,6 +248,44 @@ function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolea
     );
 }
 
+function ReportImageDialog({ student, subjects }: { student: Student, subjects: SubjectSummary[] | undefined }) {
+    const reportRef = useRef<HTMLDivElement>(null);
+
+    const handleDownload = () => {
+        if (reportRef.current === null) {
+            return;
+        }
+
+        htmlToImage.toPng(reportRef.current, { cacheBust: true })
+            .then((dataUrl) => {
+                const link = document.createElement('a');
+                link.download = `reporte_${student.id}.png`;
+                link.href = dataUrl;
+                link.click();
+            })
+            .catch((err) => {
+                console.error('oops, something went wrong!', err);
+            });
+    };
+
+    return (
+        <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>Reporte Rápido del Alumno</DialogTitle>
+                <DialogDescription>
+                    Esta es una previsualización de la imagen que se descargará.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <StudentReportImage ref={reportRef} student={student} subjects={subjects} />
+            </div>
+            <DialogFooter>
+                <Button onClick={handleDownload}><Download className="mr-2 h-4 w-4" />Descargar Imagen</Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+}
+
 export function StudentCard({ student, teams, startOpen = false, isDialog = false }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
   
@@ -312,6 +352,12 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
                     <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}><Camera className="mr-2 h-4 w-4"/>Generar Reporte</Button>
+                        </DialogTrigger>
+                        <ReportImageDialog student={student} subjects={student.subjectSummaries} />
+                    </Dialog>
                     <Dialog>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>EXPEDIENTE</Button>
