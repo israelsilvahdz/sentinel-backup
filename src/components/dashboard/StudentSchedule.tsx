@@ -378,9 +378,14 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                                <Card className="p-3 bg-muted/50 max-h-32 overflow-y-auto">
                                  {affectedClasses.length > 0 ? (
                                    affectedClasses.map(c => (
-                                     <div key={c.id} className="flex items-center space-x-2">
-                                        <Checkbox id={`class-${c.id}`} checked={selectedClasses.has(c.id)} onCheckedChange={() => setSelectedClasses(prev => { const next = new Set(prev); if (next.has(c.id)) { next.delete(c.id); } else { next.add(c.id); } return next; })} />
-                                        <Label htmlFor={`class-${c.id}`} className="font-normal">{c.name}</Label>
+                                     <div key={c.id} className="flex items-center space-x-2 justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <Checkbox id={`class-${c.id}`} checked={selectedClasses.has(c.id)} onCheckedChange={() => setSelectedClasses(prev => { const next = new Set(prev); if (next.has(c.id)) { next.delete(c.id); } else { next.add(c.id); } return next; })} />
+                                          <Label htmlFor={`class-${c.id}`} className="font-normal">{c.name}</Label>
+                                        </div>
+                                        {c.schedule?.startTime && (
+                                          <Badge variant="secondary">{c.schedule.startTime} - {c.schedule.endTime}</Badge>
+                                        )}
                                      </div>
                                    ))
                                  ) : <p className="text-xs text-muted-foreground">No hay clases en las fechas seleccionadas.</p>}
@@ -486,3 +491,4 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
     </TooltipProvider>
   );
 }
+
