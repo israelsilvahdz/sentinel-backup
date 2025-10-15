@@ -22,13 +22,13 @@ import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { Switch } from '../ui/switch';
-import { useDashboardFilters } from './DashboardClient';
 
 
 interface StudentScheduleProps {
   subjects: Subject[];
   studentName: string;
   planType: 'semestral' | 'tetramestral';
+  professorContacts: Record<string, ProfessorContact>;
 }
 
 const DAYS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIER'];
@@ -81,9 +81,8 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string },
 }
 
 
-export function StudentSchedule({ subjects, studentName, planType }: StudentScheduleProps) {
+export function StudentSchedule({ subjects, studentName, planType, professorContacts }: StudentScheduleProps) {
   const { toast } = useToast();
-  const { professorContacts } = useDashboardFilters();
   const [notificationReason, setNotificationReason] = useState("Ausencia");
   const [customNotes, setCustomNotes] = useState("");
   const [isFutureNotice, setIsFutureNotice] = useState(false);
@@ -141,7 +140,7 @@ export function StudentSchedule({ subjects, studentName, planType }: StudentSche
         setTeachersToNotify([]);
         setAffectedClasses([]);
     }
-  }, [dateRange, subjects, isPartialAbsence, professorContacts]);
+  }, [dateRange, subjects, isPartialAbsence, getProfessorEmail]);
   
   useEffect(() => {
     if (isPartialAbsence && affectedClasses.length > 0) {

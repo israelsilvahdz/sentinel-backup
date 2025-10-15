@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -68,7 +69,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
 
 
 export function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
-    const { loadStudentSubjects, planType } = useDashboardFilters();
+    const { loadStudentSubjects, planType, professorContacts } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [openSubject, setOpenSubject] = useState<string | null>(null);
@@ -194,7 +195,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
           <GradesTable subjects={subjects} />
         </TabsContent>
         <TabsContent value="horario">
-          <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} />
+          <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} professorContacts={professorContacts} />
         </TabsContent>
          <TabsContent value="contacto">
           <StudentContactInfo studentId={student.id} />
