@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { type Subject, type ProfessorContact } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -95,11 +95,11 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
 
   const TIME_SLOTS = planType === 'semestral' ? TIME_SLOTS_SEMESTRAL : TIME_SLOTS_TETRA;
   
-  const getProfessorEmail = (name: string): string | null => {
+  const getProfessorEmail = useCallback((name: string): string | null => {
       if (!name) return null;
       const normalizedNameId = name.toLowerCase().replace(/\s+/g, '');
       return professorContacts[normalizedNameId]?.email || null;
-  }
+  }, [professorContacts]);
 
   useEffect(() => {
     if (dateRange?.from) {
