@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '../ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Switch } from '../ui/switch';
+import { Timestamp } from 'firebase/firestore';
 
 
 type RiskCategory = 'ne' | 'faltas' | 'both' | 'other' | 'reporte' | 'pendiente';
@@ -47,6 +48,20 @@ const SITUATION_MAP: Record<TeamTask['situation'], { icon: React.ReactNode, text
   'no-entregados': { icon: <AlertTriangle className="h-4 w-4 text-red-600" />, text: 'Tareas No Entregadas' },
   'otro': { icon: <HelpCircle className="h-4 w-4 text-blue-600" />, text: 'Pendiente' },
 };
+
+// Convierte distintas representaciones de fecha a milisegundos
+const toMillis = (t?: Timestamp | Date | string | number) => {
+  if (!t) return 0;
+  if (t instanceof Timestamp) return t.toDate().getTime();
+  if (t instanceof Date) return t.getTime();
+  if (typeof t === "number") return t;
+  return new Date(t).getTime();
+};
+
+// Devuelve la “fecha” de cualquier item mezclado (Bitácora / Tarea / Seguimiento)
+function sortKeyOf(item: any): number {
+  return toMillis(item?.createdAt) ?? toMillis(item?.timestamp) ?? 0;
+}
 
 
 function SeguimientoForm({ 
@@ -181,7 +196,7 @@ function SeguimientoForm({
 }
 
 export function SeguimientoPanel() {
-  const { filteredStudents, allStudents, allStudentsMap, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, isLoading, loadStudentSubjects } = useDashboardFilters();
+  const { filteredStudents, allStudents, teams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, isLoading, loadStudentSubjects } = useDashboardFilters();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTopic, setFilterTopic] = useState<FilterTopic>('all');
@@ -367,7 +382,7 @@ export function SeguimientoPanel() {
             const studentTasks = teamTasks.filter(t => t.studentId === student.id);
             const allItems = [...studentInteractions, ...studentTasks]
               .filter(item => showCompleted || !('status' in item) || item.status === 'pendiente')
-              .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime());
+              .sort((a, b) => sortKeyOf(b) - sortKeyOf(a));
 
             const hasPendingTask = studentTasks.some(t => t.status === 'pendiente');
             const displayInfo = riskDisplayInfo[hasPendingTask ? 'pendiente' : riskCategory];
@@ -403,7 +418,7 @@ export function SeguimientoPanel() {
                             {student.name} ({student.id})
                           </DialogDescription>
                         </DialogHeader>
-                        <StudentCard student={student} startOpen={true} isDialog={true} />
+                        <StudentCard student={student} teams={teams} startOpen={true} isDialog={true} />
                     </DialogContent>
                 </Dialog>
 
@@ -565,7 +580,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
             return;
         }
         try {
-            await deleteSeguimientoEntry(entry.id);
+            await deleteSeguimientoEntry(entry.id!);
             toast({ title: "Registro eliminado" });
             onUpdate();
         } catch (error) {
@@ -582,7 +597,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                 <Card className="h-full flex flex-col group relative cursor-pointer hover:bg-muted/50 transition-colors">
                     <CardHeader className="p-4 flex-grow">
                         <CardTitle className="text-sm">{cardTitle}</CardTitle>
-                        <CardDescription>{format(entry.createdAt.toDate(), "d MMM, yyyy", { locale: es })}</CardDescription>
+                        <CardDescription>{format((entry.createdAt || entry.timestamp).toDate(), "d MMM, yyyy", { locale: es })}</CardDescription>
                         <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
                             {contentToShow}
                         </div>
@@ -620,7 +635,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                 <DialogHeader>
                     <DialogTitle>{cardTitle}</DialogTitle>
                     <DialogDescription>
-                        {student.name} | {format(entry.createdAt.toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
+                        {student.name} | {format((entry.createdAt || entry.timestamp).toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
@@ -647,7 +662,7 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
             </DialogContent>
             
             {/* Dialog for Editing (only for non-bitacora) */}
-            {!isBitacora && (
+            {!isBitacora && entry.id && (
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                     <DialogContent>
                         <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
@@ -713,11 +728,11 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
         );
     };
 
-     const relevantSubjects = (studentSubjects || []).filter(s => {
+     const relevantSubjects = useMemo(() => (studentSubjects || []).filter(s => {
         if (situation === 'faltas') return s.absences > 0;
         if (situation === 'no-entregados') return s.missedAssignments > 0;
         return false;
-    });
+    }), [studentSubjects, situation]);
 
     const handleCreateTask = async () => {
         setIsSubmitting(true);
@@ -787,7 +802,7 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
                             </div>
                             <div className="space-y-2">
                                 <Label>2. Situación a reportar</Label>
-                                <RadioGroup value={situation} onValueChange={handleSituationChange} className="flex gap-4">
+                                <RadioGroup value={situation} onValueChange={(value) => handleSituationChange(value as 'faltas' | 'no-entregados' | 'otro')} className="flex gap-4">
                                     <div className="flex items-center space-x-2"><RadioGroupItem value="faltas" id="faltas-new" /><Label htmlFor="faltas-new">Faltas</Label></div>
                                     <div className="flex items-center space-x-2"><RadioGroupItem value="no-entregados" id="no-entregados-new" /><Label htmlFor="no-entregados-new">Tareas NE</Label></div>
                                     <div className="flex items-center space-x-2"><RadioGroupItem value="otro" id="otro-new" /><Label htmlFor="otro-new">Otro</Label></div>
@@ -841,3 +856,4 @@ function NewItemCard({ student, riskCategory, onUpdate }: { student: Student, ri
       
 
     
+

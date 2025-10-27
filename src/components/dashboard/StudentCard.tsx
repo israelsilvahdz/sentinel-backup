@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -23,8 +24,8 @@ interface StudentCardProps {
   teams: Team[];
   startOpen?: boolean;
   isDialog?: boolean;
-  isSelected: boolean;
-  onSelectionChange: (studentId: string, isSelected: boolean) => void;
+  isSelected?: boolean;
+  onSelectionChange?: (studentId: string, isSelected: boolean) => void;
 }
 
 function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (SubjectSummary[]) }) {
@@ -43,7 +44,7 @@ function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (
     return <Badge variant="outline" className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
 }
 
-export function StudentCard({ student, teams, startOpen = false, isDialog = false, isSelected, onSelectionChange }: StudentCardProps) {
+export function StudentCard({ student, teams, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
   
   const teamName = useMemo(() => {
