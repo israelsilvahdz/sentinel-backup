@@ -50,7 +50,7 @@ En ${data.LUGAR || '{{LUGAR PENDIENTE}}'} a ${format(data.FECHA_ACTUAL || new Da
 ${data.PRESIDENTE_COMITE || '{{NOMBRE DEL DIRECTOR PENDIENTE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO DEL DIRECTOR PENDIENTE}}'}, con fundamento en el artículo 155, 156, 157 y 158 del Reglamento General de Alumnos de Universidad Tecmilenio (“Reglamento”), convoca a integrar un Comité Disciplinario, en virtud de haber recibido un reporte en el cual se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA PENDIENTE}}'} constituye una falta de disciplina. Los hechos que dan pie al comité es un reporte emitido por ${data.NOMBRE_REPORTANTE || '{{NOMBRE DEL REPORTANTE PENDIENTE}}'} y del cual se adjunta copia, donde se presume que ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} incurrió en las faltas de disciplina enmarcadas en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS PENDIENTES}}'} del Reglamento.
 
 Considerando que el Comité Disciplinario es la instancia competente para resolver cualquier asunto donde se presuma que la conducta de un estudiante constituye una falta de disciplina prevista en el Reglamento, se convoca a la integración del Comité Disciplinario por:
-${data.LISTA_MIEMBROS_COMITE || '{{INTEGRANTES Y ROLES PENDIENTES}}'}
+{{LISTA_MIEMBROS_COMITE}}
 
 Lo anterior para que las personas mencionadas de forma conjunta resuelvan lo que corresponda conforme al Reglamento.
 
@@ -184,10 +184,29 @@ export function generateDocument(step: Step, data: CaseData): string {
 
 export async function generateWordDocument(step: Step, data: CaseData): Promise<Blob> {
     const text = generateDocument(step, data);
-    const lines = text.split('\n').filter(line => line.trim() !== '');
+    const lines = text.split('\n');
     const namesToBold = [data.PRESIDENTE_COMITE, data.NOMBRE_ALUMNO, data.NOMBRE_REPORTANTE].filter(Boolean) as string[];
 
-    const createFormattedParagraph = (line: string) => {
+    const paragraphs: Paragraph[] = [];
+
+    for (const line of lines) {
+        if (line.trim() === '{{LISTA_MIEMBROS_COMITE}}') {
+            const members = data.LISTA_MIEMBROS_COMITE?.split('\n') || [];
+            members.forEach(member => {
+                if (member.trim()) {
+                    paragraphs.push(new Paragraph({
+                        children: [new TextRun(member.trim())],
+                        bullet: {
+                            level: 0
+                        },
+                        alignment: AlignmentType.JUSTIFIED,
+                        spacing: { after: 120 },
+                    }));
+                }
+            });
+            continue;
+        }
+
         const children: TextRun[] = [];
         let remainingLine = line;
 
@@ -209,8 +228,7 @@ export async function generateWordDocument(step: Step, data: CaseData): Promise<
         if (remainingLine) {
             children.push(new TextRun(remainingLine));
         }
-
-        // Default paragraph options
+        
         let paragraphOptions: any = {
             children,
             alignment: AlignmentType.JUSTIFIED,
@@ -219,31 +237,35 @@ export async function generateWordDocument(step: Step, data: CaseData): Promise<
         
         const trimmedLine = line.trim();
 
-        // Apply specific formatting based on content
         if (trimmedLine.startsWith('CONVOCATORIA') || trimmedLine.startsWith('NOTIFICACIÓN') || trimmedLine.startsWith('ACUERDO') || trimmedLine.startsWith('RESOLUCIÓN')) {
             paragraphOptions.children = [new TextRun({ text: trimmedLine, bold: true, allCaps: true })];
             paragraphOptions.alignment = AlignmentType.CENTER;
-        } else if (trimmedLine.startsWith('En ') && (line.includes(' a ') || line.includes(' a '))) {
+        } else if (trimmedLine.startsWith('En ') && (line.includes(' a '))) {
             paragraphOptions.alignment = AlignmentType.RIGHT;
         } else if (trimmedLine.startsWith('__________________________')) {
             paragraphOptions.alignment = AlignmentType.CENTER;
             paragraphOptions.spacing = { before: 240, after: 0 };
-        } else if (namesToBold.includes(trimmedLine) || trimmedLine === (data.CARGO_PRESIDENTE) || trimmedLine === "Como Presidente del Comité") {
+        } else if (namesToBold.includes(trimmedLine.replace('Como Presidente del Comité', '').trim()) || trimmedLine === (data.CARGO_PRESIDENTE) || trimmedLine === "Como Presidente del Comité") {
             paragraphOptions.alignment = AlignmentType.CENTER;
-            if(namesToBold.includes(trimmedLine)) {
+            if(namesToBold.includes(trimmedLine.replace('Como Presidente del Comité', '').trim())) {
                  paragraphOptions.children = [new TextRun({ text: trimmedLine, bold: true })];
             }
         }
         
-        return new Paragraph(paragraphOptions);
-    };
+        if (trimmedLine) {
+             paragraphs.push(new Paragraph(paragraphOptions));
+        } else {
+             paragraphs.push(new Paragraph({ children: [new TextRun('')] }));
+        }
+    }
+
 
     const doc = new Document({
         styles: {
             default: {
                 document: {
                     run: {
-                        font: "Calibri",
+                        font: "Calibri Light",
                         size: 24, // 12pt
                     },
                 },
@@ -251,10 +273,12 @@ export async function generateWordDocument(step: Step, data: CaseData): Promise<
         },
         sections: [{
             properties: {},
-            children: lines.map(createFormattedParagraph),
+            children: paragraphs,
         }],
     });
 
     const blob = await Packer.toBlob(doc);
     return blob;
 }
+
+    
