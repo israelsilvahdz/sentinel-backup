@@ -18,37 +18,10 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Gavel, Copy, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { generateDocument, type CaseData, type Step, stepKeys, templates } from '@/lib/templates';
+import { generateDocument, type CaseData, type Step, stepKeys, templates, caseSchema } from '@/lib/templates';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { useDashboardFilters } from './DashboardClient';
 
-const caseSchema = z.object({
-  NUMERO_EXPEDIENTE: z.string().min(1, 'Requerido'),
-  CAMPUS: z.string().min(1, 'Requerido'),
-  LUGAR: z.string().min(1, 'Requerido'),
-  FECHA_REPORTE: z.date({ required_error: 'Requerido' }),
-  NOMBRE_REPORTANTE: z.string().min(1, 'Requerido'),
-  NOMBRE_ALUMNO: z.string(),
-  MATRICULA_ALUMNO: z.string().min(1, 'Requerido'),
-  SEMESTRE_ALUMNO: z.string().min(1, 'Requerido'),
-  NOMBRE_TUTOR: z.string().optional(),
-  PARENTESCO_TUTOR: z.string().optional(),
-  DESCRIPCION_HECHOS: z.string().min(1, 'Requerido'),
-  ARTICULOS_PRESUNTOS: z.string().min(1, 'Requerido'),
-  PRESIDENTE_COMITE: z.string().min(1, 'Requerido'),
-  CARGO_PRESIDENTE: z.string().min(1, 'Requerido'),
-  LISTA_MIEMBROS_COMITE: z.string().min(1, 'Requerido'),
-  APLICA_MEDIDA_CAUTELAR: z.enum(['si', 'no']).optional(),
-  TIPO_MEDIDA_CAUTELAR: z.string().optional(),
-  DESCRIPCION_IMPLICACIONES_MEDIDA: z.string().optional(),
-  FECHA_SESION: z.date().optional(),
-  HORA_SESION: z.string().optional(),
-  FECHA_NOTIFICACION_EFECTIVA: z.date().optional(),
-  PRUEBAS_ALUMNO: z.string().optional(),
-  FECHA_RESOLUCION: z.date().optional(),
-  ARTICULOS_CONFIRMADOS: z.string().optional(),
-  TEXTO_SANCION: z.string().optional(),
-});
 
 export function AcademicCommitteePanel() {
   const { toast } = useToast();
@@ -59,9 +32,9 @@ export function AcademicCommitteePanel() {
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<CaseData>({
     resolver: zodResolver(caseSchema),
     defaultValues: {
-      LUGAR: 'León',
+      LUGAR: 'San Nicolás',
       FECHA_REPORTE: new Date(),
-      LISTA_MIEMBROS_COMITE: "Presidente - [Nombre]\nSecretario - [Nombre]\nVocal - [Nombre]",
+      LISTA_MIEMBROS_COMITE: "Iván Malpica Lagunes, Director de Nivel Preparatoria\nIsrael Silva Hernández, Líder de Generación\nClick or tap here to enter text., Líder de Generación\nMarce, Coordinador de Bienestar y Desarrollo Estudiantil de nivel preparatoria\nViviana Luis García como Miembro del area de bienestar y salud",
       PRUEBAS_ALUMNO: 'No presentó pruebas.',
       APLICA_MEDIDA_CAUTELAR: 'no',
     }
@@ -168,15 +141,13 @@ export function AcademicCommitteePanel() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2"><Label># Expediente</Label><Input {...register('NUMERO_EXPEDIENTE')} /></div>
-                        <div className="space-y-2"><Label>Campus</Label><Input {...register('CAMPUS')} /></div>
                         <div className="space-y-2"><Label>Lugar</Label><Input {...register('LUGAR')} /></div>
-                        <div className="space-y-2"><Label>Semestre Alumno</Label><Input {...register('SEMESTRE_ALUMNO')} /></div>
-                        <div className="space-y-2"><Label>Fecha del Reporte</Label><Input type="date" {...register('FECHA_REPORTE', { valueAsDate: true })} /></div>
                     </div>
+                    <div className="space-y-2"><Label>Fecha del Reporte</Label><Input type="date" {...register('FECHA_REPORTE', { valueAsDate: true })} /></div>
                     <div className="space-y-2"><Label>Reportado por</Label><Input {...register('NOMBRE_REPORTANTE')} /></div>
                     <div className="space-y-2"><Label>Presidente del Comité</Label><Input {...register('PRESIDENTE_COMITE')} /></div>
                     <div className="space-y-2"><Label>Cargo del Presidente</Label><Input {...register('CARGO_PRESIDENTE')} /></div>
-                    <div className="space-y-2"><Label>Artículos Presuntos</Label><Input {...register('ARTICULOS_PRESUNTOS')} placeholder="Ej. 1, 2 y 3"/></div>
+                    <div className="space-y-2"><Label>Artículos Presuntos</Label><Input {...register('ARTICULOS_PRESUNTOS')} placeholder="Ej. 134 inciso N"/></div>
                     <div className="space-y-2"><Label>Descripción de los Hechos</Label><Textarea rows={4} {...register('DESCRIPCION_HECHOS')} /></div>
                     <div className="space-y-2"><Label>Miembros del Comité</Label><Textarea rows={4} {...register('LISTA_MIEMBROS_COMITE')} /></div>
                 </CardContent>

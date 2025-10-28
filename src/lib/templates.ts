@@ -1,61 +1,65 @@
 
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import * as z from 'zod';
 
 export type Step = 'CONVOCATORIA' | 'NOTIFICACION' | 'ACUERDO' | 'RESOLUCION' | 'NOTIFICACION_RESOLUCION';
 
 export const stepKeys: Step[] = ['CONVOCATORIA', 'NOTIFICACION', 'ACUERDO', 'RESOLUCION', 'NOTIFICACION_RESOLUCION'];
 
-export interface CaseData {
-  NUMERO_EXPEDIENTE?: string;
-  CAMPUS?: string;
-  LUGAR?: string;
-  FECHA_REPORTE?: Date;
-  FECHA_ACTUAL?: Date;
-  NOMBRE_REPORTANTE?: string;
-  NOMBRE_ALUMNO?: string;
-  MATRICULA_ALUMNO?: string;
-  SEMESTRE_ALUMNO?: string;
-  NOMBRE_TUTOR?: string;
-  PARENTESCO_TUTOR?: string;
-  DESCRIPCION_HECHOS?: string;
-  ARTICULOS_PRESUNTOS?: string;
-  PRESIDENTE_COMITE?: string;
-  CARGO_PRESIDENTE?: string;
-  LISTA_MIEMBROS_COMITE?: string;
-  APLICA_MEDIDA_CAUTELAR?: 'si' | 'no';
-  TIPO_MEDIDA_CAUTELAR?: string;
-  DESCRIPCION_IMPLICACIONES_MEDIDA?: string;
-  FECHA_SESION?: Date;
-  HORA_SESION?: string;
-  FECHA_NOTIFICACION_EFECTIVA?: Date;
-  PRUEBAS_ALUMNO?: string;
-  FECHA_RESOLUCION?: Date;
-  ARTICULOS_CONFIRMADOS?: string;
-  TEXTO_SANCION?: string;
-}
+export const caseSchema = z.object({
+  NUMERO_EXPEDIENTE: z.string().optional(),
+  CAMPUS: z.string().optional(),
+  LUGAR: z.string().optional(),
+  FECHA_REPORTE: z.coerce.date().optional(),
+  FECHA_ACTUAL: z.coerce.date().optional(),
+  NOMBRE_REPORTANTE: z.string().optional(),
+  NOMBRE_ALUMNO: z.string().optional(),
+  MATRICULA_ALUMNO: z.string().optional(),
+  SEMESTRE_ALUMNO: z.string().optional(),
+  NOMBRE_TUTOR: z.string().optional(),
+  PARENTESCO_TUTOR: z.string().optional(),
+  DESCRIPCION_HECHOS: z.string().optional(),
+  ARTICULOS_PRESUNTOS: z.string().optional(),
+  PRESIDENTE_COMITE: z.string().optional(),
+  CARGO_PRESIDENTE: z.string().optional(),
+  LISTA_MIEMBROS_COMITE: z.string().optional(),
+  APLICA_MEDIDA_CAUTELAR: z.enum(['si', 'no']).optional(),
+  TIPO_MEDIDA_CAUTELAR: z.string().optional(),
+  DESCRIPCION_IMPLICACIONES_MEDIDA: z.string().optional(),
+  FECHA_SESION: z.coerce.date().optional(),
+  HORA_SESION: z.string().optional(),
+  FECHA_NOTIFICACION_EFECTIVA: z.coerce.date().optional(),
+  PRUEBAS_ALUMNO: z.string().optional(),
+  FECHA_RESOLUCION: z.coerce.date().optional(),
+  ARTICULOS_CONFIRMADOS: z.string().optional(),
+  TEXTO_SANCION: z.string().optional(),
+});
+
+export type CaseData = z.infer<typeof caseSchema>;
+
 
 const templatesContent: Record<Step, { title: string, template: (data: CaseData) => string }> = {
   CONVOCATORIA: {
     title: "1. Convocatoria",
     template: (data) => `CONVOCATORIA A INTEGRACIÓN DE COMITÉ DISCIPLINARIO
 
-En ${data.LUGAR || '{{LUGAR}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
+En ${data.LUGAR || '{{LUGAR PENDIENTE}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
 
-${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}, con fundamento en el artículo 151, 152, 153, 154 y 157 del Reglamento General de Alumnos de Universidad Tecmilenio (“Reglamento”), convoca a integrar un Comité Disciplinario, en virtud de haber recibido un reporte en el cual se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matricula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} constituye una falta de disciplina.
-
-Los hechos que dan pie al comité es un reporte emitido por ${data.NOMBRE_REPORTANTE || '{{NOMBRE_REPORTANTE}}'} y del cual se adjunta copia, donde se presume que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} incurrió en las faltas de disciplina enmarcadas en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS_PRESUNTOS}}'} del Reglamento.
+${data.PRESIDENTE_COMITE || '{{NOMBRE DEL DIRECTOR PENDIENTE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO DEL DIRECTOR PENDIENTE}}'}, con fundamento en el artículo 155, 156, 157 y 158 del Reglamento General de Alumnos de Universidad Tecmilenio (“Reglamento”), convoca a integrar un Comité Disciplinario, en virtud de haber recibido un reporte en el cual se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA PENDIENTE}}'} constituye una falta de disciplina. Los hechos que dan pie al comité es un reporte emitido por ${data.NOMBRE_REPORTANTE || '{{NOMBRE DEL REPORTANTE PENDIENTE}}'} y del cual se adjunta copia, donde se presume que ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} incurrió en las faltas de disciplina enmarcadas en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS PENDIENTES}}'} del Reglamento.
 
 Considerando que el Comité Disciplinario es la instancia competente para resolver cualquier asunto donde se presuma que la conducta de un estudiante constituye una falta de disciplina prevista en el Reglamento, se convoca a la integración del Comité Disciplinario por:
-${data.LISTA_MIEMBROS_COMITE || '{{LISTA_MIEMBROS_COMITE}}'}
+${data.LISTA_MIEMBROS_COMITE || '{{INTEGRANTES Y ROLES PENDIENTES}}'}
 
-Se acuerda notificar a ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} conforme al artículo 153 del Reglamento y generar el expediente correspondiente, al cual le corresponde el número ${data.NUMERO_EXPEDIENTE || '{{NUMERO_EXPEDIENTE}}'} para integrarse en el expediente académico de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}.
+Lo anterior para que las personas mencionadas de forma conjunta resuelvan lo que corresponda conforme al Reglamento.
+
+Se acuerda notificar a ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA PENDIENTE}}'} conforme al artículo 159 del Reglamento y generar el expediente correspondiente, al cual le corresponde el número ${data.NUMERO_EXPEDIENTE || '{{NUMERO DE CASO PENDIENTE}}'} para integrarse en el expediente académico de ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'}.
 
 Por lo expuesto, firma como encargado de presidir el comité:
 
 __________________________
-${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}
-${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}
+${data.PRESIDENTE_COMITE || '{{NOMBRE DEL DIRECTOR PENDIENTE}}'}
+${data.CARGO_PRESIDENTE || '{{CARGO DEL DIRECTOR PENDIENTE}}'}
 Como Presidente del Comité`
   },
   NOTIFICACION: {
