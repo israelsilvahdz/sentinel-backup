@@ -411,7 +411,7 @@ export function StudentSearchPopover({ onStudentSelect }: { onStudentSelect: (st
           <CommandInput placeholder="Escribe para buscar..." value={searchValue} onValueChange={setSearchValue} />
           <CommandEmpty>No se encontraron alumnos.</CommandEmpty>
           <CommandGroup>
-            {filteredStudents.slice(0, 100).map((student) => (
+            {filteredStudents.map((student) => (
               <CommandItem key={student.id} onSelect={() => handleSelect(student)}>
                 {student.name} ({student.id})
               </CommandItem>

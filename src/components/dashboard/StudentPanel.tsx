@@ -430,7 +430,7 @@ const generateImage = async (
       useEffect(() => {
         if (ref.current) {
           setTimeout(() => {
-            htmlToImage.toPng(ref.current, {
+            htmlToImage.toPng(ref.current!, {
                 pixelRatio: 2,
                 fontEmbedCSS: FONT_URL,
                 fetchRequestInit: {
