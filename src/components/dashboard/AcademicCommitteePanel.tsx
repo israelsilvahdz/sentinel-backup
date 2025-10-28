@@ -40,17 +40,11 @@ export function AcademicCommitteePanel() {
       APLICA_MEDIDA_CAUTELAR: 'no',
     }
   });
-  
-  const watchStudentId = watch('MATRICULA_ALUMNO');
 
-  React.useEffect(() => {
-    if (watchStudentId) {
-      const student = allStudentsMap.get(watchStudentId);
-      if (student) {
-        setValue('NOMBRE_ALUMNO', student.name);
-      }
-    }
-  }, [watchStudentId, allStudentsMap, setValue]);
+  const handleStudentSelect = (student: { id: string, name: string }) => {
+    setValue('MATRICULA_ALUMNO', student.id, { shouldValidate: true });
+    setValue('NOMBRE_ALUMNO', student.name, { shouldValidate: true });
+  };
 
 
   const handleGenerateDocument = (step: Step) => {
@@ -147,8 +141,9 @@ export function AcademicCommitteePanel() {
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label>Matrícula del Alumno</Label>
-                        <StudentSearchPopover onStudentSelect={({id}) => setValue('MATRICULA_ALUMNO', id, {shouldValidate: true})} />
+                        <StudentSearchPopover onStudentSelect={handleStudentSelect} />
                         {errors.MATRICULA_ALUMNO && <p className="text-xs text-destructive">{errors.MATRICULA_ALUMNO.message}</p>}
+                        <Input {...register('NOMBRE_ALUMNO')} readOnly className="bg-muted/50 mt-2" placeholder="Nombre del alumno..."/>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2"><Label># Expediente</Label><Input {...register('NUMERO_EXPEDIENTE')} /></div>
