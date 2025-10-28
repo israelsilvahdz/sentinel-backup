@@ -2,7 +2,7 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as z from 'zod';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
 
 export type Step = 'CONVOCATORIA' | 'NOTIFICACION' | 'ACUERDO' | 'RESOLUCION' | 'NOTIFICACION_RESOLUCION';
 
@@ -182,16 +182,76 @@ export function generateDocument(step: Step, data: CaseData): string {
     return templateFn(populatedData);
 }
 
-export async function generateWordDocument(text: string): Promise<Blob> {
+export async function generateWordDocument(step: Step, data: CaseData): Promise<Blob> {
+    const text = generateDocument(step, data);
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    const namesToBold = [data.PRESIDENTE_COMITE, data.NOMBRE_ALUMNO, data.NOMBRE_REPORTANTE].filter(Boolean) as string[];
+
+    const createFormattedParagraph = (line: string) => {
+        const children: TextRun[] = [];
+        let remainingLine = line;
+
+        // Special handling for bolding names
+        if (namesToBold.some(name => line.includes(name))) {
+            const regex = new RegExp(`(${namesToBold.join('|')})`, 'g');
+            const parts = line.split(regex);
+            
+            parts.forEach(part => {
+                if (namesToBold.includes(part)) {
+                    children.push(new TextRun({ text: part, bold: true }));
+                } else {
+                    children.push(new TextRun(part));
+                }
+            });
+            remainingLine = '';
+        }
+
+        if (remainingLine) {
+            children.push(new TextRun(remainingLine));
+        }
+
+        // Default paragraph options
+        let paragraphOptions: any = {
+            children,
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 120 },
+        };
+        
+        const trimmedLine = line.trim();
+
+        // Apply specific formatting based on content
+        if (trimmedLine.startsWith('CONVOCATORIA') || trimmedLine.startsWith('NOTIFICACIÓN') || trimmedLine.startsWith('ACUERDO') || trimmedLine.startsWith('RESOLUCIÓN')) {
+            paragraphOptions.children = [new TextRun({ text: trimmedLine, bold: true, allCaps: true })];
+            paragraphOptions.alignment = AlignmentType.CENTER;
+        } else if (trimmedLine.startsWith('En ') && (line.includes(' a ') || line.includes(' a '))) {
+            paragraphOptions.alignment = AlignmentType.RIGHT;
+        } else if (trimmedLine.startsWith('__________________________')) {
+            paragraphOptions.alignment = AlignmentType.CENTER;
+            paragraphOptions.spacing = { before: 240, after: 0 };
+        } else if (namesToBold.includes(trimmedLine) || trimmedLine === (data.CARGO_PRESIDENTE) || trimmedLine === "Como Presidente del Comité") {
+            paragraphOptions.alignment = AlignmentType.CENTER;
+            if(namesToBold.includes(trimmedLine)) {
+                 paragraphOptions.children = [new TextRun({ text: trimmedLine, bold: true })];
+            }
+        }
+        
+        return new Paragraph(paragraphOptions);
+    };
+
     const doc = new Document({
+        styles: {
+            default: {
+                document: {
+                    run: {
+                        font: "Calibri",
+                        size: 24, // 12pt
+                    },
+                },
+            },
+        },
         sections: [{
             properties: {},
-            children: text.split('\n').map(line => 
-                new Paragraph({
-                    children: [new TextRun(line)],
-                    spacing: { after: 100 }
-                })
-            ),
+            children: lines.map(createFormattedParagraph),
         }],
     });
 

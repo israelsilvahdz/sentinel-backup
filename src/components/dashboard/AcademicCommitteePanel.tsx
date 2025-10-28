@@ -67,10 +67,10 @@ export function AcademicCommitteePanel() {
     });
   };
 
-  const handleExportToWord = async (step: Step, text: string | undefined) => {
-    if (!text) return;
+  const handleExportToWord = async (step: Step) => {
     const formData = watch();
-    const docBlob = await generateWordDocument(text);
+     if (!formData) return;
+    const docBlob = await generateWordDocument(step, formData);
     const stepTitle = templates[step].title.split('. ')[1].replace(/\s+/g, '_');
     const studentName = formData.NOMBRE_ALUMNO?.split(' ')[0] || 'ALUMNO';
     saveAs(docBlob, `${stepTitle}_${studentName}.docx`);
@@ -198,7 +198,7 @@ export function AcademicCommitteePanel() {
                   <CardTitle className="flex items-center gap-2"><FileText /> Previsualización</CardTitle>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleCopy(generatedDocuments[activeStep])}><Copy className="mr-2 h-4 w-4" /> Copiar Texto</Button>
-                    <Button variant="outline" size="sm" onClick={() => handleExportToWord(activeStep, generatedDocuments[activeStep])}><Download className="mr-2 h-4 w-4" /> Exportar a Word</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleExportToWord(activeStep)}><Download className="mr-2 h-4 w-4" /> Exportar a Word</Button>
                   </div>
                 </div>
               </CardHeader>
