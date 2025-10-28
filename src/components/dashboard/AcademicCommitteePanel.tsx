@@ -16,11 +16,12 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Gavel, Copy, FileText } from 'lucide-react';
+import { Gavel, Copy, FileText, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { generateDocument, type CaseData, type Step, stepKeys, templates, caseSchema } from '@/lib/templates';
+import { generateDocument, generateWordDocument, type CaseData, type Step, stepKeys, templates, caseSchema } from '@/lib/templates';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { useDashboardFilters } from './DashboardClient';
+import { saveAs } from 'file-saver';
 
 
 export function AcademicCommitteePanel() {
@@ -65,6 +66,16 @@ export function AcademicCommitteePanel() {
       toast({ title: 'Texto Copiado', description: 'El contenido del documento se ha copiado al portapapeles.' });
     });
   };
+
+  const handleExportToWord = async (step: Step, text: string | undefined) => {
+    if (!text) return;
+    const formData = watch();
+    const docBlob = await generateWordDocument(text);
+    const stepTitle = templates[step].title.split('. ')[1].replace(/\s+/g, '_');
+    const studentName = formData.NOMBRE_ALUMNO?.split(' ')[0] || 'ALUMNO';
+    saveAs(docBlob, `${stepTitle}_${studentName}.docx`);
+    toast({ title: 'Documento de Word Generado', description: 'La descarga comenzará en breve.' });
+  }
 
   const aplicaMedida = watch('APLICA_MEDIDA_CAUTELAR');
 
@@ -185,7 +196,10 @@ export function AcademicCommitteePanel() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle className="flex items-center gap-2"><FileText /> Previsualización</CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => handleCopy(generatedDocuments[activeStep])}><Copy className="mr-2 h-4 w-4" /> Copiar Texto</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleCopy(generatedDocuments[activeStep])}><Copy className="mr-2 h-4 w-4" /> Copiar Texto</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleExportToWord(activeStep, generatedDocuments[activeStep])}><Download className="mr-2 h-4 w-4" /> Exportar a Word</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

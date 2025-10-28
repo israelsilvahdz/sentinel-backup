@@ -2,6 +2,7 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as z from 'zod';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
 
 export type Step = 'CONVOCATORIA' | 'NOTIFICACION' | 'ACUERDO' | 'RESOLUCION' | 'NOTIFICACION_RESOLUCION';
 
@@ -179,4 +180,21 @@ export function generateDocument(step: Step, data: CaseData): string {
     const populatedData = { ...data, FECHA_ACTUAL: new Date() };
     const templateFn = templates[step].template;
     return templateFn(populatedData);
+}
+
+export async function generateWordDocument(text: string): Promise<Blob> {
+    const doc = new Document({
+        sections: [{
+            properties: {},
+            children: text.split('\n').map(line => 
+                new Paragraph({
+                    children: [new TextRun(line)],
+                    spacing: { after: 100 }
+                })
+            ),
+        }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    return blob;
 }
