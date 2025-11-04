@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileUpload } from './FileUpload';
 import { parseDirectoryExcel, parseAthletesExcel } from '@/lib/excelParser';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
 import { format } from 'date-fns';
