@@ -897,4 +897,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
