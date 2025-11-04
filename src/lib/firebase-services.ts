@@ -1,6 +1,5 @@
 
 
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { 
   getFirestore, 
   collection, 
@@ -17,30 +16,11 @@ import {
   getDoc,
   where
 } from 'firebase/firestore';
+import { getFirebaseApp } from './firebase-client';
 import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student } from '@/types/student';
 
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyCV7o_NfeFq1xT1nF1hBfXW8Gj-A9gW6tQ",
-  authDomain: "tecmilenio-mdea.firebaseapp.com",
-  databaseURL: "https://tecmilenio-mdea-default-rtdb.firebaseio.com",
-  projectId: "tecmilenio-mdea",
-  storageBucket: "tecmilenio-mdea.appspot.com",
-  messagingSenderId: "576664692340",
-  appId: "1:576664692340:web:968f70092f6f4c3a4d5321"
-};
-
-
-// Inicializa Firebase de forma segura
-let app: FirebaseApp;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApps()[0];
-}
-
-
-const db = getFirestore(app);
+// Obtiene la instancia de Firestore del singleton del lado del cliente
+const db = getFirestore(getFirebaseApp());
 const BITACORA_COLLECTION = 'bitacora';
 const TEAM_TASKS_COLLECTION = 'teamTasks';
 const CONTACTS_COLLECTION = 'contacts';
@@ -512,6 +492,7 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
 
 
