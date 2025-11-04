@@ -131,12 +131,8 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
         }
         
-        let studentsTable = "Alumnos Ausentes:\n";
-        studentsTable += "-----------------------------------------------------------------\n";
-        studentsTable += "Nombre Completo           | Matrícula  | Grupos Regulares\n";
-        studentsTable += "-----------------------------------------------------------------\n";
-
-        filteredAthletes.forEach(s => {
+        const headers = ["Nombre Completo", "Matrícula", "Grupos Regulares"];
+        const rows = filteredAthletes.map(s => {
             const regularGroups = Array.from(
                 new Set(
                     s.subjectSummaries
@@ -144,13 +140,26 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                         .map(sub => sub.group) || []
                 )
             ).join(', ');
-            
-            const namePart = s.name.padEnd(25).substring(0, 25);
-            const idPart = s.id.padEnd(10).substring(0, 10);
-            
-            studentsTable += `${namePart} | ${idPart} | ${regularGroups}\n`;
+            return [s.name, s.id, regularGroups];
         });
-        studentsTable += "-----------------------------------------------------------------\n\n";
+
+        const colWidths = headers.map((h, i) => 
+            Math.max(h.length, ...rows.map(r => r[i].length))
+        );
+
+        let studentsTable = "Alumnos Ausentes:\n\n";
+        
+        const headerLine = headers.map((h, i) => h.padEnd(colWidths[i])).join(' | ');
+        const separatorLine = colWidths.map(w => '-'.repeat(w)).join('-|-');
+        
+        studentsTable += headerLine + '\n';
+        studentsTable += separatorLine + '\n';
+
+        rows.forEach(row => {
+            studentsTable += row.map((cell, i) => cell.padEnd(colWidths[i])).join(' | ') + '\n';
+        });
+
+        studentsTable += '\n';
         
         let body = `Estimados profesores,\n\n`;
         body += `Les notifico que los siguientes alumnos se ausentarán ${dateText} por motivo de: ${reason}.\n\n`;
@@ -917,5 +926,6 @@ export function StudentPanel() {
     </div>
   );
 }
+
 
 
