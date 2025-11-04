@@ -21,43 +21,103 @@ import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '../ui/textarea';
 
 
 function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
+  const [pastedNames, setPastedNames] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { allStudentsMap } = useDashboardFilters();
 
-  const handleAddStudent = async () => {
+  const resetState = () => {
+      setSelectedStudent(null);
+      setPastedNames('');
+  }
+
+  const handleAddSingleStudent = async () => {
     if (!selectedStudent) {
       toast({ variant: 'destructive', title: 'Error', description: 'Por favor, selecciona un alumno.' });
       return;
     }
-
-    if (team.members?.some(member => member.id === selectedStudent.id)) {
-        toast({ variant: 'destructive', title: 'Alumno ya en el equipo', description: `${selectedStudent.name} ya es miembro de este equipo.` });
-        return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const updatedMembers = [...(team.members || []), selectedStudent];
-      await addOrUpdateTeam({ ...team, members: updatedMembers });
-      toast({ title: 'Éxito', description: `${selectedStudent.name} ha sido añadido al equipo ${team.name}.` });
-      onUpdate();
-      setIsOpen(false);
-      setSelectedStudent(null);
-    } catch (error) {
-      console.error("Error adding student to team:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo añadir el alumno al equipo.' });
-    } finally {
-      setIsSubmitting(false);
-    }
+    await handleAddStudents([selectedStudent]);
   };
 
+  const handleAddMultipleStudents = async () => {
+    const names = pastedNames.split('\n').map(name => name.trim()).filter(Boolean);
+    if (names.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Por favor, pega al menos un nombre en el área de texto.' });
+      return;
+    }
+
+    const studentsToAdd: { id: string; name: string }[] = [];
+    const namesNotFound: string[] = [];
+    const studentMapByName = new Map<string, { id: string; name: string }>();
+    allStudentsMap.forEach(student => studentMapByName.set(student.name.toUpperCase(), student));
+
+    names.forEach(name => {
+      const student = studentMapByName.get(name.toUpperCase());
+      if (student) {
+        studentsToAdd.push(student);
+      } else {
+        namesNotFound.push(name);
+      }
+    });
+
+    if (namesNotFound.length > 0) {
+        toast({
+            variant: 'destructive',
+            title: 'Algunos alumnos no se encontraron',
+            description: `No se encontraron los siguientes nombres: ${namesNotFound.join(', ')}`,
+        });
+    }
+
+    if (studentsToAdd.length > 0) {
+        await handleAddStudents(studentsToAdd);
+    } else if (namesNotFound.length === names.length) {
+        // No students were found at all
+    } else {
+       setIsOpen(false);
+       resetState();
+    }
+  };
+  
+  const handleAddStudents = async (students: { id: string; name: string }[]) => {
+      const newMembers = [...(team.members || [])];
+      let addedCount = 0;
+
+      students.forEach(student => {
+          if (!newMembers.some(member => member.id === student.id)) {
+              newMembers.push(student);
+              addedCount++;
+          }
+      });
+
+      if (addedCount === 0) {
+          toast({ title: 'Sin cambios', description: 'El alumno (o alumnos) seleccionado(s) ya está(n) en el equipo.' });
+          return;
+      }
+
+      setIsSubmitting(true);
+      try {
+          await addOrUpdateTeam({ ...team, members: newMembers });
+          toast({ title: 'Éxito', description: `${addedCount} alumno(s) ha(n) sido añadido(s) al equipo ${team.name}.` });
+          onUpdate();
+          setIsOpen(false);
+          resetState();
+      } catch (error) {
+          console.error("Error adding student(s) to team:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'No se pudo añadir el/los alumno(s) al equipo.' });
+      } finally {
+          setIsSubmitting(false);
+      }
+  };
+
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if(!open) resetState(); }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => e.stopPropagation()}>
           <UserPlus className="h-4 w-4" />
@@ -65,24 +125,48 @@ function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () =
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Añadir Alumno a {team.name}</DialogTitle>
-          <DialogDescription>Busca y selecciona un alumno para añadirlo al equipo.</DialogDescription>
+          <DialogTitle>Añadir Alumno(s) a: {team.name}</DialogTitle>
+          <DialogDescription>Añade alumnos buscando uno por uno o pegando una lista de nombres.</DialogDescription>
         </DialogHeader>
-        <div className="py-4 space-y-4">
-          <Label>Buscar Alumno</Label>
-          <StudentSearchPopover onStudentSelect={setSelectedStudent} />
-           {selectedStudent && <p className="text-sm text-muted-foreground">Alumno seleccionado: {selectedStudent.name} ({selectedStudent.id})</p>}
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setIsOpen(false)}>Cancelar</Button>
-          <Button onClick={handleAddStudent} disabled={isSubmitting || !selectedStudent}>
-            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Añadir Alumno'}
-          </Button>
-        </DialogFooter>
+        
+        <Tabs defaultValue="single" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single">Uno por Uno</TabsTrigger>
+                <TabsTrigger value="bulk">Pegar Lista</TabsTrigger>
+            </TabsList>
+            <TabsContent value="single" className="py-4 space-y-4">
+                <Label>Buscar Alumno</Label>
+                <StudentSearchPopover onStudentSelect={setSelectedStudent} />
+                {selectedStudent && <p className="text-sm text-muted-foreground">Alumno seleccionado: {selectedStudent.name} ({selectedStudent.id})</p>}
+                 <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleAddSingleStudent} disabled={isSubmitting || !selectedStudent}>
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : 'Añadir Alumno'}
+                    </Button>
+                </DialogFooter>
+            </TabsContent>
+            <TabsContent value="bulk" className="py-4 space-y-4">
+                <Label htmlFor="student-list-textarea">Lista de Nombres (uno por línea)</Label>
+                <Textarea
+                    id="student-list-textarea"
+                    placeholder="Pega aquí los nombres completos de los alumnos, uno en cada línea..."
+                    rows={10}
+                    value={pastedNames}
+                    onChange={(e) => setPastedNames(e.target.value)}
+                />
+                 <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleAddMultipleStudents} disabled={isSubmitting || !pastedNames}>
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : 'Añadir Alumnos de la Lista'}
+                    </Button>
+                </DialogFooter>
+            </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 function EditTeamDialog({ team, onUpdate, children }: { team: Team, onUpdate: () => void, children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
