@@ -139,7 +139,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                         .map(sub => sub.group) || []
                 )
             );
-            return regularGroups[0] || 'N/A'; // Devuelve el primer grupo regular o N/A
+            return regularGroups[0] || 'N/A';
         }
 
         const sortedAthletes = [...filteredAthletes].sort((a, b) => {
@@ -147,6 +147,8 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             const groupB = getStudentRegularGroup(b);
             return groupA.localeCompare(groupB);
         });
+        
+        const studentsListText = sortedAthletes.map(s => s.name).join(', ');
 
         const studentsTableRows = sortedAthletes.map(s => {
             const regularGroups = Array.from(
@@ -183,7 +185,13 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
         const recipients = teachers.map(t => t.email).filter(Boolean).join(',');
         const subject = `Notificación de Ausencia por ${reason}`;
         
-        const mailtoBody = `Estimados profesores,\n\nSe notifica la ausencia de los siguientes alumnos por motivo de "${reason}" ${dateText}.\n\nA continuación, pueden pegar la tabla con los detalles de los alumnos que ha sido copiada a su portapapeles.\n\n${notes ? `Notas adicionales: ${notes}\n` : ''}\nSaludos cordiales,`;
+        const mailtoBody = `Estimados profesores,
+
+Les notifico que los siguientes alumnos se ausentarán por motivo de "${reason}" ${dateText}.
+
+Alumnos: ${studentsListText}.
+
+${notes ? `Notas adicionales: ${notes}\n\n` : ''}Saludos cordiales,`;
 
         return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody };
     };
@@ -199,7 +207,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             
             toast({ 
                 title: "Tabla Copiada", 
-                description: "La tabla con los alumnos está en tu portapapeles. Pégala en tu correo." 
+                description: "La tabla con los alumnos está en tu portapapeles. Pégala en tu correo para un mejor formato." 
             });
 
         } catch (err) {
@@ -207,7 +215,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             toast({
                 variant: 'destructive',
                 title: "Error al Copiar",
-                description: "Tu navegador no es compatible con esta función. Usa el botón de abrir correo."
+                description: "Tu navegador no es compatible para copiar tablas. Usa el botón de abrir correo."
             });
         }
     };
