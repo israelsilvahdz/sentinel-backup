@@ -124,6 +124,13 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             return null;
         }
         
+        let dateText;
+        if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
+            dateText = `del ${format(dateRange.from, "d 'de' LLLL", { locale: es })} al ${format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })}`;
+        } else {
+            dateText = `el día ${format(dateRange.from, "EEEE, d 'de' LLLL 'de' yyyy", { locale: es })}`;
+        }
+
         const getStudentRegularGroup = (student: Student): string => {
              const regularGroups = Array.from(
                 new Set(
@@ -174,8 +181,9 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
         `;
         
         const recipients = teachers.map(t => t.email).filter(Boolean).join(',');
-        const subject = `Notificación de Ausencia por Competencia Deportiva`;
-        const mailtoBody = `Estimados profesores,\n\nPor favor, peguen aquí la tabla de alumnos que han copiado.\n\nMotivo: ${reason}\n${notes ? `Notas adicionales: ${notes}\n` : ''}\nSaludos cordiales,`;
+        const subject = `Notificación de Ausencia por ${reason}`;
+        
+        const mailtoBody = `Estimados profesores,\n\nSe notifica la ausencia de los siguientes alumnos por motivo de "${reason}" ${dateText}.\n\nA continuación, pueden pegar la tabla con los detalles de los alumnos que ha sido copiada a su portapapeles.\n\n${notes ? `Notas adicionales: ${notes}\n` : ''}\nSaludos cordiales,`;
 
         return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody };
     };
@@ -285,10 +293,12 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                     </div>
                     <DialogFooter className="pt-4">
                          <Button variant="outline" onClick={handleCopyToClipboard}>
-                            <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Tabla
+                            <ClipboardCopy className="mr-2 h-4 w-4" />
+                            Copiar Tabla
                         </Button>
                         <Button onClick={handleOpenMail}>
-                           <Mail className="mr-2 h-4 w-4" /> Abrir Borrador de Correo
+                           <Mail className="mr-2 h-4 w-4" />
+                           Abrir Borrador de Correo
                         </Button>
                     </DialogFooter>
                 </div>
