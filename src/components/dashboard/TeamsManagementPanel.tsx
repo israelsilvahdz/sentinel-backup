@@ -27,14 +27,14 @@ import { Textarea } from '../ui/textarea';
 function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
-  const [pastedNames, setPastedNames] = useState('');
+  const [pastedInput, setPastedInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { allStudentsMap } = useDashboardFilters();
 
   const resetState = () => {
       setSelectedStudent(null);
-      setPastedNames('');
+      setPastedInput('');
   }
 
   const handleAddSingleStudent = async () => {
@@ -46,37 +46,42 @@ function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () =
   };
 
   const handleAddMultipleStudents = async () => {
-    const names = pastedNames.split('\n').map(name => name.trim()).filter(Boolean);
-    if (names.length === 0) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Por favor, pega al menos un nombre en el área de texto.' });
+    const lines = pastedInput.split('\n').map(line => line.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Por favor, pega al menos un nombre o matrícula en el área de texto.' });
       return;
     }
 
     const studentsToAdd: { id: string; name: string }[] = [];
-    const namesNotFound: string[] = [];
+    const itemsNotFound: string[] = [];
     const studentMapByName = new Map<string, { id: string; name: string }>();
     allStudentsMap.forEach(student => studentMapByName.set(student.name.toUpperCase(), student));
 
-    names.forEach(name => {
-      const student = studentMapByName.get(name.toUpperCase());
-      if (student) {
-        studentsToAdd.push(student);
+    lines.forEach(line => {
+      // Prioritize search by ID, then by name
+      const studentById = allStudentsMap.get(line);
+      const studentByName = studentMapByName.get(line.toUpperCase());
+      
+      if (studentById) {
+        studentsToAdd.push(studentById);
+      } else if (studentByName) {
+        studentsToAdd.push(studentByName);
       } else {
-        namesNotFound.push(name);
+        itemsNotFound.push(line);
       }
     });
 
-    if (namesNotFound.length > 0) {
+    if (itemsNotFound.length > 0) {
         toast({
             variant: 'destructive',
             title: 'Algunos alumnos no se encontraron',
-            description: `No se encontraron los siguientes nombres: ${namesNotFound.join(', ')}`,
+            description: `No se encontraron coincidencias para: ${itemsNotFound.join(', ')}`,
         });
     }
 
     if (studentsToAdd.length > 0) {
         await handleAddStudents(studentsToAdd);
-    } else if (namesNotFound.length === names.length) {
+    } else if (itemsNotFound.length === lines.length) {
         // No students were found at all
     } else {
        setIsOpen(false);
@@ -126,7 +131,7 @@ function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () =
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Añadir Alumno(s) a: {team.name}</DialogTitle>
-          <DialogDescription>Añade alumnos buscando uno por uno o pegando una lista de nombres.</DialogDescription>
+          <DialogDescription>Añade alumnos buscando uno por uno o pegando una lista de nombres o matrículas.</DialogDescription>
         </DialogHeader>
         
         <Tabs defaultValue="single" className="w-full">
@@ -146,17 +151,17 @@ function AddStudentToTeamDialog({ team, onUpdate }: { team: Team; onUpdate: () =
                 </DialogFooter>
             </TabsContent>
             <TabsContent value="bulk" className="py-4 space-y-4">
-                <Label htmlFor="student-list-textarea">Lista de Nombres (uno por línea)</Label>
+                <Label htmlFor="student-list-textarea">Lista de Nombres o Matrículas (uno por línea)</Label>
                 <Textarea
                     id="student-list-textarea"
-                    placeholder="Pega aquí los nombres completos de los alumnos, uno en cada línea..."
+                    placeholder="Pega aquí los nombres completos o matrículas de los alumnos, uno en cada línea..."
                     rows={10}
-                    value={pastedNames}
-                    onChange={(e) => setPastedNames(e.target.value)}
+                    value={pastedInput}
+                    onChange={(e) => setPastedInput(e.target.value)}
                 />
                  <DialogFooter>
                     <Button variant="ghost" onClick={() => setIsOpen(false)}>Cancelar</Button>
-                    <Button onClick={handleAddMultipleStudents} disabled={isSubmitting || !pastedNames}>
+                    <Button onClick={handleAddMultipleStudents} disabled={isSubmitting || !pastedInput}>
                         {isSubmitting ? <Loader2 className="animate-spin" /> : 'Añadir Alumnos de la Lista'}
                     </Button>
                 </DialogFooter>
