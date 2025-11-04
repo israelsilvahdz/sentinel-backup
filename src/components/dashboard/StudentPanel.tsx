@@ -123,13 +123,6 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             toast({ variant: "destructive", title: "Faltan datos", description: "Selecciona un deporte, un rango de fechas y asegúrate de que haya profesores." });
             return null;
         }
-
-        let dateText;
-        if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
-            dateText = `del ${format(dateRange.from, "d 'de' LLLL", { locale: es })} al ${format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })}`;
-        } else {
-            dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
-        }
         
         const getStudentRegularGroup = (student: Student): string => {
              const regularGroups = Array.from(
@@ -165,7 +158,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             `;
         }).join('');
 
-        const studentsTable = `
+        const studentsTableHtml = `
             <table style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 12px;">
                 <thead>
                     <tr>
@@ -180,18 +173,11 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             </table>
         `;
         
-        let body = `<p>Estimados profesores,</p>`;
-        body += `<p>Les notifico que los siguientes alumnos se ausentarán ${dateText} por motivo de: <strong>${reason}</strong>.</p>`;
-        body += studentsTable;
-        if (notes) {
-            body += `<p><strong>Notas adicionales:</strong> ${notes}</p>`;
-        }
-        body += `<p>Agradezco de antemano su apoyo y comprensión.</p><p>Saludos cordiales,</p>`;
-
         const recipients = teachers.map(t => t.email).filter(Boolean).join(',');
         const subject = `Notificación de Ausencia por Competencia Deportiva`;
-        
-        return { recipients, subject, body };
+        const mailtoBody = `Estimados profesores,\n\nPor favor, peguen aquí la tabla de alumnos que han copiado.\n\nMotivo: ${reason}\n${notes ? `Notas adicionales: ${notes}\n` : ''}\nSaludos cordiales,`;
+
+        return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody };
     };
 
     const handleCopyToClipboard = async () => {
@@ -199,7 +185,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
         if (!content) return;
 
         try {
-            const blob = new Blob([content.body], { type: 'text/html' });
+            const blob = new Blob([content.bodyHtml], { type: 'text/html' });
             const data = [new ClipboardItem({ [blob.type]: blob })];
             await navigator.clipboard.write(data);
             
@@ -217,6 +203,13 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             });
         }
     };
+    
+    const handleOpenMail = () => {
+        const content = generateEmailContent();
+        if (!content) return;
+        const {recipients, subject, mailtoBody} = content;
+        window.location.href = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
+    }
 
 
     return (
@@ -290,11 +283,14 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                             )}
                         </Card>
                     </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                         <Button onClick={handleCopyToClipboard}>
-                            <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Tabla para Correo
+                    <DialogFooter className="pt-4">
+                         <Button variant="outline" onClick={handleCopyToClipboard}>
+                            <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Tabla
                         </Button>
-                    </div>
+                        <Button onClick={handleOpenMail}>
+                           <Mail className="mr-2 h-4 w-4" /> Abrir Borrador de Correo
+                        </Button>
+                    </DialogFooter>
                 </div>
             </div>
         </DialogContent>
