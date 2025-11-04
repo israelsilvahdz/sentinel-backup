@@ -118,10 +118,10 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
         findTeachers();
     }, [dateRange, filteredAthletes, loadStudentSubjects, professorContacts]);
 
-    const generateMailto = () => {
+    const generateEmailContent = () => {
         if (teachers.length === 0 || !dateRange?.from) {
             toast({ variant: "destructive", title: "Faltan datos", description: "Selecciona un deporte, un rango de fechas y asegúrate de que haya profesores." });
-            return;
+            return null;
         }
 
         let dateText;
@@ -131,8 +131,24 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
         }
         
-        const headers = ["Nombre Completo", "Matrícula", "Grupos Regulares"];
-        const rows = filteredAthletes.map(s => {
+        const getStudentRegularGroup = (student: Student): string => {
+             const regularGroups = Array.from(
+                new Set(
+                    student.subjectSummaries
+                        ?.filter(sub => sub.group && !sub.group.startsWith('10') && !sub.group.toUpperCase().startsWith('F') && !onlineFlexSubjects.has(sub.name))
+                        .map(sub => sub.group) || []
+                )
+            );
+            return regularGroups[0] || 'N/A'; // Devuelve el primer grupo regular o N/A
+        }
+
+        const sortedAthletes = [...filteredAthletes].sort((a, b) => {
+            const groupA = getStudentRegularGroup(a);
+            const groupB = getStudentRegularGroup(b);
+            return groupA.localeCompare(groupB);
+        });
+
+        const studentsTableRows = sortedAthletes.map(s => {
             const regularGroups = Array.from(
                 new Set(
                     s.subjectSummaries
@@ -140,40 +156,68 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                         .map(sub => sub.group) || []
                 )
             ).join(', ');
-            return [s.name, s.id, regularGroups];
-        });
+            return `
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${s.name}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${s.id}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${regularGroups}</td>
+                </tr>
+            `;
+        }).join('');
 
-        const colWidths = headers.map((h, i) => 
-            Math.max(h.length, ...rows.map(r => r[i].length))
-        );
-
-        let studentsTable = "Alumnos Ausentes:\n\n";
+        const studentsTable = `
+            <table style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 12px;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Nombre Completo</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Matrícula</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Grupos Regulares</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${studentsTableRows}
+                </tbody>
+            </table>
+        `;
         
-        const headerLine = headers.map((h, i) => h.padEnd(colWidths[i])).join(' | ');
-        const separatorLine = colWidths.map(w => '-'.repeat(w)).join('-|-');
-        
-        studentsTable += headerLine + '\n';
-        studentsTable += separatorLine + '\n';
-
-        rows.forEach(row => {
-            studentsTable += row.map((cell, i) => cell.padEnd(colWidths[i])).join(' | ') + '\n';
-        });
-
-        studentsTable += '\n';
-        
-        let body = `Estimados profesores,\n\n`;
-        body += `Les notifico que los siguientes alumnos se ausentarán ${dateText} por motivo de: ${reason}.\n\n`;
+        let body = `<p>Estimados profesores,</p>`;
+        body += `<p>Les notifico que los siguientes alumnos se ausentarán ${dateText} por motivo de: <strong>${reason}</strong>.</p>`;
         body += studentsTable;
         if (notes) {
-            body += `Notas adicionales: ${notes}\n\n`;
+            body += `<p><strong>Notas adicionales:</strong> ${notes}</p>`;
         }
-        body += `Agradezco de antemano su apoyo y comprensión.\n\nSaludos cordiales,`;
+        body += `<p>Agradezco de antemano su apoyo y comprensión.</p><p>Saludos cordiales,</p>`;
 
         const recipients = teachers.map(t => t.email).filter(Boolean).join(',');
         const subject = `Notificación de Ausencia por Competencia Deportiva`;
         
-        return `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        return { recipients, subject, body };
     };
+
+    const handleCopyToClipboard = async () => {
+        const content = generateEmailContent();
+        if (!content) return;
+
+        try {
+            const blob = new Blob([content.body], { type: 'text/html' });
+            const data = [new ClipboardItem({ [blob.type]: blob })];
+            await navigator.clipboard.write(data);
+            
+            toast({ 
+                title: "Tabla Copiada", 
+                description: "La tabla con los alumnos está en tu portapapeles. Pégala en tu correo." 
+            });
+
+        } catch (err) {
+            console.error('Failed to copy HTML table: ', err);
+            toast({
+                variant: 'destructive',
+                title: "Error al Copiar",
+                description: "Tu navegador no es compatible con esta función. Usa el botón de abrir correo."
+            });
+        }
+    };
+
 
     return (
         <DialogContent className="sm:max-w-3xl">
@@ -247,17 +291,9 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                         </Card>
                     </div>
                     <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="outline" onClick={() => {
-                            const link = generateMailto();
-                            if (link) {
-                                navigator.clipboard.writeText(link);
-                                toast({ title: "Enlace copiado", description: "Pega el enlace en tu navegador para abrir el correo." });
-                            }
-                        }}> <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Enlace</Button>
-                        <Button onClick={() => {
-                            const link = generateMailto();
-                            if (link) window.location.href = link;
-                        }}> <Mail className="mr-2 h-4 w-4" /> Abrir en App de Correo</Button>
+                         <Button onClick={handleCopyToClipboard}>
+                            <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Tabla para Correo
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -929,3 +965,6 @@ export function StudentPanel() {
 
 
 
+
+
+    
