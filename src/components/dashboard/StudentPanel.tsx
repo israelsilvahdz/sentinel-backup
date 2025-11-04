@@ -43,6 +43,13 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
 };
 
 
+const onlineFlexSubjects = new Set(
+    curriculum.flatMap(term => term.courses.filter(c => c.isFlexible).map(c => c.name))
+);
+onlineFlexSubjects.add('Ciencias de la Vida');
+onlineFlexSubjects.add('El mundo contemporáneo');
+
+
 function AthleteNotificationDialog({ students, teams, filterType, selectedLeader }: { students: Student[], teams: Team[], filterType: string | null, selectedLeader: string | null }) {
     const { loadStudentSubjects, professorContacts } = useDashboardFilters();
     const { toast } = useToast();
@@ -124,11 +131,30 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             dateText = `el día ${format(dateRange.from, "EEEE d 'de' LLLL 'de' yyyy", { locale: es })}`;
         }
         
-        const studentNames = filteredAthletes.map(s => s.name).join(', ');
+        let studentsTable = "Alumnos Ausentes:\n";
+        studentsTable += "-----------------------------------------------------------------\n";
+        studentsTable += "Nombre Completo           | Matrícula  | Grupos Regulares\n";
+        studentsTable += "-----------------------------------------------------------------\n";
+
+        filteredAthletes.forEach(s => {
+            const regularGroups = Array.from(
+                new Set(
+                    s.subjectSummaries
+                        ?.filter(sub => sub.group && !sub.group.startsWith('10') && !sub.group.toUpperCase().startsWith('F') && !onlineFlexSubjects.has(sub.name))
+                        .map(sub => sub.group) || []
+                )
+            ).join(', ');
+            
+            const namePart = s.name.padEnd(25).substring(0, 25);
+            const idPart = s.id.padEnd(10).substring(0, 10);
+            
+            studentsTable += `${namePart} | ${idPart} | ${regularGroups}\n`;
+        });
+        studentsTable += "-----------------------------------------------------------------\n\n";
         
         let body = `Estimados profesores,\n\n`;
         body += `Les notifico que los siguientes alumnos se ausentarán ${dateText} por motivo de: ${reason}.\n\n`;
-        body += `Alumnos: ${studentNames}\n\n`;
+        body += studentsTable;
         if (notes) {
             body += `Notas adicionales: ${notes}\n\n`;
         }
@@ -203,7 +229,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                             {teachers.length > 0 ? (
                                 <ul className="text-sm list-disc list-inside">
                                     {teachers.map(t => (
-                                        <li key={t.name}>{t.name} {!t.email && <span className="text-destructive text-xs">(Sin correo)</span>}</li>
+                                        <li key={t.name}>{t.name} {!t.email && <span className="text-destructive text-xs font-semibold">(Sin correo)</span>}</li>
                                     ))}
                                 </ul>
                             ) : (
@@ -240,12 +266,6 @@ interface PrintOptions {
   includeStudentPhone: boolean;
   includeParentPhones: boolean;
 }
-
-const onlineFlexSubjects = new Set(
-    curriculum.flatMap(term => term.courses.filter(c => c.isFlexible).map(c => c.name))
-);
-onlineFlexSubjects.add('Ciencias de la Vida');
-onlineFlexSubjects.add('El mundo contemporáneo');
 
 
 function PrintListDialog({ students, contacts }: { students: Student[], contacts: Record<string, StudentContact>}) {
@@ -897,4 +917,5 @@ export function StudentPanel() {
     </div>
   );
 }
+
 
