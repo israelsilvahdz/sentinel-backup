@@ -13,12 +13,13 @@ export function RiskCell({ value, limit }: { value: number; limit: number; }) {
   const riskColorMapping: Record<RiskLevel, string> = {
     low: 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300',
     medium: 'bg-yellow-100 dark:bg-yellow-800/50 text-yellow-800 dark:text-yellow-300',
-    high: 'bg-red-100 dark:bg-red-800/50 text-red-800 dark:text-red-300',
+    high: 'bg-orange-100 dark:bg-orange-800/50 text-orange-800 dark:text-orange-300',
+    sd: 'bg-red-100 dark:bg-red-800/50 text-red-800 dark:text-red-300'
   };
 
   return (
-    <div className={`px-2 py-1 rounded-md text-center ${riskColorMapping[level]}`}>
-        {value} / {limit}
+    <div className={`px-2 py-1 rounded-md text-center font-semibold ${riskColorMapping[level]}`}>
+        {level === 'sd' ? 'SD' : `${value} / ${limit}`}
     </div>
   );
 }

@@ -1,23 +1,29 @@
 
+
 import { type Student, type Subject, type SubjectSummary } from '@/types/student';
 
-export type RiskLevel = 'low' | 'medium' | 'high';
+export type RiskLevel = 'low' | 'medium' | 'high' | 'sd';
 export type CaseStatus = 'lost' | 'urgent' | 'observation' | 'ok';
 
 /**
  * Calcula el nivel de riesgo para un valor y su límite.
  * @param value El valor actual (ej. número de faltas).
  * @param limit El límite permitido.
- * @returns El nivel de riesgo ('low', 'medium', 'high') y el porcentaje de riesgo.
+ * @returns El nivel de riesgo ('low', 'medium', 'high', 'sd') y el porcentaje de riesgo.
  */
 export function getRisk(value: number, limit: number): { risk: number; level: RiskLevel } {
-  if (limit <= 0) return { risk: value > 0 ? 1 : 0, level: value > 0 ? 'high' : 'low' };
+  if (limit <= 0) return { risk: value > 0 ? 1 : 0, level: value > 0 ? 'sd' : 'low' };
+  
+  if (value >= limit) {
+    return { risk: 1, level: 'sd' };
+  }
+
   const percentage = value / limit;
   
   let level: RiskLevel;
-  if (percentage >= 0.8) { // 80% o más es crítico. El limite real es > 100%, pero se marca antes
+  if (percentage >= 0.8) {
     level = 'high';
-  } else if (percentage >= 0.5) { // 50% o más es observación
+  } else if (percentage >= 0.5) {
     level = 'medium';
   } else {
     level = 'low';
@@ -29,20 +35,24 @@ export function getRisk(value: number, limit: number): { risk: number; level: Ri
  * Calcula el riesgo general de un estudiante basado en sus materias.
  * @param student El objeto del estudiante.
  * @param subjects Un array con las materias (o resúmenes de materias) del estudiante.
- * @returns El nivel de riesgo general ('low', 'medium', 'high') y flags para cada nivel.
+ * @returns El nivel de riesgo general y flags para cada nivel.
  */
 export function getStudentOverallRisk(student: Student, subjects: (Subject | SubjectSummary)[]) {
+  let hasSD = false;
   let hasHighRisk = false;
   let hasMediumRisk = false;
   
   if (!subjects || subjects.length === 0) {
-    return { overallRisk: 'low' as RiskLevel, hasHighRisk: false, hasMediumRisk: false };
+    return { overallRisk: 'low' as RiskLevel, hasSD: false, hasHighRisk: false, hasMediumRisk: false };
   }
 
   for (const subject of subjects) {
     const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
     const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
 
+    if (absenceRisk.level === 'sd' || assignmentRisk.level === 'sd') {
+      hasSD = true;
+    }
     if (absenceRisk.level === 'high' || assignmentRisk.level === 'high') {
       hasHighRisk = true;
     }
@@ -51,9 +61,10 @@ export function getStudentOverallRisk(student: Student, subjects: (Subject | Sub
     }
   }
 
-  const overallRisk = hasHighRisk ? 'high' : hasMediumRisk ? 'medium' : 'low';
-  return { overallRisk, hasHighRisk, hasMediumRisk };
+  const overallRisk: RiskLevel = hasSD ? 'sd' : hasHighRisk ? 'high' : hasMediumRisk ? 'medium' : 'low';
+  return { overallRisk, hasSD, hasHighRisk, hasMediumRisk };
 }
+
 
 /**
  * Calcula los KPIs (Key Performance Indicators) para una lista de estudiantes.
@@ -80,7 +91,7 @@ export function calculateKpis(students: Student[]) {
 
 
 /**
- * Criterio: Alumnos que superaron el límite de faltas y/o NE.
+ * Criterio: Alumnos que superaron el límite de faltas y/o NE (Sin Derecho).
  */
 export function findLostCases(students: Student[]): Student[] {
     return students.filter(student => {
@@ -92,7 +103,7 @@ export function findLostCases(students: Student[]): Student[] {
 }
 
 /**
- * Criterio: Alumnos con >= 50% de faltas/NE en alguna materia (y no son casos perdidos).
+ * Criterio: Alumnos con >= 80% de faltas/NE en alguna materia (y no son casos perdidos).
  */
 export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): Student[] {
     return students.filter(student => {
@@ -101,13 +112,13 @@ export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): 
         return student.subjectSummaries.some(subject => {
             const absencePercentage = subject.absenceLimit > 0 ? (subject.absences / subject.absenceLimit) : 0;
             const assignmentPercentage = subject.missedAssignmentLimit > 0 ? (subject.missedAssignments / subject.missedAssignmentLimit) : 0;
-            return absencePercentage >= 0.5 || assignmentPercentage >= 0.5;
+            return absencePercentage >= 0.8 || assignmentPercentage >= 0.8;
         });
     });
 }
 
 /**
- * Criterio: Alumnos con > 20% de faltas/NE en alguna materia (y no son urgentes ni perdidos).
+ * Criterio: Alumnos con >= 50% de faltas/NE en alguna materia (y no son urgentes ni perdidos).
  */
 export function findObservationCases(students: Student[], excludedIds: Set<string>): Student[] {
     return students.filter(student => {
@@ -116,7 +127,7 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
         return student.subjectSummaries.some(subject => {
             const absencePercentage = subject.absenceLimit > 0 ? (subject.absences / subject.absenceLimit) : 0;
             const assignmentPercentage = subject.missedAssignmentLimit > 0 ? (subject.missedAssignments / subject.missedAssignmentLimit) : 0;
-            return absencePercentage > 0.2 || assignmentPercentage > 0.2;
+            return absencePercentage >= 0.5 || assignmentPercentage >= 0.5;
         });
     });
 }

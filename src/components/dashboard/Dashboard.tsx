@@ -156,8 +156,8 @@ export function Dashboard() {
       {hasData && (
         <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard title="Casos Perdidos" value={lostCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('lost')} />
-                <KpiCard title="Casos Urgentes" value={urgentCases.length} icon={BellRing} color="yellow" onClick={() => handleCaseClick('urgent')} />
+                <KpiCard title="Casos SD (Sin Derecho)" value={lostCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('lost')} />
+                <KpiCard title="Casos Críticos" value={urgentCases.length} icon={BellRing} color="yellow" onClick={() => handleCaseClick('urgent')} />
                 <KpiCard title="En Observación" value={observationCases.length} icon={Users} color="blue" onClick={() => handleCaseClick('observation')} />
                 <KpiCard title="A Extraordinario" value={extraordinaryCases.length} icon={Award} onClick={() => handleCaseClick('extraordinary')} />
             </div>

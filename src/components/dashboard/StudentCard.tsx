@@ -29,9 +29,13 @@ interface StudentCardProps {
 }
 
 function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (SubjectSummary[]) }) {
-    const { overallRisk } = getStudentOverallRisk(student, subjects);
+    const { overallRisk, hasSD } = getStudentOverallRisk(student, subjects);
 
     if (overallRisk === 'low') return null;
+    
+    if (hasSD) {
+        return <Badge variant="destructive" className="ml-2">SD</Badge>;
+    }
 
     const config: Record<string, { text: string; className: string; }> = {
         medium: { text: 'En Observación', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
@@ -153,5 +157,3 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
     </Card>
   );
 }
-
-    
