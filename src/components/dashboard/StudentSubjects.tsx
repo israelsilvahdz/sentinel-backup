@@ -192,7 +192,9 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
           </div>
         </TabsContent>
          <TabsContent value="calificaciones">
-          <GradesTable subjects={subjects} />
+          <div className="overflow-x-auto">
+            <GradesTable subjects={subjects} />
+          </div>
         </TabsContent>
         <TabsContent value="horario">
           <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} professorContacts={professorContacts} />
