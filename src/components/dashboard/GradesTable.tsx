@@ -48,7 +48,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
     }
 
     return (
-        <div className="overflow-x-auto p-1">
+        <div className="p-1">
             <Table>
                 <TableHeader>
                     <TableRow>
