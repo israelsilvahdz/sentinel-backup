@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Clock } from 'lucide-react';
 import { type Subject } from "@/types/student";
+import { cn } from '@/lib/utils';
 
 interface GradesTableProps {
     subjects: Subject[];
@@ -19,7 +20,12 @@ export function GradesTable({ subjects }: GradesTableProps) {
 
         const allActivityKeys = new Set<string>();
         subjects.forEach(subject => {
-            Object.keys(subject.activities).forEach(key => allActivityKeys.add(key));
+            Object.keys(subject.activities).forEach(key => {
+                 // Solo añade la clave de actividad si tiene un valor (no es null, undefined, o string vacío)
+                if (ACTIVITY_REGEX.test(key) && subject.activities[key] !== null && subject.activities[key] !== undefined && String(subject.activities[key]).trim() !== '') {
+                    allActivityKeys.add(key);
+                }
+            });
         });
 
         const sortedHeaders = Array.from(allActivityKeys).sort((a, b) => {
@@ -43,6 +49,8 @@ export function GradesTable({ subjects }: GradesTableProps) {
 
     }, [subjects]);
 
+    const ACTIVITY_REGEX = /^A\d+$/;
+
     if (rows.length === 0) {
         return <p className="p-4 text-center text-muted-foreground">No hay datos de calificaciones para mostrar.</p>
     }
@@ -52,7 +60,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="min-w-[200px]">Materia</TableHead>
+                        <TableHead className="min-w-[200px] font-semibold">Materia</TableHead>
                         {headers.map(header => (
                             <TableHead key={header} className="text-center">{header}</TableHead>
                         ))}
@@ -61,7 +69,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
                 </TableHeader>
                 <TableBody>
                     {rows.map((row, index) => (
-                        <TableRow key={index}>
+                        <TableRow key={index} className={cn(index % 2 === 0 ? 'bg-muted/30' : '')}>
                             <TableCell className="font-medium">{row.subjectName}</TableCell>
                             {headers.map(header => (
                                 <TableCell key={header} className="text-center font-mono">
