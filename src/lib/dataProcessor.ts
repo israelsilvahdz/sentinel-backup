@@ -14,7 +14,8 @@ export type CaseStatus = 'lost' | 'urgent' | 'observation' | 'ok';
 export function getRisk(value: number, limit: number): { risk: number; level: RiskLevel } {
   if (limit <= 0) return { risk: value > 0 ? 1 : 0, level: value > 0 ? 'sd' : 'low' };
   
-  if (value >= limit) {
+  // Corregido: SD es estrictamente MAYOR que el límite.
+  if (value > limit) {
     return { risk: 1, level: 'sd' };
   }
 
@@ -97,7 +98,7 @@ export function findLostCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
         return student.subjectSummaries.some(subject => 
-            subject.absences >= subject.absenceLimit || subject.missedAssignments >= subject.missedAssignmentLimit
+            subject.absences > subject.absenceLimit || subject.missedAssignments > subject.missedAssignmentLimit
         );
     });
 }
@@ -109,7 +110,7 @@ export function findSDAbsencesCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
         return student.subjectSummaries.some(subject => 
-            subject.absences >= subject.absenceLimit
+            subject.absences > subject.absenceLimit
         );
     });
 }
@@ -121,7 +122,7 @@ export function findSDAssignmentsCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
         return student.subjectSummaries.some(subject => 
-            subject.missedAssignments >= subject.missedAssignmentLimit
+            subject.missedAssignments > subject.missedAssignmentLimit
         );
     });
 }
