@@ -10,7 +10,7 @@ import { RiskDistributionChart } from './RiskDistributionChart';
 import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group, UserSquare, CheckCircle, Clock, FileWarning, FileText } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-import { calculateKpis, findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases, findIncompleteGradeCases, findRiskCasesBySubject } from '@/lib/dataProcessor';
+import { findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases, findIncompleteGradeCases, findRiskCasesBySubject, findSDAbsencesCases, findSDAssignmentsCases } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
 import type { Student } from '@/types/student';
 
@@ -33,24 +33,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function Dashboard() {
   const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue } = useDashboardFilters();
 
-  const { kpis, lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, onlineRiskMundo, onlineRiskVida, scByProfessor } = useMemo(() => {
+  const { lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, sdAbsencesCases, sdAssignmentsCases, onlineRiskMundo, onlineRiskVida, scByProfessor } = useMemo(() => {
     if (isLoading || !hasData) {
         return { 
-            kpis: { totalStudents: 0 },
-            lostCases: [],
-            urgentCases: [],
-            observationCases: [],
-            extraordinaryCases: [],
-            incompleteGradeCases: [],
-            onlineRiskMundo: [],
-            onlineRiskVida: [],
-            scByProfessor: [],
+            lostCases: [], urgentCases: [], observationCases: [], extraordinaryCases: [],
+            incompleteGradeCases: [], sdAbsencesCases: [], sdAssignmentsCases: [],
+            onlineRiskMundo: [], onlineRiskVida: [], scByProfessor: [],
         };
     }
     const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
     
-    const lc = findLostCases(studentSource);
-    const lostCaseIds = new Set(lc.map(s => s.id));
+    const sdAbsences = findSDAbsencesCases(studentSource);
+    const sdAssignments = findSDAssignmentsCases(studentSource);
+    const allLostCases = findLostCases(studentSource);
+    const lostCaseIds = new Set(allLostCases.map(s => s.id));
     
     const uc = findUrgentCases(studentSource, lostCaseIds);
     const urgentCaseIds = new Set(uc.map(s => s.id));
@@ -91,19 +87,20 @@ export function Dashboard() {
         .slice(0,10);
 
     return {
-      kpis: { totalStudents: studentSource.length },
-      lostCases: lc,
+      lostCases: allLostCases,
       urgentCases: uc,
       observationCases: oc,
       extraordinaryCases: extraCases,
       incompleteGradeCases: incompleteCases,
+      sdAbsencesCases: sdAbsences,
+      sdAssignmentsCases: sdAssignments,
       onlineRiskMundo: riskMundo,
       onlineRiskVida: riskVida,
       scByProfessor: professorChartData,
     };
   }, [filteredStudents, allStudents, isLoading, hasData]);
 
-  const handleCaseClick = (caseType: 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'incompleteGrade' | null) => {
+  const handleCaseClick = (caseType: 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'incompleteGrade' | 'sd-absences' | 'sd-assignments' | null) => {
     setCaseType(caseType);
     setActiveView('students');
   };
@@ -155,8 +152,9 @@ export function Dashboard() {
 
       {hasData && (
         <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCard title="Casos SD (Sin Derecho)" value={lostCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('lost')} />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <KpiCard title="SD por Faltas" value={sdAbsencesCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('sd-absences')} />
+                <KpiCard title="SD por Tareas (NE)" value={sdAssignmentsCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('sd-assignments')} />
                 <KpiCard title="Casos Críticos" value={urgentCases.length} icon={BellRing} color="yellow" onClick={() => handleCaseClick('urgent')} />
                 <KpiCard title="En Observación" value={observationCases.length} icon={Users} color="blue" onClick={() => handleCaseClick('observation')} />
                 <KpiCard title="A Extraordinario" value={extraordinaryCases.length} icon={Award} onClick={() => handleCaseClick('extraordinary')} />

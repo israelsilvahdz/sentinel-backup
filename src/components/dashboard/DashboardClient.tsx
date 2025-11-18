@@ -42,13 +42,13 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, Team } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases } from '@/lib/dataProcessor';
+import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases } from '@/lib/dataProcessor';
 import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
-export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments';
+export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments';
 export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
@@ -520,6 +520,8 @@ export function DashboardClient() {
         if(caseType === 'lost') return findLostCases(students);
         if(caseType === 'extraordinary') return findExtraordinaryCases(students);
         if(caseType === 'incompleteGrade') return findIncompleteGradeCases(students);
+        if(caseType === 'sd-absences') return findSDAbsencesCases(students);
+        if(caseType === 'sd-assignments') return findSDAssignmentsCases(students);
 
         const lostCaseIds = new Set(findLostCases(students).map(s => s.id));
         if (caseType === 'urgent') return findUrgentCases(students, lostCaseIds);
@@ -729,6 +731,7 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
+
 
 
 

@@ -103,6 +103,30 @@ export function findLostCases(students: Student[]): Student[] {
 }
 
 /**
+ * Criterio: Alumnos que superaron el límite de faltas (Sin Derecho por Faltas).
+ */
+export function findSDAbsencesCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        return student.subjectSummaries.some(subject => 
+            subject.absences >= subject.absenceLimit
+        );
+    });
+}
+
+/**
+ * Criterio: Alumnos que superaron el límite de NE (Sin Derecho por Tareas).
+ */
+export function findSDAssignmentsCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        return student.subjectSummaries.some(subject => 
+            subject.missedAssignments >= subject.missedAssignmentLimit
+        );
+    });
+}
+
+/**
  * Criterio: Alumnos con >= 80% de faltas/NE en alguna materia (y no son casos perdidos).
  */
 export function findUrgentCases(students: Student[], lostCaseIds: Set<string>): Student[] {

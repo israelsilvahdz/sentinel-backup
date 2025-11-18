@@ -19,7 +19,7 @@ export function RiskCell({ value, limit }: { value: number; limit: number; }) {
 
   return (
     <div className={`px-2 py-1 rounded-md text-center font-semibold ${riskColorMapping[level]}`}>
-        {level === 'sd' ? 'SD' : `${value} / ${limit}`}
+        {`${value} / ${limit}`}
     </div>
   );
 }
