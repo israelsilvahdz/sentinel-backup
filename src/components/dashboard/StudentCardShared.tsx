@@ -14,7 +14,8 @@ export function RiskCell({ value, limit }: { value: number; limit: number; }) {
     low: 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300',
     medium: 'bg-yellow-100 dark:bg-yellow-800/50 text-yellow-800 dark:text-yellow-300',
     high: 'bg-orange-100 dark:bg-orange-800/50 text-orange-800 dark:text-orange-300',
-    sd: 'bg-red-100 dark:bg-red-800/50 text-red-800 dark:text-red-300'
+    at_limit: 'bg-red-200 dark:bg-red-700/50 text-red-900 dark:text-red-300',
+    sd: 'bg-red-600 dark:bg-red-800/50 text-red-100 dark:text-red-200'
   };
 
   return (

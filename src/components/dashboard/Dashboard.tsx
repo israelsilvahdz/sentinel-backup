@@ -7,10 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { KpiCard } from './KpiCard';
 import { RiskFocusChart } from './RiskFocusChart';
 import { RiskDistributionChart } from './RiskDistributionChart';
-import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group, UserSquare, CheckCircle, Clock, FileWarning, FileText } from 'lucide-react';
+import { AlertCircle, BarChart2, BellRing, Users, UserX, UserCheck, Loader2, ArrowRightCircle, Award, BookX, UserCog, Library, Group, UserSquare, CheckCircle, Clock, FileWarning, FileText, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-import { findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases, findIncompleteGradeCases, findRiskCasesBySubject, findSDAbsencesCases, findSDAssignmentsCases } from '@/lib/dataProcessor';
+import { findLostCases, findUrgentCases, findObservationCases, findExtraordinaryCases, findIncompleteGradeCases, findRiskCasesBySubject, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitCases } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
 import type { Student } from '@/types/student';
 
@@ -33,10 +33,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function Dashboard() {
   const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue } = useDashboardFilters();
 
-  const { lostCases, urgentCases, observationCases, extraordinaryCases, incompleteGradeCases, sdAbsencesCases, sdAssignmentsCases, onlineRiskMundo, onlineRiskVida, scByProfessor } = useMemo(() => {
+  const { lostCases, urgentCases, observationCases, atLimitCases, extraordinaryCases, incompleteGradeCases, sdAbsencesCases, sdAssignmentsCases, onlineRiskMundo, onlineRiskVida, scByProfessor } = useMemo(() => {
     if (isLoading || !hasData) {
         return { 
-            lostCases: [], urgentCases: [], observationCases: [], extraordinaryCases: [],
+            lostCases: [], urgentCases: [], observationCases: [], atLimitCases: [], extraordinaryCases: [],
             incompleteGradeCases: [], sdAbsencesCases: [], sdAssignmentsCases: [],
             onlineRiskMundo: [], onlineRiskVida: [], scByProfessor: [],
         };
@@ -48,11 +48,16 @@ export function Dashboard() {
     const allLostCases = findLostCases(studentSource);
     const lostCaseIds = new Set(allLostCases.map(s => s.id));
     
-    const uc = findUrgentCases(studentSource, lostCaseIds);
+    const atLimit = findAtLimitCases(studentSource).filter(s => !lostCaseIds.has(s.id));
+    const atLimitIds = new Set(atLimit.map(s => s.id));
+    
+    const highRiskExclusions = new Set([...lostCaseIds, ...atLimitIds]);
+
+    const uc = findUrgentCases(studentSource, highRiskExclusions);
     const urgentCaseIds = new Set(uc.map(s => s.id));
     
-    const combinedExclusions = new Set([...lostCaseIds, ...urgentCaseIds]);
-    const oc = findObservationCases(studentSource, combinedExclusions);
+    const observationExclusions = new Set([...highRiskExclusions, ...urgentCaseIds]);
+    const oc = findObservationCases(studentSource, observationExclusions);
 
     const extraCases = findExtraordinaryCases(studentSource);
     const incompleteCases = findIncompleteGradeCases(studentSource);
@@ -90,6 +95,7 @@ export function Dashboard() {
       lostCases: allLostCases,
       urgentCases: uc,
       observationCases: oc,
+      atLimitCases: atLimit,
       extraordinaryCases: extraCases,
       incompleteGradeCases: incompleteCases,
       sdAbsencesCases: sdAbsences,
@@ -100,7 +106,7 @@ export function Dashboard() {
     };
   }, [filteredStudents, allStudents, isLoading, hasData]);
 
-  const handleCaseClick = (caseType: 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'incompleteGrade' | 'sd-absences' | 'sd-assignments' | null) => {
+  const handleCaseClick = (caseType: 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'incompleteGrade' | 'sd-absences' | 'sd-assignments' | 'at-limit' | null) => {
     setCaseType(caseType);
     setActiveView('students');
   };
@@ -152,9 +158,10 @@ export function Dashboard() {
 
       {hasData && (
         <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <KpiCard title="SD por Faltas" value={sdAbsencesCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('sd-absences')} />
                 <KpiCard title="SD por Tareas (NE)" value={sdAssignmentsCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('sd-assignments')} />
+                <KpiCard title="Al Límite" value={atLimitCases.length} icon={AlertTriangle} color="red" onClick={() => handleCaseClick('at-limit')} />
                 <KpiCard title="Casos Críticos" value={urgentCases.length} icon={BellRing} color="yellow" onClick={() => handleCaseClick('urgent')} />
                 <KpiCard title="En Observación" value={observationCases.length} icon={Users} color="blue" onClick={() => handleCaseClick('observation')} />
                 <KpiCard title="A Extraordinario" value={extraordinaryCases.length} icon={Award} onClick={() => handleCaseClick('extraordinary')} />

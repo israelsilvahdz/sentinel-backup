@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useMemo } from 'react';
@@ -17,8 +18,8 @@ export function RiskDistributionChart({ students }: RiskDistributionChartProps) 
         return [];
     }
 
-    let absenceRisks = { low: 0, medium: 0, high: 0 };
-    let assignmentRisks = { low: 0, medium: 0, high: 0 };
+    let absenceRisks: Record<RiskLevel, number> = { low: 0, medium: 0, high: 0, at_limit: 0, sd: 0 };
+    let assignmentRisks: Record<RiskLevel, number> = { low: 0, medium: 0, high: 0, at_limit: 0, sd: 0 };
 
     students.forEach(student => {
       let maxAbsenceLevel: RiskLevel = 'low';
@@ -28,12 +29,15 @@ export function RiskDistributionChart({ students }: RiskDistributionChartProps) 
       subjects.forEach(subject => {
         const absenceLevel = getRisk(subject.absences, subject.absenceLimit).level;
         const assignmentLevel = getRisk(subject.missedAssignments, subject.missedAssignmentLimit).level;
-
-        if (absenceLevel === 'high') maxAbsenceLevel = 'high';
-        else if (absenceLevel === 'medium' && maxAbsenceLevel !== 'high') maxAbsenceLevel = 'medium';
         
-        if (assignmentLevel === 'high') maxAssignmentLevel = 'high';
-        else if (assignmentLevel === 'medium' && maxAssignmentLevel !== 'high') maxAssignmentLevel = 'medium';
+        const riskOrder: RiskLevel[] = ['low', 'medium', 'high', 'at_limit', 'sd'];
+        
+        if (riskOrder.indexOf(absenceLevel) > riskOrder.indexOf(maxAbsenceLevel)) {
+          maxAbsenceLevel = absenceLevel;
+        }
+        if (riskOrder.indexOf(assignmentLevel) > riskOrder.indexOf(maxAssignmentLevel)) {
+          maxAssignmentLevel = assignmentLevel;
+        }
       });
 
       absenceRisks[maxAbsenceLevel]++;
@@ -48,12 +52,16 @@ export function RiskDistributionChart({ students }: RiskDistributionChartProps) 
         Bajo: (absenceRisks.low / totalStudents) * 100,
         Observación: (absenceRisks.medium / totalStudents) * 100,
         Crítico: (absenceRisks.high / totalStudents) * 100,
+        "Al Límite": (absenceRisks.at_limit / totalStudents) * 100,
+        "SD": (absenceRisks.sd / totalStudents) * 100,
       },
       {
         name: 'Tareas (NE)',
         Bajo: (assignmentRisks.low / totalStudents) * 100,
         Observación: (assignmentRisks.medium / totalStudents) * 100,
         Crítico: (assignmentRisks.high / totalStudents) * 100,
+        "Al Límite": (assignmentRisks.at_limit / totalStudents) * 100,
+        "SD": (assignmentRisks.sd / totalStudents) * 100,
       }
     ];
   }, [students]);
@@ -90,7 +98,9 @@ export function RiskDistributionChart({ students }: RiskDistributionChartProps) 
             <Legend />
             <Bar dataKey="Bajo" stackId="a" fill="hsl(var(--chart-2) / 0.6)" />
             <Bar dataKey="Observación" stackId="a" fill="hsl(var(--chart-4) / 0.6)" />
-            <Bar dataKey="Crítico" stackId="a" fill="hsl(var(--chart-3) / 0.6)" />
+            <Bar dataKey="Crítico" stackId="a" fill="hsl(var(--chart-5) / 0.7)" />
+            <Bar dataKey="Al Límite" stackId="a" fill="hsl(var(--chart-3) / 0.8)" />
+            <Bar dataKey="SD" stackId="a" fill="hsl(var(--destructive) / 0.9)" />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

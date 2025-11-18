@@ -29,17 +29,15 @@ interface StudentCardProps {
 }
 
 function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (SubjectSummary[]) }) {
-    const { overallRisk, hasSD } = getStudentOverallRisk(student, subjects);
+    const { overallRisk } = getStudentOverallRisk(student, subjects);
 
     if (overallRisk === 'low') return null;
     
-    if (hasSD) {
-        return <Badge variant="destructive" className="ml-2">SD</Badge>;
-    }
-
     const config: Record<string, { text: string; className: string; }> = {
         medium: { text: 'En Observación', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-        high: { text: 'Crítico', className: 'bg-red-100 text-red-800 border-red-300' },
+        high: { text: 'Crítico', className: 'bg-orange-100 text-orange-800 border-orange-300' },
+        at_limit: { text: 'Al Límite', className: 'bg-red-200 text-red-900 border-red-400' },
+        sd: { text: 'SD', className: 'bg-red-500 text-white border-red-700' },
     };
 
     const riskConfig = config[overallRisk];
