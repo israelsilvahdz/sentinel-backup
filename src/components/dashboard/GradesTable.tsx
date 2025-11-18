@@ -13,6 +13,8 @@ interface GradesTableProps {
 }
 
 export function GradesTable({ subjects }: GradesTableProps) {
+    const ACTIVITY_REGEX = /^A\d+$/;
+    
     const { headers, rows } = useMemo(() => {
         if (!subjects || subjects.length === 0) {
             return { headers: [], rows: [] };
@@ -47,9 +49,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
 
         return { headers: sortedHeaders, rows: tableRows };
 
-    }, [subjects]);
-
-    const ACTIVITY_REGEX = /^A\d+$/;
+    }, [subjects, ACTIVITY_REGEX]);
 
     if (rows.length === 0) {
         return <p className="p-4 text-center text-muted-foreground">No hay datos de calificaciones para mostrar.</p>
