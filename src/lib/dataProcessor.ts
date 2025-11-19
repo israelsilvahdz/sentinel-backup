@@ -156,19 +156,24 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
 }
 
 /**
- * Criterio: Alumnos con exactamente el 100% de faltas o NE en alguna materia.
+ * Criterio: Alumnos que alcanzaron exactamente el 100% del límite de faltas.
  */
-export function findAtLimitCases(students: Student[]): Student[] {
+export function findAtLimitAbsencesCases(students: Student[]): Student[] {
   return students.filter(student => {
     if (!student.subjectSummaries) return false;
-    return student.subjectSummaries.some(subject => {
-      const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
-      const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
-      return absenceRisk.level === 'at_limit' || assignmentRisk.level === 'at_limit';
-    });
+    return student.subjectSummaries.some(subject => getRisk(subject.absences, subject.absenceLimit).level === 'at_limit');
   });
 }
 
+/**
+ * Criterio: Alumnos que alcanzaron exactamente el 100% del límite de Tareas (NE).
+ */
+export function findAtLimitAssignmentsCases(students: Student[]): Student[] {
+  return students.filter(student => {
+    if (!student.subjectSummaries) return false;
+    return student.subjectSummaries.some(subject => getRisk(subject.missedAssignments, subject.missedAssignmentLimit).level === 'at_limit');
+  });
+}
 
 /**
  * Criterio: Alumnos con derecho a examen extraordinario.
