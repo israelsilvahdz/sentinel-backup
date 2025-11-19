@@ -208,19 +208,27 @@ ${notes ? `Notas adicionales: ${notes}\n\n` : ''}Saludos cordiales,`;
         }
     };
     
-    const handleOpenMail = () => {
+    const handleOpenMail = async () => {
         const content = generateEmailContent();
         if (!content) return;
-        const {recipients, subject, mailtoBody, recipientsWithoutEmail} = content;
+        const { recipients, subject, mailtoBody, recipientsWithoutEmail } = content;
 
         if (recipientsWithoutEmail.length > 0) {
             const namesToCopy = recipientsWithoutEmail.map(t => t.name).join('\n');
-            navigator.clipboard.writeText(namesToCopy).then(() => {
+            try {
+                await navigator.clipboard.writeText(namesToCopy);
                 toast({
                     title: "Nombres Copiados",
                     description: `Se copiaron los nombres de ${recipientsWithoutEmail.length} profesores sin correo para que los busques manualmente.`,
                 });
-            });
+            } catch (err) {
+                console.error("Failed to copy names:", err);
+                toast({
+                    variant: 'destructive',
+                    title: "Error al copiar nombres",
+                    description: "No se pudieron copiar los nombres de los profesores."
+                });
+            }
         }
         
         window.location.href = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
@@ -813,10 +821,14 @@ export function StudentPanel() {
     incompleteGrade: 'Alumnos con Calificaciones Incompletas (SC)',
     newAbsences: 'Alumnos con Nuevas Faltas',
     newMissedAssignments: 'Alumnos con Nuevas Tareas No Entregadas',
+    'sd-absences': 'Alumnos Sin Derecho por Faltas',
+    'sd-assignments': 'Alumnos Sin Derecho por Tareas (NE)',
+    'at-limit-absences': 'Alumnos al Límite por Faltas',
+    'at-limit-assignments': 'Alumnos al Límite por Tareas (NE)',
   };
 
   const getPanelTitle = () => {
-    if (caseType) {
+    if (caseType && caseTypeMap[caseType]) {
         return <p className="text-muted-foreground">Mostrando: {caseTypeMap[caseType]}</p>;
     }
     if (subjectRiskFilter) {
