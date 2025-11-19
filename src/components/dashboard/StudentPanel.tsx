@@ -131,22 +131,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             dateText = `el día ${format(dateRange.from, "EEEE, d 'de' LLLL 'de' yyyy", { locale: es })}`;
         }
 
-        const getStudentRegularGroup = (student: Student): string => {
-             const regularGroups = Array.from(
-                new Set(
-                    student.subjectSummaries
-                        ?.filter(sub => sub.group && !sub.group.startsWith('10') && !sub.group.toUpperCase().startsWith('F') && !onlineFlexSubjects.has(sub.name))
-                        .map(sub => sub.group) || []
-                )
-            );
-            return regularGroups[0] || 'N/A';
-        }
-
-        const sortedAthletes = [...filteredAthletes].sort((a, b) => {
-            const groupA = getStudentRegularGroup(a);
-            const groupB = getStudentRegularGroup(b);
-            return groupA.localeCompare(groupB);
-        });
+        const sortedAthletes = [...filteredAthletes].sort((a, b) => a.name.localeCompare(b.name));
         
         const studentsListText = sortedAthletes.map(s => s.name).join(', ');
 
@@ -182,7 +167,10 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
             </table>
         `;
         
-        const recipients = teachers.map(t => t.email).filter(Boolean).join(',');
+        const recipientsWithEmail = teachers.filter(t => t.email);
+        const recipientsWithoutEmail = teachers.filter(t => !t.email);
+
+        const recipients = recipientsWithEmail.map(t => t.email).join(',');
         const subject = `Notificación de Ausencia por ${reason}`;
         
         const mailtoBody = `Estimados profesores,
@@ -193,7 +181,7 @@ Alumnos: ${studentsListText}.
 
 ${notes ? `Notas adicionales: ${notes}\n\n` : ''}Saludos cordiales,`;
 
-        return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody };
+        return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody, recipientsWithoutEmail };
     };
 
     const handleCopyToClipboard = async () => {
@@ -223,7 +211,18 @@ ${notes ? `Notas adicionales: ${notes}\n\n` : ''}Saludos cordiales,`;
     const handleOpenMail = () => {
         const content = generateEmailContent();
         if (!content) return;
-        const {recipients, subject, mailtoBody} = content;
+        const {recipients, subject, mailtoBody, recipientsWithoutEmail} = content;
+
+        if (recipientsWithoutEmail.length > 0) {
+            const namesToCopy = recipientsWithoutEmail.map(t => t.name).join('\n');
+            navigator.clipboard.writeText(namesToCopy).then(() => {
+                toast({
+                    title: "Nombres Copiados",
+                    description: `Se copiaron los nombres de ${recipientsWithoutEmail.length} profesores sin correo para que los busques manualmente.`,
+                });
+            });
+        }
+        
         window.location.href = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`;
     }
 
