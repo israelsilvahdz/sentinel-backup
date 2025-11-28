@@ -561,22 +561,7 @@ type EmailTemplate = {
 };
 
 const getEmailTemplate = (student: Student, subjects: SubjectSummary[]): EmailTemplate => {
-  const { overallRisk, hasSD, hasAtLimit, hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, subjects);
-
-  let highestAbsenceRisk: RiskLevel = 'low';
-  let highestNeRisk: RiskLevel = 'low';
-  
-  subjects.forEach(s => {
-    const absenceLevel = getStudentOverallRisk(student, [s]).overallRisk;
-    if (['sd', 'at_limit', 'high', 'medium'].indexOf(absenceLevel) > ['sd', 'at_limit', 'high', 'medium'].indexOf(highestAbsenceRisk)) {
-      highestAbsenceRisk = absenceLevel;
-    }
-    const neLevel = getStudentOverallRisk(student, [s]).overallRisk;
-     if (['sd', 'at_limit', 'high', 'medium'].indexOf(neLevel) > ['sd', 'at_limit', 'high', 'medium'].indexOf(highestNeRisk)) {
-      highestNeRisk = neLevel;
-    }
-  });
-
+  const { hasSD, hasAtLimit, hasHighRisk } = getStudentOverallRisk(student, subjects);
 
   if (hasSD) {
     const isSdByAbsences = subjects.some(s => s.absences > s.absenceLimit);
@@ -587,8 +572,8 @@ const getEmailTemplate = (student: Student, subjects: SubjectSummary[]): EmailTe
         };
     }
     return { // SD por NE
-        subject: `Notificación Importante: Estatus Académico - ${student.name}`,
-        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo para informarte sobre una situación importante. Debido al número de tareas no entregadas (NE), has quedado en estatus de "Sin Derecho" (SD) en una o más de tus materias.\n\nSé que esto puede ser desalentador, pero es crucial que no te desanimes. Por favor, búscame para que podamos conversar sobre los siguientes pasos y las opciones disponibles para ti.\n\nEstoy para ayudarte.`
+        subject: `URGENTE: Estatus Académico - ${student.name}`,
+        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en una o más materias debido a tareas no entregadas (NE).\n\nNo hay tiempo que perder. Es fundamental que te acerques **inmediatamente** con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.\n\nQuedo a tu disposición.`
     };
   }
 
@@ -650,7 +635,8 @@ export function StudentPanel() {
     setSubjectRiskFilter,
     selectedValue,
     filterType,
-    loadStudentSubjects
+    loadStudentSubjects,
+    professorContacts,
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -1193,3 +1179,4 @@ export function StudentPanel() {
 
 
     
+
