@@ -39,7 +39,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
         const tableRows = subjects.map(subject => {
             const rowData: Record<string, string | number> = {
                 subjectName: subject.name,
-                ponderado: subject.grade.toFixed(2), // Usar la calificación del reporte
+                ponderado: (subject.grade || 0).toFixed(2), // Usar la calificación del reporte
             };
             sortedHeaders.forEach(header => {
                 rowData[header] = subject.activities[header] ?? '';
