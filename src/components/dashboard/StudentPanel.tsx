@@ -894,55 +894,44 @@ export function StudentPanel() {
     };
 
     const handleSendEmails = async () => {
-      if (selectedStudents.size === 0) return;
-  
-      setIsEmailing(true);
-      toast({
-          title: "Generando Correos...",
-          description: "Preparando los borradores, por favor espera."
-      });
-  
-      let emailsOpened = 0;
-      for (const studentId of Array.from(selectedStudents)) {
-          const student = allStudentsMap.get(studentId);
-          if (!student || !student.subjectSummaries) continue;
-  
-          const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
-          const template = getEmailTemplate(student, student.subjectSummaries);
-          
-          let finalBody = template.body;
-  
-          // The logic for attaching images is complex and can be blocked by browsers.
-          // For reliability, we will send plain text emails for now.
-          // If image attachment is re-introduced, ensure it is handled robustly.
-          if (attachReport) {
-            const subjects = await loadStudentSubjects(studentId);
-            const reportImage = await generateImageFromComponent(StudentGradesReportImage, student, subjects);
-
-            if (reportImage) {
-                // This approach of embedding a base64 image in a mailto link is highly unreliable
-                // and often exceeds URL length limits. Sticking to plain text is safer.
-                // For now, we will not attach the image to prevent the mailto link from breaking.
-                 finalBody += "\n\n(El reporte de calificaciones no se pudo adjuntar automáticamente en este correo).";
-            } else {
-                console.error(`Could not generate report for ${student.name}`);
+        if (selectedStudents.size === 0) return;
+    
+        setIsEmailing(true);
+        toast({
+            title: "Generando Correos...",
+            description: "Preparando los borradores, por favor espera."
+        });
+    
+        const studentIds = Array.from(selectedStudents);
+    
+        const openMailto = (student: Student, template: EmailTemplate) => {
+            const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
+            const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(template.body)}`;
+            window.open(mailtoLink, '_blank');
+        };
+    
+        // Abre los enlaces mailto de forma secuencial con un pequeño retraso
+        for (let i = 0; i < studentIds.length; i++) {
+            const studentId = studentIds[i];
+            const student = allStudentsMap.get(studentId);
+            if (student && student.subjectSummaries) {
+                const template = getEmailTemplate(student, student.subjectSummaries);
+                
+                // Abre el correo en un timeout para evitar el bloqueo del navegador
+                setTimeout(() => openMailto(student, template), i * 300);
             }
-          }
-          
-          // Using encodeURIComponent for the body is more reliable for special characters and newlines.
-          const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(finalBody)}`;
-          
-          window.open(mailtoLink, '_blank');
-          emailsOpened++;
-      }
-  
-      setIsEmailing(false);
-      setIsEmailDialogOpen(false);
-      toast({
-          title: "¡Listo!",
-          description: `Se han abierto ${emailsOpened} borradores de correo en nuevas pestañas.`
-      });
-  };
+        }
+    
+        // Espera un tiempo prudencial para que todos los timeouts se ejecuten
+        setTimeout(() => {
+            setIsEmailing(false);
+            setIsEmailDialogOpen(false);
+            toast({
+                title: "¡Listo!",
+                description: `Se han abierto ${studentIds.length} borradores de correo en nuevas pestañas.`
+            });
+        }, studentIds.length * 300 + 500);
+    };
 
 
   if (isLoading) {
@@ -1083,53 +1072,6 @@ export function StudentPanel() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-                        <DialogTrigger asChild>
-                             <Button disabled={selectedStudents.size === 0} onClick={handleOpenEmailDialog}>
-                                <Send className="mr-2 h-4 w-4" />
-                                Enviar Correo ({selectedStudents.size})
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
-                             <DialogHeader>
-                                <DialogTitle>Enviar Correo a Alumnos Seleccionados</DialogTitle>
-                                <DialogDescription>
-                                    El sistema generará un correo personalizado para cada alumno según su situación. Revisa la plantilla base.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="py-4 space-y-4">
-                                <div>
-                                    <Label>Destinatarios ({selectedStudents.size}):</Label>
-                                    <ScrollArea className="h-24 w-full rounded-md border p-2 mt-2">
-                                        <ul className="text-sm text-muted-foreground">
-                                            {Array.from(selectedStudents).map(id => (
-                                                <li key={id}>{allStudentsMap.get(id)?.name}</li>
-                                            ))}
-                                        </ul>
-                                    </ScrollArea>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email-subject">Plantilla de Asunto</Label>
-                                    <Input id="email-subject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email-body">Plantilla de Cuerpo del Correo</Label>
-                                    <Textarea id="email-body" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={8}/>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox id="attach-report" checked={attachReport} onCheckedChange={(checked) => setAttachReport(!!checked)} />
-                                    <Label htmlFor="attach-report">Adjuntar Reporte de Calificaciones (como imagen)</Label>
-                                </div>
-                                <p className="text-xs text-muted-foreground">Nota: Se abrirá una nueva pestaña por cada correo a enviar para su revisión individual.</p>
-                            </div>
-                            <DialogFooter>
-                                <Button onClick={handleSendEmails} disabled={isEmailing}>
-                                    {isEmailing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                                    Abrir Borradores de Correo
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
                     <Button 
                         onClick={handleDownloadZip}
                         disabled={selectedStudents.size === 0}
@@ -1183,5 +1125,6 @@ export function StudentPanel() {
 
 
     
+
 
 
