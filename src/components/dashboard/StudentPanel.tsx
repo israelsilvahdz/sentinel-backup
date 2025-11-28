@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
@@ -501,113 +500,108 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
 
 function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[], loadStudentSubjects: (studentId: string) => Promise<Subject[]> }) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-    const [generatedReport, setGeneratedReport] = useState<string | null>(null);
-    const [isLoadingReport, setIsLoadingReport] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
     useEffect(() => {
         if (!open) {
             setSelectedStudent(null);
-            setGeneratedReport(null);
         }
     }, [open]);
 
-    const handleGenerateReport = async (student: Student) => {
-        setIsLoadingReport(true);
+    const handleGenerateAndCopy = async (student: Student) => {
+        setIsGenerating(true);
         setSelectedStudent(student);
-        setGeneratedReport(null); // Clear previous report
 
-        const subjects = await loadStudentSubjects(student.id);
-        const reportComponent = <StudentReportImage ref={reportRef} student={student} subjects={subjects.map(s => ({
-            id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-            missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-            grade: s.grade, finalGrade: s.finalGrade, group: s.group,
-        }))} />;
-
-        // Render the component off-screen to generate the image
+        // We need to render the component to a temporary off-screen div to get a ref
         const node = document.createElement('div');
         node.style.position = 'fixed';
         node.style.top = '-9999px';
-        node.style.left = '0';
         document.body.appendChild(node);
         
-        const { createRoot } = await import('react-dom/client');
-        const root = createRoot(node);
-        
+        const subjects = await loadStudentSubjects(student.id);
+        const subjectSummaries = subjects.map(s => ({
+            id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+            missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+            grade: s.grade, finalGrade: s.finalGrade, group: s.group,
+        }));
+
         const ComponentToRender = () => {
             const innerRef = useRef<HTMLDivElement>(null);
             useEffect(() => {
-                if(innerRef.current) {
-                    setTimeout(() => { // Timeout to ensure rendering
-                        htmlToImage.toPng(innerRef.current!, { pixelRatio: 1.5 })
+                if (innerRef.current) {
+                    setTimeout(() => { // Small timeout to ensure render
+                        htmlToImage.toPng(innerRef.current!, { pixelRatio: 2 })
                             .then((dataUrl) => {
-                                setGeneratedReport(dataUrl);
-                                setIsLoadingReport(false);
-                                root.unmount();
-                                document.body.removeChild(node);
+                                fetch(dataUrl)
+                                .then(res => res.blob())
+                                .then(blob => {
+                                    navigator.clipboard.write([
+                                        new ClipboardItem({ 'image/png': blob })
+                                    ]);
+                                    toast({ title: "Reporte Copiado", description: `El reporte de ${student.name} está en tu portapapeles.` });
+                                })
+                                .catch(err => {
+                                    console.error('Error fetching blob:', err);
+                                    toast({ variant: "destructive", title: "Error", description: "No se pudo procesar la imagen para copiar." });
+                                })
+                                .finally(() => {
+                                    setIsGenerating(false);
+                                    document.body.removeChild(node);
+                                });
                             })
                             .catch((err) => {
-                                console.error("Error generating image", err);
-                                toast({ variant: 'destructive', title: 'Error', description: 'No se pudo generar la imagen del reporte.' });
-                                setIsLoadingReport(false);
-                                root.unmount();
+                                console.error('Error generating image:', err);
+                                toast({ variant: "destructive", title: "Error", description: "No se pudo generar la imagen del reporte." });
+                                setIsGenerating(false);
                                 document.body.removeChild(node);
                             });
                     }, 500);
                 }
             }, []);
-            return React.cloneElement(reportComponent, { ref: innerRef });
-        }
-        
-        root.render(<ComponentToRender/>);
-    };
 
+            return <StudentReportImage ref={innerRef} student={student} subjects={subjectSummaries} />;
+        };
+
+        const { createRoot } = await import('react-dom/client');
+        const root = createRoot(node);
+        root.render(<ComponentToRender />);
+    };
+    
+    
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Centro de Generación de Reportes</DialogTitle>
+                    <DialogTitle>Generar Reportes Individuales</DialogTitle>
                     <DialogDescription>
-                        Genera el reporte de cada alumno y cópialo para pegarlo en tu cliente de correo.
+                        Selecciona un alumno para generar su reporte y copiarlo al portapapeles. Luego, pégalo en tu cliente de correo.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-[250px_1fr] gap-6 py-4 h-[60vh]">
-                    <Card className="h-full">
-                        <ScrollArea className="h-full">
-                            <div className="p-2 space-y-1">
-                                {students.map(student => (
-                                    <Button
-                                        key={student.id}
-                                        variant={selectedStudent?.id === student.id ? "secondary" : "ghost"}
-                                        className="w-full justify-start"
-                                        onClick={() => handleGenerateReport(student)}
-                                    >
-                                        {student.name}
-                                    </Button>
-                                ))}
+                <ScrollArea className="h-[60vh] -mx-6 px-6">
+                    <div className="py-4 space-y-2">
+                        {students.map(student => (
+                            <div key={student.id} className="flex items-center justify-between gap-2">
+                                <p className="font-medium text-sm">{student.name}</p>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleGenerateAndCopy(student)}
+                                    disabled={isGenerating && selectedStudent?.id === student.id}
+                                >
+                                    {isGenerating && selectedStudent?.id === student.id ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <ClipboardCopy className="mr-2 h-4 w-4" />
+                                    )}
+                                    Generar y Copiar
+                                </Button>
                             </div>
-                        </ScrollArea>
-                    </Card>
-                    <Card className="h-full flex items-center justify-center">
-                        {isLoadingReport ? (
-                            <div className="text-center text-muted-foreground">
-                                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                                <p>Generando reporte...</p>
-                            </div>
-                        ) : generatedReport ? (
-                            <div className="w-full h-full p-4 overflow-auto">
-                               <img src={generatedReport} alt={`Reporte de ${selectedStudent?.name}`} className="max-w-full h-auto mx-auto border rounded-lg shadow-md" />
-                            </div>
-                        ) : (
-                            <div className="text-center text-muted-foreground">
-                                <p>Selecciona un alumno para generar su reporte.</p>
-                            </div>
-                        )}
-                    </Card>
-                </div>
+                        ))}
+                    </div>
+                </ScrollArea>
                  <DialogFooter>
-                     <p className="text-sm text-muted-foreground mr-auto">Tip: Haz clic derecho en la imagen generada y selecciona "Copiar imagen".</p>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
                 </DialogFooter>
             </DialogContent>
@@ -834,12 +828,12 @@ export function StudentPanel() {
                     useEffect(() => {
                         if (ref.current) {
                            setTimeout(() => { // Gives time for render
-                                htmlToImage.toPng(ref.current!, { pixelRatio: 1.5, fontEmbedCSS: FONT_URL, fetchRequestInit: { mode: 'no-cors' }})
+                                htmlToImage.toPng(ref.current!, { pixelRatio: 1.5, fetchRequestInit: { mode: 'no-cors' } })
                                 .then(dataUrl => fetch(dataUrl).then(res => res.blob()))
                                 .then(resolve)
                                 .catch(err => { console.error(err); resolve(null); })
                                 .finally(() => { root.unmount(); if(document.body.contains(node)) document.body.removeChild(node); });
-                           }, 200);
+                           }, 500);
                         }
                     }, []);
                     return React.createElement(ReportComponent, { ref, ...props });
@@ -1045,7 +1039,7 @@ export function StudentPanel() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                     <Button 
+                    <Button 
                         onClick={() => setIsMailerOpen(true)}
                         disabled={selectedStudents.size === 0}
                     >
@@ -1100,3 +1094,5 @@ export function StudentPanel() {
     </div>
   );
 }
+
+    
