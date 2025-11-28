@@ -32,6 +32,7 @@ import JSZip from 'jszip';
 import { StudentReportImage } from './StudentReportImage';
 import { StudentGradesReportImage } from './StudentGradesReportImage';
 import { ScrollArea } from '../ui/scroll-area';
+import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -554,7 +555,75 @@ const generateImageFromComponent = async (
   return promise;
 };
 
+type EmailTemplate = {
+  subject: string;
+  body: string;
+};
+
+const getEmailTemplate = (student: Student, subjects: SubjectSummary[]): EmailTemplate => {
+  const { overallRisk, hasSD, hasAtLimit, hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, subjects);
+
+  let highestAbsenceRisk: RiskLevel = 'low';
+  let highestNeRisk: RiskLevel = 'low';
+  
+  subjects.forEach(s => {
+    const absenceLevel = getStudentOverallRisk(student, [s]).overallRisk;
+    if (['sd', 'at_limit', 'high', 'medium'].indexOf(absenceLevel) > ['sd', 'at_limit', 'high', 'medium'].indexOf(highestAbsenceRisk)) {
+      highestAbsenceRisk = absenceLevel;
+    }
+    const neLevel = getStudentOverallRisk(student, [s]).overallRisk;
+     if (['sd', 'at_limit', 'high', 'medium'].indexOf(neLevel) > ['sd', 'at_limit', 'high', 'medium'].indexOf(highestNeRisk)) {
+      highestNeRisk = neLevel;
+    }
+  });
+
+
+  if (hasSD) {
+    const isSdByAbsences = subjects.some(s => s.absences > s.absenceLimit);
+    if (isSdByAbsences) {
+        return {
+            subject: `Notificación Importante: Estatus Académico - ${student.name}`,
+            body: `Hola ${student.name.split(' ')[0]},\n\nLamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en una o más de tus materias. Esto significa que ya no es posible acreditar la materia por la vía regular en este periodo.\n\nEs una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.\n\nSaludos.`
+        };
+    }
+    return { // SD por NE
+        subject: `Notificación Importante: Estatus Académico - ${student.name}`,
+        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo para informarte sobre una situación importante. Debido al número de tareas no entregadas (NE), has quedado en estatus de "Sin Derecho" (SD) en una o más de tus materias.\n\nSé que esto puede ser desalentador, pero es crucial que no te desanimes. Por favor, búscame para que podamos conversar sobre los siguientes pasos y las opciones disponibles para ti.\n\nEstoy para ayudarte.`
+    };
+  }
+
+  if (hasAtLimit) {
+      const isAtLimitByAbsences = subjects.some(s => s.absences === s.absenceLimit);
+      if(isAtLimitByAbsences){
+        return {
+            subject: `Aviso Importante: Límite de Faltas - ${student.name}`,
+            body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo con urgencia. He notado que has llegado al límite de faltas permitido en una o más de tus materias. Esto significa que cualquier ausencia adicional resultará en un estatus de "Sin Derecho" (SD) para esa materia.\n\nEs muy importante que no faltes a ninguna clase más. Tu asistencia a partir de ahora es crucial para poder acreditar el periodo.\n\nSi estás teniendo alguna dificultad, por favor, acércate a mí. Estamos a tiempo de evitar que la situación se complique más.\n\n¡Cuento contigo!`
+        };
+      }
+       return { // Al límite por NE
+            subject: `Acción Requerida: Límite de Entregas - ${student.name}`,
+            body: `Hola ${student.name.split(' ')[0]},\n\nEspero que estés bien. Te contacto porque he observado que has alcanzado el límite de tareas no entregadas (NE) en algunas de tus materias. Una entrega no realizada más y podrías pasar a estatus de "Sin Derecho".\n\nTe recomiendo fuertemente que te acerques a tus maestros para revisar tu situación y explorar si hay alguna posibilidad de recuperar los trabajos pendientes. Cada entrega cuenta mucho en este momento.\n\nSi necesitas apoyo para organizarte o tienes alguna otra dificultad, no dudes en buscarme. Estoy para ayudarte a cerrar el periodo de la mejor manera.\n\nSaludos.`
+        };
+  }
+  
+  if (hasHighRisk) {
+     return {
+        subject: `Seguimiento Académico: Riesgo Alto - ${student.name}`,
+        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto debido a faltas o tareas no entregadas. Es un momento clave para redoblar esfuerzos y evitar complicaciones.\n\nPor favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción. Estoy para apoyarte.\n\nSaludos.`
+    }
+  }
+
+
+  // Default case
+  return {
+    subject: `Reporte de Calificaciones y Seguimiento - ${student.name}`,
+    body: `Hola ${student.name.split(' ')[0]},\n\nTe comparto tu reporte de seguimiento académico.\n\nPor favor, revísalo y ponte en contacto si tienes alguna duda.\n\nSaludos cordiales.`
+  };
+};
+
 const generateEmailBodyWithReport = async (student: Student, body: string, reportImage: string): Promise<string> => {
+    // This function can remain simple as it just embeds the image.
+    // The complex logic is in getting the right body text.
     const htmlBody = `
         <p>${body.replace(/\n/g, '<br>')}</p>
         <br>
@@ -594,8 +663,9 @@ export function StudentPanel() {
 
   // State for the email dialog
   const [isEmailing, setIsEmailing] = useState(false);
-  const [emailSubject, setEmailSubject] = useState('Reporte de Calificaciones y Seguimiento');
-  const [emailBody, setEmailBody] = useState('Hola,\n\nTe comparto tu reporte de seguimiento académico.\n\nPor favor, revísalo y ponte en contacto si tienes alguna duda.\n\nSaludos.');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [attachReport, setAttachReport] = useState(true);
 
 
@@ -821,6 +891,21 @@ export function StudentPanel() {
       });
     }
   };
+  
+    const handleOpenEmailDialog = () => {
+        if (selectedStudents.size === 0) return;
+        
+        // Para simplificar, usamos el estado del primer alumno como plantilla.
+        // El envío real generará un correo personalizado para cada uno.
+        const firstStudentId = Array.from(selectedStudents)[0];
+        const student = allStudentsMap.get(firstStudentId);
+        if(student && student.subjectSummaries) {
+            const template = getEmailTemplate(student, student.subjectSummaries);
+            setEmailSubject(template.subject);
+            setEmailBody(template.body);
+        }
+        setIsEmailDialogOpen(true);
+    };
 
   const handleSendEmails = async () => {
     if (selectedStudents.size === 0) return;
@@ -834,16 +919,18 @@ export function StudentPanel() {
     let emailsOpened = 0;
     for (const studentId of Array.from(selectedStudents)) {
         const student = allStudentsMap.get(studentId);
-        if (!student) continue;
+        if (!student || !student.subjectSummaries) continue;
 
         const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
-        let finalBody = emailBody;
+        const template = getEmailTemplate(student, student.subjectSummaries);
+        
+        let finalBody = template.body;
 
         if (attachReport) {
             const subjects = await loadStudentSubjects(studentId);
             const reportImage = await generateImageFromComponent(StudentGradesReportImage, student, subjects);
             if (reportImage) {
-                finalBody = await generateEmailBodyWithReport(student, emailBody, reportImage);
+                finalBody = await generateEmailBodyWithReport(student, template.body, reportImage);
             } else {
                 toast({
                     variant: 'destructive',
@@ -853,12 +940,14 @@ export function StudentPanel() {
             }
         }
         
-        const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(finalBody)}`;
+        // Usamos el `template.subject` que ya está personalizado
+        const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(finalBody)}`;
         window.open(mailtoLink, '_blank');
         emailsOpened++;
     }
 
     setIsEmailing(false);
+    setIsEmailDialogOpen(false);
     toast({
         title: "¡Listo!",
         description: `Se han abierto ${emailsOpened} borradores de correo en nuevas pestañas.`
@@ -876,7 +965,7 @@ export function StudentPanel() {
 
   const caseTypeMap = {
     lost: 'Casos Perdidos',
-    urgent: 'Casos Urgentes',
+    urgent: 'Casos Críticos',
     observation: 'Alumnos en Observación',
     extraordinary: 'Alumnos con derecho a extraordinario',
     changes: 'Alumnos con Cambios Detectados',
@@ -1004,9 +1093,9 @@ export function StudentPanel() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Dialog>
+                    <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
                         <DialogTrigger asChild>
-                             <Button disabled={selectedStudents.size === 0}>
+                             <Button disabled={selectedStudents.size === 0} onClick={handleOpenEmailDialog}>
                                 <Send className="mr-2 h-4 w-4" />
                                 Enviar Correo ({selectedStudents.size})
                             </Button>
@@ -1015,7 +1104,7 @@ export function StudentPanel() {
                              <DialogHeader>
                                 <DialogTitle>Enviar Correo a Alumnos Seleccionados</DialogTitle>
                                 <DialogDescription>
-                                    Prepara y envía un correo a los {selectedStudents.size} alumnos seleccionados. El sistema abrirá un borrador por cada alumno.
+                                    El sistema generará un correo personalizado para cada alumno según su situación. Revisa la plantilla base.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="py-4 space-y-4">
@@ -1030,12 +1119,12 @@ export function StudentPanel() {
                                     </ScrollArea>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email-subject">Asunto</Label>
+                                    <Label htmlFor="email-subject">Plantilla de Asunto</Label>
                                     <Input id="email-subject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email-body">Cuerpo del Correo</Label>
-                                    <Textarea id="email-body" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={6}/>
+                                    <Label htmlFor="email-body">Plantilla de Cuerpo del Correo</Label>
+                                    <Textarea id="email-body" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={8}/>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <Checkbox id="attach-report" checked={attachReport} onCheckedChange={(checked) => setAttachReport(!!checked)} />
@@ -1046,7 +1135,7 @@ export function StudentPanel() {
                             <DialogFooter>
                                 <Button onClick={handleSendEmails} disabled={isEmailing}>
                                     {isEmailing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                                    Abrir Borrador de Correos
+                                    Abrir Borradores de Correo
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
