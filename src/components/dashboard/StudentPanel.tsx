@@ -223,7 +223,7 @@ Saludos cordiales,`;
                 await navigator.clipboard.writeText(namesToCopy);
                 toast({
                     title: "Nombres Copiados",
-                    description: `Se copiaron los nombres de ${recipientsWithoutEmail.length} profesores sin correo para que los busques manually.`,
+                    description: `Se copiaron los nombres de ${recipientsWithoutEmail.length} profesores sin correo para que los busques manualmente.`,
                 });
             } catch (err) {
                 console.error("Failed to copy names:", err);
@@ -521,76 +521,65 @@ const getEmailTemplate = (student: Student, allSubjects: Subject[]): EmailTempla
     const sdAssignments = subjects.filter(s => s.missedAssignments > s.missedAssignmentLimit);
 
     if (sdAbsences.length > 0) {
-      const subjectList = sdAbsences.map(s => `<li><b>Sin Derecho por Faltas en:</b> ${s.name} (${s.absences} de ${s.absenceLimit} faltas)</li>`).join('');
+      const subjectList = sdAbsences.map(s => `* Sin Derecho por Faltas en: ${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join('\n');
       riskDetailsList.push(subjectList);
-      mainMessage = `<p>Lamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s):</p><ul>${riskDetailsList.join('')}</ul><p>Esto significa que ya no es posible acreditar la materia por la vía regular en este periodo.</p><p>Es una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.</p>`;
+      mainMessage = `Lamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s):\n${riskDetailsList.join('\n')}\n\nEsto significa que ya no es posible acreditar la materia por la vía regular en este periodo.\n\nEs una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.`;
     } else if (sdAssignments.length > 0) {
-       const subjectList = sdAssignments.map(s => `<li><b>Sin Derecho por Tareas No Entregadas en:</b> ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)</li>`).join('');
+       const subjectList = sdAssignments.map(s => `* Sin Derecho por Tareas No Entregadas en: ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join('\n');
        riskDetailsList.push(subjectList);
-       mainMessage = `<p>Te escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s) debido a tareas no entregadas (NE):</p><ul>${riskDetailsList.join('')}</ul><p><b>No hay tiempo que perder.</b> Es fundamental que te acerques <strong>inmediatamente</strong> con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.</p>`;
+       mainMessage = `Te escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s) debido a tareas no entregadas (NE):\n${riskDetailsList.join('\n')}\n\nNo hay tiempo que perder. Es fundamental que te acerques inmediatamente con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.`;
     }
   } else if (hasAtLimit) {
       subject = `Acción Requerida: Límite de Entregas/Faltas - ${student.name}`;
       const atLimitAbsences = subjects.filter(s => s.absences === s.absenceLimit);
       const atLimitAssignments = subjects.filter(s => s.missedAssignments === s.missedAssignmentLimit);
       if(atLimitAbsences.length > 0){
-        const subjectList = atLimitAbsences.map(s => `<li><b>Al Límite de Faltas en:</b> ${s.name} (${s.absences} de ${s.absenceLimit} faltas)</li>`).join('');
+        const subjectList = atLimitAbsences.map(s => `* Al Límite de Faltas en: ${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join('\n');
         riskDetailsList.push(subjectList);
       }
       if(atLimitAssignments.length > 0){
-        const subjectList = atLimitAssignments.map(s => `<li><b>Al Límite de Tareas No Entregadas en:</b> ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)</li>`).join('');
+        const subjectList = atLimitAssignments.map(s => `* Al Límite de Tareas No Entregadas en: ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join('\n');
         riskDetailsList.push(subjectList);
       }
-      mainMessage = `<p>Te contacto porque he observado que has alcanzado el límite en las siguientes materias:</p><ul>${riskDetailsList.join('')}</ul><p>Una falta o entrega no realizada más y podrías pasar a estatus de "Sin Derecho". Te recomiendo fuertemente que te acerques a tus maestros para revisar tu situación. Cada clase y cada entrega cuenta mucho en este momento. Si necesitas apoyo, no dudes en buscarme.</p>`;
+      mainMessage = `Te contacto porque he observado que has alcanzado el límite en las siguientes materias:\n${riskDetailsList.join('\n')}\n\nUna falta o entrega no realizada más y podrías pasar a estatus de "Sin Derecho". Te recomiendo fuertemente que te acerques a tus maestros para revisar tu situación. Cada clase y cada entrega cuenta mucho en este momento. Si necesitas apoyo, no dudes en buscarme.`;
   } else if (hasHighRisk) {
      subject = `Seguimiento Académico: Riesgo Alto - ${student.name}`;
      const highRiskAbsences = subjects.filter(s => s.absences / s.absenceLimit >= 0.8 && s.absences < s.absenceLimit);
      const highRiskAssignments = subjects.filter(s => s.missedAssignments / s.missedAssignmentLimit >= 0.8 && s.missedAssignments < s.missedAssignmentLimit);
      if(highRiskAbsences.length > 0){
-        const subjectList = highRiskAbsences.map(s => `<li><b>Riesgo Alto por Faltas en:</b> ${s.name} (${s.absences} de ${s.absenceLimit} faltas)</li>`).join('');
+        const subjectList = highRiskAbsences.map(s => `* Riesgo Alto por Faltas en: ${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join('\n');
         riskDetailsList.push(subjectList);
      }
      if(highRiskAssignments.length > 0){
-        const subjectList = highRiskAssignments.map(s => `<li><b>Riesgo Alto por Tareas No Entregadas en:</b> ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)</li>`).join('');
+        const subjectList = highRiskAssignments.map(s => `* Riesgo Alto por Tareas No Entregadas en: ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join('\n');
         riskDetailsList.push(subjectList);
      }
-     mainMessage = `<p>Te escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto en las siguientes áreas:</p><ul>${riskDetailsList.join('')}</ul><p>Te recomiendo que te acerques a tus maestros para explorar la posibilidad de entregar los trabajos pendientes. Si necesitas ayuda o tienes alguna dificultad, cuenta conmigo. Es un momento clave para redoblar esfuerzos y evitar complicaciones. Por favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción.</p>`;
+     mainMessage = `Te escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto en las siguientes áreas:\n${riskDetailsList.join('\n')}\n\nTe recomiendo que te acerques a tus maestros para explorar la posibilidad de entregar los trabajos pendientes. Si necesitas ayuda o tienes alguna dificultad, cuenta conmigo. Es un momento clave para redoblar esfuerzos y evitar complicaciones. Por favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción.`;
   } else {
-    mainMessage = `<p>Te comparto tu reporte de seguimiento académico. Por favor, revísalo y ponte en contacto si tienes alguna duda.</p>`;
+    mainMessage = `Te comparto tu reporte de seguimiento académico. Por favor, revísalo y ponte en contacto si tienes alguna duda.`;
   }
   
   const allActivityKeys = Array.from(new Set(subjects.flatMap(s => Object.keys(s.activities).filter(key => ACTIVITY_REGEX.test(key))))).sort((a,b) => parseInt(a.substring(1)) - parseInt(b.substring(1)));
 
-  const gradesTableRows = subjects.map(s => {
-    const gradeText = (s.grade || 0).toFixed(2);
-    const activitiesCells = allActivityKeys.map(key => `<td>${s.activities[key] ?? ''}</td>`).join('');
-    return `<tr>
-              <td style="font-weight: bold; padding: 4px; border: 1px solid #ccc;">${s.name}</td>
-              <td style="padding: 4px; border: 1px solid #ccc;">${gradeText}</td>
-              ${activitiesCells}
-            </tr>`;
-  }).join('');
-  
-  const gradesTableHeader = `<tr><th style="padding: 4px; border: 1px solid #ccc;">Materia</th><th style="padding: 4px; border: 1px solid #ccc;">Ponderado</th>${allActivityKeys.map(key => `<th style="padding: 4px; border: 1px solid #ccc;">${key}</th>`).join('')}</tr>`;
+  let gradesTable = '';
+  if (subjects.length > 0) {
+      const headers = ["Materia", "Ponderado", ...allActivityKeys];
+      const headerString = headers.join(' | ');
+      const separator = headers.map(h => '-'.repeat(h.length)).join('-|-');
+      
+      const rows = subjects.map(s => {
+          const gradeText = (s.grade || 0).toFixed(2);
+          const activityValues = allActivityKeys.map(key => String(s.activities[key] ?? '').padEnd(key.length, ' '));
+          const subjectNamePadded = s.name.padEnd("Materia".length, ' ');
+          const gradePadded = gradeText.padEnd("Ponderado".length, ' ');
+          return [subjectNamePadded, gradePadded, ...activityValues].join(' | ');
+      }).join('\n');
 
-  const finalGradeDetails = `<br><hr>
-    <h3>Desglose de Calificaciones</h3>
-    <table border="1" cellpadding="5" style="border-collapse: collapse; width: 100%; font-size: 11px; font-family: sans-serif;">
-      <thead style="background-color: #f2f2f2;">${gradesTableHeader}</thead>
-      <tbody>${gradesTableRows}</tbody>
-    </table>`;
+      gradesTable = `\n\n--- Desglose de Calificaciones ---\n${headerString}\n${separator}\n${rows}`;
+  }
 
-  const body = `
-    <html>
-      <body style="font-family: sans-serif; font-size: 14px;">
-        <p>Hola ${student.name.split(' ')[0]},</p>
-        ${mainMessage}
-        ${finalGradeDetails}
-        <br>
-        <p>Saludos cordiales.</p>
-      </body>
-    </html>
-  `;
+
+  const body = `Hola ${student.name.split(' ')[0]},\n\n${mainMessage}${gradesTable}\n\nSaludos cordiales.`;
   
   return { subject, body };
 };
@@ -1147,6 +1136,7 @@ export function StudentPanel() {
 
 
     
+
 
 
 
