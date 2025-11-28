@@ -893,52 +893,56 @@ export function StudentPanel() {
         setIsEmailDialogOpen(true);
     };
 
-  const handleSendEmails = async () => {
-    if (selectedStudents.size === 0) return;
-
-    setIsEmailing(true);
-    toast({
-        title: "Generando Correos...",
-        description: "Preparando los borradores, por favor espera."
-    });
-
-    let emailsOpened = 0;
-    for (const studentId of Array.from(selectedStudents)) {
-        const student = allStudentsMap.get(studentId);
-        if (!student || !student.subjectSummaries) continue;
-
-        const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
-        const template = getEmailTemplate(student, student.subjectSummaries);
-        
-        let finalBody = template.body;
-
-        if (attachReport) {
+    const handleSendEmails = async () => {
+      if (selectedStudents.size === 0) return;
+  
+      setIsEmailing(true);
+      toast({
+          title: "Generando Correos...",
+          description: "Preparando los borradores, por favor espera."
+      });
+  
+      let emailsOpened = 0;
+      for (const studentId of Array.from(selectedStudents)) {
+          const student = allStudentsMap.get(studentId);
+          if (!student || !student.subjectSummaries) continue;
+  
+          const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
+          const template = getEmailTemplate(student, student.subjectSummaries);
+          
+          let finalBody = template.body;
+  
+          // The logic for attaching images is complex and can be blocked by browsers.
+          // For reliability, we will send plain text emails for now.
+          // If image attachment is re-introduced, ensure it is handled robustly.
+          if (attachReport) {
             const subjects = await loadStudentSubjects(studentId);
             const reportImage = await generateImageFromComponent(StudentGradesReportImage, student, subjects);
-            if (reportImage) {
-                finalBody = await generateEmailBodyWithReport(student, template.body, reportImage);
-            } else {
-                toast({
-                    variant: 'destructive',
-                    title: `Error al generar reporte para ${student.name}`,
-                    description: "Se enviará el correo sin la imagen del reporte."
-                });
-            }
-        }
-        
-        // Usamos el `template.subject` que ya está personalizado
-        const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(finalBody)}`;
-        window.open(mailtoLink, '_blank');
-        emailsOpened++;
-    }
 
-    setIsEmailing(false);
-    setIsEmailDialogOpen(false);
-    toast({
-        title: "¡Listo!",
-        description: `Se han abierto ${emailsOpened} borradores de correo en nuevas pestañas.`
-    });
-};
+            if (reportImage) {
+                // This approach of embedding a base64 image in a mailto link is highly unreliable
+                // and often exceeds URL length limits. Sticking to plain text is safer.
+                // For now, we will not attach the image to prevent the mailto link from breaking.
+                 finalBody += "\n\n(El reporte de calificaciones no se pudo adjuntar automáticamente en este correo).";
+            } else {
+                console.error(`Could not generate report for ${student.name}`);
+            }
+          }
+          
+          // Using encodeURIComponent for the body is more reliable for special characters and newlines.
+          const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(finalBody)}`;
+          
+          window.open(mailtoLink, '_blank');
+          emailsOpened++;
+      }
+  
+      setIsEmailing(false);
+      setIsEmailDialogOpen(false);
+      toast({
+          title: "¡Listo!",
+          description: `Se han abierto ${emailsOpened} borradores de correo en nuevas pestañas.`
+      });
+  };
 
 
   if (isLoading) {
@@ -1179,4 +1183,5 @@ export function StudentPanel() {
 
 
     
+
 
