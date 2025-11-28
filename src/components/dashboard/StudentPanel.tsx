@@ -564,18 +564,16 @@ const getEmailTemplate = (student: Student, allSubjects: Subject[]): EmailTempla
   let gradesTable = '';
   if (subjects.length > 0) {
       const headers = ["Materia", "Ponderado", ...allActivityKeys];
-      const headerString = headers.join(' | ');
-      const separator = headers.map(h => '-'.repeat(h.length)).join('-|-');
+      
+      const headerRow = headers.join('\t');
       
       const rows = subjects.map(s => {
           const gradeText = (s.grade || 0).toFixed(2);
-          const activityValues = allActivityKeys.map(key => String(s.activities[key] ?? '').padEnd(key.length, ' '));
-          const subjectNamePadded = s.name.padEnd("Materia".length, ' ');
-          const gradePadded = gradeText.padEnd("Ponderado".length, ' ');
-          return [subjectNamePadded, gradePadded, ...activityValues].join(' | ');
+          const activityValues = allActivityKeys.map(key => String(s.activities[key] ?? ''));
+          return [s.name, gradeText, ...activityValues].join('\t');
       }).join('\n');
 
-      gradesTable = `\n\n--- Desglose de Calificaciones ---\n${headerString}\n${separator}\n${rows}`;
+      gradesTable = `\n\n--- Desglose de Calificaciones ---\n${headerRow}\n${rows}`;
   }
 
 
@@ -1136,6 +1134,7 @@ export function StudentPanel() {
 
 
     
+
 
 
 
