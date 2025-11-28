@@ -560,53 +560,88 @@ type EmailTemplate = {
   body: string;
 };
 
-const getEmailTemplate = (student: Student, subjects: SubjectSummary[]): EmailTemplate => {
-  const { hasSD, hasAtLimit, hasHighRisk } = getStudentOverallRisk(student, subjects);
+const getEmailTemplate = (student: Student, allSubjects: Subject[]): EmailTemplate => {
+  const { overallRisk, hasSD, hasAtLimit, hasHighRisk } = getStudentOverallRisk(student, allSubjects);
+  
+  const subjects = allSubjects || [];
+
+  let riskDetails = '';
+  let finalGradeDetails = '--- Desglose de Calificaciones ---\n';
+
+  subjects.forEach(s => {
+    const gradeText = `Ponderado: ${(s.grade || 0).toFixed(2)}`;
+    let activitiesText = '';
+    const activityKeys = Object.keys(s.activities).filter(k => /^A\d+$/.test(k)).sort((a,b) => parseInt(a.substring(1)) - parseInt(b.substring(1)));
+    if (activityKeys.length > 0) {
+        activitiesText = activityKeys.map(key => `${key}: ${s.activities[key]}`).join(', ');
+    }
+    finalGradeDetails += `${s.name}: ${gradeText} | ${activitiesText}\n`;
+  });
 
   if (hasSD) {
-    const isSdByAbsences = subjects.some(s => s.absences > s.absenceLimit);
-    if (isSdByAbsences) {
-        return {
-            subject: `Notificación Importante: Estatus Académico - ${student.name}`,
-            body: `Hola ${student.name.split(' ')[0]},\n\nLamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en una o más de tus materias. Esto significa que ya no es posible acreditar la materia por la vía regular en este periodo.\n\nEs una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.\n\nSaludos.`
-        };
+    const sdAbsences = subjects.filter(s => s.absences > s.absenceLimit);
+    const sdAssignments = subjects.filter(s => s.missedAssignments > s.missedAssignmentLimit);
+
+    if (sdAbsences.length > 0) {
+      const subjectList = sdAbsences.map(s => `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join(', ');
+      riskDetails = `* Sin Derecho por Faltas en: ${subjectList}\n`;
+      return {
+        subject: `Notificación Importante: Estatus Académico - ${student.name}`,
+        body: `Hola ${student.name.split(' ')[0]},\n\nLamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s):\n${riskDetails}\nEsto significa que ya no es posible acreditar la materia por la vía regular en este periodo.\n\nEs una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.\n\n${finalGradeDetails}\nSaludos.`
+      };
     }
-    return { // SD por NE
+    if (sdAssignments.length > 0) {
+       const subjectList = sdAssignments.map(s => `${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join(', ');
+       riskDetails = `* Sin Derecho por Tareas No Entregadas en: ${subjectList}\n`;
+       return {
         subject: `URGENTE: Estatus Académico - ${student.name}`,
-        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en una o más materias debido a tareas no entregadas (NE).\n\nNo hay tiempo que perder. Es fundamental que te acerques **inmediatamente** con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.\n\nQuedo a tu disposición.`
-    };
+        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s) debido a tareas no entregadas (NE):\n${riskDetails}\nNo hay tiempo que perder. Es fundamental que te acerques **inmediatamente** con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.\n\n${finalGradeDetails}\nQuedo a tu disposición.`
+      };
+    }
   }
 
   if (hasAtLimit) {
-      const isAtLimitByAbsences = subjects.some(s => s.absences === s.absenceLimit);
-      if(isAtLimitByAbsences){
-        return {
-            subject: `Aviso Importante: Límite de Faltas - ${student.name}`,
-            body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo con urgencia. He notado que has llegado al límite de faltas permitido en una o más de tus materias. Esto significa que cualquier ausencia adicional resultará en un estatus de "Sin Derecho" (SD) para esa materia.\n\nEs muy importante que no faltes a ninguna clase más. Tu asistencia a partir de ahora es crucial para poder acreditar el periodo.\n\nSi estás teniendo alguna dificultad, por favor, acércate a mí. Estamos a tiempo de evitar que la situación se complique más.\n\n¡Cuento contigo!`
-        };
+      const atLimitAbsences = subjects.filter(s => s.absences === s.absenceLimit);
+      const atLimitAssignments = subjects.filter(s => s.missedAssignments === s.missedAssignmentLimit);
+      if(atLimitAbsences.length > 0){
+        const subjectList = atLimitAbsences.map(s => `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join(', ');
+        riskDetails += `* Al Límite de Faltas en: ${subjectList}\n`;
       }
-       return { // Al límite por NE
-            subject: `Acción Requerida: Límite de Entregas - ${student.name}`,
-            body: `Hola ${student.name.split(' ')[0]},\n\nEspero que estés bien. Te contacto porque he observado que has alcanzado el límite de tareas no entregadas (NE) en algunas de tus materias. Una entrega no realizada más y podrías pasar a estatus de "Sin Derecho".\n\nTe recomiendo fuertemente que te acerques a tus maestros para revisar tu situación y explorar si hay alguna posibilidad de recuperar los trabajos pendientes. Cada entrega cuenta mucho en este momento.\n\nSi necesitas apoyo para organizarte o tienes alguna otra dificultad, no dudes en buscarme. Estoy para ayudarte a cerrar el periodo de la mejor manera.\n\nSaludos.`
-        };
+      if(atLimitAssignments.length > 0){
+        const subjectList = atLimitAssignments.map(s => `${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join(', ');
+        riskDetails += `* Al Límite de Tareas No Entregadas en: ${subjectList}\n`;
+      }
+      return {
+          subject: `Acción Requerida: Límite de Entregas/Faltas - ${student.name}`,
+          body: `Hola ${student.name.split(' ')[0]},\n\nTe contacto porque he observado que has alcanzado el límite en las siguientes materias:\n${riskDetails}\nUna falta o entrega no realizada más y podrías pasar a estatus de "Sin Derecho".\n\nTe recomiendo fuertemente que te acerques a tus maestros para revisar tu situación. Cada clase y cada entrega cuenta mucho en este momento.\n\n${finalGradeDetails}\nSi necesitas apoyo, no dudes en buscarme.`
+      };
   }
   
   if (hasHighRisk) {
+     const highRiskAbsences = subjects.filter(s => s.absences / s.absenceLimit >= 0.8 && s.absences < s.absenceLimit);
+     const highRiskAssignments = subjects.filter(s => s.missedAssignments / s.missedAssignmentLimit >= 0.8 && s.missedAssignments < s.missedAssignmentLimit);
+     if(highRiskAbsences.length > 0){
+        const subjectList = highRiskAbsences.map(s => `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join(', ');
+        riskDetails += `* Riesgo Alto por Faltas en: ${subjectList}\n`;
+     }
+     if(highRiskAssignments.length > 0){
+        const subjectList = highRiskAssignments.map(s => `${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join(', ');
+        riskDetails += `* Riesgo Alto por Tareas No Entregadas en: ${subjectList}\n`;
+     }
      return {
         subject: `Seguimiento Académico: Riesgo Alto - ${student.name}`,
-        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto debido a faltas o tareas no entregadas. Es un momento clave para redoblar esfuerzos y evitar complicaciones.\n\nPor favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción. Estoy para apoyarte.\n\nSaludos.`
+        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto en las siguientes áreas:\n${riskDetails}\nEs un momento clave para redoblar esfuerzos y evitar complicaciones. Por favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción.\n\n${finalGradeDetails}\nEstoy para apoyarte.`
     }
   }
-
 
   // Default case
   return {
     subject: `Reporte de Calificaciones y Seguimiento - ${student.name}`,
-    body: `Hola ${student.name.split(' ')[0]},\n\nTe comparto tu reporte de seguimiento académico.\n\nPor favor, revísalo y ponte en contacto si tienes alguna duda.\n\nSaludos cordiales.`
+    body: `Hola ${student.name.split(' ')[0]},\n\nTe comparto tu reporte de seguimiento académico.\n\n${finalGradeDetails}\nPor favor, revísalo y ponte en contacto si tienes alguna duda.\n\nSaludos cordiales.`
   };
 };
 
-function MailerDialog({ open, onOpenChange, students }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[] }) {
+function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[], loadStudentSubjects: (studentId: string) => Promise<Subject[]> }) {
     const [sentStatus, setSentStatus] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
@@ -615,12 +650,10 @@ function MailerDialog({ open, onOpenChange, students }: { open: boolean, onOpenC
         }
     }, [open]);
 
-    const handleSend = (student: Student) => {
-        if (!student.subjectSummaries) {
-            alert("No hay datos de materias para este alumno.");
-            return;
-        }
-        const template = getEmailTemplate(student, student.subjectSummaries);
+    const handleSend = async (student: Student) => {
+        if (!student.id) return;
+        const subjects = await loadStudentSubjects(student.id);
+        const template = getEmailTemplate(student, subjects);
         const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
         const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(template.body)}`;
         
@@ -867,7 +900,7 @@ export function StudentPanel() {
         const subjects = await loadStudentSubjects(studentId);
         
         imagePromises.push(
-            generateImageFromComponent(StudentReportImage, student, subjects as SubjectSummary[]).then(dataUrl => dataUrl ? fetch(dataUrl).then(res => res.blob()) : null).then(blob => ({
+            generateImageFromComponent(StudentReportImage, student, student.subjectSummaries || []).then(dataUrl => dataUrl ? fetch(dataUrl).then(res => res.blob()) : null).then(blob => ({
               name: student.name,
               type: 'riesgo',
               blob,
@@ -1114,7 +1147,7 @@ export function StudentPanel() {
           )}
         </>
       )}
-      <MailerDialog open={isMailerOpen} onOpenChange={setIsMailerOpen} students={studentsForMailer} />
+      <MailerDialog open={isMailerOpen} onOpenChange={setIsMailerOpen} students={studentsForMailer} loadStudentSubjects={loadStudentSubjects} />
     </div>
   );
 }
@@ -1128,3 +1161,4 @@ export function StudentPanel() {
 
 
     
+
