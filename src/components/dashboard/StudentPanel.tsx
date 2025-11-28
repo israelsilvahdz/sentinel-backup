@@ -499,139 +499,115 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
     );
 }
 
-type EmailTemplate = {
-  subject: string;
-  body: string;
-};
-
-const ACTIVITY_REGEX = /^A\d+$/;
-
-const getEmailTemplate = (student: Student, allSubjects: Subject[]): EmailTemplate => {
-  const { overallRisk, hasSD, hasAtLimit, hasHighRisk } = getStudentOverallRisk(student, allSubjects);
-  
-  const subjects = allSubjects || [];
-
-  let riskDetailsList: string[] = [];
-  let mainMessage = '';
-  let subject = `Reporte de Calificaciones y Seguimiento - ${student.name}`;
-
-  if (hasSD) {
-    subject = `URGENTE: Estatus Académico - ${student.name}`;
-    const sdAbsences = subjects.filter(s => s.absences > s.absenceLimit);
-    const sdAssignments = subjects.filter(s => s.missedAssignments > s.missedAssignmentLimit);
-
-    if (sdAbsences.length > 0) {
-      const subjectList = sdAbsences.map(s => `* Sin Derecho por Faltas en: ${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join('\n');
-      riskDetailsList.push(subjectList);
-      mainMessage = `Lamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s):\n${riskDetailsList.join('\n')}\n\nEsto significa que ya no es posible acreditar la materia por la vía regular en este periodo.\n\nEs una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.`;
-    } else if (sdAssignments.length > 0) {
-       const subjectList = sdAssignments.map(s => `* Sin Derecho por Tareas No Entregadas en: ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join('\n');
-       riskDetailsList.push(subjectList);
-       mainMessage = `Te escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s) debido a tareas no entregadas (NE):\n${riskDetailsList.join('\n')}\n\nNo hay tiempo que perder. Es fundamental que te acerques inmediatamente con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.`;
-    }
-  } else if (hasAtLimit) {
-      subject = `Acción Requerida: Límite de Entregas/Faltas - ${student.name}`;
-      const atLimitAbsences = subjects.filter(s => s.absences === s.absenceLimit);
-      const atLimitAssignments = subjects.filter(s => s.missedAssignments === s.missedAssignmentLimit);
-      if(atLimitAbsences.length > 0){
-        const subjectList = atLimitAbsences.map(s => `* Al Límite de Faltas en: ${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join('\n');
-        riskDetailsList.push(subjectList);
-      }
-      if(atLimitAssignments.length > 0){
-        const subjectList = atLimitAssignments.map(s => `* Al Límite de Tareas No Entregadas en: ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join('\n');
-        riskDetailsList.push(subjectList);
-      }
-      mainMessage = `Te contacto porque he observado que has alcanzado el límite en las siguientes materias:\n${riskDetailsList.join('\n')}\n\nUna falta o entrega no realizada más y podrías pasar a estatus de "Sin Derecho". Te recomiendo fuertemente que te acerques a tus maestros para revisar tu situación. Cada clase y cada entrega cuenta mucho en este momento. Si necesitas apoyo, no dudes en buscarme.`;
-  } else if (hasHighRisk) {
-     subject = `Seguimiento Académico: Riesgo Alto - ${student.name}`;
-     const highRiskAbsences = subjects.filter(s => s.absences / s.absenceLimit >= 0.8 && s.absences < s.absenceLimit);
-     const highRiskAssignments = subjects.filter(s => s.missedAssignments / s.missedAssignmentLimit >= 0.8 && s.missedAssignments < s.missedAssignmentLimit);
-     if(highRiskAbsences.length > 0){
-        const subjectList = highRiskAbsences.map(s => `* Riesgo Alto por Faltas en: ${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join('\n');
-        riskDetailsList.push(subjectList);
-     }
-     if(highRiskAssignments.length > 0){
-        const subjectList = highRiskAssignments.map(s => `* Riesgo Alto por Tareas No Entregadas en: ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join('\n');
-        riskDetailsList.push(subjectList);
-     }
-     mainMessage = `Te escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto en las siguientes áreas:\n${riskDetailsList.join('\n')}\n\nTe recomiendo que te acerques a tus maestros para explorar la posibilidad de entregar los trabajos pendientes. Si necesitas ayuda o tienes alguna dificultad, cuenta conmigo. Es un momento clave para redoblar esfuerzos y evitar complicaciones. Por favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción.`;
-  } else {
-    mainMessage = `Te comparto tu reporte de seguimiento académico. Por favor, revísalo y ponte en contacto si tienes alguna duda.`;
-  }
-  
-  const allActivityKeys = Array.from(new Set(subjects.flatMap(s => Object.keys(s.activities).filter(key => ACTIVITY_REGEX.test(key))))).sort((a,b) => parseInt(a.substring(1)) - parseInt(b.substring(1)));
-
-  let gradesTable = '';
-  if (subjects.length > 0) {
-      const headers = ["Materia", "Ponderado", ...allActivityKeys];
-      
-      const headerRow = headers.join('\t');
-      
-      const rows = subjects.map(s => {
-          const gradeText = (s.grade || 0).toFixed(2);
-          const activityValues = allActivityKeys.map(key => String(s.activities[key] ?? ''));
-          return [s.name, gradeText, ...activityValues].join('\t');
-      }).join('\n');
-
-      gradesTable = `\n\n--- Desglose de Calificaciones ---\n${headerRow}\n${rows}`;
-  }
-
-
-  const body = `Hola ${student.name.split(' ')[0]},\n\n${mainMessage}${gradesTable}\n\nSaludos cordiales.`;
-  
-  return { subject, body };
-};
-
 function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[], loadStudentSubjects: (studentId: string) => Promise<Subject[]> }) {
-    const [sentStatus, setSentStatus] = useState<Record<string, boolean>>({});
+    const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [generatedReport, setGeneratedReport] = useState<string | null>(null);
+    const [isLoadingReport, setIsLoadingReport] = useState(false);
+    const reportRef = useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
 
     useEffect(() => {
-        if (open) {
-            setSentStatus({});
+        if (!open) {
+            setSelectedStudent(null);
+            setGeneratedReport(null);
         }
     }, [open]);
 
-    const handleSend = async (student: Student) => {
-        if (!student.id) return;
+    const handleGenerateReport = async (student: Student) => {
+        setIsLoadingReport(true);
+        setSelectedStudent(student);
+        setGeneratedReport(null); // Clear previous report
+
         const subjects = await loadStudentSubjects(student.id);
-        const template = getEmailTemplate(student, subjects);
-        const studentEmail = `A${student.id}@tecmilenio.mx`;
-        const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(template.body)}`;
+        const reportComponent = <StudentReportImage ref={reportRef} student={student} subjects={subjects.map(s => ({
+            id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+            missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+            grade: s.grade, finalGrade: s.finalGrade, group: s.group,
+        }))} />;
+
+        // Render the component off-screen to generate the image
+        const node = document.createElement('div');
+        node.style.position = 'fixed';
+        node.style.top = '-9999px';
+        node.style.left = '0';
+        document.body.appendChild(node);
         
-        window.open(mailtoLink, '_blank');
-        setSentStatus(prev => ({ ...prev, [student.id]: true }));
+        const { createRoot } = await import('react-dom/client');
+        const root = createRoot(node);
+        
+        const ComponentToRender = () => {
+            const innerRef = useRef<HTMLDivElement>(null);
+            useEffect(() => {
+                if(innerRef.current) {
+                    setTimeout(() => { // Timeout to ensure rendering
+                        htmlToImage.toPng(innerRef.current!, { pixelRatio: 1.5 })
+                            .then((dataUrl) => {
+                                setGeneratedReport(dataUrl);
+                                setIsLoadingReport(false);
+                                root.unmount();
+                                document.body.removeChild(node);
+                            })
+                            .catch((err) => {
+                                console.error("Error generating image", err);
+                                toast({ variant: 'destructive', title: 'Error', description: 'No se pudo generar la imagen del reporte.' });
+                                setIsLoadingReport(false);
+                                root.unmount();
+                                document.body.removeChild(node);
+                            });
+                    }, 500);
+                }
+            }, []);
+            return React.cloneElement(reportComponent, { ref: innerRef });
+        }
+        
+        root.render(<ComponentToRender/>);
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl">
                 <DialogHeader>
-                    <DialogTitle>Centro de Envío de Correos</DialogTitle>
+                    <DialogTitle>Centro de Generación de Reportes</DialogTitle>
                     <DialogDescription>
-                        Genera un borrador de correo para cada alumno seleccionado. Haz clic en cada botón para abrir el borrador en tu cliente de correo.
+                        Genera el reporte de cada alumno y cópialo para pegarlo en tu cliente de correo.
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="h-96 pr-6 -mr-6">
-                    <div className="py-4 space-y-2">
-                        {students.map(student => (
-                            <div key={student.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
-                                <div>
-                                    <p className="font-semibold">{student.name}</p>
-                                    <p className="text-sm text-muted-foreground">{student.id}</p>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    variant={sentStatus[student.id] ? "secondary" : "default"}
-                                    onClick={() => handleSend(student)}
-                                >
-                                    {sentStatus[student.id] ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-                                    {sentStatus[student.id] ? "Generado" : "Abrir Borrador de Correo"}
-                                </Button>
+                <div className="grid grid-cols-[250px_1fr] gap-6 py-4 h-[60vh]">
+                    <Card className="h-full">
+                        <ScrollArea className="h-full">
+                            <div className="p-2 space-y-1">
+                                {students.map(student => (
+                                    <Button
+                                        key={student.id}
+                                        variant={selectedStudent?.id === student.id ? "secondary" : "ghost"}
+                                        className="w-full justify-start"
+                                        onClick={() => handleGenerateReport(student)}
+                                    >
+                                        {student.name}
+                                    </Button>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                </ScrollArea>
+                        </ScrollArea>
+                    </Card>
+                    <Card className="h-full flex items-center justify-center">
+                        {isLoadingReport ? (
+                            <div className="text-center text-muted-foreground">
+                                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                                <p>Generando reporte...</p>
+                            </div>
+                        ) : generatedReport ? (
+                            <div className="w-full h-full p-4 overflow-auto">
+                               <img src={generatedReport} alt={`Reporte de ${selectedStudent?.name}`} className="max-w-full h-auto mx-auto border rounded-lg shadow-md" />
+                            </div>
+                        ) : (
+                            <div className="text-center text-muted-foreground">
+                                <p>Selecciona un alumno para generar su reporte.</p>
+                            </div>
+                        )}
+                    </Card>
+                </div>
                  <DialogFooter>
+                     <p className="text-sm text-muted-foreground mr-auto">Tip: Haz clic derecho en la imagen generada y selecciona "Copiar imagen".</p>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
                 </DialogFooter>
             </DialogContent>
@@ -1069,7 +1045,7 @@ export function StudentPanel() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button 
+                     <Button 
                         onClick={() => setIsMailerOpen(true)}
                         disabled={selectedStudents.size === 0}
                     >
@@ -1124,18 +1100,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
-
-
-
-
-    
-
-
-
-    
-
-
-
-
-

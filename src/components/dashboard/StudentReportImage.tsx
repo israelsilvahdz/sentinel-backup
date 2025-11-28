@@ -15,7 +15,7 @@ interface StudentReportImageProps {
 export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReportImageProps>(
   ({ student, subjects }, ref) => {
     return (
-      <div ref={ref} className="bg-white p-6 rounded-lg border-2 border-primary" style={{ width: '600px', fontFamily: "'Inter', sans-serif" }}>
+      <div ref={ref} className="bg-white p-6 rounded-lg border-2 border-primary" style={{ width: '800px', fontFamily: "'Inter', sans-serif" }}>
         <div className="text-center mb-4">
             <h1 className="text-2xl font-bold text-primary">{student.name}</h1>
             <p className="text-md text-muted-foreground">{student.id}</p>
@@ -25,9 +25,9 @@ export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReport
                  <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[250px]">Materia</TableHead>
-                            <TableHead className="text-center">Faltas (Límite)</TableHead>
-                            <TableHead className="text-center">Tareas NE (Límite)</TableHead>
+                            <TableHead className="w-[250px] font-bold">Materia</TableHead>
+                            <TableHead className="text-center font-bold">Faltas (Límite)</TableHead>
+                            <TableHead className="text-center font-bold">Tareas NE (Límite)</TableHead>
                             <TableHead className="text-right font-bold">Ponderado</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -52,3 +52,4 @@ export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReport
 );
 
 StudentReportImage.displayName = 'StudentReportImage';
+
