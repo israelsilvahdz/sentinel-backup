@@ -606,18 +606,64 @@ const getEmailTemplate = (student: Student, subjects: SubjectSummary[]): EmailTe
   };
 };
 
-const generateEmailBodyWithReport = async (student: Student, body: string, reportImage: string): Promise<string> => {
-    // This function can remain simple as it just embeds the image.
-    // The complex logic is in getting the right body text.
-    const htmlBody = `
-        <p>${body.replace(/\n/g, '<br>')}</p>
-        <br>
-        <p>A continuación se muestra tu reporte de calificaciones:</p>
-        <img src="${reportImage}" alt="Reporte de Calificaciones de ${student.name}" />
-    `;
-    return htmlBody;
-};
+function MailerDialog({ open, onOpenChange, students }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[] }) {
+    const [sentStatus, setSentStatus] = useState<Record<string, boolean>>({});
 
+    useEffect(() => {
+        if (open) {
+            setSentStatus({});
+        }
+    }, [open]);
+
+    const handleSend = (student: Student) => {
+        if (!student.subjectSummaries) {
+            alert("No hay datos de materias para este alumno.");
+            return;
+        }
+        const template = getEmailTemplate(student, student.subjectSummaries);
+        const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
+        const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(template.body)}`;
+        
+        window.open(mailtoLink, '_blank');
+        setSentStatus(prev => ({ ...prev, [student.id]: true }));
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Centro de Envío de Correos</DialogTitle>
+                    <DialogDescription>
+                        Genera un borrador de correo para cada alumno seleccionado. Haz clic en cada botón para abrir el borrador en tu cliente de correo.
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-96 pr-6 -mr-6">
+                    <div className="py-4 space-y-2">
+                        {students.map(student => (
+                            <div key={student.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
+                                <div>
+                                    <p className="font-semibold">{student.name}</p>
+                                    <p className="text-sm text-muted-foreground">{student.id}</p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant={sentStatus[student.id] ? "secondary" : "default"}
+                                    onClick={() => handleSend(student)}
+                                >
+                                    {sentStatus[student.id] ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                                    {sentStatus[student.id] ? "Enviado" : "Abrir Borrador"}
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+                 <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 export function StudentPanel() {
   const { 
@@ -648,11 +694,7 @@ export function StudentPanel() {
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
 
   // State for the email dialog
-  const [isEmailing, setIsEmailing] = useState(false);
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
-  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  const [attachReport, setAttachReport] = useState(true);
+  const [isMailerOpen, setIsMailerOpen] = useState(false);
 
 
   const { toast } = useToast();
@@ -850,7 +892,7 @@ export function StudentPanel() {
         const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
         const fileNumber = type === 'riesgo' ? '1' : '2';
         zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
-        successfulCount++;
+        if(type === 'riesgo') successfulCount++;
       } else {
         console.error(`Failed to generate ${type} image for student ${name}`);
       }
@@ -866,7 +908,7 @@ export function StudentPanel() {
             document.body.removeChild(link);
             toast({
                 title: "Descarga Completa",
-                description: `Se han descargado ${successfulCount / 2} pares de imágenes en un archivo ZIP.`,
+                description: `Se han descargado los reportes de ${successfulCount} alumnos en un archivo ZIP.`,
             });
         });
     } else {
@@ -877,62 +919,11 @@ export function StudentPanel() {
       });
     }
   };
+
+  const studentsForMailer = useMemo(() => {
+    return Array.from(selectedStudents).map(id => allStudentsMap.get(id)).filter(Boolean) as Student[];
+  }, [selectedStudents, allStudentsMap]);
   
-    const handleOpenEmailDialog = () => {
-        if (selectedStudents.size === 0) return;
-        
-        // Para simplificar, usamos el estado del primer alumno como plantilla.
-        // El envío real generará un correo personalizado para cada uno.
-        const firstStudentId = Array.from(selectedStudents)[0];
-        const student = allStudentsMap.get(firstStudentId);
-        if(student && student.subjectSummaries) {
-            const template = getEmailTemplate(student, student.subjectSummaries);
-            setEmailSubject(template.subject);
-            setEmailBody(template.body);
-        }
-        setIsEmailDialogOpen(true);
-    };
-
-    const handleSendEmails = async () => {
-        if (selectedStudents.size === 0) return;
-    
-        setIsEmailing(true);
-        toast({
-            title: "Generando Correos...",
-            description: "Preparando los borradores, por favor espera."
-        });
-    
-        const studentIds = Array.from(selectedStudents);
-    
-        const openMailto = (student: Student, template: EmailTemplate) => {
-            const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
-            const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(template.subject)}&body=${encodeURIComponent(template.body)}`;
-            window.open(mailtoLink, '_blank');
-        };
-    
-        // Abre los enlaces mailto de forma secuencial con un pequeño retraso
-        for (let i = 0; i < studentIds.length; i++) {
-            const studentId = studentIds[i];
-            const student = allStudentsMap.get(studentId);
-            if (student && student.subjectSummaries) {
-                const template = getEmailTemplate(student, student.subjectSummaries);
-                
-                // Abre el correo en un timeout para evitar el bloqueo del navegador
-                setTimeout(() => openMailto(student, template), i * 300);
-            }
-        }
-    
-        // Espera un tiempo prudencial para que todos los timeouts se ejecuten
-        setTimeout(() => {
-            setIsEmailing(false);
-            setIsEmailDialogOpen(false);
-            toast({
-                title: "¡Listo!",
-                description: `Se han abierto ${studentIds.length} borradores de correo en nuevas pestañas.`
-            });
-        }, studentIds.length * 300 + 500);
-    };
-
 
   if (isLoading) {
     return (
@@ -1072,6 +1063,13 @@ export function StudentPanel() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                     <Button 
+                        onClick={() => setIsMailerOpen(true)}
+                        disabled={selectedStudents.size === 0}
+                    >
+                        <Mail className="mr-2 h-4 w-4" />
+                        Enviar Correo ({selectedStudents.size})
+                    </Button>
                     <Button 
                         onClick={handleDownloadZip}
                         disabled={selectedStudents.size === 0}
@@ -1116,6 +1114,7 @@ export function StudentPanel() {
           )}
         </>
       )}
+      <MailerDialog open={isMailerOpen} onOpenChange={setIsMailerOpen} students={studentsForMailer} />
     </div>
   );
 }
@@ -1128,3 +1127,4 @@ export function StudentPanel() {
 
 
 
+    
