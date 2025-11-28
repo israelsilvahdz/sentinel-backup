@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
@@ -31,6 +31,7 @@ import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { StudentReportImage } from './StudentReportImage';
 import { StudentGradesReportImage } from './StudentGradesReportImage';
+import { ScrollArea } from '../ui/scroll-area';
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -179,7 +180,9 @@ Les notifico que los siguientes alumnos se ausentarán por motivo de "${reason}"
 
 Alumnos: ${studentsListText}.
 
-${notes ? `Notas adicionales: ${notes}\n\n` : ''}Saludos cordiales,`;
+${notes ? `Notas adicionales: ${notes}\n\n` : ''}Si desean una tabla más detallada con matrículas y grupos, pueden reemplazar la lista de alumnos pegando la tabla que se ha copiado al portapapeles.
+
+Saludos cordiales,`;
 
         return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody, recipientsWithoutEmail };
     };
@@ -498,18 +501,18 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
 const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
 
 
-const generateImage = async (
+const generateImageFromComponent = async (
   ReportComponent: React.ElementType,
   student: Student,
-  subjects: Subject[]
-): Promise<Blob | null> => {
+  subjects: Subject[] | SubjectSummary[]
+): Promise<string | null> => {
   const node = document.createElement('div');
   node.style.position = 'fixed';
   node.style.top = '-9999px';
   node.style.left = '0px';
   document.body.appendChild(node);
 
-  const promise = new Promise<Blob | null>((resolve, reject) => {
+  const promise = new Promise<string | null>((resolve, reject) => {
     const Component = () => {
       const ref = useRef<HTMLDivElement>(null);
 
@@ -517,13 +520,12 @@ const generateImage = async (
         if (ref.current) {
           setTimeout(() => {
             htmlToImage.toPng(ref.current!, {
-                pixelRatio: 2,
+                pixelRatio: 1.5,
                 fontEmbedCSS: FONT_URL,
                 fetchRequestInit: {
-                    mode: 'no-cors', // Use no-cors to avoid CORS issues with fonts
+                    mode: 'no-cors',
                 },
               })
-              .then((dataUrl) => fetch(dataUrl).then(res => res.blob()))
               .then(resolve)
               .catch((error) => {
                 console.error('Error generating image:', error);
@@ -550,6 +552,16 @@ const generateImage = async (
   });
 
   return promise;
+};
+
+const generateEmailBodyWithReport = async (student: Student, body: string, reportImage: string): Promise<string> => {
+    const htmlBody = `
+        <p>${body.replace(/\n/g, '<br>')}</p>
+        <br>
+        <p>A continuación se muestra tu reporte de calificaciones:</p>
+        <img src="${reportImage}" alt="Reporte de Calificaciones de ${student.name}" />
+    `;
+    return htmlBody;
 };
 
 
@@ -579,6 +591,13 @@ export function StudentPanel() {
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
   const [isProcessingAthletes, setIsProcessingAthletes] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+
+  // State for the email dialog
+  const [isEmailing, setIsEmailing] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('Reporte de Calificaciones y Seguimiento');
+  const [emailBody, setEmailBody] = useState('Hola,\n\nTe comparto tu reporte de seguimiento académico.\n\nPor favor, revísalo y ponte en contacto si tienes alguna duda.\n\nSaludos.');
+  const [attachReport, setAttachReport] = useState(true);
+
 
   const { toast } = useToast();
   
@@ -750,7 +769,7 @@ export function StudentPanel() {
         const subjects = await loadStudentSubjects(studentId);
         
         imagePromises.push(
-            generateImage(StudentReportImage, student, subjects).then(blob => ({
+            generateImageFromComponent(StudentReportImage, student, subjects as SubjectSummary[]).then(dataUrl => dataUrl ? fetch(dataUrl).then(res => res.blob()) : null).then(blob => ({
               name: student.name,
               type: 'riesgo',
               blob,
@@ -758,7 +777,7 @@ export function StudentPanel() {
         );
 
         imagePromises.push(
-            generateImage(StudentGradesReportImage, student, subjects).then(blob => ({
+            generateImageFromComponent(StudentGradesReportImage, student, subjects).then(dataUrl => dataUrl ? fetch(dataUrl).then(res => res.blob()) : null).then(blob => ({
               name: student.name,
               type: 'calificaciones',
               blob,
@@ -802,6 +821,49 @@ export function StudentPanel() {
       });
     }
   };
+
+  const handleSendEmails = async () => {
+    if (selectedStudents.size === 0) return;
+
+    setIsEmailing(true);
+    toast({
+        title: "Generando Correos...",
+        description: "Preparando los borradores, por favor espera."
+    });
+
+    let emailsOpened = 0;
+    for (const studentId of Array.from(selectedStudents)) {
+        const student = allStudentsMap.get(studentId);
+        if (!student) continue;
+
+        const studentEmail = `A${student.id.substring(1)}@tecmilenio.mx`;
+        let finalBody = emailBody;
+
+        if (attachReport) {
+            const subjects = await loadStudentSubjects(studentId);
+            const reportImage = await generateImageFromComponent(StudentGradesReportImage, student, subjects);
+            if (reportImage) {
+                finalBody = await generateEmailBodyWithReport(student, emailBody, reportImage);
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: `Error al generar reporte para ${student.name}`,
+                    description: "Se enviará el correo sin la imagen del reporte."
+                });
+            }
+        }
+        
+        const mailtoLink = `mailto:${studentEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(finalBody)}`;
+        window.open(mailtoLink, '_blank');
+        emailsOpened++;
+    }
+
+    setIsEmailing(false);
+    toast({
+        title: "¡Listo!",
+        description: `Se han abierto ${emailsOpened} borradores de correo en nuevas pestañas.`
+    });
+};
 
 
   if (isLoading) {
@@ -941,13 +1003,62 @@ export function StudentPanel() {
                         <Label htmlFor="select-all">Seleccionar Todos ({selectedStudents.size})</Label>
                     </div>
                 </div>
-                <Button 
-                    onClick={handleDownloadZip}
-                    disabled={selectedStudents.size === 0}
-                >
-                    <Download className="mr-2 h-4 w-4" />
-                    Descargar Reportes ({selectedStudents.size})
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                             <Button disabled={selectedStudents.size === 0}>
+                                <Send className="mr-2 h-4 w-4" />
+                                Enviar Correo ({selectedStudents.size})
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                             <DialogHeader>
+                                <DialogTitle>Enviar Correo a Alumnos Seleccionados</DialogTitle>
+                                <DialogDescription>
+                                    Prepara y envía un correo a los {selectedStudents.size} alumnos seleccionados. El sistema abrirá un borrador por cada alumno.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4 space-y-4">
+                                <div>
+                                    <Label>Destinatarios ({selectedStudents.size}):</Label>
+                                    <ScrollArea className="h-24 w-full rounded-md border p-2 mt-2">
+                                        <ul className="text-sm text-muted-foreground">
+                                            {Array.from(selectedStudents).map(id => (
+                                                <li key={id}>{allStudentsMap.get(id)?.name}</li>
+                                            ))}
+                                        </ul>
+                                    </ScrollArea>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email-subject">Asunto</Label>
+                                    <Input id="email-subject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email-body">Cuerpo del Correo</Label>
+                                    <Textarea id="email-body" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={6}/>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox id="attach-report" checked={attachReport} onCheckedChange={(checked) => setAttachReport(!!checked)} />
+                                    <Label htmlFor="attach-report">Adjuntar Reporte de Calificaciones (como imagen)</Label>
+                                </div>
+                                <p className="text-xs text-muted-foreground">Nota: Se abrirá una nueva pestaña por cada correo a enviar para su revisión individual.</p>
+                            </div>
+                            <DialogFooter>
+                                <Button onClick={handleSendEmails} disabled={isEmailing}>
+                                    {isEmailing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                                    Abrir Borrador de Correos
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                    <Button 
+                        onClick={handleDownloadZip}
+                        disabled={selectedStudents.size === 0}
+                    >
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar Reportes ({selectedStudents.size})
+                    </Button>
+                </div>
             </div>
            )}
 
