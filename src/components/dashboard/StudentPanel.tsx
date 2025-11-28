@@ -499,62 +499,6 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
     );
 }
 
-const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
-
-
-const generateImageFromComponent = async (
-  ReportComponent: React.ElementType,
-  student: Student,
-  subjects: Subject[] | SubjectSummary[]
-): Promise<string | null> => {
-  const node = document.createElement('div');
-  node.style.position = 'fixed';
-  node.style.top = '-9999px';
-  node.style.left = '0px';
-  document.body.appendChild(node);
-
-  const promise = new Promise<string | null>((resolve, reject) => {
-    const Component = () => {
-      const ref = useRef<HTMLDivElement>(null);
-
-      useEffect(() => {
-        if (ref.current) {
-          setTimeout(() => {
-            htmlToImage.toPng(ref.current!, {
-                pixelRatio: 1.5,
-                fontEmbedCSS: FONT_URL,
-                fetchRequestInit: {
-                    mode: 'no-cors',
-                },
-              })
-              .then(resolve)
-              .catch((error) => {
-                console.error('Error generating image:', error);
-                reject(error);
-              })
-              .finally(() => {
-                if (document.body.contains(node)) {
-                    document.body.removeChild(node);
-                }
-              });
-          }, 100);
-        }
-      }, []);
-
-      return <ReportComponent ref={ref} student={student} subjects={subjects} />;
-    };
-    
-    const root = (async () => {
-        const { createRoot } = await import('react-dom/client');
-        return createRoot(node);
-    })();
-      
-    root.then(r => r.render(<Component />));
-  });
-
-  return promise;
-};
-
 type EmailTemplate = {
   subject: string;
   body: string;
@@ -565,80 +509,89 @@ const getEmailTemplate = (student: Student, allSubjects: Subject[]): EmailTempla
   
   const subjects = allSubjects || [];
 
-  let riskDetails = '';
-  let finalGradeDetails = '--- Desglose de Calificaciones ---\n';
-
-  subjects.forEach(s => {
-    const gradeText = `Ponderado: ${(s.grade || 0).toFixed(2)}`;
-    let activitiesText = '';
-    const activityKeys = Object.keys(s.activities).filter(k => /^A\d+$/.test(k)).sort((a,b) => parseInt(a.substring(1)) - parseInt(b.substring(1)));
-    if (activityKeys.length > 0) {
-        activitiesText = activityKeys.map(key => `${key}: ${s.activities[key]}`).join(', ');
-    }
-    finalGradeDetails += `${s.name}: ${gradeText} | ${activitiesText}\n`;
-  });
+  let riskDetailsList: string[] = [];
+  let mainMessage = '';
+  let subject = `Reporte de Calificaciones y Seguimiento - ${student.name}`;
 
   if (hasSD) {
     const sdAbsences = subjects.filter(s => s.absences > s.absenceLimit);
     const sdAssignments = subjects.filter(s => s.missedAssignments > s.missedAssignmentLimit);
 
     if (sdAbsences.length > 0) {
-      const subjectList = sdAbsences.map(s => `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join(', ');
-      riskDetails = `* Sin Derecho por Faltas en: ${subjectList}\n`;
-      return {
-        subject: `Notificación Importante: Estatus Académico - ${student.name}`,
-        body: `Hola ${student.name.split(' ')[0]},\n\nLamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s):\n${riskDetails}\nEsto significa que ya no es posible acreditar la materia por la vía regular en este periodo.\n\nEs una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.\n\n${finalGradeDetails}\nSaludos.`
-      };
+      const subjectList = sdAbsences.map(s => `<li><b>Sin Derecho por Faltas en:</b> ${s.name} (${s.absences} de ${s.absenceLimit} faltas)</li>`).join('');
+      riskDetailsList.push(subjectList);
+      subject = `Notificación Importante: Estatus Académico - ${student.name}`;
+      mainMessage = `<p>Lamento informarte que, debido al número de ausencias registradas, has quedado en estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s):</p><ul>${riskDetailsList.join('')}</ul><p>Esto significa que ya no es posible acreditar la materia por la vía regular en este periodo.</p><p>Es una situación seria, pero es importante que sigamos adelante. Por favor, acércate conmigo para platicar sobre tus opciones.</p>`;
+    } else if (sdAssignments.length > 0) {
+       const subjectList = sdAssignments.map(s => `<li><b>Sin Derecho por Tareas No Entregadas en:</b> ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)</li>`).join('');
+       riskDetailsList.push(subjectList);
+       subject = `URGENTE: Estatus Académico - ${student.name}`;
+       mainMessage = `<p>Te escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s) debido a tareas no entregadas (NE):</p><ul>${riskDetailsList.join('')}</ul><p><b>No hay tiempo que perder.</b> Es fundamental que te acerques <strong>inmediatamente</strong> con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.</p>`;
     }
-    if (sdAssignments.length > 0) {
-       const subjectList = sdAssignments.map(s => `${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join(', ');
-       riskDetails = `* Sin Derecho por Tareas No Entregadas en: ${subjectList}\n`;
-       return {
-        subject: `URGENTE: Estatus Académico - ${student.name}`,
-        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo con urgencia sobre tu situación académica. Has alcanzado el estatus de "Sin Derecho" (SD) en la(s) siguiente(s) materia(s) debido a tareas no entregadas (NE):\n${riskDetails}\nNo hay tiempo que perder. Es fundamental que te acerques **inmediatamente** con tus maestros para discutir tu situación. Explora si existe alguna posibilidad de recuperar los trabajos pendientes. Tu acción inmediata es crucial.\n\n${finalGradeDetails}\nQuedo a tu disposición.`
-      };
-    }
-  }
-
-  if (hasAtLimit) {
+  } else if (hasAtLimit) {
       const atLimitAbsences = subjects.filter(s => s.absences === s.absenceLimit);
       const atLimitAssignments = subjects.filter(s => s.missedAssignments === s.missedAssignmentLimit);
       if(atLimitAbsences.length > 0){
-        const subjectList = atLimitAbsences.map(s => `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join(', ');
-        riskDetails += `* Al Límite de Faltas en: ${subjectList}\n`;
+        const subjectList = atLimitAbsences.map(s => `<li><b>Al Límite de Faltas en:</b> ${s.name} (${s.absences} de ${s.absenceLimit} faltas)</li>`).join('');
+        riskDetailsList.push(subjectList);
       }
       if(atLimitAssignments.length > 0){
-        const subjectList = atLimitAssignments.map(s => `${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join(', ');
-        riskDetails += `* Al Límite de Tareas No Entregadas en: ${subjectList}\n`;
+        const subjectList = atLimitAssignments.map(s => `<li><b>Al Límite de Tareas No Entregadas en:</b> ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)</li>`).join('');
+        riskDetailsList.push(subjectList);
       }
-      return {
-          subject: `Acción Requerida: Límite de Entregas/Faltas - ${student.name}`,
-          body: `Hola ${student.name.split(' ')[0]},\n\nTe contacto porque he observado que has alcanzado el límite en las siguientes materias:\n${riskDetails}\nUna falta o entrega no realizada más y podrías pasar a estatus de "Sin Derecho".\n\nTe recomiendo fuertemente que te acerques a tus maestros para revisar tu situación. Cada clase y cada entrega cuenta mucho en este momento.\n\n${finalGradeDetails}\nSi necesitas apoyo, no dudes en buscarme.`
-      };
-  }
-  
-  if (hasHighRisk) {
+      subject = `Acción Requerida: Límite de Entregas/Faltas - ${student.name}`;
+      mainMessage = `<p>Te contacto porque he observado que has alcanzado el límite en las siguientes materias:</p><ul>${riskDetailsList.join('')}</ul><p>Una falta o entrega no realizada más y podrías pasar a estatus de "Sin Derecho". Te recomiendo fuertemente que te acerques a tus maestros para revisar tu situación. Cada clase y cada entrega cuenta mucho en este momento. Si necesitas apoyo, no dudes en buscarme.</p>`;
+  } else if (hasHighRisk) {
      const highRiskAbsences = subjects.filter(s => s.absences / s.absenceLimit >= 0.8 && s.absences < s.absenceLimit);
      const highRiskAssignments = subjects.filter(s => s.missedAssignments / s.missedAssignmentLimit >= 0.8 && s.missedAssignments < s.missedAssignmentLimit);
      if(highRiskAbsences.length > 0){
-        const subjectList = highRiskAbsences.map(s => `${s.name} (${s.absences} de ${s.absenceLimit} faltas)`).join(', ');
-        riskDetails += `* Riesgo Alto por Faltas en: ${subjectList}\n`;
+        const subjectList = highRiskAbsences.map(s => `<li><b>Riesgo Alto por Faltas en:</b> ${s.name} (${s.absences} de ${s.absenceLimit} faltas)</li>`).join('');
+        riskDetailsList.push(subjectList);
      }
      if(highRiskAssignments.length > 0){
-        const subjectList = highRiskAssignments.map(s => `${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)`).join(', ');
-        riskDetails += `* Riesgo Alto por Tareas No Entregadas en: ${subjectList}\n`;
+        const subjectList = highRiskAssignments.map(s => `<li><b>Riesgo Alto por Tareas No Entregadas en:</b> ${s.name} (${s.missedAssignments} de ${s.missedAssignmentLimit} NE)</li>`).join('');
+        riskDetailsList.push(subjectList);
      }
-     return {
-        subject: `Seguimiento Académico: Riesgo Alto - ${student.name}`,
-        body: `Hola ${student.name.split(' ')[0]},\n\nTe escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto en las siguientes áreas:\n${riskDetails}\nEs un momento clave para redoblar esfuerzos y evitar complicaciones. Por favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción.\n\n${finalGradeDetails}\nEstoy para apoyarte.`
-    }
+     subject = `Seguimiento Académico: Riesgo Alto - ${student.name}`;
+     mainMessage = `<p>Te escribo para dar seguimiento a tu progreso. He notado un riesgo académico alto en las siguientes áreas:</p><ul>${riskDetailsList.join('')}</ul><p>Te recomiendo que te acerques a tus maestros para explorar la posibilidad de entregar los trabajos pendientes. Si necesitas ayuda o tienes alguna dificultad, cuenta conmigo. Es un momento clave para redoblar esfuerzos y evitar complicaciones. Por favor, acércate conmigo lo antes posible para que juntos hagamos un plan de acción.</p>`;
+  } else {
+    mainMessage = `<p>Te comparto tu reporte de seguimiento académico. Por favor, revísalo y ponte en contacto si tienes alguna duda.</p>`;
   }
+  
+  const allActivityKeys = Array.from(new Set(subjects.flatMap(s => Object.keys(s.activities).filter(key => ACTIVITY_REGEX.test(key))))).sort((a,b) => parseInt(a.substring(1)) - parseInt(b.substring(1)));
 
-  // Default case
-  return {
-    subject: `Reporte de Calificaciones y Seguimiento - ${student.name}`,
-    body: `Hola ${student.name.split(' ')[0]},\n\nTe comparto tu reporte de seguimiento académico.\n\n${finalGradeDetails}\nPor favor, revísalo y ponte en contacto si tienes alguna duda.\n\nSaludos cordiales.`
-  };
+  const gradesTableRows = subjects.map(s => {
+    const gradeText = (s.grade || 0).toFixed(2);
+    const activitiesCells = allActivityKeys.map(key => `<td>${s.activities[key] ?? ''}</td>`).join('');
+    return `<tr>
+              <td style="font-weight: bold;">${s.name}</td>
+              <td>${gradeText}</td>
+              ${activitiesCells}
+            </tr>`;
+  }).join('');
+  
+  const gradesTableHeader = `<tr><th>Materia</th><th>Ponderado</th>${allActivityKeys.map(key => `<th>${key}</th>`).join('')}</tr>`;
+
+  const finalGradeDetails = `<br><hr>
+    <h3>Desglose de Calificaciones</h3>
+    <table border="1" cellpadding="5" style="border-collapse: collapse; width: 100%; font-size: 11px; font-family: sans-serif;">
+      <thead style="background-color: #f2f2f2;">${gradesTableHeader}</thead>
+      <tbody>${gradesTableRows}</tbody>
+    </table>`;
+
+  const body = `
+    <html>
+      <body style="font-family: sans-serif; font-size: 14px;">
+        <p>Hola ${student.name.split(' ')[0]},</p>
+        ${mainMessage}
+        ${finalGradeDetails}
+        <br>
+        <p>Saludos cordiales.</p>
+      </body>
+    </html>
+  `;
+  
+  return { subject, body };
 };
 
 function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[], loadStudentSubjects: (studentId: string) => Promise<Subject[]> }) {
@@ -684,7 +637,7 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { o
                                     onClick={() => handleSend(student)}
                                 >
                                     {sentStatus[student.id] ? <Check className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-                                    {sentStatus[student.id] ? "Enviado" : "Abrir Borrador"}
+                                    {sentStatus[student.id] ? "Generado" : "Generar Correo"}
                                 </Button>
                             </div>
                         ))}
@@ -899,8 +852,40 @@ export function StudentPanel() {
       if (student) {
         const subjects = await loadStudentSubjects(studentId);
         
+        const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+
+        const generateImage = (ReportComponent: React.ElementType, props: any) => {
+            return new Promise<Blob | null>(async (resolve) => {
+                const node = document.createElement('div');
+                node.style.position = 'fixed';
+                node.style.top = '-9999px';
+                node.style.left = '0px';
+                document.body.appendChild(node);
+                
+                const { createRoot } = await import('react-dom/client');
+                const root = createRoot(node);
+                
+                const Component = () => {
+                    const ref = useRef<HTMLDivElement>(null);
+                    useEffect(() => {
+                        if (ref.current) {
+                           setTimeout(() => { // Gives time for render
+                                htmlToImage.toPng(ref.current!, { pixelRatio: 1.5, fontEmbedCSS: FONT_URL, fetchRequestInit: { mode: 'no-cors' }})
+                                .then(dataUrl => fetch(dataUrl).then(res => res.blob()))
+                                .then(resolve)
+                                .catch(err => { console.error(err); resolve(null); })
+                                .finally(() => { root.unmount(); if(document.body.contains(node)) document.body.removeChild(node); });
+                           }, 200);
+                        }
+                    }, []);
+                    return React.createElement(ReportComponent, { ref, ...props });
+                };
+                root.render(<Component />);
+            });
+        };
+
         imagePromises.push(
-            generateImageFromComponent(StudentReportImage, student, student.subjectSummaries || []).then(dataUrl => dataUrl ? fetch(dataUrl).then(res => res.blob()) : null).then(blob => ({
+            generateImage(StudentReportImage, { student, subjects: student.subjectSummaries || [] }).then(blob => ({
               name: student.name,
               type: 'riesgo',
               blob,
@@ -908,7 +893,7 @@ export function StudentPanel() {
         );
 
         imagePromises.push(
-            generateImageFromComponent(StudentGradesReportImage, student, subjects).then(dataUrl => dataUrl ? fetch(dataUrl).then(res => res.blob()) : null).then(blob => ({
+            generateImage(StudentGradesReportImage, { student, subjects }).then(blob => ({
               name: student.name,
               type: 'calificaciones',
               blob,
@@ -1096,7 +1081,7 @@ export function StudentPanel() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                     <Button 
+                    <Button 
                         onClick={() => setIsMailerOpen(true)}
                         disabled={selectedStudents.size === 0}
                     >
@@ -1161,4 +1146,5 @@ export function StudentPanel() {
 
 
     
+
 
