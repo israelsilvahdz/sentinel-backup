@@ -38,7 +38,10 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
             const timeoutId = setTimeout(async () => {
                 if (reportRef.current) {
                     try {
-                        const dataUrl = await import('html-to-image').then(lib => lib.toPng(reportRef.current!, { pixelRatio: 2 }));
+                        const dataUrl = await import('html-to-image').then(lib => lib.toPng(reportRef.current!, { 
+                            pixelRatio: 2,
+                            fetchRequestInit: { mode: 'no-cors' } 
+                        }));
                         setImageUrl(dataUrl);
                     } catch (error) {
                        console.error("Error generating image:", error);
