@@ -4,7 +4,7 @@
 import React, { useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Clock } from 'lucide-react';
+import { Clock, AlertCircle } from 'lucide-react';
 import { type Subject } from "@/types/student";
 import { cn } from '@/lib/utils';
 import { getActivityList } from '@/lib/ponderaciones';
@@ -42,14 +42,20 @@ export function PointsGradesTable({ subjects, planType }: PointsGradesTableProps
             const activityList = subjectActivityLists[index];
             const activitiesMap = new Map(activityList.map(act => [act.name, act]));
             
-            const rowData: Record<string, string> = { subjectName: subject.name };
+            const rowData: Record<string, string | { earned: number, weight: number } | 'SC' | 'NE'> = { subjectName: subject.name };
             
             sortedHeaders.forEach(header => {
                 const activity = activitiesMap.get(header);
                 if (activity) {
-                     const score = typeof activity.score === 'string' && (activity.score.toUpperCase() === 'SC' || activity.score.toUpperCase() === 'NE' || activity.score.trim() === '') ? 0 : Number(activity.score);
-                     const earnedPoints = (score / 100) * activity.weight;
-                     rowData[header] = `${earnedPoints.toFixed(1)} / ${activity.weight.toFixed(1)}`;
+                     if (typeof activity.score === 'string' && activity.score.toUpperCase() === 'SC') {
+                        rowData[header] = 'SC';
+                     } else if (typeof activity.score === 'string' && activity.score.toUpperCase() === 'NE') {
+                        rowData[header] = 'NE';
+                     } else {
+                        const score = typeof activity.score === 'string' && activity.score.trim() === '' ? 0 : Number(activity.score);
+                        const earnedPoints = (score / 100) * activity.weight;
+                        rowData[header] = { earned: earnedPoints, weight: activity.weight };
+                     }
                 } else {
                     rowData[header] = '-';
                 }
@@ -81,13 +87,24 @@ export function PointsGradesTable({ subjects, planType }: PointsGradesTableProps
                         <TableRow key={index} className={cn(index % 2 === 0 ? 'bg-muted/30' : '')}>
                             <TableCell className="font-medium">{row.subjectName}</TableCell>
                             {headers.map(header => (
-                                <TableCell key={header} className="text-center font-mono">
-                                    {row[header].includes('NaN') || row[header] === '-' ? (
+                                <TableCell key={header} className="text-center font-mono align-middle">
+                                    {row[header] === 'SC' ? (
+                                         <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                            <Clock className="h-3 w-3 mr-1"/>
+                                            SC
+                                        </Badge>
+                                    ) : row[header] === 'NE' ? (
+                                        <Badge variant="destructive" className="bg-red-100 text-red-800">
+                                            <AlertCircle className="h-3 w-3 mr-1"/>
+                                            NE
+                                        </Badge>
+                                    ) : row[header] === '-' ? (
                                         '-'
-                                    ) : row[header].includes('/ 0.0') ? (
-                                        'SC'
                                     ) : (
-                                        row[header]
+                                        <div className="flex flex-col items-center">
+                                            <span className="font-bold text-primary">{(row[header] as {earned: number}).earned.toFixed(1)}</span>
+                                            <span className="text-xs text-muted-foreground">/ {(row[header] as {weight: number}).weight.toFixed(1)}</span>
+                                        </div>
                                     )}
                                 </TableCell>
                             ))}
@@ -98,4 +115,3 @@ export function PointsGradesTable({ subjects, planType }: PointsGradesTableProps
         </div>
     );
 }
-
