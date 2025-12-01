@@ -16,6 +16,7 @@ export interface Ponderacion {
 export const EXAM_INTERMEDIO_PONDERACION = 15;
 export const EXAM_FINAL_PONDERACION = 30;
 
+// Ponderaciones para el esquema TETRAMESTRAL (basado en áreas)
 export const PONDERACIONES_POR_AREA: Record<AreaName, Ponderacion | null> = {
   'Matemáticas': { aai: 5, vcu_aai: 4, aaf: 7, vcu_aaf: 5 },
   'Ciencias': { aai: 3, vcu_aai: 7, aaf: 3, vcu_aaf: 7, vpaf: 13 },
@@ -25,6 +26,18 @@ export const PONDERACIONES_POR_AREA: Record<AreaName, Ponderacion | null> = {
   'Optativas': { aai: 6, vcu_aai: 3, aaf: 6, vcu_aaf: 3, vpaf: 5, vpaf2: 14 },
   'Unknown': null,
 };
+
+// NUEVA ESTRUCTURA: Ponderaciones para el esquema SEMESTRAL (basado en materias específicas)
+export const PONDERACIONES_SEMESTRAL_POR_MATERIA: Record<string, number[]> = {
+    'Materia y energía I': [3, 3, 3, 3, 3, 11, 3, 3, 3, 3, 3, 12, 3, 3, 3, 3, 3, 12, 20],
+    'Ciencias de la Vida': [4, 4, 4, 14, 5, 4, 4, 14, 4, 4, 14, 5, 20],
+    'Expresión Literaria': [1, 1, 5, 1, 1, 5, 10, 1, 1, 5, 2, 2, 5, 10, 2, 2, 5, 1, 1, 5, 4, 10, 20],
+    'Habilidades y valores IV: plan de vida y carrera': [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 31, 10, 10],
+    'Antropología': [4, 5, 3, 5, 10, 3, 5, 3, 5, 10, 3, 5, 4, 5, 10, 20],
+    'Matemáticas IV: modelos matemáticos': [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 16],
+    'Optativa de lengua adicional al español I': [8, 8, 10, 8, 8, 11, 8, 8, 11, 20],
+};
+
 
 export const CLASIFICACION_MATERIAS: Record<AreaName, string[]> = {
   'Matemáticas': [
@@ -125,6 +138,7 @@ function normalizeSubjectName(name: string): string {
         const mainPart = parts[0].trim();
         // Find the matching official name
         if (mainPart === 'habilidades y valores ii') return 'Habilidades y valores II: pensamiento crítico';
+        if (mainPart === 'habilidades y valores iv') return 'Habilidades y valores IV: plan de vida y carrera';
         if (mainPart === 'habilidades y valores v') return 'Habilidades y valores V: lenguaje';
         if (mainPart === 'habilidades y valores vi') return 'Habilidades y valores VI: toma de decisiones';
 
@@ -171,12 +185,8 @@ export function getAreaForMateria(materiaName: string): AreaName {
 
 // Función para calcular la calificación final de una materia
 export function calculateFinalGrade(subject: Subject): number {
-  const area = getAreaForMateria(subject.name);
-  const ponderacion = PONDERACIONES_POR_AREA[area];
-
-  if (!ponderacion) {
-    return NaN; // Retorna NaN si no hay ponderación definida
-  }
+  const normalizedName = normalizeSubjectName(subject.name);
+  const semestralWeights = PONDERACIONES_SEMESTRAL_POR_MATERIA[normalizedName];
 
   // Ordenar las actividades cronológicamente (A1, A2, A10, etc.)
   const sortedActivities = Object.entries(subject.activities)
@@ -186,8 +196,32 @@ export function calculateFinalGrade(subject: Subject): number {
       const numB = parseInt(keyB.substring(1), 10);
       return numA - numB;
     })
-    .map(([, value]) => (typeof value === 'number' ? value : parseFloat(String(value)) || 0));
+    .map(([, value]) => {
+        if(typeof value === 'string' && (value.toUpperCase() === 'SC' || value.toUpperCase() === 'NE' || value.trim() === '')) {
+            return 0;
+        }
+        return typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+    });
 
+  // --- Lógica para Plan Semestral (por materia específica) ---
+  if (semestralWeights) {
+    let totalScore = 0;
+    for (let i = 0; i < semestralWeights.length; i++) {
+        const score = sortedActivities[i] ?? 0;
+        const weight = semestralWeights[i];
+        totalScore += (score / 100) * weight;
+    }
+    return totalScore;
+  }
+  
+  // --- Lógica para Plan Tetramestral (por área) ---
+  const area = getAreaForMateria(normalizedName);
+  const ponderacion = PONDERACIONES_POR_AREA[area];
+
+  if (!ponderacion) {
+    return NaN; // Retorna NaN si no hay ponderación definida
+  }
+  
   let totalScore = 0;
   let activityIndex = 0;
 
