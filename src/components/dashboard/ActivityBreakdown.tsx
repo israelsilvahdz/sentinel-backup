@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import type { Subject } from '@/types/student';
-import { getAreaForMateria, PONDERACIONES_POR_AREA, EXAM_INTERMEDIO_PONDERACION, EXAM_FINAL_PONDERACION, PONDERACIONES_SEMESTRAL_POR_MATERIA } from '@/lib/ponderaciones';
+import { getActivityList } from '@/lib/ponderaciones';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Clock } from 'lucide-react';
@@ -11,52 +11,6 @@ import { Clock } from 'lucide-react';
 interface ActivityBreakdownProps {
     subject: Subject;
     planType: 'tetramestral' | 'semestral';
-}
-
-interface ActivityItem {
-    name: string;
-    score: number | string;
-    weight: number;
-    earnedPoints: number;
-}
-
-function getActivityList(subject: Subject, planType: 'tetramestral' | 'semestral'): ActivityItem[] {
-    const sortedScores = Object.entries(subject.activities)
-        .filter(([key]) => /^A\d+$/.test(key))
-        .sort(([keyA], [keyB]) => parseInt(keyA.substring(1), 10) - parseInt(keyB.substring(1), 10))
-        .map(([, value]) => value);
-
-    const activityItems: ActivityItem[] = [];
-    let activityIndex = 0;
-
-    const addActivity = (name: string, weight: number) => {
-        const rawScore = sortedScores[activityIndex++] ?? 'SC';
-        const score = typeof rawScore === 'string' && (rawScore.toUpperCase() === 'SC' || rawScore.toUpperCase() === 'NE' || rawScore.trim() === '') ? 0 : Number(rawScore);
-        const earnedPoints = (score / 100) * weight;
-        activityItems.push({ name, score: rawScore, weight, earnedPoints });
-    };
-
-    if (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name]) {
-        const weights = PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name];
-        weights.forEach((weight, index) => {
-            addActivity(`Actividad ${activityIndex + 1}`, weight);
-        });
-        return activityItems;
-    }
-    
-    const area = getAreaForMateria(subject.name);
-    const ponderacion = PONDERACIONES_POR_AREA[area];
-    if (!ponderacion) return [];
-
-    for (let i = 1; i <= ponderacion.aai; i++) addActivity(`Actividad ${activityIndex + 1}`, ponderacion.vcu_aai);
-    if (ponderacion.vpai) addActivity('Proyecto Pre-Intermedio', ponderacion.vpai);
-    addActivity('Examen Intermedio', EXAM_INTERMEDIO_PONDERACION);
-    for (let i = 1; i <= ponderacion.aaf; i++) addActivity(`Actividad ${activityIndex + 1}`, ponderacion.vcu_aaf);
-    if (ponderacion.vpaf) addActivity('1er Proyecto Pre-Final', ponderacion.vpaf);
-    if (ponderacion.vpaf2) addActivity('2do Proyecto Pre-Final', ponderacion.vpaf2);
-    addActivity('Examen Final', EXAM_FINAL_PONDERACION);
-    
-    return activityItems;
 }
 
 export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps) {
@@ -72,51 +26,92 @@ export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps)
         );
     }
 
-    const schemeUsed = (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name]) ? 'Semestral' : 'Tetramestral';
-    const totalEarnedPoints = activityList.reduce((acc, item) => acc + item.earnedPoints, 0);
+    const { totalEarnedPoints, maxPossiblePoints } = useMemo(() => {
+        let earned = 0;
+        let possible = 0;
+
+        activityList.forEach(item => {
+            const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+            
+            if (isGraded) {
+                const score = Number(item.score) || 0;
+                earned += (score / 100) * item.weight;
+                possible += item.weight;
+            }
+        });
+        
+        return { totalEarnedPoints: earned, maxPossiblePoints: possible };
+
+    }, [activityList]);
+    
+    const schemeUsed = (planType === 'semestral' && subject.name in PONDERACIONES_SEMESTRAL_POR_MATERIA) ? 'Semestral' : 'Tetramestral';
+
 
     return (
         <div className="bg-muted/30 p-4">
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                         <div>
                             <CardTitle className="text-lg">Desglose de Calificaciones</CardTitle>
                             <CardDescription>
                                 Ponderaciones para: {subject.name} (Esquema: {schemeUsed})
                             </CardDescription>
                         </div>
-                        <div className="text-right">
-                           <p className="text-sm font-medium text-muted-foreground">Total Acumulado</p>
-                           <p className="text-2xl font-bold text-primary">{totalEarnedPoints.toFixed(2)} / 100</p>
+                        <div className="grid grid-cols-2 gap-6 text-right">
+                           <div>
+                               <p className="text-sm font-medium text-muted-foreground">Puntos Acumulados</p>
+                               <p className="text-2xl font-bold text-primary">{totalEarnedPoints.toFixed(2)}</p>
+                           </div>
+                           <div>
+                               <p className="text-sm font-medium text-muted-foreground">Máximo Obtenible (hasta ahora)</p>
+                               <p className="text-2xl font-bold">{maxPossiblePoints.toFixed(2)}</p>
+                           </div>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-6">
-                        {activityList.map((item, index) => (
-                            <div key={index} className="space-y-1">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="font-semibold text-muted-foreground">{item.name}</span>
-                                    <Badge variant="secondary">{item.weight}%</Badge>
-                                </div>
-                                {typeof item.score === 'string' && (item.score.toUpperCase() === 'SC' || item.score.trim() === '') ? (
-                                    <div className="flex items-center gap-2 text-sm text-blue-600 font-semibold p-2 bg-blue-50 rounded-md">
-                                        <Clock className="h-4 w-4" />
-                                        <span>Sin Cargar</span>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6">
+                        {activityList.map((item, index) => {
+                            const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+                            const score = Number(item.score) || 0;
+                            const earnedPoints = isGraded ? (score / 100) * item.weight : 0;
+                            
+                            return (
+                                <div key={index} className="space-y-1">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="font-semibold text-muted-foreground">{item.name}</span>
+                                        <Badge variant="secondary">{item.weight}%</Badge>
                                     </div>
-                                ) : (
-                                    <p className="font-mono text-xl font-bold text-primary p-2 bg-primary/5 rounded-md">
-                                        {item.earnedPoints.toFixed(1)} / {item.weight.toFixed(1)}
-                                    </p>
-                                )}
-                                 <p className="text-xs text-muted-foreground pl-1">Calificación: {String(item.score).toUpperCase()}</p>
-                            </div>
-                        ))}
+                                    {isGraded ? (
+                                        <p className="font-mono text-xl font-bold text-primary p-2 bg-primary/5 rounded-md">
+                                            {earnedPoints.toFixed(1)} / {item.weight.toFixed(1)}
+                                        </p>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-sm text-blue-600 font-semibold p-2 bg-blue-50 rounded-md h-[44px]">
+                                            <Clock className="h-4 w-4" />
+                                            <span>Sin Cargar</span>
+                                        </div>
+                                    )}
+                                     <p className="text-xs text-muted-foreground pl-1">Calificación: {String(item.score).toUpperCase()}</p>
+                                </div>
+                            )
+                        })}
                     </div>
                 </CardContent>
             </Card>
         </div>
     );
 }
+
+// Need to add this here since it's used in the component
+const PONDERACIONES_SEMESTRAL_POR_MATERIA: Record<string, number[]> = {
+    'Materia y energía I': [3, 3, 3, 3, 3, 11, 3, 3, 3, 3, 3, 12, 3, 3, 3, 3, 3, 12, 20],
+    'Ciencias de la Vida': [4, 4, 4, 14, 5, 4, 4, 14, 4, 4, 14, 5, 20],
+    'Expresión Literaria': [1, 1, 5, 1, 1, 5, 10, 1, 1, 5, 2, 2, 5, 10, 2, 2, 5, 1, 1, 5, 4, 10, 20],
+    'Habilidades y valores IV: plan de vida y carrera': [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 31, 10, 10],
+    'Antropología: cultura y consciencia social': [4, 5, 3, 5, 10, 3, 5, 3, 5, 10, 3, 5, 4, 5, 10, 20],
+    'Matemáticas IV: modelos matemáticos': [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 16],
+    'Optativa de lengua adicional al español I': [8, 8, 10, 8, 8, 11, 8, 8, 11, 20],
+};
     
