@@ -503,10 +503,14 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { o
     const [isGenerating, setIsGenerating] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
+    const [dialogContent, setDialogContent] = useState<React.ReactNode>(null);
+    const [isReportOpen, setIsReportOpen] = useState(false);
 
     useEffect(() => {
         if (!open) {
             setSelectedStudent(null);
+            setIsReportOpen(false);
+            setDialogContent(null);
         }
     }, [open]);
 
@@ -514,98 +518,105 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { o
         setIsGenerating(true);
         setSelectedStudent(student);
 
-        // We need to render the component to a temporary off-screen div to get a ref
-        const node = document.createElement('div');
-        node.style.position = 'fixed';
-        node.style.top = '-9999px';
-        document.body.appendChild(node);
-        
         const subjects = await loadStudentSubjects(student.id);
         const subjectSummaries = subjects.map(s => ({
             id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
             missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
             grade: s.grade, finalGrade: s.finalGrade, group: s.group,
         }));
-
-        const ComponentToRender = () => {
+        
+        const ReportComponent = () => {
             const innerRef = useRef<HTMLDivElement>(null);
-            useEffect(() => {
+            const handleCopy = () => {
                 if (innerRef.current) {
-                    setTimeout(() => { // Small timeout to ensure render
-                        htmlToImage.toPng(innerRef.current!, { pixelRatio: 2 })
-                            .then((dataUrl) => {
-                                fetch(dataUrl)
-                                .then(res => res.blob())
-                                .then(blob => {
-                                    navigator.clipboard.write([
-                                        new ClipboardItem({ 'image/png': blob })
-                                    ]);
-                                    toast({ title: "Reporte Copiado", description: `El reporte de ${student.name} está en tu portapapeles.` });
-                                })
-                                .catch(err => {
-                                    console.error('Error fetching blob:', err);
-                                    toast({ variant: "destructive", title: "Error", description: "No se pudo procesar la imagen para copiar." });
-                                })
-                                .finally(() => {
-                                    setIsGenerating(false);
-                                    document.body.removeChild(node);
-                                });
-                            })
-                            .catch((err) => {
-                                console.error('Error generating image:', err);
-                                toast({ variant: "destructive", title: "Error", description: "No se pudo generar la imagen del reporte." });
-                                setIsGenerating(false);
-                                document.body.removeChild(node);
-                            });
-                    }, 500);
+                    htmlToImage.toPng(innerRef.current, { pixelRatio: 2, fetchRequestInit: { mode: 'no-cors' } })
+                        .then(dataUrl => fetch(dataUrl))
+                        .then(res => res.blob())
+                        .then(blob => {
+                            navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                            toast({ title: "Reporte Copiado", description: `El reporte de ${student.name} está en tu portapapeles.` });
+                        })
+                        .catch(err => {
+                             toast({ variant: "destructive", title: "Error al Copiar", description: "No se pudo procesar la imagen para copiar." });
+                             console.error(err);
+                        });
                 }
-            }, []);
+            };
 
-            return <StudentReportImage ref={innerRef} student={student} subjects={subjectSummaries} />;
-        };
+            return (
+                <div>
+                     <div ref={innerRef}>
+                        <StudentReportImage student={student} subjects={subjectSummaries} />
+                    </div>
+                    <DialogFooter className="mt-4">
+                        <Button onClick={handleCopy}>
+                            <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Imagen
+                        </Button>
+                    </DialogFooter>
+                </div>
+            )
+        }
 
-        const { createRoot } = await import('react-dom/client');
-        const root = createRoot(node);
-        root.render(<ComponentToRender />);
+        setDialogContent(
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Reporte de {student.name}</DialogTitle>
+                    <DialogDescription>Copia la imagen y pégala en tu cliente de correo.</DialogDescription>
+                </DialogHeader>
+                <ReportComponent />
+            </DialogContent>
+        );
+
+        setIsGenerating(false);
+        setIsReportOpen(true);
     };
     
-    
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Generar Reportes Individuales</DialogTitle>
-                    <DialogDescription>
-                        Selecciona un alumno para generar su reporte y copiarlo al portapapeles. Luego, pégalo en tu cliente de correo.
-                    </DialogDescription>
-                </DialogHeader>
-                <ScrollArea className="h-[60vh] -mx-6 px-6">
-                    <div className="py-4 space-y-2">
-                        {students.map(student => (
-                            <div key={student.id} className="flex items-center justify-between gap-2">
-                                <p className="font-medium text-sm">{student.name}</p>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleGenerateAndCopy(student)}
-                                    disabled={isGenerating && selectedStudent?.id === student.id}
-                                >
-                                    {isGenerating && selectedStudent?.id === student.id ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <ClipboardCopy className="mr-2 h-4 w-4" />
-                                    )}
-                                    Generar y Copiar
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                </ScrollArea>
-                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+        <>
+            <Dialog open={open && !isReportOpen} onOpenChange={onOpenChange}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Generar Reportes Individuales</DialogTitle>
+                        <DialogDescription>
+                            Selecciona un alumno para generar su reporte visual.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="h-[60vh] -mx-6 px-6">
+                        <div className="py-4 space-y-2">
+                            {students.map(student => (
+                                <div key={student.id} className="flex items-center justify-between gap-2">
+                                    <p className="font-medium text-sm">{student.name}</p>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleGenerateAndCopy(student)}
+                                        disabled={isGenerating && selectedStudent?.id === student.id}
+                                    >
+                                        {isGenerating && selectedStudent?.id === student.id ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Eye className="mr-2 h-4 w-4" />
+                                        )}
+                                        Generar Reporte
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isReportOpen} onOpenChange={(open) => {
+                if(!open) {
+                    setIsReportOpen(false);
+                    setDialogContent(null);
+                }
+            }}>
+                {dialogContent}
+            </Dialog>
+        </>
     );
 }
 
@@ -810,8 +821,6 @@ export function StudentPanel() {
       if (student) {
         const subjects = await loadStudentSubjects(studentId);
         
-        const FONT_URL = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
-
         const generateImage = (ReportComponent: React.ElementType, props: any) => {
             return new Promise<Blob | null>(async (resolve) => {
                 const node = document.createElement('div');
@@ -1094,5 +1103,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
-    
