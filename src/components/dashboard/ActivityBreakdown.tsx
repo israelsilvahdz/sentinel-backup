@@ -17,24 +17,23 @@ interface ActivityItem {
     name: string;
     score: number | string;
     weight: number;
+    earnedPoints: number;
 }
 
 function getActivityList(subject: Subject, planType: 'tetramestral' | 'semestral'): ActivityItem[] {
-    const sortedActivities = Object.entries(subject.activities)
+    const sortedScores = Object.entries(subject.activities)
         .filter(([key]) => /^A\d+$/.test(key))
-        .sort(([keyA], [keyB]) => {
-            const numA = parseInt(keyA.substring(1), 10);
-            const numB = parseInt(keyB.substring(1), 10);
-            return numA - numB;
-        })
+        .sort(([keyA], [keyB]) => parseInt(keyA.substring(1), 10) - parseInt(keyB.substring(1), 10))
         .map(([, value]) => value);
 
     const activityItems: ActivityItem[] = [];
     let activityIndex = 0;
 
     const addActivity = (name: string, weight: number) => {
-        const score = sortedActivities[activityIndex++] ?? 'SC';
-        activityItems.push({ name, score, weight });
+        const rawScore = sortedScores[activityIndex++] ?? 'SC';
+        const score = typeof rawScore === 'string' && (rawScore.toUpperCase() === 'SC' || rawScore.toUpperCase() === 'NE' || rawScore.trim() === '') ? 0 : Number(rawScore);
+        const earnedPoints = (score / 100) * weight;
+        activityItems.push({ name, score: rawScore, weight, earnedPoints });
     };
 
     if (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name]) {
@@ -45,33 +44,16 @@ function getActivityList(subject: Subject, planType: 'tetramestral' | 'semestral
         return activityItems;
     }
     
-    // Fallback to tetramestral logic if plan is tetra or semestral ponderation is not found
     const area = getAreaForMateria(subject.name);
     const ponderacion = PONDERACIONES_POR_AREA[area];
     if (!ponderacion) return [];
 
-    for (let i = 1; i <= ponderacion.aai; i++) {
-        addActivity(`Actividad ${activityIndex + 1}`, ponderacion.vcu_aai);
-    }
-
-    if (ponderacion.vpai) {
-        addActivity('Proyecto Pre-Intermedio', ponderacion.vpai);
-    }
-
+    for (let i = 1; i <= ponderacion.aai; i++) addActivity(`Actividad ${activityIndex + 1}`, ponderacion.vcu_aai);
+    if (ponderacion.vpai) addActivity('Proyecto Pre-Intermedio', ponderacion.vpai);
     addActivity('Examen Intermedio', EXAM_INTERMEDIO_PONDERACION);
-
-    for (let i = 1; i <= ponderacion.aaf; i++) {
-        addActivity(`Actividad ${activityIndex + 1}`, ponderacion.vcu_aaf);
-    }
-
-    if (ponderacion.vpaf) {
-        addActivity('1er Proyecto Pre-Final', ponderacion.vpaf);
-    }
-
-    if (ponderacion.vpaf2) {
-        addActivity('2do Proyecto Pre-Final', ponderacion.vpaf2);
-    }
-
+    for (let i = 1; i <= ponderacion.aaf; i++) addActivity(`Actividad ${activityIndex + 1}`, ponderacion.vcu_aaf);
+    if (ponderacion.vpaf) addActivity('1er Proyecto Pre-Final', ponderacion.vpaf);
+    if (ponderacion.vpaf2) addActivity('2do Proyecto Pre-Final', ponderacion.vpaf2);
     addActivity('Examen Final', EXAM_FINAL_PONDERACION);
     
     return activityItems;
@@ -79,8 +61,7 @@ function getActivityList(subject: Subject, planType: 'tetramestral' | 'semestral
 
 export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps) {
     const activityList = useMemo(() => getActivityList(subject, planType), [subject, planType]);
-    const area = getAreaForMateria(subject.name);
-
+    
     if (activityList.length === 0) {
         return (
             <div className="bg-muted/50 p-4">
@@ -92,15 +73,24 @@ export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps)
     }
 
     const schemeUsed = (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name]) ? 'Semestral' : 'Tetramestral';
+    const totalEarnedPoints = activityList.reduce((acc, item) => acc + item.earnedPoints, 0);
 
     return (
         <div className="bg-muted/30 p-4">
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg">Desglose de Calificaciones</CardTitle>
-                    <CardDescription>
-                        Ponderaciones para: {subject.name} (Esquema: {schemeUsed})
-                    </CardDescription>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle className="text-lg">Desglose de Calificaciones</CardTitle>
+                            <CardDescription>
+                                Ponderaciones para: {subject.name} (Esquema: {schemeUsed})
+                            </CardDescription>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-sm font-medium text-muted-foreground">Total Acumulado</p>
+                           <p className="text-2xl font-bold text-primary">{totalEarnedPoints.toFixed(2)} / 100</p>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-6">
@@ -110,16 +100,17 @@ export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps)
                                     <span className="font-semibold text-muted-foreground">{item.name}</span>
                                     <Badge variant="secondary">{item.weight}%</Badge>
                                 </div>
-                                {typeof item.score === 'string' && item.score.toUpperCase() === 'SC' ? (
+                                {typeof item.score === 'string' && (item.score.toUpperCase() === 'SC' || item.score.trim() === '') ? (
                                     <div className="flex items-center gap-2 text-sm text-blue-600 font-semibold p-2 bg-blue-50 rounded-md">
                                         <Clock className="h-4 w-4" />
                                         <span>Sin Cargar</span>
                                     </div>
                                 ) : (
                                     <p className="font-mono text-xl font-bold text-primary p-2 bg-primary/5 rounded-md">
-                                        {Number(item.score).toFixed(2)}
+                                        {item.earnedPoints.toFixed(1)} / {item.weight.toFixed(1)}
                                     </p>
                                 )}
+                                 <p className="text-xs text-muted-foreground pl-1">Calificación: {String(item.score).toUpperCase()}</p>
                             </div>
                         ))}
                     </div>
