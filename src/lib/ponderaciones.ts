@@ -286,13 +286,28 @@ export function getActivityList(subject: Subject, planType: 'tetramestral' | 'se
     const ponderacion = PONDERACIONES_POR_AREA[area];
     if (!ponderacion) return [];
 
-    for (let i = 1; i <= ponderacion.aai; i++) addActivity(`A${activityIndex + 1}`, ponderacion.vcu_aai);
-    if (ponderacion.vpai) addActivity('Proy. Intermedio', ponderacion.vpai);
-    addActivity('Exam. Intermedio', EXAM_INTERMEDIO_PONDERACION);
-    for (let i = 1; i <= ponderacion.aaf; i++) addActivity(`A${activityIndex + 1}`, ponderacion.vcu_aaf);
-    if (ponderacion.vpaf) addActivity('Proy. Final 1', ponderacion.vpaf);
-    if (ponderacion.vpaf2) addActivity('Proy. Final 2', ponderacion.vpaf2);
-    addActivity('Exam. Final', EXAM_FINAL_PONDERACION);
+    const totalActivities =
+      ponderacion.aai +
+      (ponderacion.vpai ? 1 : 0) +
+      1 + // Examen intermedio
+      ponderacion.aaf +
+      (ponderacion.vpaf ? 1 : 0) +
+      (ponderacion.vpaf2 ? 1 : 0) +
+      1; // Examen final
+      
+    const allPonderaciones = [
+        ...Array(ponderacion.aai).fill(ponderacion.vcu_aai),
+        ...(ponderacion.vpai ? [ponderacion.vpai] : []),
+        EXAM_INTERMEDIO_PONDERACION,
+        ...Array(ponderacion.aaf).fill(ponderacion.vcu_aaf),
+        ...(ponderacion.vpaf ? [ponderacion.vpaf] : []),
+        ...(ponderacion.vpaf2 ? [ponderacion.vpaf2] : []),
+        EXAM_FINAL_PONDERACION,
+    ];
+
+    allPonderaciones.forEach((weight, index) => {
+      addActivity(`A${index + 1}`, weight);
+    });
     
     return activityItems;
 }
