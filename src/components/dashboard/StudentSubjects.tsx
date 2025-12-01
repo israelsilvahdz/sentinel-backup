@@ -14,6 +14,7 @@ import { StudentSchedule } from './StudentSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { ActivityBreakdown } from './ActivityBreakdown';
 import { GradesTable } from './GradesTable';
+import { PointsGradesTable } from './PointsGradesTable';
 import { Dialog, DialogContent, DialogFooter, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -112,6 +113,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
             <TabsList>
                 <TabsTrigger value="materias">Materias</TabsTrigger>
                 <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
+                <TabsTrigger value="calificaciones_puntos">Calificaciones por Puntos</TabsTrigger>
                 <TabsTrigger value="horario">Horario</TabsTrigger>
                 <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
             </TabsList>
@@ -197,6 +199,11 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
           <div className="overflow-x-auto">
             <GradesTable subjects={subjects} />
           </div>
+        </TabsContent>
+        <TabsContent value="calificaciones_puntos">
+            <div className="overflow-x-auto">
+                <PointsGradesTable subjects={subjects} planType={planType} />
+            </div>
         </TabsContent>
         <TabsContent value="horario">
           <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} professorContacts={professorContacts} />

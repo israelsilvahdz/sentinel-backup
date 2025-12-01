@@ -33,7 +33,7 @@ export const PONDERACIONES_SEMESTRAL_POR_MATERIA: Record<string, number[]> = {
     'Ciencias de la Vida': [4, 4, 4, 14, 5, 4, 4, 14, 4, 4, 14, 5, 20],
     'Expresión Literaria': [1, 1, 5, 1, 1, 5, 10, 1, 1, 5, 2, 2, 5, 10, 2, 2, 5, 1, 1, 5, 4, 10, 20],
     'Habilidades y valores IV: plan de vida y carrera': [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 31, 10, 10],
-    'Antropología': [4, 5, 3, 5, 10, 3, 5, 3, 5, 10, 3, 5, 4, 5, 10, 20],
+    'Antropología: cultura y consciencia social': [4, 5, 3, 5, 10, 3, 5, 3, 5, 10, 3, 5, 4, 5, 10, 20],
     'Matemáticas IV: modelos matemáticos': [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 16],
     'Optativa de lengua adicional al español I': [8, 8, 10, 8, 8, 11, 8, 8, 11, 20],
 };
@@ -182,7 +182,7 @@ export function getAreaForMateria(materiaName: string): AreaName {
   return materiaToAreaMap.get(normalizedName) || 'Unknown';
 }
 
-function getSortedScores(subject: Subject): number[] {
+export function getSortedScores(subject: Subject): (number | string)[] {
     return Object.entries(subject.activities)
         .filter(([key]) => /^A\d+$/.test(key))
         .sort(([keyA], [keyB]) => {
@@ -190,29 +190,25 @@ function getSortedScores(subject: Subject): number[] {
             const numB = parseInt(keyB.substring(1), 10);
             return numA - numB;
         })
-        .map(([, value]) => {
-            if (typeof value === 'string' && (value.toUpperCase() === 'SC' || value.toUpperCase() === 'NE' || value.trim() === '')) {
-                return 0;
-            }
-            return typeof value === 'number' ? value : parseFloat(String(value)) || 0;
-        });
+        .map(([, value]) => value);
 }
 
-function calculateSemestralGrade(subject: Subject, sortedScores: number[]): number {
+function calculateSemestralGrade(subject: Subject, sortedScores: (number|string)[]): number {
     const normalizedName = normalizeSubjectName(subject.name);
     const weights = PONDERACIONES_SEMESTRAL_POR_MATERIA[normalizedName];
     if (!weights) return NaN;
 
     let totalScore = 0;
     for (let i = 0; i < weights.length; i++) {
-        const score = sortedScores[i] ?? 0;
+        const rawScore = sortedScores[i] ?? 0;
+        const score = typeof rawScore === 'string' && (rawScore.toUpperCase() === 'SC' || rawScore.toUpperCase() === 'NE' || rawScore.trim() === '') ? 0 : Number(rawScore);
         const weight = weights[i];
         totalScore += (score / 100) * weight;
     }
     return totalScore;
 }
 
-function calculateTetraGrade(subject: Subject, sortedScores: number[]): number {
+function calculateTetraGrade(subject: Subject, sortedScores: (number|string)[]): number {
     const area = getAreaForMateria(subject.name);
     const ponderacion = PONDERACIONES_POR_AREA[area];
 
@@ -222,37 +218,35 @@ function calculateTetraGrade(subject: Subject, sortedScores: number[]): number {
 
     let totalScore = 0;
     let activityIndex = 0;
+    
+    const getScore = () => {
+        const rawScore = sortedScores[activityIndex++] ?? 0;
+        return typeof rawScore === 'string' && (rawScore.toUpperCase() === 'SC' || rawScore.toUpperCase() === 'NE' || rawScore.trim() === '') ? 0 : Number(rawScore);
+    }
 
     for (let i = 0; i < ponderacion.aai; i++) {
-        const score = sortedScores[activityIndex++] ?? 0;
-        totalScore += (score / 100) * ponderacion.vcu_aai;
+        totalScore += (getScore() / 100) * ponderacion.vcu_aai;
     }
 
     if (ponderacion.vpai) {
-        const score = sortedScores[activityIndex++] ?? 0;
-        totalScore += (score / 100) * ponderacion.vpai;
+        totalScore += (getScore() / 100) * ponderacion.vpai;
     }
 
-    const intermedioScore = sortedScores[activityIndex++] ?? 0;
-    totalScore += (intermedioScore / 100) * EXAM_INTERMEDIO_PONDERACION;
+    totalScore += (getScore() / 100) * EXAM_INTERMEDIO_PONDERACION;
 
     for (let i = 0; i < ponderacion.aaf; i++) {
-        const score = sortedScores[activityIndex++] ?? 0;
-        totalScore += (score / 100) * ponderacion.vcu_aaf;
+        totalScore += (getScore() / 100) * ponderacion.vcu_aaf;
     }
 
     if (ponderacion.vpaf) {
-        const score = sortedScores[activityIndex++] ?? 0;
-        totalScore += (score / 100) * ponderacion.vpaf;
+        totalScore += (getScore() / 100) * ponderacion.vpaf;
     }
 
     if (ponderacion.vpaf2) {
-        const score = sortedScores[activityIndex++] ?? 0;
-        totalScore += (score / 100) * ponderacion.vpaf2;
+        totalScore += (getScore() / 100) * ponderacion.vpaf2;
     }
 
-    const finalScore = sortedScores[activityIndex++] ?? 0;
-    totalScore += (finalScore / 100) * EXAM_FINAL_PONDERACION;
+    totalScore += (getScore() / 100) * EXAM_FINAL_PONDERACION;
 
     return totalScore;
 }
@@ -268,4 +262,37 @@ export function calculateFinalGrade(subject: Subject, planType: 'tetramestral' |
     }
     
     return calculateTetraGrade(subject, sortedScores);
+}
+
+export function getActivityList(subject: Subject, planType: 'tetramestral' | 'semestral'): { name: string; score: number | string; weight: number }[] {
+    const sortedScores = getSortedScores(subject);
+    const activityItems: { name: string; score: number | string; weight: number }[] = [];
+    let activityIndex = 0;
+
+    const addActivity = (name: string, weight: number) => {
+        const rawScore = sortedScores[activityIndex++] ?? 'SC';
+        activityItems.push({ name, score: rawScore, weight });
+    };
+
+    if (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name]) {
+        const weights = PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name];
+        weights.forEach((weight, index) => {
+            addActivity(`A${activityIndex + 1}`, weight);
+        });
+        return activityItems;
+    }
+    
+    const area = getAreaForMateria(subject.name);
+    const ponderacion = PONDERACIONES_POR_AREA[area];
+    if (!ponderacion) return [];
+
+    for (let i = 1; i <= ponderacion.aai; i++) addActivity(`A${activityIndex + 1}`, ponderacion.vcu_aai);
+    if (ponderacion.vpai) addActivity('Proy. Intermedio', ponderacion.vpai);
+    addActivity('Exam. Intermedio', EXAM_INTERMEDIO_PONDERACION);
+    for (let i = 1; i <= ponderacion.aaf; i++) addActivity(`A${activityIndex + 1}`, ponderacion.vcu_aaf);
+    if (ponderacion.vpaf) addActivity('Proy. Final 1', ponderacion.vpaf);
+    if (ponderacion.vpaf2) addActivity('Proy. Final 2', ponderacion.vpaf2);
+    addActivity('Exam. Final', EXAM_FINAL_PONDERACION);
+    
+    return activityItems;
 }
