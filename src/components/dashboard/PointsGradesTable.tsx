@@ -101,10 +101,9 @@ export function PointsGradesTable({ subjects, planType }: PointsGradesTableProps
                                     ) : row[header] === '-' ? (
                                         '-'
                                     ) : (
-                                        <div className="flex flex-col items-center">
-                                            <span className="font-bold text-primary">{(row[header] as {earned: number}).earned.toFixed(1)}</span>
-                                            <span className="text-xs text-muted-foreground">/ {(row[header] as {weight: number}).weight.toFixed(1)}</span>
-                                        </div>
+                                        <span>
+                                            {(row[header] as {earned: number}).earned.toFixed(1)} / {(row[header] as {weight: number}).weight.toFixed(1)}
+                                        </span>
                                     )}
                                 </TableCell>
                             ))}
