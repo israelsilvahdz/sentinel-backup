@@ -182,86 +182,90 @@ export function getAreaForMateria(materiaName: string): AreaName {
   return materiaToAreaMap.get(normalizedName) || 'Unknown';
 }
 
+function getSortedScores(subject: Subject): number[] {
+    return Object.entries(subject.activities)
+        .filter(([key]) => /^A\d+$/.test(key))
+        .sort(([keyA], [keyB]) => {
+            const numA = parseInt(keyA.substring(1), 10);
+            const numB = parseInt(keyB.substring(1), 10);
+            return numA - numB;
+        })
+        .map(([, value]) => {
+            if (typeof value === 'string' && (value.toUpperCase() === 'SC' || value.toUpperCase() === 'NE' || value.trim() === '')) {
+                return 0;
+            }
+            return typeof value === 'number' ? value : parseFloat(String(value)) || 0;
+        });
+}
 
-// Función para calcular la calificación final de una materia
-export function calculateFinalGrade(subject: Subject): number {
-  const normalizedName = normalizeSubjectName(subject.name);
-  const semestralWeights = PONDERACIONES_SEMESTRAL_POR_MATERIA[normalizedName];
+function calculateSemestralGrade(subject: Subject, sortedScores: number[]): number {
+    const normalizedName = normalizeSubjectName(subject.name);
+    const weights = PONDERACIONES_SEMESTRAL_POR_MATERIA[normalizedName];
+    if (!weights) return NaN;
 
-  // Ordenar las actividades cronológicamente (A1, A2, A10, etc.)
-  const sortedActivities = Object.entries(subject.activities)
-    .filter(([key]) => /^A\d+$/.test(key))
-    .sort(([keyA], [keyB]) => {
-      const numA = parseInt(keyA.substring(1), 10);
-      const numB = parseInt(keyB.substring(1), 10);
-      return numA - numB;
-    })
-    .map(([, value]) => {
-        if(typeof value === 'string' && (value.toUpperCase() === 'SC' || value.toUpperCase() === 'NE' || value.trim() === '')) {
-            return 0;
-        }
-        return typeof value === 'number' ? value : parseFloat(String(value)) || 0;
-    });
-
-  // --- Lógica para Plan Semestral (por materia específica) ---
-  if (semestralWeights) {
     let totalScore = 0;
-    for (let i = 0; i < semestralWeights.length; i++) {
-        const score = sortedActivities[i] ?? 0;
-        const weight = semestralWeights[i];
+    for (let i = 0; i < weights.length; i++) {
+        const score = sortedScores[i] ?? 0;
+        const weight = weights[i];
         totalScore += (score / 100) * weight;
     }
     return totalScore;
-  }
-  
-  // --- Lógica para Plan Tetramestral (por área) ---
-  const area = getAreaForMateria(normalizedName);
-  const ponderacion = PONDERACIONES_POR_AREA[area];
+}
 
-  if (!ponderacion) {
-    return NaN; // Retorna NaN si no hay ponderación definida
-  }
-  
-  let totalScore = 0;
-  let activityIndex = 0;
+function calculateTetraGrade(subject: Subject, sortedScores: number[]): number {
+    const area = getAreaForMateria(subject.name);
+    const ponderacion = PONDERACIONES_POR_AREA[area];
 
-  // 1. Actividades Antes del Intermedio (AAI)
-  for (let i = 0; i < ponderacion.aai; i++) {
-    const score = sortedActivities[activityIndex++] ?? 0;
-    totalScore += (score / 100) * ponderacion.vcu_aai;
-  }
+    if (!ponderacion) {
+        return NaN;
+    }
 
-  // 2. Proyecto Antes del Intermedio (VPAI)
-  if (ponderacion.vpai) {
-    const score = sortedActivities[activityIndex++] ?? 0;
-    totalScore += (score / 100) * ponderacion.vpai;
-  }
+    let totalScore = 0;
+    let activityIndex = 0;
 
-  // 3. Examen Intermedio
-  const intermedioScore = sortedActivities[activityIndex++] ?? 0;
-  totalScore += (intermedioScore / 100) * EXAM_INTERMEDIO_PONDERACION;
+    for (let i = 0; i < ponderacion.aai; i++) {
+        const score = sortedScores[activityIndex++] ?? 0;
+        totalScore += (score / 100) * ponderacion.vcu_aai;
+    }
 
-  // 4. Actividades Antes del Final (AAF)
-  for (let i = 0; i < ponderacion.aaf; i++) {
-    const score = sortedActivities[activityIndex++] ?? 0;
-    totalScore += (score / 100) * ponderacion.vcu_aaf;
-  }
+    if (ponderacion.vpai) {
+        const score = sortedScores[activityIndex++] ?? 0;
+        totalScore += (score / 100) * ponderacion.vpai;
+    }
 
-  // 5. Proyecto Antes del Final (VPAF)
-  if (ponderacion.vpaf) {
-    const score = sortedActivities[activityIndex++] ?? 0;
-    totalScore += (score / 100) * ponderacion.vpaf;
-  }
-  
-  // 6. Segundo Proyecto Antes del Final (VPAF2)
-  if (ponderacion.vpaf2) {
-    const score = sortedActivities[activityIndex++] ?? 0;
-    totalScore += (score / 100) * ponderacion.vpaf2;
-  }
+    const intermedioScore = sortedScores[activityIndex++] ?? 0;
+    totalScore += (intermedioScore / 100) * EXAM_INTERMEDIO_PONDERACION;
 
-  // 7. Examen Final
-  const finalScore = sortedActivities[activityIndex++] ?? 0;
-  totalScore += (finalScore / 100) * EXAM_FINAL_PONDERACION;
-  
-  return totalScore;
+    for (let i = 0; i < ponderacion.aaf; i++) {
+        const score = sortedScores[activityIndex++] ?? 0;
+        totalScore += (score / 100) * ponderacion.vcu_aaf;
+    }
+
+    if (ponderacion.vpaf) {
+        const score = sortedScores[activityIndex++] ?? 0;
+        totalScore += (score / 100) * ponderacion.vpaf;
+    }
+
+    if (ponderacion.vpaf2) {
+        const score = sortedScores[activityIndex++] ?? 0;
+        totalScore += (score / 100) * ponderacion.vpaf2;
+    }
+
+    const finalScore = sortedScores[activityIndex++] ?? 0;
+    totalScore += (finalScore / 100) * EXAM_FINAL_PONDERACION;
+
+    return totalScore;
+}
+
+
+// Función para calcular la calificación final de una materia
+export function calculateFinalGrade(subject: Subject, planType: 'tetramestral' | 'semestral'): number {
+    const sortedScores = getSortedScores(subject);
+    const normalizedName = normalizeSubjectName(subject.name);
+
+    if (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[normalizedName]) {
+        return calculateSemestralGrade(subject, sortedScores);
+    }
+    
+    return calculateTetraGrade(subject, sortedScores);
 }

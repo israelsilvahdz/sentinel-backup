@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -178,13 +177,13 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                               {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
                           </TableCell>
                           <TableCell className="text-right font-mono font-bold text-primary">
-                              {calculateFinalGrade(subject).toFixed(2)}
+                              {calculateFinalGrade(subject, planType).toFixed(2)}
                           </TableCell>
                       </TableRow>
                       {openSubject === subject.id && (
                         <TableRow>
                             <TableCell colSpan={7} className="p-0">
-                              <ActivityBreakdown subject={subject} />
+                              <ActivityBreakdown subject={subject} planType={planType} />
                             </TableCell>
                         </TableRow>
                       )}

@@ -3,13 +3,14 @@
 
 import { useMemo } from 'react';
 import type { Subject } from '@/types/student';
-import { getAreaForMateria, PONDERACIONES_POR_AREA, EXAM_INTERMEDIO_PONDERACION, EXAM_FINAL_PONDERACION, type Ponderacion } from '@/lib/ponderaciones';
+import { getAreaForMateria, PONDERACIONES_POR_AREA, EXAM_INTERMEDIO_PONDERACION, EXAM_FINAL_PONDERACION, PONDERACIONES_SEMESTRAL_POR_MATERIA } from '@/lib/ponderaciones';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Clock } from 'lucide-react';
 
 interface ActivityBreakdownProps {
     subject: Subject;
+    planType: 'tetramestral' | 'semestral';
 }
 
 interface ActivityItem {
@@ -18,11 +19,7 @@ interface ActivityItem {
     weight: number;
 }
 
-function getActivityList(subject: Subject): ActivityItem[] {
-    const area = getAreaForMateria(subject.name);
-    const ponderacion = PONDERACIONES_POR_AREA[area];
-    if (!ponderacion) return [];
-
+function getActivityList(subject: Subject, planType: 'tetramestral' | 'semestral'): ActivityItem[] {
     const sortedActivities = Object.entries(subject.activities)
         .filter(([key]) => /^A\d+$/.test(key))
         .sort(([keyA], [keyB]) => {
@@ -39,6 +36,19 @@ function getActivityList(subject: Subject): ActivityItem[] {
         const score = sortedActivities[activityIndex++] ?? 'SC';
         activityItems.push({ name, score, weight });
     };
+
+    if (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name]) {
+        const weights = PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name];
+        weights.forEach((weight, index) => {
+            addActivity(`Actividad ${activityIndex + 1}`, weight);
+        });
+        return activityItems;
+    }
+    
+    // Fallback to tetramestral logic if plan is tetra or semestral ponderation is not found
+    const area = getAreaForMateria(subject.name);
+    const ponderacion = PONDERACIONES_POR_AREA[area];
+    if (!ponderacion) return [];
 
     for (let i = 1; i <= ponderacion.aai; i++) {
         addActivity(`Actividad ${activityIndex + 1}`, ponderacion.vcu_aai);
@@ -67,19 +77,21 @@ function getActivityList(subject: Subject): ActivityItem[] {
     return activityItems;
 }
 
-export function ActivityBreakdown({ subject }: ActivityBreakdownProps) {
-    const activityList = useMemo(() => getActivityList(subject), [subject]);
+export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps) {
+    const activityList = useMemo(() => getActivityList(subject, planType), [subject, planType]);
     const area = getAreaForMateria(subject.name);
 
     if (activityList.length === 0) {
         return (
             <div className="bg-muted/50 p-4">
                 <p className="text-center text-sm text-muted-foreground">
-                    No hay desglose de ponderación definido para el área "{area}".
+                    No hay desglose de ponderación definido para la materia "{subject.name}".
                 </p>
             </div>
         );
     }
+
+    const schemeUsed = (planType === 'semestral' && PONDERACIONES_SEMESTRAL_POR_MATERIA[subject.name]) ? 'Semestral' : 'Tetramestral';
 
     return (
         <div className="bg-muted/30 p-4">
@@ -87,7 +99,7 @@ export function ActivityBreakdown({ subject }: ActivityBreakdownProps) {
                 <CardHeader>
                     <CardTitle className="text-lg">Desglose de Calificaciones</CardTitle>
                     <CardDescription>
-                        Calificaciones y ponderaciones para: {subject.name} (Área: {area})
+                        Ponderaciones para: {subject.name} (Esquema: {schemeUsed})
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
