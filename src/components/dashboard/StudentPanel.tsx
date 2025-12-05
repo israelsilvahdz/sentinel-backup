@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -33,6 +32,7 @@ import { StudentReportImage } from './StudentReportImage';
 import { StudentGradesReportImage } from './StudentGradesReportImage';
 import { ScrollArea } from '../ui/scroll-area';
 import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
+import { Progress } from '../ui/progress';
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -648,9 +648,9 @@ export function StudentPanel() {
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
   const [isProcessingAthletes, setIsProcessingAthletes] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
-
-  // State for the email dialog
   const [isMailerOpen, setIsMailerOpen] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatus, setDownloadStatus] = useState('');
 
 
   const { toast } = useToast();
@@ -808,26 +808,24 @@ export function StudentPanel() {
   const handleDownloadZip = async () => {
     if (selectedStudents.size === 0) return;
 
-    toast({
-      title: "Iniciando descarga...",
-      description: `Generando reportes para ${selectedStudents.size} alumnos.`,
-    });
+    setDownloadStatus(`Iniciando descarga para ${selectedStudents.size} alumnos...`);
+    setDownloadProgress(0);
 
     const zip = new JSZip();
+    const totalImages = selectedStudents.size * 2;
+    let completedImages = 0;
     
-    const imagePromises: Promise<{ name: string; type: 'riesgo' | 'calificaciones'; blob: Blob | null }>[] = [];
+    const imagePromises: Promise<any>[] = [];
 
     for (const studentId of Array.from(selectedStudents)) {
       const student = allStudentsMap.get(studentId);
       if (student) {
         const subjects = await loadStudentSubjects(studentId);
         
-        const generateImage = (ReportComponent: React.ElementType, props: any) => {
-            return new Promise<Blob | null>(async (resolve) => {
+        const generateImage = (ReportComponent: React.ElementType, props: any, type: 'riesgo' | 'calificaciones') => {
+            return new Promise<void>(async (resolve) => {
                 const node = document.createElement('div');
-                node.style.position = 'fixed';
-                node.style.top = '-9999px';
-                node.style.left = '0px';
+                node.style.position = 'fixed'; node.style.top = '-9999px'; node.style.left = '0px';
                 document.body.appendChild(node);
                 
                 const { createRoot } = await import('react-dom/client');
@@ -837,13 +835,26 @@ export function StudentPanel() {
                     const ref = useRef<HTMLDivElement>(null);
                     useEffect(() => {
                         if (ref.current) {
-                           setTimeout(() => { // Gives time for render
-                                htmlToImage.toPng(ref.current!, { pixelRatio: 1.5, fetchRequestInit: { mode: 'no-cors' } })
-                                .then(dataUrl => fetch(dataUrl).then(res => res.blob()))
-                                .then(resolve)
-                                .catch(err => { console.error(err); resolve(null); })
-                                .finally(() => { root.unmount(); if(document.body.contains(node)) document.body.removeChild(node); });
-                           }, 500);
+                           setTimeout(async () => {
+                                try {
+                                    const blob = await htmlToImage.toBlob(ref.current!, { pixelRatio: 1.5, fetchRequestInit: { mode: 'no-cors' } });
+                                    if (blob) {
+                                        const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                                        const fileNumber = type === 'riesgo' ? '1_riesgo' : '2_calificaciones';
+                                        zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
+                                    }
+                                } catch (err) {
+                                    console.error(`Failed to generate ${type} image for student ${student.name}`, err);
+                                } finally {
+                                    completedImages++;
+                                    const progress = (completedImages / totalImages) * 100;
+                                    setDownloadProgress(progress);
+                                    setDownloadStatus(`Generando reporte ${Math.ceil(completedImages / 2)} de ${selectedStudents.size}...`);
+                                    root.unmount();
+                                    if(document.body.contains(node)) document.body.removeChild(node);
+                                    resolve();
+                                }
+                           }, 300);
                         }
                     }, []);
                     return React.createElement(ReportComponent, { ref, ...props });
@@ -853,48 +864,28 @@ export function StudentPanel() {
         };
 
         imagePromises.push(
-            generateImage(StudentReportImage, { student, subjects: student.subjectSummaries || [] }).then(blob => ({
-              name: student.name,
-              type: 'riesgo',
-              blob,
-            }))
+            generateImage(StudentReportImage, { student, subjects: student.subjectSummaries || [] }, 'riesgo')
         );
 
         imagePromises.push(
-            generateImage(StudentGradesReportImage, { student, subjects }).then(blob => ({
-              name: student.name,
-              type: 'calificaciones',
-              blob,
-            }))
+            generateImage(StudentGradesReportImage, { student, subjects }, 'calificaciones')
         );
       }
     }
 
-    const results = await Promise.all(imagePromises);
-    let successfulCount = 0;
+    await Promise.all(imagePromises);
 
-    for (const { name, type, blob } of results) {
-      if (blob) {
-        const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-        const fileNumber = type === 'riesgo' ? '1' : '2';
-        zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
-        if(type === 'riesgo') successfulCount++;
-      } else {
-        console.error(`Failed to generate ${type} image for student ${name}`);
-      }
-    }
-
-    if (successfulCount > 0) {
+    if (Object.keys(zip.files).length > 0) {
         zip.generateAsync({ type: "blob" }).then(content => {
             const link = document.createElement('a');
             link.href = URL.createObjectURL(content);
-            link.download = "reportes_alumnos.zip";
+            link.download = `reportes_${format(new Date(), 'yyyy-MM-dd')}.zip`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             toast({
                 title: "Descarga Completa",
-                description: `Se han descargado los reportes de ${successfulCount} alumnos en un archivo ZIP.`,
+                description: `Se han descargado los reportes en un archivo ZIP.`,
             });
         });
     } else {
@@ -904,6 +895,9 @@ export function StudentPanel() {
         description: "No se pudo generar ningún reporte. Revisa la consola para más detalles.",
       });
     }
+
+    setDownloadStatus('');
+    setDownloadProgress(0);
   };
 
   const studentsForMailer = useMemo(() => {
@@ -1058,13 +1052,19 @@ export function StudentPanel() {
                     </Button>
                     <Button 
                         onClick={handleDownloadZip}
-                        disabled={selectedStudents.size === 0}
+                        disabled={selectedStudents.size === 0 || downloadProgress > 0}
                     >
                         <Download className="mr-2 h-4 w-4" />
                         Descargar Reportes ({selectedStudents.size})
                     </Button>
                 </div>
             </div>
+           )}
+           {downloadProgress > 0 && (
+                <div className="space-y-2">
+                    <Progress value={downloadProgress} className="w-full" />
+                    <p className="text-sm text-muted-foreground">{downloadStatus}</p>
+                </div>
            )}
 
           {filteredStudents.length > 0 ? (
