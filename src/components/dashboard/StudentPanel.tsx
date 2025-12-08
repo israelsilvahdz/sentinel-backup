@@ -502,7 +502,6 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
 function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[], loadStudentSubjects: (studentId: string) => Promise<Subject[]> }) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const reportRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const [dialogContent, setDialogContent] = useState<React.ReactNode>(null);
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -714,7 +713,6 @@ export function StudentPanel() {
   }, [allStudentsMap, toast]);
 
   const athleteStudents = useMemo(() => allStudents.filter(s => teams.some(team => Array.isArray(team.members) && team.members.some(member => member.id === s.id))), [allStudents, teams]);
-  const sportList = useMemo(() => Array.from(new Set(teams.map(team => team.name))), [teams]);
 
   const filteredStudents = useMemo(() => {
     let students = initialFilteredStudents;
@@ -805,100 +803,109 @@ export function StudentPanel() {
     }
   };
 
-  const handleDownloadZip = async () => {
-    if (selectedStudents.size === 0) return;
+    const handleDownloadZip = async () => {
+        if (selectedStudents.size === 0) return;
 
-    setDownloadStatus(`Iniciando descarga para ${selectedStudents.size} alumnos...`);
-    setDownloadProgress(0);
+        setDownloadStatus(`Iniciando descarga para ${selectedStudents.size} alumnos...`);
+        setDownloadProgress(0);
 
-    const zip = new JSZip();
-    const totalImages = selectedStudents.size * 2;
-    let completedImages = 0;
-    
-    const imagePromises: Promise<any>[] = [];
+        const zip = new JSZip();
+        const totalImages = selectedStudents.size * 2;
+        let completedImages = 0;
 
-    for (const studentId of Array.from(selectedStudents)) {
-      const student = allStudentsMap.get(studentId);
-      if (student) {
-        const subjects = await loadStudentSubjects(studentId);
-        
-        const generateImage = (ReportComponent: React.ElementType, props: any, type: 'riesgo' | 'calificaciones') => {
-            return new Promise<void>(async (resolve) => {
-                const node = document.createElement('div');
-                node.style.position = 'fixed'; node.style.top = '-9999px'; node.style.left = '0px';
-                document.body.appendChild(node);
+        const imagePromises: Promise<{name: string, type: string, blob: Blob | null}>[] = [];
+
+        for (const studentId of Array.from(selectedStudents)) {
+            const student = allStudentsMap.get(studentId);
+            if (student) {
+                const subjects = await loadStudentSubjects(studentId);
+                const subjectSummaries = subjects.map(s => ({
+                    id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+                    missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+                    grade: s.grade, finalGrade: s.finalGrade, group: s.group,
+                }));
                 
-                const { createRoot } = await import('react-dom/client');
-                const root = createRoot(node);
-                
-                const Component = () => {
-                    const ref = useRef<HTMLDivElement>(null);
-                    useEffect(() => {
-                        if (ref.current) {
-                           setTimeout(async () => {
+                const generateImage = (ReportComponent: React.ElementType, props: any, type: 'riesgo' | 'calificaciones') => {
+                    return new Promise<{name: string, type: 'riesgo' | 'calificaciones', blob: Blob | null}>(async (resolve) => {
+                        const node = document.createElement('div');
+                        node.style.position = 'fixed'; node.style.top = '-9999px'; node.style.left = '0px'; document.body.appendChild(node);
+                        
+                        const { createRoot } = await import('react-dom/client');
+                        const root = createRoot(node);
+                        
+                        const Component = React.forwardRef<HTMLDivElement>((_props, ref) => <ReportComponent ref={ref} {...props} />);
+                        Component.displayName = 'Component';
+
+                        const ref = React.createRef<HTMLDivElement>();
+
+                        root.render(<Component ref={ref} />);
+                        
+                        setTimeout(async () => {
+                            if (ref.current) {
                                 try {
-                                    const blob = await htmlToImage.toBlob(ref.current!, { pixelRatio: 1.5, fetchRequestInit: { mode: 'no-cors' } });
-                                    if (blob) {
-                                        const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                                        const fileNumber = type === 'riesgo' ? '1_riesgo' : '2_calificaciones';
-                                        zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
-                                    }
+                                    const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5, fetchRequestInit: { mode: 'no-cors' } });
+                                    resolve({ name: student.name, type, blob });
                                 } catch (err) {
                                     console.error(`Failed to generate ${type} image for student ${student.name}`, err);
+                                    resolve({ name: student.name, type, blob: null });
                                 } finally {
-                                    completedImages++;
-                                    const progress = (completedImages / totalImages) * 100;
-                                    setDownloadProgress(progress);
-                                    setDownloadStatus(`Generando reporte ${Math.ceil(completedImages / 2)} de ${selectedStudents.size}...`);
                                     root.unmount();
-                                    if(document.body.contains(node)) document.body.removeChild(node);
-                                    resolve();
+                                    document.body.removeChild(node);
                                 }
-                           }, 300);
-                        }
-                    }, []);
-                    return React.createElement(ReportComponent, { ref, ...props });
+                            } else {
+                                 resolve({ name: student.name, type, blob: null });
+                            }
+                        }, 500);
+                    });
                 };
-                root.render(<Component />);
+                
+                imagePromises.push(generateImage(StudentReportImage, { student, subjects: subjectSummaries }, 'riesgo'));
+                imagePromises.push(generateImage(StudentGradesReportImage, { student, subjects }, 'calificaciones'));
+            }
+        }
+
+        const results = await Promise.all(imagePromises);
+        let successfulCount = 0;
+
+        for (const { name, type, blob } of results) {
+            if (blob) {
+                const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                const fileNumber = type === 'riesgo' ? '1_riesgo' : '2_calificaciones';
+                zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
+                successfulCount++;
+            }
+            
+            completedImages += 0.5; // Each promise is half of one student's work
+            const progress = (completedImages / selectedStudents.size) * 100;
+            setDownloadProgress(progress);
+            setDownloadStatus(`Generando reporte ${Math.ceil(completedImages)} de ${selectedStudents.size}...`);
+        }
+        
+        if (Object.keys(zip.files).length > 0) {
+            zip.generateAsync({ type: "blob" }).then(content => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = `reportes_${format(new Date(), 'yyyy-MM-dd')}.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast({
+                    title: "Descarga Completa",
+                    description: `Se han descargado los reportes en un archivo ZIP.`,
+                });
             });
-        };
-
-        imagePromises.push(
-            generateImage(StudentReportImage, { student, subjects: student.subjectSummaries || [] }, 'riesgo')
-        );
-
-        imagePromises.push(
-            generateImage(StudentGradesReportImage, { student, subjects }, 'calificaciones')
-        );
-      }
-    }
-
-    await Promise.all(imagePromises);
-
-    if (Object.keys(zip.files).length > 0) {
-        zip.generateAsync({ type: "blob" }).then(content => {
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(content);
-            link.download = `reportes_${format(new Date(), 'yyyy-MM-dd')}.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        } else {
             toast({
-                title: "Descarga Completa",
-                description: `Se han descargado los reportes en un archivo ZIP.`,
+                variant: "destructive",
+                title: "Error en la descarga",
+                description: "No se pudo generar ningún reporte. Revisa la consola para más detalles.",
             });
-        });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Error en la descarga",
-        description: "No se pudo generar ningún reporte. Revisa la consola para más detalles.",
-      });
-    }
+        }
 
-    setDownloadStatus('');
-    setDownloadProgress(0);
-  };
+        setDownloadStatus('');
+        setDownloadProgress(0);
+    };
+
 
   const studentsForMailer = useMemo(() => {
     return Array.from(selectedStudents).map(id => allStudentsMap.get(id)).filter(Boolean) as Student[];
@@ -1104,3 +1111,5 @@ export function StudentPanel() {
     </div>
   );
 }
+
+    

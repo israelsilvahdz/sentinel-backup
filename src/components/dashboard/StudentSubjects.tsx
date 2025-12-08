@@ -207,3 +207,5 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
       </Tabs>
     );
 }
+
+    
