@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -810,11 +811,9 @@ export function StudentPanel() {
         setDownloadProgress(0);
 
         const zip = new JSZip();
-        const totalImages = selectedStudents.size * 2;
-        let completedImages = 0;
         
-        const generateImage = (ReportComponent: React.ElementType, props: any, type: 'riesgo' | 'calificaciones') => {
-            return new Promise<{name: string, type: 'riesgo' | 'calificaciones', blob: Blob | null}>(async (resolve) => {
+        const generateImage = (ReportComponent: React.ElementType, props: any, type: 'riesgo' | 'calificaciones'): Promise<{ name: string, type: 'riesgo' | 'calificaciones', blob: Blob | null }> => {
+            return new Promise(async (resolve) => {
                 const node = document.createElement('div');
                 node.style.position = 'fixed';
                 node.style.top = '-9999px';
@@ -867,25 +866,30 @@ export function StudentPanel() {
                 imagePromises.push(generateImage(StudentGradesReportImage, { student, subjects }, 'calificaciones'));
             }
         }
+        
+        const totalImages = imagePromises.length;
+        let completedImages = 0;
 
-        for (const promise of imagePromises) {
-            try {
-                const { name, type, blob } = await promise;
-                if (blob) {
-                    const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                    const fileNumber = type === 'riesgo' ? '1_riesgo' : '2_calificaciones';
-                    zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
-                }
-            } catch (error) {
-                console.error("Error processing an image promise:", error);
-            }
-            completedImages += 1;
+        const results = await Promise.all(imagePromises.map(p => p.then(result => {
+            completedImages++;
             const progress = (completedImages / totalImages) * 100;
             setDownloadProgress(progress);
             setDownloadStatus(`Generando imagen ${completedImages} de ${totalImages}...`);
+            return result;
+        })));
+        
+        let successfulCount = 0;
+
+        for (const { name, type, blob } of results) {
+            if (blob) {
+                const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                const fileNumber = type === 'riesgo' ? '1_riesgo' : '2_calificaciones';
+                zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
+                successfulCount++;
+            }
         }
         
-        if (Object.keys(zip.files).length > 0) {
+        if (successfulCount > 0) {
             zip.generateAsync({ type: "blob" }).then(content => {
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(content);
