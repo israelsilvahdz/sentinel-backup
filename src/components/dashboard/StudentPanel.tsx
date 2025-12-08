@@ -529,7 +529,7 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { o
             const innerRef = useRef<HTMLDivElement>(null);
             const handleCopy = () => {
                 if (innerRef.current) {
-                    htmlToImage.toPng(innerRef.current, { pixelRatio: 2, fetchRequestInit: { mode: 'no-cors' } })
+                    htmlToImage.toPng(innerRef.current, { pixelRatio: 2 })
                         .then(dataUrl => fetch(dataUrl))
                         .then(res => res.blob())
                         .then(blob => {
@@ -812,6 +812,44 @@ export function StudentPanel() {
         const zip = new JSZip();
         const totalImages = selectedStudents.size * 2;
         let completedImages = 0;
+        
+        const generateImage = (ReportComponent: React.ElementType, props: any, type: 'riesgo' | 'calificaciones') => {
+            return new Promise<{name: string, type: 'riesgo' | 'calificaciones', blob: Blob | null}>(async (resolve) => {
+                const node = document.createElement('div');
+                node.style.position = 'fixed';
+                node.style.top = '-9999px';
+                node.style.left = '0px';
+                node.style.width = '800px';
+                document.body.appendChild(node);
+                
+                const { createRoot } = await import('react-dom/client');
+                const root = createRoot(node);
+                
+                const Component = React.forwardRef<HTMLDivElement>((_props, ref) => <ReportComponent ref={ref} {...props} />);
+                Component.displayName = 'Component';
+
+                const ref = React.createRef<HTMLDivElement>();
+
+                root.render(<Component ref={ref} />);
+                
+                setTimeout(async () => {
+                    if (ref.current) {
+                        try {
+                            const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5 });
+                            resolve({ name: props.student.name, type, blob });
+                        } catch (err) {
+                            console.error(`Failed to generate ${type} image for student ${props.student.name}`, err);
+                            resolve({ name: props.student.name, type, blob: null });
+                        } finally {
+                            root.unmount();
+                            document.body.removeChild(node);
+                        }
+                    } else {
+                         resolve({ name: props.student.name, type, blob: null });
+                    }
+                }, 500);
+            });
+        };
 
         const imagePromises: Promise<{name: string, type: string, blob: Blob | null}>[] = [];
 
@@ -825,60 +863,26 @@ export function StudentPanel() {
                     grade: s.grade, finalGrade: s.finalGrade, group: s.group,
                 }));
                 
-                const generateImage = (ReportComponent: React.ElementType, props: any, type: 'riesgo' | 'calificaciones') => {
-                    return new Promise<{name: string, type: 'riesgo' | 'calificaciones', blob: Blob | null}>(async (resolve) => {
-                        const node = document.createElement('div');
-                        node.style.position = 'fixed'; node.style.top = '-9999px'; node.style.left = '0px'; document.body.appendChild(node);
-                        
-                        const { createRoot } = await import('react-dom/client');
-                        const root = createRoot(node);
-                        
-                        const Component = React.forwardRef<HTMLDivElement>((_props, ref) => <ReportComponent ref={ref} {...props} />);
-                        Component.displayName = 'Component';
-
-                        const ref = React.createRef<HTMLDivElement>();
-
-                        root.render(<Component ref={ref} />);
-                        
-                        setTimeout(async () => {
-                            if (ref.current) {
-                                try {
-                                    const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5, fetchRequestInit: { mode: 'no-cors' } });
-                                    resolve({ name: student.name, type, blob });
-                                } catch (err) {
-                                    console.error(`Failed to generate ${type} image for student ${student.name}`, err);
-                                    resolve({ name: student.name, type, blob: null });
-                                } finally {
-                                    root.unmount();
-                                    document.body.removeChild(node);
-                                }
-                            } else {
-                                 resolve({ name: student.name, type, blob: null });
-                            }
-                        }, 500);
-                    });
-                };
-                
                 imagePromises.push(generateImage(StudentReportImage, { student, subjects: subjectSummaries }, 'riesgo'));
                 imagePromises.push(generateImage(StudentGradesReportImage, { student, subjects }, 'calificaciones'));
             }
         }
 
-        const results = await Promise.all(imagePromises);
-        let successfulCount = 0;
-
-        for (const { name, type, blob } of results) {
-            if (blob) {
-                const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                const fileNumber = type === 'riesgo' ? '1_riesgo' : '2_calificaciones';
-                zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
-                successfulCount++;
+        for (const promise of imagePromises) {
+            try {
+                const { name, type, blob } = await promise;
+                if (blob) {
+                    const sanitizedName = name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                    const fileNumber = type === 'riesgo' ? '1_riesgo' : '2_calificaciones';
+                    zip.file(`${sanitizedName}_${fileNumber}.png`, blob);
+                }
+            } catch (error) {
+                console.error("Error processing an image promise:", error);
             }
-            
-            completedImages += 0.5; // Each promise is half of one student's work
-            const progress = (completedImages / selectedStudents.size) * 100;
+            completedImages += 1;
+            const progress = (completedImages / totalImages) * 100;
             setDownloadProgress(progress);
-            setDownloadStatus(`Generando reporte ${Math.ceil(completedImages)} de ${selectedStudents.size}...`);
+            setDownloadStatus(`Generando imagen ${completedImages} de ${totalImages}...`);
         }
         
         if (Object.keys(zip.files).length > 0) {
