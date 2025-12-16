@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -7,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Minus, Plus, Phone, Camera, Download } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { calculateFinalGrade } from '@/lib/ponderaciones';
+import { isWithoutRight } from '@/lib/dataProcessor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
@@ -19,6 +21,7 @@ import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { RiskCell, CopyButton } from './StudentCardShared';
 import * as htmlToImage from 'html-to-image';
+import { Badge } from '../ui/badge';
 
 
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
@@ -40,6 +43,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
                     try {
                         const dataUrl = await htmlToImage.toPng(reportRef.current!, { 
                             pixelRatio: 2,
+                            fetchRequestInit: { mode: 'no-cors' }
                         });
                         setImageUrl(dataUrl);
                     } catch (error) {
@@ -177,7 +181,11 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                               {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
                           </TableCell>
                           <TableCell className="text-right font-mono font-bold text-primary">
-                              {calculateFinalGrade(subject, planType).toFixed(2)}
+                              {isWithoutRight(subject) ? (
+                                <Badge variant="destructive">SD</Badge>
+                              ) : (
+                                calculateFinalGrade(subject, planType).toFixed(2)
+                              )}
                           </TableCell>
                       </TableRow>
                       {openSubject === subject.id && (

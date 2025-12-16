@@ -35,6 +35,15 @@ export function getRisk(value: number, limit: number): { risk: number; level: Ri
 }
 
 /**
+ * Checks if a subject is failed due to absences or missed assignments.
+ * @param subject The subject summary object.
+ * @returns True if the student is without right to pass the subject.
+ */
+export function isWithoutRight(subject: SubjectSummary | Subject): boolean {
+  return subject.absences > subject.absenceLimit || subject.missedAssignments > subject.missedAssignmentLimit;
+}
+
+/**
  * Calcula el riesgo general de un estudiante basado en sus materias.
  * @param student El objeto del estudiante.
  * @param subjects Un array con las materias (o resúmenes de materias) del estudiante.
