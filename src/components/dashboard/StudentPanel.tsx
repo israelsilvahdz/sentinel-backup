@@ -805,13 +805,19 @@ export function StudentPanel() {
 
     const handleDownloadZip = async () => {
         if (selectedStudents.size === 0) return;
+        
+        const CHUNK_SIZE = 50;
+        const studentChunks = [];
+        const studentArray = Array.from(selectedStudents);
 
-        setDownloadStatus(`Iniciando descarga para ${selectedStudents.size} alumnos...`);
+        for (let i = 0; i < studentArray.length; i += CHUNK_SIZE) {
+            studentChunks.push(studentArray.slice(i, i + CHUNK_SIZE));
+        }
+
+        setDownloadStatus(`Iniciando descarga en ${studentChunks.length} partes...`);
         setDownloadProgress(0);
 
-        const zip = new JSZip();
-        
-        const generateImage = async (student: Student) => {
+        const generateImage = async (student: Student): Promise<Blob | null> => {
             const subjects = await loadStudentSubjects(student.id);
             const subjectSummaries = subjects.map(s => ({
                 id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
@@ -823,7 +829,6 @@ export function StudentPanel() {
             node.style.position = 'fixed';
             node.style.top = '-9999px';
             node.style.left = '0px';
-            node.style.width = '800px';
             document.body.appendChild(node);
             
             const { createRoot } = await import('react-dom/client');
@@ -833,16 +838,16 @@ export function StudentPanel() {
             const ReportComponent = React.forwardRef<HTMLDivElement>((props, fwdRef) => <StudentReportImage ref={fwdRef} student={student} subjects={subjectSummaries} />);
             ReportComponent.displayName = 'ReportComponent';
             
-            root.render(<ReportComponent ref={ref} />);
-            
-            return new Promise<Blob | null>((resolve) => {
+            return new Promise((resolve) => {
+                root.render(<ReportComponent ref={ref} />);
+                
                 setTimeout(async () => {
                     if (ref.current) {
                         try {
                             const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5 });
                             resolve(blob);
                         } catch (err) {
-                            console.error(`Failed to generate report for ${student.name}`, err);
+                            console.error(`Failed to generate image for student ${student.name}`, err);
                             resolve(null);
                         } finally {
                             root.unmount();
@@ -851,43 +856,43 @@ export function StudentPanel() {
                     } else {
                         resolve(null);
                     }
-                }, 500);
+                }, 500); 
             });
         };
 
-        let completedCount = 0;
-        const studentIds = Array.from(selectedStudents);
-        const totalReports = studentIds.length;
+        let totalCompleted = 0;
+        
+        for (let i = 0; i < studentChunks.length; i++) {
+            const chunk = studentChunks[i];
+            const zip = new JSZip();
+            setDownloadStatus(`Generando reportes para el lote ${i + 1} de ${studentChunks.length}...`);
 
-        for (const studentId of studentIds) {
-            const student = allStudentsMap.get(studentId);
-            if (student) {
-                setDownloadStatus(`Generando reporte para ${student.name}... (${completedCount + 1}/${totalReports})`);
-                
-                const blob = await generateImage(student);
-                
-                if (blob) {
-                    const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                    zip.file(`${sanitizedName}_reporte_riesgo.png`, blob);
+            for (const studentId of chunk) {
+                const student = allStudentsMap.get(studentId);
+                if (student) {
+                    const blob = await generateImage(student);
+                    if (blob) {
+                        const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                        zip.file(`${sanitizedName}_reporte.png`, blob);
+                    }
                 }
+                totalCompleted++;
+                setDownloadProgress((totalCompleted / studentArray.length) * 100);
             }
-            completedCount++;
-            setDownloadProgress((completedCount / totalReports) * 100);
+
+            setDownloadStatus(`Comprimiendo lote ${i + 1}...`);
+            const zipContent = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipContent);
+            link.download = `reportes_parte_${i + 1}_de_${studentChunks.length}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
-        
-        setDownloadStatus('Comprimiendo archivos...');
-        const zipContent = await zip.generateAsync({ type: "blob" });
-        
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(zipContent);
-        link.download = `reportes_${format(new Date(), 'yyyy-MM-dd')}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
 
         toast({
             title: "Descarga Completa",
-            description: `Se han descargado los reportes en un archivo ZIP.`,
+            description: `Se han descargado los reportes en ${studentChunks.length} archivo(s) ZIP.`,
         });
 
         setDownloadStatus('');
@@ -1100,5 +1105,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
-    
