@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Lightbulb, Users, AlertTriangle, BadgeAlert } from 'lucide-react';
+import { useDashboardFilters } from './DashboardClient';
 
 const courseMap = new Map(curriculum.flatMap((term, termIndex) => term.courses.map(course => [course.name, { ...course, term: term.name, termIndex }])));
 
@@ -77,6 +78,7 @@ const getCriticalCourses = (currentTermIndex: number, activeTerms: Set<string>):
 
 
 export function MapPlanner() {
+  const { ofertaAcademica } = useDashboardFilters();
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
   const [pendingCourses, setPendingCourses] = useState<Set<string>>(new Set());
   const [manuallyApprovedCourses, setManuallyApprovedCourses] = useState<Set<string>>(new Set());
@@ -84,6 +86,11 @@ export function MapPlanner() {
   const [isGraduationCandidate, setIsGraduationCandidate] = useState(false);
   const [nodePositions, setNodePositions] = useState<Record<string, NodePosition>>({});
   const gridRef = useRef<HTMLDivElement>(null);
+
+  const availableCoursesSet = useMemo(() => {
+    return new Set(ofertaAcademica.map(item => item.subjectName));
+  }, [ofertaAcademica]);
+
 
   useEffect(() => {
     function updateNodePositions() {
@@ -317,10 +324,10 @@ export function MapPlanner() {
             <AlertTitle className="text-blue-800">Planificador por Mapa Interactivo</AlertTitle>
             <AlertDescription className="text-blue-700">
               <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
-                <li>Selecciona los **períodos activos** para simular la oferta académica real. Las materias no flexibles de períodos inactivos se bloquearán.</li>
+                <li>Sube el archivo de **Oferta Académica** para ver la disponibilidad real de las materias recomendadas.</li>
+                <li>Selecciona los **períodos activos** para simular la oferta académica. Las materias no flexibles de períodos inactivos se bloquearán.</li>
                 <li>Haz clic en el **título de un período (ej. 1°)** para simular el avance de un alumno.</li>
-                <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>. Las materias reprobadas de periodos anteriores se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> para cursar.</li>
-                <li>Las materias del período seleccionado se marcarán como <span className="font-semibold text-blue-700">recomendadas</span> o <span className="font-semibold text-red-700">críticas</span> para cursar.</li>
+                <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>. Las reprobadas se marcarán como <span className="font-semibold text-blue-700">recomendadas</span>.</li>
                 <li>Haz clic en el <span className="font-semibold">círculo de una materia</span> para cambiar su estado (pendiente o aprobada manualmente).</li>
               </ol>
             </AlertDescription>
@@ -404,6 +411,7 @@ export function MapPlanner() {
                       const isPending = pendingCourses.has(course.name);
                       const state = getCourseState(course.name, isPending);
                       const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+                      const isNotOffered = state === 'recommended' && availableCoursesSet.size > 0 && !availableCoursesSet.has(course.name);
                       
                       return (
                           <div
@@ -414,7 +422,7 @@ export function MapPlanner() {
                                   'pending': isPending,
                                   'approved': state === 'approved',
                                   'recommended': state === 'recommended',
-                                  'critical': state === 'critical',
+                                  'critical': state === 'critical' || isNotOffered,
                               })}
                               style={{ 
                                   gridColumn: termIndex + 1,
@@ -441,7 +449,12 @@ export function MapPlanner() {
                                   </TooltipTrigger>
                                   <TooltipContent>
                                       <p className="font-bold">{course.name}</p>
-                                      {state === 'critical' && (
+                                      {isNotOffered ? (
+                                        <p className="text-xs text-destructive font-semibold flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            ¡No Ofertada! Esta materia es recomendada pero no se encuentra en la oferta académica cargada.
+                                        </p>
+                                      ) : state === 'critical' && (
                                         <p className="text-xs text-destructive font-semibold flex items-center gap-1">
                                             <AlertTriangle className="h-3 w-3" />
                                             ¡Crítica! Si no la cursas ahora, te atrasarás un ciclo.

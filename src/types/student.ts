@@ -135,3 +135,17 @@ export interface Team {
     type?: 'deportivo' | 'cultural'; // Nuevo campo para clasificar el equipo
     members: { id: string; name: string }[];
 }
+
+export interface OfertaAcademicaItem {
+    crn: string;
+    subjectName: string;
+    group: string;
+    capacity: number;
+    enrolled: number;
+    professor: string;
+    days: string[];
+    startTime: string;
+    endTime: string;
+    building: string;
+    room: string;
+}

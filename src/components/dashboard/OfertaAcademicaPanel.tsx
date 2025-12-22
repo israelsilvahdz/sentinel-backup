@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -12,6 +13,7 @@ import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
+import { useDashboardFilters } from './DashboardClient';
 
 const DAYS = ['LUN', 'MAR', 'MI', 'JUE', 'VIE'];
 const DAY_MAP: Record<string, string> = {
@@ -37,9 +39,9 @@ function isClassInSlot(item: OfertaAcademicaItem, slot: string, day: string): bo
 
 export function OfertaAcademicaPanel() {
     const { toast } = useToast();
+    const { ofertaAcademica, setOfertaAcademica } = useDashboardFilters();
     const [ofertaFile, setOfertaFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [ofertaData, setOfertaData] = useState<OfertaAcademicaItem[]>([]);
     const [filter, setFilter] = useState('');
 
     const handleFileUpload = useCallback(async (file: File | null) => {
@@ -52,7 +54,7 @@ export function OfertaAcademicaPanel() {
         try {
             const data = await parseOfertaAcademicaExcel(file);
             if (data) {
-                setOfertaData(data);
+                setOfertaAcademica(data);
                 toast({
                     title: "Oferta Académica Cargada",
                     description: `Se procesaron ${data.length} registros de materias.`,
@@ -69,17 +71,17 @@ export function OfertaAcademicaPanel() {
         } finally {
             setIsProcessing(false);
         }
-    }, [toast]);
+    }, [toast, setOfertaAcademica]);
     
     const filteredData = useMemo(() => {
-        if (!filter) return ofertaData;
+        if (!filter) return ofertaAcademica;
         const lowerFilter = filter.toLowerCase();
-        return ofertaData.filter(item => 
+        return ofertaAcademica.filter(item => 
             item.subjectName.toLowerCase().includes(lowerFilter) ||
             item.crn.toLowerCase().includes(lowerFilter) ||
             item.professor.toLowerCase().includes(lowerFilter)
         );
-    }, [filter, ofertaData]);
+    }, [filter, ofertaAcademica]);
     
     const scheduleGrid = useMemo(() => {
         const grid: Record<string, OfertaAcademicaItem[]> = {};
@@ -107,7 +109,7 @@ export function OfertaAcademicaPanel() {
                 />
             </header>
 
-            {ofertaData.length > 0 && (
+            {ofertaAcademica.length > 0 && (
                 <>
                     <Card>
                         <CardHeader>
@@ -196,7 +198,7 @@ export function OfertaAcademicaPanel() {
                 </>
             )}
 
-            {ofertaData.length === 0 && !isProcessing && (
+            {ofertaAcademica.length === 0 && !isProcessing && (
                 <Card className="text-center p-12 mt-16">
                     <CardHeader>
                         <div className="mx-auto bg-secondary p-3 rounded-full w-fit">

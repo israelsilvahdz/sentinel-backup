@@ -40,7 +40,7 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, Team } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, Team, OfertaAcademicaItem } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
@@ -96,6 +96,8 @@ interface DashboardContextType {
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
   planType: PlanType;
+  ofertaAcademica: OfertaAcademicaItem[];
+  setOfertaAcademica: React.Dispatch<React.SetStateAction<OfertaAcademicaItem[]>>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -114,6 +116,7 @@ const LOCAL_STORAGE_KEYS = {
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
     PROFESSOR_CONTACTS_MIGRATED: 'academic_sentinel_prof_contacts_migrated',
+    OFERTA_ACADEMICA: 'academic_sentinel_oferta_academica',
 };
 
 
@@ -128,6 +131,7 @@ export function DashboardClient() {
   const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
+  const [ofertaAcademica, setOfertaAcademica] = useState<OfertaAcademicaItem[]>([]);
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
 
@@ -222,6 +226,9 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
+          const storedOferta = localStorage.getItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
+          if (storedOferta) setOfertaAcademica(JSON.parse(storedOferta));
+
           const studentContactsFromDb = await getContacts();
           setStudentContacts(studentContactsFromDb);
           
@@ -279,6 +286,9 @@ export function DashboardClient() {
         if(uploadHistory.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
         }
+        if (ofertaAcademica.length > 0) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA, JSON.stringify(ofertaAcademica));
+        }
         localStorage.setItem(LOCAL_STORAGE_KEYS.PLAN_TYPE, planType);
 
     } catch(error) {
@@ -289,7 +299,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, studentHistory, uploadHistory, planType, toast]);
+  }, [allStudents, studentHistory, uploadHistory, planType, ofertaAcademica, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -575,6 +585,7 @@ export function DashboardClient() {
     getStudentChanges: getStudentChangesWrapper,
     activeView, setActiveView: handleSetActiveView,
     planType,
+    ofertaAcademica, setOfertaAcademica,
   };
 
   const renderActiveView = () => {
@@ -751,12 +762,3 @@ export function DashboardClient() {
     </DashboardContext.Provider>
   );
 }
-
-
-
-
-
-
-
-
-
