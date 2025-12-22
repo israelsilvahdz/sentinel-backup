@@ -4,6 +4,22 @@ import * as XLSX from 'xlsx';
 import type { StudentData, Subject, Student, StudentContact, ProfessorContact, Team } from '@/types/student';
 import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams } from './firebase-services';
 
+// --- NUEVA INTERFAZ PARA OFERTA ACADÉMICA ---
+export interface OfertaAcademicaItem {
+    crn: string;
+    subjectName: string;
+    group: string;
+    capacity: number;
+    enrolled: number;
+    professor: string;
+    days: string[];
+    startTime: string;
+    endTime: string;
+    building: string;
+    room: string;
+}
+
+
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
   STUDENT_ID: 'Matrícula',
@@ -30,7 +46,7 @@ const COLUMNS = {
 };
 
 // Se usan los encabezados exactos proporcionados por el usuario.
-const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIER'];
+const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIE'];
 
 const ACTIVITY_REGEX = /^A\d+$/;
 
@@ -523,4 +539,98 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
     });
 }
 
+
+// --- PARSER PARA OFERTA ACADÉMICA ---
+
+const OFERTA_COLUMNS = {
+    CRN: 'CRN',
+    SUBJECT_NAME: 'NOMBRE LARGO MATERIA',
+    PROFESSOR: 'NOMBRE PROFESOR',
+    GROUP: 'NUMERO O GRUPO',
+    CAPACITY: 'CAPACIDAD GRUPO',
+    ENROLLED: 'NUMERO ALUMNOS INSCRITOS',
+    START_TIME: 'HORA INICIO CLASE',
+    END_TIME: 'HORA FIN CLASE',
+    BUILDING: 'EDIFICIO',
+    ROOM: 'SALON'
+};
+const OFERTA_DAYS = ['L', 'M', 'MI', 'J', 'V'];
+
+export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcademicaItem[] | null> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = (e: ProgressEvent<FileReader>) => {
+            try {
+                const data = e.target?.result;
+                if (!data) return resolve(null);
+
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+                if (jsonData.length < 2) return resolve(null);
+
+                const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
+                const headerMap: Record<string, number> = {};
+                headers.forEach((header, index) => {
+                    // Especial atención a las 'M' de Martes y Miércoles
+                    if (header === 'M') {
+                        if (!('M' in headerMap)) { // First 'M' is Martes
+                            headerMap['MAR'] = index;
+                        } else { // Second 'M' is Miércoles
+                            headerMap['MI'] = index;
+                        }
+                    } else {
+                        headerMap[header] = index;
+                    }
+                });
+
+                const oferta: OfertaAcademicaItem[] = [];
+                const dataRows = jsonData.slice(1);
+
+                for (const row of dataRows) {
+                    if (!row || row.length === 0 || !row[headerMap[OFERTA_COLUMNS.CRN]]) continue;
+                    
+                     const getColumnValue = (columnName: string) => {
+                        const upperColName = normalizeHeader(columnName);
+                        const index = headerMap[upperColName];
+                        return index !== undefined ? String(row[index] || '').trim() : '';
+                    }
+
+                    const days: string[] = [];
+                    if (getColumnValue('L') === 'Y') days.push('LUN');
+                    if (headerMap['MAR'] !== undefined && getColumnValue('MAR') === 'Y') days.push('MAR');
+                    if (headerMap['MI'] !== undefined && getColumnValue('MI') === 'Y') days.push('MI');
+                    if (getColumnValue('J') === 'Y') days.push('JUE');
+                    if (getColumnValue('V') === 'Y') days.push('VIE');
+
+                    const item: OfertaAcademicaItem = {
+                        crn: getColumnValue(OFERTA_COLUMNS.CRN),
+                        subjectName: getColumnValue(OFERTA_COLUMNS.SUBJECT_NAME),
+                        group: getColumnValue(OFERTA_COLUMNS.GROUP),
+                        capacity: parseInt(getColumnValue(OFERTA_COLUMNS.CAPACITY) || '0', 10),
+                        enrolled: parseInt(getColumnValue(OFERTA_COLUMNS.ENROLLED) || '0', 10),
+                        professor: getColumnValue(OFERTA_COLUMNS.PROFESSOR),
+                        days,
+                        startTime: getColumnValue(OFERTA_COLUMNS.START_TIME),
+                        endTime: getColumnValue(OFERTA_COLUMNS.END_TIME),
+                        building: getColumnValue(OFERTA_COLUMNS.BUILDING),
+                        room: getColumnValue(OFERTA_COLUMNS.ROOM),
+                    };
+                    oferta.push(item);
+                }
+                resolve(oferta);
+
+            } catch (error) {
+                console.error("Error al procesar archivo de oferta académica:", error);
+                reject(error);
+            }
+        };
+
+        reader.onerror = (error) => reject(error);
+        reader.readAsArrayBuffer(file);
+    });
+}
     
