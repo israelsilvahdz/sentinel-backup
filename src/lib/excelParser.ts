@@ -117,22 +117,28 @@ function normalizeHeader(header: string): string {
 
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
-    let cleanedName = name.toLowerCase().replace(/"/g, '').trim();
-    
-    if (cleanedName.startsWith('habilidades y valores')) {
-        const parts = cleanedName.split(':');
-        const mainPart = parts[0].trim();
-        // Specific normalizations for Habilidades
-        if (mainPart === 'habilidades y valores ii') return 'Habilidades y valores II: pensamiento crítico';
-        if (mainPart === 'habilidades y valores v') return 'Habilidades y valores V: lenguaje';
-        if (mainPart === 'habilidades y valores vi') return 'Habilidades y valores VI: toma de decisiones';
+    const cleanedName = name.toLowerCase().replace(/"/g, '').trim();
+
+    if (SUBJECT_NAME_NORMALIZATION_MAP[cleanedName]) {
+        return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName];
     }
     
+    // Fallback for "Habilidades" with slight variations
+    if (cleanedName.startsWith('habilidades y valores v')) {
+        return 'Habilidades y valores V: lenguaje';
+    }
+    if (cleanedName.startsWith('habilidades y valores vi')) {
+        return 'Habilidades y valores VI: toma de decisiones';
+    }
+     if (cleanedName.startsWith('habilidades y valores ii')) {
+        return 'Habilidades y valores II: pensamiento crítico';
+    }
+
     if (cleanedName.startsWith('antropología')) {
         return 'Antropología';
     }
 
-    return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName] || name;
+    return name;
 }
 
 
@@ -575,14 +581,20 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
                 const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
                 const headerMap: Record<string, number> = {};
                 headers.forEach((header, index) => {
-                    // Especial atención a las 'M' de Martes y Miércoles
                     if (header === 'M') {
-                        if (!('M' in headerMap)) { // First 'M' is Martes
+                        if (!('MAR' in headerMap)) { // First 'M' is Martes
                             headerMap['MAR'] = index;
                         } else { // Second 'M' is Miércoles
                             headerMap['MI'] = index;
                         }
-                    } else {
+                    } else if (header === 'L') {
+                        headerMap['LUN'] = index;
+                    } else if (header === 'J') {
+                         headerMap['JUE'] = index;
+                    } else if (header === 'V') {
+                         headerMap['VIE'] = index;
+                    }
+                    else {
                         headerMap[header] = index;
                     }
                 });
@@ -600,15 +612,15 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
                     }
 
                     const days: string[] = [];
-                    if (getColumnValue('L') === 'Y') days.push('LUN');
-                    if (headerMap['MAR'] !== undefined && getColumnValue('MAR') === 'Y') days.push('MAR');
-                    if (headerMap['MI'] !== undefined && getColumnValue('MI') === 'Y') days.push('MI');
-                    if (getColumnValue('J') === 'Y') days.push('JUE');
-                    if (getColumnValue('V') === 'Y') days.push('VIE');
+                    if (getColumnValue('LUN') === 'Y') days.push('LUN');
+                    if (getColumnValue('MAR') === 'Y') days.push('MAR');
+                    if (getColumnValue('MI') === 'Y') days.push('MI');
+                    if (getColumnValue('JUE') === 'Y') days.push('JUE');
+                    if (getColumnValue('VIE') === 'Y') days.push('VIE');
 
                     const item: OfertaAcademicaItem = {
                         crn: getColumnValue(OFERTA_COLUMNS.CRN),
-                        subjectName: getColumnValue(OFERTA_COLUMNS.SUBJECT_NAME),
+                        subjectName: normalizeSubjectName(getColumnValue(OFERTA_COLUMNS.SUBJECT_NAME)),
                         group: getColumnValue(OFERTA_COLUMNS.GROUP),
                         capacity: parseInt(getColumnValue(OFERTA_COLUMNS.CAPACITY) || '0', 10),
                         enrolled: parseInt(getColumnValue(OFERTA_COLUMNS.ENROLLED) || '0', 10),

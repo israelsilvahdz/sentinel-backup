@@ -16,8 +16,18 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Lightbulb, Users, AlertTriangle, BadgeAlert } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
+import { PlannerSchedule } from './PlannerSchedule';
+
 
 const courseMap = new Map(curriculum.flatMap((term, termIndex) => term.courses.map(course => [course.name, { ...course, term: term.name, termIndex }])));
+
+// Lista de materias que son flexibles o en línea y siempre deben considerarse disponibles.
+const alwaysAvailableSubjects = new Set(
+    curriculum.flatMap(term => term.courses.filter(c => c.isFlexible).map(c => c.name))
+);
+alwaysAvailableSubjects.add('Ciencias de la Vida');
+alwaysAvailableSubjects.add('El mundo contemporáneo');
+
 
 const prerequisiteForMap = new Map<string, string[]>();
 for (const course of courseMap.values()) {
@@ -78,7 +88,7 @@ const getCriticalCourses = (currentTermIndex: number, activeTerms: Set<string>):
 
 
 export function MapPlanner() {
-  const { ofertaAcademica } = useDashboardFilters();
+  const { ofertaAcademica, planType, professorContacts } = useDashboardFilters();
   const [selectedTermIndex, setSelectedTermIndex] = useState<number>(-1);
   const [pendingCourses, setPendingCourses] = useState<Set<string>>(new Set());
   const [manuallyApprovedCourses, setManuallyApprovedCourses] = useState<Set<string>>(new Set());
@@ -173,7 +183,6 @@ export function MapPlanner() {
   }
 
   const { approvedCourses, lockedCourses, recommendedCourses, criticalCourses } = useMemo(() => {
-      // 1. Determine Approved Courses first, as they can prevent locking
       const approved = new Set<string>();
       if (selectedTermIndex > -1) {
           for (let i = 0; i < selectedTermIndex; i++) {
@@ -186,24 +195,19 @@ export function MapPlanner() {
       }
       manuallyApprovedCourses.forEach(c => approved.add(c));
 
-
-      // 2. Determine Locked Courses (Cascading effect)
       const locked = new Set<string>();
       let prevLockedSize = -1;
       
       while (locked.size !== prevLockedSize) {
           prevLockedSize = locked.size;
           for (const course of courseMap.values()) {
-              if (course.isPlaceholder || locked.has(course.name)) continue;
+              if (course.isPlaceholder || locked.has(course.name) || approved.has(course.name)) continue;
 
               const prereq = course.prerequisite;
-              
-              // Rule 1: Lock if prerequisite is NOT approved AND (is pending OR is locked)
               if (prereq && !approved.has(prereq) && (pendingCourses.has(prereq) || locked.has(prereq))) {
                   locked.add(course.name);
               }
 
-              // Rule 2: Lock if non-flexible and its term is inactive
               const isNonFlexible = HIGH_PRIORITY_COURSES.has(course.name);
               if (isNonFlexible && !activeTerms.has(course.term)) {
                   locked.add(course.name);
@@ -211,22 +215,18 @@ export function MapPlanner() {
           }
       }
       
-      // Ensure nothing locked is ever considered approved.
       locked.forEach(c => approved.delete(c));
 
-      // 3. Determine Recommended and Critical Courses
       const critical = getCriticalCourses(selectedTermIndex, activeTerms);
       const recommendedSet = new Set<string>();
 
       if (selectedTermIndex > -1) {
-          // Rule 1: Recommend all PENDING courses that are not locked
           pendingCourses.forEach(pendingCourse => {
               if (!locked.has(pendingCourse)) {
                   recommendedSet.add(pendingCourse);
               }
           });
 
-          // Rule 2: Recommend courses from the current term
           const currentTermCourses = curriculum[selectedTermIndex].courses;
           currentTermCourses.forEach(course => {
               if (course.isPlaceholder || locked.has(course.name) || approved.has(course.name)) return;
@@ -316,6 +316,10 @@ export function MapPlanner() {
       return !isGraduationCandidate && allPossibleRecommendations.size > 7;
   }, [selectedTermIndex, pendingCourses, lockedCourses, approvedCourses, isGraduationCandidate]);
 
+  const recommendedSubjectsForSchedule = useMemo(() => {
+    return Array.from(recommendedCourses);
+  }, [recommendedCourses]);
+
   return (
     <TooltipProvider>
       <div className="p-6 bg-slate-50 min-h-full">
@@ -324,7 +328,7 @@ export function MapPlanner() {
             <AlertTitle className="text-blue-800">Planificador por Mapa Interactivo</AlertTitle>
             <AlertDescription className="text-blue-700">
               <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
-                <li>Sube el archivo de **Oferta Académica** para ver la disponibilidad real de las materias recomendadas.</li>
+                <li>Sube el archivo de **Oferta Académica** para ver la disponibilidad real y el horario simulado.</li>
                 <li>Selecciona los **períodos activos** para simular la oferta académica. Las materias no flexibles de períodos inactivos se bloquearán.</li>
                 <li>Haz clic en el **título de un período (ej. 1°)** para simular el avance de un alumno.</li>
                 <li>Las materias de períodos anteriores se marcarán como <span className="font-semibold text-green-700">aprobadas</span>. Las reprobadas se marcarán como <span className="font-semibold text-blue-700">recomendadas</span>.</li>
@@ -379,106 +383,121 @@ export function MapPlanner() {
                 </AlertDescription>
             </Alert>
         )}
+        
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+            <main className="flex-1 overflow-x-auto">
+                <div
+                    ref={gridRef}
+                    className="curriculum-grid relative"
+                    style={{
+                        gridTemplateColumns: `repeat(${gridStructure.columns}, minmax(160px, 1fr))`,
+                        gridTemplateRows: `auto repeat(${gridStructure.rows - 1}, minmax(60px, auto))`,
+                    }}
+                >
+                    <svg className="svg-connector-layer">
+                        <g>{connectorLines}</g>
+                    </svg>
+                    {curriculum.map((term, termIndex) => (
+                        <div key={term.name} className="term-header" style={{ gridColumn: termIndex + 1 }} onClick={() => handleTermClick(termIndex)}>
+                            <h2 className={cn(
+                            "font-bold text-center text-primary cursor-pointer hover:underline p-2 rounded-md transition-colors",
+                            selectedTermIndex === termIndex && "bg-primary/10 ring-2 ring-primary"
+                            )}>{ORDINAL_MAP[term.name] ?? term.name}</h2>
+                        </div>
+                    ))}
 
-        <main className="flex-1 overflow-x-auto">
-            <div
-                ref={gridRef}
-                className="curriculum-grid relative"
-                style={{
-                    gridTemplateColumns: `repeat(${gridStructure.columns}, minmax(160px, 1fr))`,
-                    gridTemplateRows: `auto repeat(${gridStructure.rows - 1}, minmax(60px, auto))`,
-                }}
-            >
-                <svg className="svg-connector-layer">
-                    <g>{connectorLines}</g>
-                </svg>
-                {curriculum.map((term, termIndex) => (
-                    <div key={term.name} className="term-header" style={{ gridColumn: termIndex + 1 }} onClick={() => handleTermClick(termIndex)}>
-                        <h2 className={cn(
-                          "font-bold text-center text-primary cursor-pointer hover:underline p-2 rounded-md transition-colors",
-                          selectedTermIndex === termIndex && "bg-primary/10 ring-2 ring-primary"
-                        )}>{ORDINAL_MAP[term.name] ?? term.name}</h2>
-                    </div>
-                ))}
-
-                {curriculum.flatMap((term, termIndex) => 
-                    term.courses.map((course, courseIndex) => {
-                        if (course.isPlaceholder) {
-                          return (
-                              <div key={`${term.name}-${course.name}-${courseIndex}`} style={{ gridColumn: termIndex + 1, gridRow: courseIndex + 2 }}></div>
-                          );
-                        }
-                      const isPending = pendingCourses.has(course.name);
-                      const state = getCourseState(course.name, isPending);
-                      const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
-                      const isNotOffered = state === 'recommended' && availableCoursesSet.size > 0 && !availableCoursesSet.has(course.name);
-                      
-                      return (
-                          <div
-                              key={course.name}
-                              data-course-name={course.name}
-                              className={cn('course-cell', {
-                                  'locked': state === 'locked',
-                                  'pending': isPending,
-                                  'approved': state === 'approved',
-                                  'recommended': state === 'recommended',
-                                  'critical': state === 'critical' || isNotOffered,
-                              })}
-                              style={{ 
-                                  gridColumn: termIndex + 1,
-                                  gridRow: courseIndex + 2 // +2 because row 1 is for headers
-                              }}
-                          >
-                              <Tooltip>
-                                  <TooltipTrigger asChild>
-                                      <div className="course-card">
-                                          {selectedTermIndex > -1 && (
-                                              <div 
-                                                className="course-status-indicator" 
-                                                onClick={() => handleCourseStatusToggle(course.name, termIndex)}
-                                                title={
-                                                    termIndex < selectedTermIndex 
-                                                        ? (isPending ? 'Marcar como aprobada' : 'Marcar como pendiente')
-                                                        : (approvedCourses.has(course.name) ? 'Desmarcar como aprobada' : 'Marcar como aprobada manualmente')
-                                                }
-                                              />
-                                          )}
-                                          {isFlex && <div className="course-flex-indicator">F</div>}
-                                          <p className="text-xs font-semibold leading-tight">{course.name}</p>
-                                      </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                      <p className="font-bold">{course.name}</p>
-                                      {isNotOffered ? (
-                                        <p className="text-xs text-destructive font-semibold flex items-center gap-1">
-                                            <AlertTriangle className="h-3 w-3" />
-                                            ¡No Ofertada! Esta materia es recomendada pero no se encuentra en la oferta académica cargada.
-                                        </p>
-                                      ) : state === 'critical' && (
-                                        <p className="text-xs text-destructive font-semibold flex items-center gap-1">
-                                            <AlertTriangle className="h-3 w-3" />
-                                            ¡Crítica! Si no la cursas ahora, te atrasarás un ciclo.
-                                        </p>
-                                      )}
-                                      <div className='flex gap-2 items-center'>
-                                        <p className="text-xs text-muted-foreground capitalize">Estado: {state}</p>
-                                        {isPending && <p className="text-xs text-red-500 font-semibold">Pendiente</p>}
-                                      </div>
-                                      {isFlex && <p className="text-xs text-blue-500 font-semibold">Materia Flexible</p>}
-                                      {course.prerequisite && <p className="text-xs text-muted-foreground">Prerrequisito: {course.prerequisite}</p>}
-                                      {prerequisiteForMap.get(course.name) && (
-                                          <p className="text-xs text-muted-foreground mt-1">
-                                              Requisito para: {prerequisiteForMap.get(course.name)!.join(', ')}
-                                          </p>
-                                      )}
-                                  </TooltipContent>
-                              </Tooltip>
-                          </div>
-                      );
-                    })
-                )}
-            </div>
-        </main>
+                    {curriculum.flatMap((term, termIndex) => 
+                        term.courses.map((course, courseIndex) => {
+                            if (course.isPlaceholder) {
+                            return (
+                                <div key={`${term.name}-${course.name}-${courseIndex}`} style={{ gridColumn: termIndex + 1, gridRow: courseIndex + 2 }}></div>
+                            );
+                            }
+                        const isPending = pendingCourses.has(course.name);
+                        const state = getCourseState(course.name, isPending);
+                        const isFlex = !HIGH_PRIORITY_COURSES.has(course.name);
+                        
+                        const isNotOffered = 
+                            state === 'recommended' && 
+                            availableCoursesSet.size > 0 && 
+                            !availableCoursesSet.has(course.name) &&
+                            !alwaysAvailableSubjects.has(course.name);
+                        
+                        return (
+                            <div
+                                key={course.name}
+                                data-course-name={course.name}
+                                className={cn('course-cell', {
+                                    'locked': state === 'locked',
+                                    'pending': isPending,
+                                    'approved': state === 'approved',
+                                    'recommended': state === 'recommended',
+                                    'critical': state === 'critical' || isNotOffered,
+                                })}
+                                style={{ 
+                                    gridColumn: termIndex + 1,
+                                    gridRow: courseIndex + 2 // +2 because row 1 is for headers
+                                }}
+                            >
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="course-card">
+                                            {selectedTermIndex > -1 && (
+                                                <div 
+                                                    className="course-status-indicator" 
+                                                    onClick={() => handleCourseStatusToggle(course.name, termIndex)}
+                                                    title={
+                                                        termIndex < selectedTermIndex 
+                                                            ? (isPending ? 'Marcar como aprobada' : 'Marcar como pendiente')
+                                                            : (approvedCourses.has(course.name) ? 'Desmarcar como aprobada' : 'Marcar como aprobada manualmente')
+                                                    }
+                                                />
+                                            )}
+                                            {isFlex && <div className="course-flex-indicator">F</div>}
+                                            <p className="text-xs font-semibold leading-tight">{course.name}</p>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="font-bold">{course.name}</p>
+                                        {isNotOffered ? (
+                                            <p className="text-xs text-destructive font-semibold flex items-center gap-1">
+                                                <AlertTriangle className="h-3 w-3" />
+                                                ¡No Ofertada! Esta materia es recomendada pero no se encuentra en la oferta académica cargada.
+                                            </p>
+                                        ) : state === 'critical' && (
+                                            <p className="text-xs text-destructive font-semibold flex items-center gap-1">
+                                                <AlertTriangle className="h-3 w-3" />
+                                                ¡Crítica! Si no la cursas ahora, te atrasarás un ciclo.
+                                            </p>
+                                        )}
+                                        <div className='flex gap-2 items-center'>
+                                            <p className="text-xs text-muted-foreground capitalize">Estado: {state}</p>
+                                            {isPending && <p className="text-xs text-red-500 font-semibold">Pendiente</p>}
+                                        </div>
+                                        {isFlex && <p className="text-xs text-blue-500 font-semibold">Materia Flexible</p>}
+                                        {course.prerequisite && <p className="text-xs text-muted-foreground">Prerrequisito: {course.prerequisite}</p>}
+                                        {prerequisiteForMap.get(course.name) && (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Requisito para: {prerequisiteForMap.get(course.name)!.join(', ')}
+                                            </p>
+                                        )}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        );
+                        })
+                    )}
+                </div>
+            </main>
+             <aside>
+                <PlannerSchedule 
+                    recommendedSubjects={recommendedSubjectsForSchedule}
+                    oferta={ofertaAcademica}
+                    planType={planType}
+                    professorContacts={professorContacts}
+                />
+            </aside>
+        </div>
       </div>
     </TooltipProvider>
   );
