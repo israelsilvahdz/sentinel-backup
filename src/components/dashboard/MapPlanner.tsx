@@ -166,30 +166,7 @@ export function MapPlanner() {
   }
 
   const { approvedCourses, lockedCourses, recommendedCourses, criticalCourses } = useMemo(() => {
-      // 1. Determine Locked Courses first (Cascading effect)
-      const locked = new Set<string>();
-      let prevLockedSize = -1;
-      
-      while (locked.size !== prevLockedSize) {
-          prevLockedSize = locked.size;
-          for (const course of courseMap.values()) {
-              if (course.isPlaceholder || locked.has(course.name)) continue;
-
-              // Rule 1: Lock if prerequisite is pending or locked
-              const prereq = course.prerequisite;
-              if (prereq && (pendingCourses.has(prereq) || locked.has(prereq))) {
-                  locked.add(course.name);
-              }
-
-              // Rule 2: Lock if non-flexible and its term is inactive
-              const isNonFlexible = HIGH_PRIORITY_COURSES.has(course.name);
-              if (isNonFlexible && !activeTerms.has(course.term)) {
-                  locked.add(course.name);
-              }
-          }
-      }
-
-      // 2. Determine Approved Courses
+      // 1. Determine Approved Courses first, as they can prevent locking
       const approved = new Set<string>();
       if (selectedTermIndex > -1) {
           for (let i = 0; i < selectedTermIndex; i++) {
@@ -201,6 +178,31 @@ export function MapPlanner() {
           }
       }
       manuallyApprovedCourses.forEach(c => approved.add(c));
+
+
+      // 2. Determine Locked Courses (Cascading effect)
+      const locked = new Set<string>();
+      let prevLockedSize = -1;
+      
+      while (locked.size !== prevLockedSize) {
+          prevLockedSize = locked.size;
+          for (const course of courseMap.values()) {
+              if (course.isPlaceholder || locked.has(course.name)) continue;
+
+              const prereq = course.prerequisite;
+              
+              // Rule 1: Lock if prerequisite is NOT approved AND (is pending OR is locked)
+              if (prereq && !approved.has(prereq) && (pendingCourses.has(prereq) || locked.has(prereq))) {
+                  locked.add(course.name);
+              }
+
+              // Rule 2: Lock if non-flexible and its term is inactive
+              const isNonFlexible = HIGH_PRIORITY_COURSES.has(course.name);
+              if (isNonFlexible && !activeTerms.has(course.term)) {
+                  locked.add(course.name);
+              }
+          }
+      }
       
       // Ensure nothing locked is ever considered approved.
       locked.forEach(c => approved.delete(c));
@@ -275,19 +277,20 @@ export function MapPlanner() {
             
             const isSourcePending = pendingCourses.has(course.prerequisite);
             const isTargetLocked = lockedCourses.has(courseName);
+            const isPrereqApproved = approvedCourses.has(course.prerequisite);
 
             lines.push(
                  <path
                     key={`${course.prerequisite}-${courseName}`}
                     d={`M ${startX},${startY} C ${startX + 30},${startY} ${endX - 30},${endY} ${endX},${endY}`}
-                    className={cn('connector-line', { 'locked': isSourcePending || isTargetLocked })}
+                    className={cn('connector-line', { 'locked': !isPrereqApproved && (isSourcePending || isTargetLocked) })}
                     fill="none"
                 />
             );
         }
     }
     return lines;
-  }, [nodePositions, lockedCourses, pendingCourses]);
+  }, [nodePositions, lockedCourses, pendingCourses, approvedCourses]);
 
   const showRecommendationLimitWarning = useMemo(() => {
       const allPossibleRecommendations = new Set<string>();
