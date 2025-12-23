@@ -560,7 +560,14 @@ const OFERTA_COLUMNS = {
     BUILDING: 'EDIFICIO',
     ROOM: 'SALON'
 };
-const OFERTA_DAYS = ['L', 'M', 'MI', 'J', 'V'];
+const OFERTA_DAYS_ABBR = {
+    'LUN': 'L',
+    'MAR': 'M',
+    'MI': 'MI',
+    'JUE': 'J',
+    'VIE': 'V'
+};
+
 
 export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcademicaItem[] | null> {
     return new Promise((resolve, reject) => {
@@ -578,45 +585,41 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
 
                 if (jsonData.length < 2) return resolve(null);
 
-                const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
+                const headers: string[] = jsonData[0].map((h: any) => String(h || '').trim());
                 const headerMap: Record<string, number> = {};
                 headers.forEach((header, index) => {
-                    if (header === 'M') {
-                        if (!('MAR' in headerMap)) { // First 'M' is Martes
-                            headerMap['MAR'] = index;
-                        } else { // Second 'M' is Miércoles
-                            headerMap['MI'] = index;
-                        }
-                    } else if (header === 'L') {
-                        headerMap['LUN'] = index;
-                    } else if (header === 'J') {
-                         headerMap['JUE'] = index;
-                    } else if (header === 'V') {
-                         headerMap['VIE'] = index;
+                    const normalized = normalizeHeader(header);
+                    if (!headerMap[normalized]) {
+                      headerMap[normalized] = index;
                     }
-                    else {
-                        headerMap[header] = index;
+                    // Special handling for 'M' which can be Martes or Miercoles
+                    if(header.toUpperCase() === 'M' && 'MAR' in headerMap) {
+                        headerMap['MI'] = index;
                     }
                 });
+
+                const getColumnIndex = (name: string): number | undefined => {
+                    const normalizedName = normalizeHeader(name);
+                    return headerMap[normalizedName];
+                }
 
                 const oferta: OfertaAcademicaItem[] = [];
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
-                    if (!row || row.length === 0 || !row[headerMap[normalizeHeader(OFERTA_COLUMNS.CRN)]]) continue;
+                    if (!row || row.length === 0 || !row[getColumnIndex(OFERTA_COLUMNS.CRN)!]) continue;
                     
                      const getColumnValue = (columnName: string) => {
-                        const upperColName = normalizeHeader(columnName);
-                        const index = headerMap[upperColName];
+                        const index = getColumnIndex(columnName);
                         return index !== undefined ? String(row[index] || '').trim() : '';
                     }
 
                     const days: string[] = [];
-                    if (getColumnValue('LUN') === 'Y') days.push('LUN');
-                    if (getColumnValue('MAR') === 'Y') days.push('MAR');
-                    if (getColumnValue('MI') === 'Y') days.push('MI');
-                    if (getColumnValue('JUE') === 'Y') days.push('JUE');
-                    if (getColumnValue('VIE') === 'Y') days.push('VIE');
+                    if (getColumnValue('Lunes') === 'SI') days.push('LUN');
+                    if (getColumnValue('Martes') === 'SI') days.push('MAR');
+                    if (getColumnValue('Miércoles') === 'SI') days.push('MI');
+                    if (getColumnValue('Jueves') === 'SI') days.push('JUE');
+                    if (getColumnValue('Viernes') === 'SI') days.push('VIE');
 
                     const item: OfertaAcademicaItem = {
                         crn: getColumnValue(OFERTA_COLUMNS.CRN),
@@ -646,3 +649,4 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
     });
 }
     
+
