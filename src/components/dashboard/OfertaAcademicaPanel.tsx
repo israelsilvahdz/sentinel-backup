@@ -8,7 +8,7 @@ import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseOfertaAcademicaExcel } from '@/lib/excelParser';
 import { Input } from '../ui/input';
-import { Search, Info, Calendar, User, X, AlertTriangle, PlusCircle } from 'lucide-react';
+import { Search, Info, Calendar, User, X, AlertTriangle, PlusCircle, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
@@ -312,10 +312,20 @@ export function OfertaAcademicaPanel() {
                         <>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Horario Simulado</CardTitle>
-                                    <CardDescription>
-                                        Los bloques de clase se posicionan y dimensionan según su horario. Los empalmes se muestran uno al lado del otro en rojo.
-                                    </CardDescription>
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <CardTitle>Horario Simulado</CardTitle>
+                                            <CardDescription>
+                                                Los bloques de clase se posicionan y dimensionan según su horario. Los empalmes se muestran uno al lado del otro en rojo.
+                                            </CardDescription>
+                                        </div>
+                                        {scheduleSubjects.length > 0 && (
+                                            <Button variant="destructive" onClick={() => setScheduleSubjects([])}>
+                                                <Trash2 className="mr-2 h-4 w-4"/>
+                                                Borrar Todo
+                                            </Button>
+                                        )}
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
                                    <ScheduleVisualizer subjects={scheduleSubjects} onRemoveSubject={removeSubjectFromSchedule} />
