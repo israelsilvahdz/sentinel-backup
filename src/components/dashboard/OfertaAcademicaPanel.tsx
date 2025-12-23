@@ -222,8 +222,9 @@ export function OfertaAcademicaPanel() {
                                 <CardTitle>Paso 2: Edita el Horario</CardTitle>
                                 <CardDescription>Añade o quita materias para simular el horario de un alumno.</CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-4">
+                             <CardContent>
+                                 <Label>Añadir materia al horario</Label>
+                                 <div className="flex items-center gap-4">
                                    <SubjectSearchPopover allSubjects={ofertaAcademica} onSubjectSelect={addSubjectToSchedule} />
                                    <Button onClick={() => document.querySelector<HTMLButtonElement>('[cmdk-input-wrapper] button')?.click()}>
                                         <PlusCircle className="mr-2 h-4 w-4" />
@@ -234,7 +235,7 @@ export function OfertaAcademicaPanel() {
                         </Card>
                     </div>
 
-                    {selectedGroup && (
+                    {(selectedGroup || scheduleSubjects.length > 0) && (
                         <>
                             <Card>
                                 <CardHeader>
@@ -244,25 +245,27 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                <ScrollArea className="w-full h-[80vh] border rounded-lg">
+                                <ScrollArea className="w-full h-[80vh] border-none">
                                     <div 
-                                        className="grid grid-cols-[auto_repeat(5,1fr)]"
+                                        className="grid grid-cols-[auto_repeat(5,1fr)] bg-muted/30 rounded-lg p-2 gap-px"
                                         style={{ gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(60px, auto))`}}
                                     >
-                                        <div className="p-2 bg-card sticky top-0 z-10 row-start-1"></div>
+                                        <div className="p-2 sticky top-0 z-10 row-start-1"></div>
                                         {DAYS.map((day, i) => (
-                                            <div key={day} className="p-2 text-center font-bold bg-card sticky top-0 z-10 border-b border-l row-start-1" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
+                                            <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
                                         ))}
                                         
                                         {TIME_SLOTS.map((slot, i) => (
-                                            <div key={slot} className="p-2 text-center text-xs font-mono bg-card border-r border-t sticky left-0" style={{ gridRow: i + 2 }}>{slot}</div>
+                                            <div key={slot} className="p-2 text-center sticky left-0" style={{ gridRow: i + 2 }}>
+                                                <Badge variant="outline" className="font-mono text-xs">{slot}</Badge>
+                                            </div>
                                         ))}
 
                                         {DAYS.map((day, dayIndex) => (
                                             <React.Fragment key={day}>
                                                 {scheduleGrid[day]?.map((gridItem, slotIndex) => {
                                                     if (!gridItem) {
-                                                         return <div key={`${day}-${slotIndex}`} className="p-1 border-t border-l min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}></div>;
+                                                         return <div key={`${day}-${slotIndex}`} className="min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}></div>;
                                                     }
                                                     if (gridItem.rowSpan === 0) {
                                                         return null;
@@ -271,13 +274,13 @@ export function OfertaAcademicaPanel() {
                                                     const { item, rowSpan, isClashing } = gridItem;
 
                                                     return (
-                                                        <div key={item.crn} className="p-1 border-t border-l" style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${rowSpan}` }}>
-                                                            <Card className={cn("text-xs p-1.5 shadow-sm relative group h-full flex flex-col justify-center", isClashing && "border-destructive animate-pulse")}>
+                                                        <div key={item.crn} className="p-1" style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${rowSpan}` }}>
+                                                            <Card className={cn("text-xs p-1.5 shadow-sm relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", isClashing && "border-destructive animate-pulse border-2")}>
                                                                 {isClashing && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
                                                                 <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(item.crn)}>
                                                                     <X className="h-3 w-3 text-destructive"/>
                                                                 </Button>
-                                                                <p className="font-bold leading-tight">{item.subjectName}</p>
+                                                                <p className="font-bold leading-tight text-primary">{item.subjectName}</p>
                                                                 <p className="text-muted-foreground">{item.professor}</p>
                                                             </Card>
                                                         </div>
