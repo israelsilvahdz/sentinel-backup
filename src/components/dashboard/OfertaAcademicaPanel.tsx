@@ -18,6 +18,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '
 import type { OfertaAcademicaItem } from '@/types/student';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { ScrollArea } from '../ui/scroll-area';
 
 
 const DAYS = ['LUN', 'MAR', 'MI', 'JUE', 'VIE'];
@@ -121,8 +122,9 @@ export function OfertaAcademicaPanel() {
     }
 
     const { scheduleGrid, visibleTimeSlots, clashes } = useMemo(() => {
-        // First, determine which time slots are occupied
+        const clashMap = new Map<string, boolean>();
         const occupiedSlots = new Set<string>();
+
         scheduleSubjects.forEach(subject => {
             TIME_SLOTS.forEach(slot => {
                 if (subject.days.some(day => isClassInSlot(subject, slot, day))) {
@@ -130,17 +132,17 @@ export function OfertaAcademicaPanel() {
                 }
             });
         });
-        const visibleSlots = TIME_SLOTS.filter(slot => occupiedSlots.has(slot));
+        
+        const visibleSlots = TIME_SLOTS.filter(slot => occupiedSlots.has(slot)).sort((a, b) => parseInt(a.replace(':', '')) - parseInt(b.replace(':', '')));
 
-        // Then, build the grid and detect clashes
         const grid: Record<string, (ScheduleGridItem[])[]> = {};
-        const clashMap = new Map<string, boolean>();
-
+        
         DAYS.forEach(day => {
             grid[day] = Array(visibleSlots.length).fill(null).map(() => []);
-            const subjectsForDay = scheduleSubjects.filter(s => s.days.includes(day));
+        });
 
-            subjectsForDay.forEach(subject => {
+        scheduleSubjects.forEach(subject => {
+            subject.days.forEach(day => {
                 const startIndex = visibleSlots.findIndex(slot => isClassInSlot(subject, slot, day));
                 if (startIndex === -1) return;
 
@@ -150,12 +152,9 @@ export function OfertaAcademicaPanel() {
                 }
                 const rowSpan = endIndex - startIndex + 1;
                 
-                // Add to grid and check for clashes
                 for(let i = startIndex; i <= endIndex; i++) {
                      if (grid[day][i].length > 0) {
-                        // Mark existing subjects in slot as clashing
                         grid[day][i].forEach(existing => clashMap.set(existing.item.crn, true));
-                        // Mark current subject as clashing
                         clashMap.set(subject.crn, true);
                     }
                 }
@@ -261,16 +260,14 @@ export function OfertaAcademicaPanel() {
                                                         
                                                         if (isSlotOccupiedBySpan && itemsInSlot.length === 0) return null;
                                                         
-                                                        const latestItemIndex = itemsInSlot.length > 1 ? scheduleSubjects.findIndex(subj => subj.crn === itemsInSlot[itemsInSlot.length - 1].item.crn) : -1;
-                                                        
                                                         return (
                                                             <div 
                                                                 key={`${day}-${slotIndex}`} 
-                                                                className="relative min-h-[60px] bg-card flex" 
+                                                                className="relative min-h-[60px] bg-card flex z-10" 
                                                                 style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
                                                             >
                                                                 {itemsInSlot.map((gridItem, itemIndex) => {
-                                                                     const lastAddedIndex = scheduleSubjects.length - 1;
+                                                                    const lastAddedIndex = scheduleSubjects.length - 1;
                                                                     const currentItemIndex = scheduleSubjects.findIndex(subj => subj.crn === gridItem.item.crn);
                                                                     const isLatestAdded = currentItemIndex === lastAddedIndex;
 
@@ -374,11 +371,13 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
           <CommandInput placeholder="Buscar por nombre o CRN..." value={searchValue} onValueChange={setSearchValue} />
           <CommandEmpty>No se encontraron materias.</CommandEmpty>
           <CommandGroup>
-            {filteredSubjects.map((subject) => (
-              <CommandItem key={subject.crn} onSelect={() => handleSelect(subject)}>
-                {subject.subjectName} ({subject.crn}) - {subject.professor}
-              </CommandItem>
-            ))}
+            <ScrollArea className="h-72">
+                {filteredSubjects.map((subject) => (
+                <CommandItem key={subject.crn} onSelect={() => handleSelect(subject)}>
+                    {subject.subjectName} ({subject.crn}) - {subject.professor}
+                </CommandItem>
+                ))}
+            </ScrollArea>
           </CommandGroup>
         </Command>
       </PopoverContent>
