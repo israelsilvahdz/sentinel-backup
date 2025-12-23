@@ -11,7 +11,6 @@ import { Search, Info, Calendar, User, X, AlertTriangle, PlusCircle } from 'luci
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '../ui/scroll-area';
 import { useDashboardFilters } from './DashboardClient';
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -39,17 +38,6 @@ interface ScheduleGridItem {
     rowSpan: number;
 }
 
-
-function isTimeOverlap(item1: OfertaAcademicaItem, item2: OfertaAcademicaItem): boolean {
-    if (!item1.startTime || !item1.endTime || !item2.startTime || !item2.endTime) return false;
-    
-    const start1 = parseInt(item1.startTime.replace(':', ''), 10);
-    const end1 = parseInt(item1.endTime.replace(':', ''), 10);
-    const start2 = parseInt(item2.startTime.replace(':', ''), 10);
-    const end2 = parseInt(item2.endTime.replace(':', ''), 10);
-
-    return start1 < end2 && start2 < end1;
-}
 
 function isClassInSlot(item: OfertaAcademicaItem, slot: string, day: string): boolean {
     if (!item.days.includes(day) || !item.startTime || !item.endTime) return false;
@@ -132,11 +120,9 @@ export function OfertaAcademicaPanel() {
         setScheduleSubjects(prev => prev.filter(s => s.crn !== crnToRemove));
     }
 
-    const { scheduleGrid, visibleTimeSlots } = useMemo(() => {
-        const grid: Record<string, (ScheduleGridItem[])[]> = {};
-        const occupiedSlots = new Set<string>();
-
+    const { scheduleGrid, visibleTimeSlots, clashes } = useMemo(() => {
         // First, determine which time slots are occupied
+        const occupiedSlots = new Set<string>();
         scheduleSubjects.forEach(subject => {
             TIME_SLOTS.forEach(slot => {
                 if (subject.days.some(day => isClassInSlot(subject, slot, day))) {
@@ -144,8 +130,11 @@ export function OfertaAcademicaPanel() {
                 }
             });
         });
-        
         const visibleSlots = TIME_SLOTS.filter(slot => occupiedSlots.has(slot));
+
+        // Then, build the grid and detect clashes
+        const grid: Record<string, (ScheduleGridItem[])[]> = {};
+        const clashMap = new Map<string, boolean>();
 
         DAYS.forEach(day => {
             grid[day] = Array(visibleSlots.length).fill(null).map(() => []);
@@ -161,14 +150,20 @@ export function OfertaAcademicaPanel() {
                 }
                 const rowSpan = endIndex - startIndex + 1;
                 
-                grid[day][startIndex].push({
-                    item: subject,
-                    rowSpan,
-                });
+                // Add to grid and check for clashes
+                for(let i = startIndex; i <= endIndex; i++) {
+                     if (grid[day][i].length > 0) {
+                        // Mark existing subjects in slot as clashing
+                        grid[day][i].forEach(existing => clashMap.set(existing.item.crn, true));
+                        // Mark current subject as clashing
+                        clashMap.set(subject.crn, true);
+                    }
+                }
+                grid[day][startIndex].push({ item: subject, rowSpan });
             });
         });
         
-        return { scheduleGrid: grid, visibleTimeSlots: visibleSlots };
+        return { scheduleGrid: grid, visibleTimeSlots: visibleSlots, clashes: clashMap };
     }, [scheduleSubjects]);
     
     return (
@@ -235,74 +230,76 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                <div className="w-full overflow-x-auto">
-                                    <div 
-                                        className="grid bg-muted/30 rounded-lg p-2 gap-px"
-                                        style={{ 
-                                            gridTemplateColumns: 'auto repeat(5, minmax(140px, 1fr))',
-                                            gridTemplateRows: `auto repeat(${visibleTimeSlots.length}, minmax(60px, auto))`
-                                        }}
-                                    >
-                                        <div className="p-2 sticky top-0 left-0 z-10 row-start-1 bg-muted/30"></div>
-                                        {DAYS.map((day, i) => (
-                                            <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1 bg-muted/30" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
-                                        ))}
-                                        
-                                        {visibleTimeSlots.map((slot, i) => (
-                                            <div key={slot} className="p-2 text-center sticky left-0 z-10 bg-muted/30 flex items-center justify-center" style={{ gridRow: i + 2 }}>
-                                                <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
-                                            </div>
-                                        ))}
+                                    <div className="w-full overflow-x-auto">
+                                        <div 
+                                            className="grid bg-muted/30 rounded-lg p-2 gap-px"
+                                            style={{ 
+                                                gridTemplateColumns: 'auto repeat(5, minmax(140px, 1fr))',
+                                                gridTemplateRows: `auto repeat(${visibleTimeSlots.length}, minmax(60px, auto))`
+                                            }}
+                                        >
+                                            <div className="p-2 sticky top-0 left-0 z-10 row-start-1 bg-muted/30"></div>
+                                            {DAYS.map((day, i) => (
+                                                <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1 bg-muted/30" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
+                                            ))}
+                                            
+                                            {visibleTimeSlots.map((slot, i) => (
+                                                <div key={slot} className="p-2 text-center sticky left-0 z-10 bg-muted/30 flex items-center justify-center" style={{ gridRow: i + 2 }}>
+                                                    <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
+                                                </div>
+                                            ))}
 
-                                        {DAYS.map((day, dayIndex) => (
-                                            <React.Fragment key={day}>
-                                                {visibleTimeSlots.map((slot, slotIndex) => {
-                                                    const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
-                                                    const isSlotOccupiedBySpan = slotIndex > 0 && 
-                                                        (scheduleGrid[day]?.[slotIndex - 1] || []).some(prevItem => {
-                                                            const prevSlotIndex = visibleTimeSlots.findIndex(s => s === visibleTimeSlots[slotIndex-1]);
-                                                            return prevSlotIndex + prevItem.rowSpan > slotIndex;
-                                                        });
-                                                    
-                                                    if (isSlotOccupiedBySpan && itemsInSlot.length === 0) return null;
-                                                    
-                                                    const latestItemIndex = itemsInSlot.length > 1 ? scheduleSubjects.findIndex(subj => subj.crn === itemsInSlot[itemsInSlot.length - 1].item.crn) : -1;
-                                                    
-                                                    return (
-                                                        <div 
-                                                            key={`${day}-${slotIndex}`} 
-                                                            className="relative min-h-[60px] bg-card flex" 
-                                                            style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
-                                                        >
-                                                            {itemsInSlot.map((gridItem, itemIndex) => {
-                                                                const isLatestAdded = scheduleSubjects.findIndex(subj => subj.crn === gridItem.item.crn) === scheduleSubjects.length - 1;
+                                            {DAYS.map((day, dayIndex) => (
+                                                <React.Fragment key={day}>
+                                                    {visibleTimeSlots.map((slot, slotIndex) => {
+                                                        const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
+                                                        const isSlotOccupiedBySpan = slotIndex > 0 && 
+                                                            (scheduleGrid[day]?.[slotIndex - 1] || []).some(prevItem => {
+                                                                const prevSlotIndex = visibleTimeSlots.findIndex(s => s === visibleTimeSlots[slotIndex-1]);
+                                                                return prevSlotIndex + prevItem.rowSpan > slotIndex;
+                                                            });
+                                                        
+                                                        if (isSlotOccupiedBySpan && itemsInSlot.length === 0) return null;
+                                                        
+                                                        const latestItemIndex = itemsInSlot.length > 1 ? scheduleSubjects.findIndex(subj => subj.crn === itemsInSlot[itemsInSlot.length - 1].item.crn) : -1;
+                                                        
+                                                        return (
+                                                            <div 
+                                                                key={`${day}-${slotIndex}`} 
+                                                                className="relative min-h-[60px] bg-card flex" 
+                                                                style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
+                                                            >
+                                                                {itemsInSlot.map((gridItem, itemIndex) => {
+                                                                     const lastAddedIndex = scheduleSubjects.length - 1;
+                                                                    const currentItemIndex = scheduleSubjects.findIndex(subj => subj.crn === gridItem.item.crn);
+                                                                    const isLatestAdded = currentItemIndex === lastAddedIndex;
 
-                                                                return (
-                                                                    <div 
-                                                                        key={gridItem.item.crn} 
-                                                                        className="p-1 w-full"
-                                                                        style={{ flex: `1 1 ${100 / itemsInSlot.length}%` }}
-                                                                    >
-                                                                        <Card className={cn(
-                                                                            "h-full flex flex-col justify-center text-center text-xs p-1.5 shadow-md relative group bg-card hover:shadow-lg transition-shadow", 
-                                                                            itemsInSlot.length > 1 && isLatestAdded && "border-destructive animate-pulse border-2 shadow-destructive/20"
-                                                                        )}>
-                                                                            {itemsInSlot.length > 1 && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
-                                                                            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
-                                                                                <X className="h-3 w-3 text-destructive"/>
-                                                                            </Button>
-                                                                            <p className="font-bold leading-tight text-primary whitespace-normal">{gridItem.item.subjectName}</p>
-                                                                            <p className="text-muted-foreground whitespace-normal">{gridItem.item.professor}</p>
-                                                                        </Card>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )
-                                                })}
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
+                                                                    return (
+                                                                        <div 
+                                                                            key={gridItem.item.crn} 
+                                                                            className="p-1 w-full"
+                                                                            style={{ flex: `1 1 ${100 / itemsInSlot.length}%` }}
+                                                                        >
+                                                                            <Card className={cn(
+                                                                                "h-full flex flex-col justify-center text-center text-xs p-1.5 shadow-sm relative group bg-card hover:shadow-lg transition-shadow", 
+                                                                                clashes.has(gridItem.item.crn) && isLatestAdded && "border-destructive animate-pulse border-2 shadow-destructive/20"
+                                                                            )}>
+                                                                                {clashes.has(gridItem.item.crn) && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
+                                                                                <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
+                                                                                    <X className="h-3 w-3 text-destructive"/>
+                                                                                </Button>
+                                                                                <p className="font-bold leading-tight text-primary whitespace-normal">{gridItem.item.subjectName}</p>
+                                                                                <p className="text-muted-foreground whitespace-normal">{gridItem.item.professor}</p>
+                                                                            </Card>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </React.Fragment>
+                                            ))}
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -310,24 +307,22 @@ export function OfertaAcademicaPanel() {
                             <Card>
                                 <CardHeader><CardTitle>Listado de Materias en Simulación</CardTitle></CardHeader>
                                 <CardContent>
-                                    <ScrollArea>
-                                        <Table>
-                                            <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
-                                            <TableBody>
-                                                {scheduleSubjects.map(item => (
-                                                    <TableRow key={item.crn}>
-                                                        <TableCell className="font-medium">{item.subjectName}</TableCell>
-                                                        <TableCell>{item.crn}</TableCell>
-                                                        <TableCell>{item.professor}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex gap-1 flex-wrap">{item.days.map(d => <Badge key={d} variant="outline">{d}</Badge>)}</div>
-                                                            <span className="text-xs">{item.startTime}-{item.endTime}</span>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </ScrollArea>
+                                    <Table>
+                                        <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
+                                        <TableBody>
+                                            {scheduleSubjects.map(item => (
+                                                <TableRow key={item.crn}>
+                                                    <TableCell className="font-medium">{item.subjectName}</TableCell>
+                                                    <TableCell>{item.crn}</TableCell>
+                                                    <TableCell>{item.professor}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex gap-1 flex-wrap">{item.days.map(d => <Badge key={d} variant="outline">{d}</Badge>)}</div>
+                                                        <span className="text-xs">{item.startTime}-{item.endTime}</span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
                                 </CardContent>
                             </Card>
                         </>
@@ -390,5 +385,7 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
+
+    
 
     
