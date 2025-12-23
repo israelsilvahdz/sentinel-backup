@@ -37,7 +37,6 @@ const TIME_SLOTS = [
 interface ScheduleGridItem {
     item: OfertaAcademicaItem;
     rowSpan: number;
-    isNewestInClash: boolean;
 }
 
 
@@ -133,9 +132,7 @@ export function OfertaAcademicaPanel() {
         setScheduleSubjects(prev => prev.filter(s => s.crn !== crnToRemove));
     }
 
-    const { scheduleGrid, clashes } = useMemo(() => {
-        const subjectIndices = new Map(scheduleSubjects.map((s, i) => [s.crn, i]));
-        
+    const { clashes, scheduleGrid } = useMemo(() => {
         const clashMap = new Map<string, string[]>();
         for (let i = 0; i < scheduleSubjects.length; i++) {
             for (let j = i + 1; j < scheduleSubjects.length; j++) {
@@ -167,23 +164,14 @@ export function OfertaAcademicaPanel() {
                 }
                 const rowSpan = endIndex - startIndex + 1;
                 
-                const isClashing = clashMap.has(subject.crn);
-                let isNewestInClash = false;
-                if(isClashing) {
-                    const myIndex = subjectIndices.get(subject.crn) ?? -1;
-                    const clashingIndices = (clashMap.get(subject.crn) || []).map(crn => subjectIndices.get(crn) ?? -1);
-                    isNewestInClash = myIndex > Math.max(...clashingIndices);
-                }
-
                 grid[day][startIndex].push({
                     item: subject,
                     rowSpan,
-                    isNewestInClash
                 });
             });
         });
         
-        return { scheduleGrid: grid, clashes: clashMap };
+        return { clashes: clashMap, scheduleGrid: grid };
     }, [scheduleSubjects]);
     
     return (
@@ -250,7 +238,7 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                <ScrollArea className="w-full h-[80vh] border-none">
+                                <ScrollArea className="w-full border-none">
                                     <div 
                                         className="grid bg-muted/30 rounded-lg p-2 gap-px"
                                         style={{ 
@@ -281,26 +269,37 @@ export function OfertaAcademicaPanel() {
                                                     
                                                     if (isSlotOccupiedBySpan && itemsInSlot.length === 0) return null;
                                                     
+                                                    const latestItemIndex = itemsInSlot.length > 1 ? scheduleSubjects.findIndex(subj => subj.crn === itemsInSlot[itemsInSlot.length - 1].item.crn) : -1;
+                                                    
                                                     return (
-                                                        <div key={`${day}-${slotIndex}`} className="relative min-h-[60px] bg-card flex" style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}>
-                                                            {itemsInSlot.map((gridItem, itemIndex) => (
-                                                                <div 
-                                                                    key={gridItem.item.crn} 
-                                                                    className="p-1 w-full"
-                                                                    style={{ flex: '1 1 50%' }}
-                                                                >
-                                                                    <Card className={cn("text-xs p-1.5 shadow-md relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", gridItem.isNewestInClash && "border-destructive animate-pulse border-2 shadow-destructive/20")}>
-                                                                        {clashes.has(gridItem.item.crn) && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
-                                                                        <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
-                                                                            <X className="h-3 w-3 text-destructive"/>
-                                                                        </Button>
-                                                                        <div className="text-center">
+                                                        <div 
+                                                            key={`${day}-${slotIndex}`} 
+                                                            className="relative min-h-[60px] bg-card flex" 
+                                                            style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
+                                                        >
+                                                            {itemsInSlot.map((gridItem, itemIndex) => {
+                                                                const isLatest = scheduleSubjects.findIndex(subj => subj.crn === gridItem.item.crn) === latestItemIndex;
+
+                                                                return (
+                                                                    <div 
+                                                                        key={gridItem.item.crn} 
+                                                                        className="p-1 w-full"
+                                                                        style={{ flex: `1 1 ${100 / itemsInSlot.length}%` }}
+                                                                    >
+                                                                        <Card className={cn(
+                                                                            "h-full flex flex-col justify-center text-center text-xs p-1.5 shadow-md relative group bg-card hover:shadow-lg transition-shadow", 
+                                                                            itemsInSlot.length > 1 && isLatest && "border-destructive animate-pulse border-2 shadow-destructive/20"
+                                                                        )}>
+                                                                            {itemsInSlot.length > 1 && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
+                                                                            <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
+                                                                                <X className="h-3 w-3 text-destructive"/>
+                                                                            </Button>
                                                                             <p className="font-bold leading-tight text-primary">{gridItem.item.subjectName}</p>
                                                                             <p className="text-muted-foreground">{gridItem.item.professor}</p>
-                                                                        </div>
-                                                                    </Card>
-                                                                </div>
-                                                            ))}
+                                                                        </Card>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )
                                                 })}
