@@ -119,29 +119,30 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
 
         studentsData.forEach((entries, studentId) => {
             const studentName = entries[0].studentName;
+            // El tetramestre actual es el más alto que aparece en su kardex
             const currentTerm = Math.max(...entries.map(e => e.term));
 
+            // Construir un Set con todas las materias que tienen CUALQUIER tipo de calificación (incluyendo CU)
             const passedOrCouringSubjects = new Set<string>();
             entries.forEach(entry => {
                 const grade = entry.grade;
-                // Si la calificación existe y no es 'CU' (o está vacío, que significa reprobada), se considera cursada.
-                // Una calificación numérica o cualquier texto que no sea 'CU' se considera que ya se intentó cursar.
-                // Si la calificación es nula o vacía, la materia está pendiente.
-                if (grade !== null && grade !== '') {
+                // Si la calificación no es nula o vacía, significa que el alumno la cursó o la está cursando.
+                if (grade !== null && String(grade).trim() !== '') {
                     passedOrCouringSubjects.add(entry.subjectName);
                 }
             });
 
             const pendingSubjects: { name: string; term: number }[] = [];
             
-            // Iterar sobre los tetramestres ANTERIORES al actual del alumno
-            for (let i = 0; i < currentTerm - 1; i++) {
-                const termData = curriculum[i];
+            // Revisar todos los tetramestres ANTERIORES al actual del alumno
+            for (let i = 1; i < currentTerm; i++) {
+                const termData = curriculum[i-1]; // El índice del array es `i-1`
                 if (termData) {
                     termData.courses.forEach(course => {
-                        // Es una materia del plan que no está en la lista de aprobadas/cursando
+                        // Si la materia no es un placeholder, no es flexible, Y NO ESTÁ en la lista de cursadas/aprobadas
+                        // entonces es una materia pendiente de un tetra anterior.
                         if (!course.isPlaceholder && !course.isFlexible && !passedOrCouringSubjects.has(course.name)) {
-                            pendingSubjects.push({ name: course.name, term: i + 1 });
+                            pendingSubjects.push({ name: course.name, term: i });
                         }
                     });
                 }
