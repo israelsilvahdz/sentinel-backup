@@ -41,24 +41,34 @@ interface ScheduleGridItem {
 }
 
 
+function isTimeOverlap(item1: OfertaAcademicaItem, item2: OfertaAcademicaItem): boolean {
+    if (!item1.startTime || !item1.endTime || !item2.startTime || !item2.endTime) return false;
+    
+    const start1 = parseInt(item1.startTime.replace(':', ''), 10);
+    const end1 = parseInt(item1.endTime.replace(':', ''), 10);
+    const start2 = parseInt(item2.startTime.replace(':', ''), 10);
+    const end2 = parseInt(item2.endTime.replace(':', ''), 10);
+
+    return start1 < end2 && start2 < end1;
+}
+
 function isClassInSlot(item: OfertaAcademicaItem, slot: string, day: string): boolean {
     if (!item.days.includes(day) || !item.startTime || !item.endTime) return false;
     const itemStart = parseInt(item.startTime.replace(':', ''), 10);
     const itemEnd = parseInt(item.endTime.replace(':', ''), 10);
     const slotStart = parseInt(slot.replace(':', ''), 10);
     
-    // Asumimos que cada slot de tiempo dura hasta el inicio del siguiente
     const nextSlotIndex = TIME_SLOTS.indexOf(slot) + 1;
     const slotEnd = nextSlotIndex < TIME_SLOTS.length 
         ? parseInt(TIME_SLOTS[nextSlotIndex].replace(':', ''), 10)
-        : slotStart + 100; // Asume 1 hora si es el último slot
+        : slotStart + 100;
 
     return itemStart < slotEnd && itemEnd > slotStart;
 }
 
 export function OfertaAcademicaPanel() {
-    const { toast } = useToast();
     const { ofertaAcademica, setOfertaAcademica } = useDashboardFilters();
+    const { toast } = useToast();
     const [ofertaFile, setOfertaFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     
@@ -128,9 +138,9 @@ export function OfertaAcademicaPanel() {
             for (let j = i + 1; j < scheduleSubjects.length; j++) {
                 const item1 = scheduleSubjects[i];
                 const item2 = scheduleSubjects[j];
-                const commonDays = item1.days.some(day => item2.days.includes(day));
+                const commonDays = item1.days.filter(day => item2.days.includes(day));
                 
-                if (commonDays && isTimeOverlap(item1, item2)) {
+                if (commonDays.length > 0 && isTimeOverlap(item1, item2)) {
                     if (!clashMap.has(item1.crn)) clashMap.set(item1.crn, []);
                     if (!clashMap.has(item2.crn)) clashMap.set(item2.crn, []);
                     clashMap.get(item1.crn)!.push(item2.crn);
@@ -139,14 +149,15 @@ export function OfertaAcademicaPanel() {
             }
         }
         
-        const grid: Record<string, (ScheduleGridItem | null)[]> = {};
+        const grid: Record<string, (ScheduleGridItem[])[]> = {};
         DAYS.forEach(day => {
-            grid[day] = Array(TIME_SLOTS.length).fill(null);
-            const subjectsForDay = scheduleSubjects.filter(s => s.days.includes(day));
+            grid[day] = Array(TIME_SLOTS.length).fill(null).map(() => []);
 
+            const subjectsForDay = scheduleSubjects.filter(s => s.days.includes(day));
+            
             subjectsForDay.forEach(subject => {
                 const startIndex = TIME_SLOTS.findIndex(slot => isClassInSlot(subject, slot, day));
-                if (startIndex === -1 || grid[day][startIndex] !== null) return;
+                if (startIndex === -1) return;
 
                 let endIndex = startIndex;
                 while (endIndex + 1 < TIME_SLOTS.length && isClassInSlot(subject, TIME_SLOTS[endIndex + 1], day)) {
@@ -154,33 +165,17 @@ export function OfertaAcademicaPanel() {
                 }
                 const rowSpan = endIndex - startIndex + 1;
 
-                grid[day][startIndex] = {
+                grid[day][startIndex].push({
                     item: subject,
                     rowSpan: rowSpan,
                     isClashing: clashMap.has(subject.crn)
-                };
-                
-                for (let i = startIndex + 1; i <= endIndex; i++) {
-                    grid[day][i] = { item: subject, rowSpan: 0, isClashing: false }; 
-                }
+                });
             });
         });
         
         return { scheduleGrid: grid, clashes: clashMap };
     }, [scheduleSubjects]);
     
-    function isTimeOverlap(item1: OfertaAcademicaItem, item2: OfertaAcademicaItem): boolean {
-        if (!item1.startTime || !item1.endTime || !item2.startTime || !item2.endTime) return false;
-        
-        const start1 = parseInt(item1.startTime.replace(':', ''), 10);
-        const end1 = parseInt(item1.endTime.replace(':', ''), 10);
-        const start2 = parseInt(item2.startTime.replace(':', ''), 10);
-        const end2 = parseInt(item2.endTime.replace(':', ''), 10);
-
-        return start1 < end2 && start2 < end1;
-    }
-
-
     return (
         <div className="space-y-8 p-4 md:p-8 pt-6">
             <header className="flex items-center justify-between flex-wrap gap-4">
@@ -247,8 +242,11 @@ export function OfertaAcademicaPanel() {
                                 <CardContent>
                                 <ScrollArea className="w-full h-[80vh] border-none">
                                     <div 
-                                        className="grid grid-cols-[auto_repeat(5,1fr)] bg-muted/30 rounded-lg p-2 gap-px"
-                                        style={{ gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(60px, auto))`}}
+                                        className="grid bg-muted/30 rounded-lg p-2 gap-px"
+                                        style={{ 
+                                            gridTemplateColumns: 'auto repeat(5, 1fr)',
+                                            gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(60px, auto))`
+                                        }}
                                     >
                                         <div className="p-2 sticky top-0 z-10 row-start-1"></div>
                                         {DAYS.map((day, i) => (
@@ -263,26 +261,39 @@ export function OfertaAcademicaPanel() {
 
                                         {DAYS.map((day, dayIndex) => (
                                             <React.Fragment key={day}>
-                                                {scheduleGrid[day]?.map((gridItem, slotIndex) => {
-                                                    if (!gridItem) {
-                                                         return <div key={`${day}-${slotIndex}`} className="min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}></div>;
-                                                    }
-                                                    if (gridItem.rowSpan === 0) {
-                                                        return null;
-                                                    }
-                                                    
-                                                    const { item, rowSpan, isClashing } = gridItem;
+                                                {TIME_SLOTS.map((slot, slotIndex) => {
+                                                    const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
+                                                    const isSlotOccupiedBySpan = slotIndex > 0 && 
+                                                        scheduleGrid[day]?.[slotIndex - 1]?.some(prevItem => prevItem.rowSpan > 1 && isClassInSlot(prevItem.item, slot, day));
 
+                                                    if (isSlotOccupiedBySpan) return null;
+                                                    
                                                     return (
-                                                        <div key={item.crn} className="p-1" style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${rowSpan}` }}>
-                                                            <Card className={cn("text-xs p-1.5 shadow-sm relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", isClashing && "border-destructive animate-pulse border-2")}>
-                                                                {isClashing && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
-                                                                <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(item.crn)}>
-                                                                    <X className="h-3 w-3 text-destructive"/>
-                                                                </Button>
-                                                                <p className="font-bold leading-tight text-primary">{item.subjectName}</p>
-                                                                <p className="text-muted-foreground">{item.professor}</p>
-                                                            </Card>
+                                                        <div key={`${day}-${slotIndex}`} className="relative min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}>
+                                                            {itemsInSlot.map((gridItem, itemIndex) => (
+                                                                <div 
+                                                                    key={gridItem.item.crn} 
+                                                                    className="p-1 absolute w-full h-full"
+                                                                    style={{ 
+                                                                        height: `calc(${gridItem.rowSpan * 100}% + ${gridItem.rowSpan-1}px)`,
+                                                                        zIndex: 10 + itemIndex,
+                                                                        ...(itemsInSlot.length > 1 && {
+                                                                            marginLeft: `${itemIndex * 8}px`,
+                                                                            marginTop: `${itemIndex * 8}px`,
+                                                                            width: `calc(100% - ${itemIndex * 8}px)`
+                                                                        })
+                                                                    }}
+                                                                >
+                                                                    <Card className={cn("text-xs p-1.5 shadow-md relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", gridItem.isClashing && "border-destructive animate-pulse border-2 shadow-destructive/20")}>
+                                                                        {gridItem.isClashing && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
+                                                                        <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
+                                                                            <X className="h-3 w-3 text-destructive"/>
+                                                                        </Button>
+                                                                        <p className="font-bold leading-tight text-primary">{gridItem.item.subjectName}</p>
+                                                                        <p className="text-muted-foreground">{gridItem.item.professor}</p>
+                                                                    </Card>
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     )
                                                 })}
@@ -344,7 +355,7 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect }: { allSubjects: O
     return allSubjects.filter(subject => 
         subject.subjectName.toLowerCase().includes(lowercasedFilter) || 
         subject.crn.includes(lowercasedFilter)
-    ).slice(0, 50); // Limit results for performance
+    ).slice(0, 50);
   }, [searchValue, allSubjects]);
 
   const handleSelect = (subject: OfertaAcademicaItem) => {
