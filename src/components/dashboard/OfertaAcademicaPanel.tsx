@@ -32,10 +32,6 @@ const DAY_MAP: Record<string, string> = {
 };
 
 const HOUR_HEIGHT = 60; // 60px por hora
-const START_HOUR = 7;
-const END_HOUR = 18;
-
-// --- New Schedule Viewer Components ---
 
 interface TimeBlock {
     item: OfertaAcademicaItem;
@@ -51,19 +47,34 @@ const timeToMinutes = (time: string): number => {
     return hours * 60 + minutes;
 };
 
-const minutesToPosition = (minutes: number): number => {
-    return ((minutes - START_HOUR * 60) / 60) * HOUR_HEIGHT;
-};
-
 
 function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAcademicaItem[], onRemoveSubject: (crn: string) => void }) {
     const timeSlots = useMemo(() => {
-        const slots = [];
-        for (let i = START_HOUR; i < END_HOUR; i++) {
+        const slots: string[] = [];
+        if (subjects.length === 0) return slots;
+        
+        let minHour = 24;
+        let maxHour = 0;
+
+        subjects.forEach(s => {
+            if (s.startTime) minHour = Math.min(minHour, parseInt(s.startTime.split(':')[0], 10));
+            if (s.endTime) maxHour = Math.max(maxHour, parseInt(s.endTime.split(':')[0], 10));
+        });
+        
+        const startHour = Math.max(0, minHour -1);
+        const endHour = Math.min(23, maxHour + 1);
+
+
+        for (let i = startHour; i < endHour; i++) {
             slots.push(`${String(i).padStart(2, '0')}:00`);
         }
         return slots;
-    }, []);
+    }, [subjects]);
+
+    const minutesToPosition = useCallback((minutes: number): number => {
+        const firstHour = timeSlots.length > 0 ? parseInt(timeSlots[0].split(':')[0], 10) : 7;
+        return ((minutes - firstHour * 60) / 60) * HOUR_HEIGHT;
+    }, [timeSlots]);
 
     const dailyBlocks = useMemo(() => {
         const blocksByDay: Record<string, TimeBlock[]> = {};
@@ -114,7 +125,7 @@ function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAca
         });
 
         return blocksByDay;
-    }, [subjects]);
+    }, [subjects, minutesToPosition]);
 
 
     return (
@@ -130,7 +141,7 @@ function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAca
             <div className="grid grid-cols-[auto_1fr] min-w-[800px]">
                 {/* Time Ruler */}
                 <div className="relative">
-                    {timeSlots.map((time, index) => (
+                    {timeSlots.map((time) => (
                         <div key={time} className="h-[60px] text-right pr-2">
                              <span className="text-xs -translate-y-1/2 relative top-0 text-muted-foreground font-mono">{time}</span>
                         </div>
@@ -199,7 +210,7 @@ export function OfertaAcademicaPanel() {
     
     const availableGroups = useMemo(() => {
         const groups = new Set(ofertaAcademica.map(item => item.group));
-        return Array.from(groups).filter(group => group && group.trim() !== '').sort();
+        return Array.from(groups).filter(group => group && group.trim() !== '' && !group.toUpperCase().startsWith('F')).sort();
     }, [ofertaAcademica]);
 
 
@@ -235,7 +246,7 @@ export function OfertaAcademicaPanel() {
     const handleGroupSelect = (group: string | null) => {
         setSelectedGroup(group);
         if (group) {
-            const groupSubjects = ofertaAcademica.filter(item => item.group === group);
+            const groupSubjects = ofertaAcademica.filter(item => item.group === group && !item.group.toUpperCase().startsWith('F'));
             setScheduleSubjects(groupSubjects);
         } else {
             setScheduleSubjects([]);
@@ -385,8 +396,9 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     if (!searchValue) return [];
     const lowercasedFilter = searchValue.toLowerCase();
     return allSubjects.filter(subject => 
-        subject.subjectName.toLowerCase().includes(lowercasedFilter) || 
-        subject.crn.includes(lowercasedFilter)
+        !subject.group.toUpperCase().startsWith('F') &&
+        (subject.subjectName.toLowerCase().includes(lowercasedFilter) || 
+        subject.crn.includes(lowercasedFilter))
     ).slice(0, 50);
   }, [searchValue, allSubjects]);
 
@@ -422,3 +434,4 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
+
