@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -49,8 +50,9 @@ function isClassInSlot(item: OfertaAcademicaItem, slot: string, day: string): bo
     const nextSlotIndex = TIME_SLOTS.indexOf(slot) + 1;
     const slotEnd = nextSlotIndex < TIME_SLOTS.length 
         ? parseInt(TIME_SLOTS[nextSlotIndex].replace(':', ''), 10)
-        : slotStart + 100;
+        : slotStart + 100; // Asume 1 hora si es el último slot
 
+    // Verifica si hay cualquier superposición
     return itemStart < slotEnd && itemEnd > slotStart;
 }
 
@@ -122,9 +124,7 @@ export function OfertaAcademicaPanel() {
     }
 
     const { scheduleGrid, visibleTimeSlots, clashes } = useMemo(() => {
-        const clashMap = new Map<string, boolean>();
         const occupiedSlots = new Set<string>();
-
         scheduleSubjects.forEach(subject => {
             TIME_SLOTS.forEach(slot => {
                 if (subject.days.some(day => isClassInSlot(subject, slot, day))) {
@@ -132,35 +132,50 @@ export function OfertaAcademicaPanel() {
                 }
             });
         });
-        
-        const visibleSlots = TIME_SLOTS.filter(slot => occupiedSlots.has(slot)).sort((a, b) => parseInt(a.replace(':', '')) - parseInt(b.replace(':', '')));
 
-        const grid: Record<string, (ScheduleGridItem[])[]> = {};
-        
-        DAYS.forEach(day => {
-            grid[day] = Array(visibleSlots.length).fill(null).map(() => []);
-        });
+        const visibleSlots = TIME_SLOTS
+            .filter(slot => occupiedSlots.has(slot))
+            .sort((a, b) => parseInt(a.replace(':', '')) - parseInt(b.replace(':', '')));
 
-        scheduleSubjects.forEach(subject => {
-            subject.days.forEach(day => {
-                const startIndex = visibleSlots.findIndex(slot => isClassInSlot(subject, slot, day));
-                if (startIndex === -1) return;
+        const clashMap = new Map<string, boolean>();
+        const grid: Record<string, ScheduleGridItem[]> = {};
 
-                let endIndex = startIndex;
-                while (endIndex + 1 < visibleSlots.length && isClassInSlot(subject, visibleSlots[endIndex + 1], day)) {
-                    endIndex++;
-                }
-                const rowSpan = endIndex - startIndex + 1;
-                
-                for(let i = startIndex; i <= endIndex; i++) {
-                     if (grid[day][i].length > 0) {
-                        grid[day][i].forEach(existing => clashMap.set(existing.item.crn, true));
-                        clashMap.set(subject.crn, true);
+        // Inicializar el grid solo con los slots visibles
+        if(visibleSlots.length > 0) {
+            scheduleSubjects.forEach(subject => {
+                subject.days.forEach(day => {
+                    const keyPrefix = `${day}-`;
+                    let startSlotIndex = -1;
+
+                    for (let i = 0; i < visibleSlots.length; i++) {
+                        if (isClassInSlot(subject, visibleSlots[i], day)) {
+                            if (startSlotIndex === -1) {
+                                startSlotIndex = i;
+                            }
+                        }
                     }
-                }
-                grid[day][startIndex].push({ item: subject, rowSpan });
+
+                    if (startSlotIndex !== -1) {
+                        let endSlotIndex = startSlotIndex;
+                        while(endSlotIndex + 1 < visibleSlots.length && isClassInSlot(subject, visibleSlots[endSlotIndex + 1], day)) {
+                            endSlotIndex++;
+                        }
+                        const rowSpan = endSlotIndex - startSlotIndex + 1;
+                        const key = `${keyPrefix}${visibleSlots[startSlotIndex]}`;
+                        if (!grid[key]) {
+                            grid[key] = [];
+                        }
+                        
+                        grid[key].forEach(existing => clashMap.set(existing.item.crn, true));
+                        if(grid[key].length > 0) {
+                             clashMap.set(subject.crn, true);
+                        }
+
+                        grid[key].push({ item: subject, rowSpan });
+                    }
+                });
             });
-        });
+        }
         
         return { scheduleGrid: grid, visibleTimeSlots: visibleSlots, clashes: clashMap };
     }, [scheduleSubjects]);
@@ -234,7 +249,7 @@ export function OfertaAcademicaPanel() {
                                             className="grid bg-muted/30 rounded-lg p-2 gap-px"
                                             style={{ 
                                                 gridTemplateColumns: 'auto repeat(5, minmax(140px, 1fr))',
-                                                gridTemplateRows: `auto repeat(${visibleTimeSlots.length}, minmax(60px, auto))`
+                                                gridAutoRows: 'minmax(60px, auto)'
                                             }}
                                         >
                                             <div className="p-2 sticky top-0 left-0 z-10 row-start-1 bg-muted/30"></div>
@@ -243,28 +258,28 @@ export function OfertaAcademicaPanel() {
                                             ))}
                                             
                                             {visibleTimeSlots.map((slot, i) => (
-                                                <div key={slot} className="p-2 text-center sticky left-0 z-10 bg-muted/30 flex items-center justify-center" style={{ gridRow: i + 2 }}>
-                                                    <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
-                                                </div>
-                                            ))}
+                                                <React.Fragment key={slot}>
+                                                    <div className="p-2 text-center sticky left-0 z-10 bg-muted/30 flex items-center justify-center" style={{ gridRow: i + 2 }}>
+                                                        <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
+                                                    </div>
 
-                                            {DAYS.map((day, dayIndex) => (
-                                                <React.Fragment key={day}>
-                                                    {visibleTimeSlots.map((slot, slotIndex) => {
-                                                        const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
-                                                        const isSlotOccupiedBySpan = slotIndex > 0 && 
-                                                            (scheduleGrid[day]?.[slotIndex - 1] || []).some(prevItem => {
-                                                                const prevSlotIndex = visibleTimeSlots.findIndex(s => s === visibleTimeSlots[slotIndex-1]);
-                                                                return prevSlotIndex + prevItem.rowSpan > slotIndex;
-                                                            });
-                                                        
-                                                        if (isSlotOccupiedBySpan && itemsInSlot.length === 0) return null;
-                                                        
+                                                     {DAYS.map((day, dayIndex) => {
+                                                        const itemsInSlot = scheduleGrid[`${day}-${slot}`] || [];
+                                                        const isSlotOccupiedBySpan = i > 0 && 
+                                                            Object.values(scheduleGrid).flat().some(gridItem => 
+                                                                gridItem.item.days.includes(day) && 
+                                                                isClassInSlot(gridItem.item, visibleTimeSlots[i-1], day) &&
+                                                                !isClassInSlot(gridItem.item, slot, day) && // Doesn't start here
+                                                                (visibleTimeSlots.findIndex(s => isClassInSlot(gridItem.item, s, day)) + gridItem.rowSpan > i)
+                                                            );
+                                                            
+                                                        if (isSlotOccupiedBySpan) return null;
+
                                                         return (
                                                             <div 
-                                                                key={`${day}-${slotIndex}`} 
-                                                                className="relative min-h-[60px] bg-card flex z-10" 
-                                                                style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
+                                                                key={`${day}-${slot}`} 
+                                                                className="relative min-h-[60px] bg-card flex z-0" 
+                                                                style={{ gridColumn: dayIndex + 2, gridRow: `${i + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
                                                             >
                                                                 {itemsInSlot.map((gridItem, itemIndex) => {
                                                                     const lastAddedIndex = scheduleSubjects.length - 1;
@@ -361,7 +376,7 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
   return (
     <Popover open={isOpen} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="w-full justify-start" onClick={(e) => { e.preventDefault(); onOpenChange(true); }}>
+        <Button variant="outline" className="w-full justify-start" onClick={(e) => { e.preventDefault(); }}>
             <Search className="mr-2 h-4 w-4" />
             Buscar Materia por nombre o CRN...
         </Button>
@@ -388,3 +403,4 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     
 
     
+
