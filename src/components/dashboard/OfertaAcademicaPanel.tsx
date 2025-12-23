@@ -55,7 +55,7 @@ const minutesToPosition = (minutes: number): number => {
 };
 
 
-function ScheduleVisualizer({ subjects }: { subjects: OfertaAcademicaItem[] }) {
+function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAcademicaItem[], onRemoveSubject: (crn: string) => void }) {
     const timeSlots = useMemo(() => {
         const slots = [];
         for (let i = START_HOUR; i < END_HOUR; i++) {
@@ -136,22 +136,30 @@ function ScheduleVisualizer({ subjects }: { subjects: OfertaAcademicaItem[] }) {
                     ))}
                     {DAYS.map((day, dayIndex) => (
                          <div key={day} className="absolute inset-0 grid grid-cols-5">
-                             <div className="relative" style={{ gridColumn: dayIndex + 1 }}>
+                             <div className="relative px-0.5" style={{ gridColumn: dayIndex + 1 }}>
                                  {dailyBlocks[day]?.map(block => (
                                     <div 
                                         key={block.item.crn}
                                         className={cn(
-                                            "absolute rounded-lg p-2 text-white shadow-md transition-all duration-300",
+                                            "absolute rounded-lg p-2 text-white shadow-md transition-all duration-300 group",
                                             block.isConflict ? 'bg-destructive/80 border-2 border-destructive-foreground' : 'bg-primary/80'
                                         )}
                                         style={{
                                             top: `${block.top}px`,
                                             height: `${block.height}px`,
-                                            width: `${block.width}%`,
-                                            left: `${block.left}%`,
+                                            width: `calc(${block.width}% - 4px)`,
+                                            left: `calc(${block.left}% + 2px)`,
                                         }}
                                     >
-                                        <p className="font-bold text-xs leading-tight">{block.item.subjectName}</p>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="absolute top-1 right-1 h-5 w-5 text-white/70 hover:text-white hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => onRemoveSubject(block.item.crn)}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                        <p className="font-bold text-xs leading-tight pr-4">{block.item.subjectName}</p>
                                         <p className="text-xs opacity-80">{block.item.professor}</p>
                                         <p className="text-xs opacity-80 font-mono">{block.item.startTime} - {block.item.endTime}</p>
                                     </div>
@@ -310,7 +318,7 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                   <ScheduleVisualizer subjects={scheduleSubjects} />
+                                   <ScheduleVisualizer subjects={scheduleSubjects} onRemoveSubject={removeSubjectFromSchedule} />
                                 </CardContent>
                             </Card>
 
@@ -381,7 +389,7 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
   return (
     <Popover open={isOpen} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="w-full justify-start" onClick={(e) => { e.preventDefault(); }}>
+        <Button variant="outline" className="w-full justify-start" onClick={(e) => { e.preventDefault(); onOpenChange(true); }}>
             <Search className="mr-2 h-4 w-4" />
             Buscar Materia por nombre o CRN...
         </Button>
