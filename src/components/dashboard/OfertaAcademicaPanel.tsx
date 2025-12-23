@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef } from 'react';
@@ -118,6 +119,14 @@ function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAca
 
     return (
         <div className="overflow-x-auto">
+             <div className="grid grid-cols-[auto_1fr] min-w-[800px] mb-2">
+                <div />
+                <div className="grid grid-cols-5">
+                    {DAYS.map(day => (
+                        <div key={`header-${day}`} className="text-center font-bold text-primary">{DAY_MAP[day]}</div>
+                    ))}
+                </div>
+            </div>
             <div className="grid grid-cols-[auto_1fr] min-w-[800px]">
                 {/* Time Ruler */}
                 <div className="relative">
@@ -170,15 +179,6 @@ function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAca
                      <div className="col-span-5 grid grid-cols-5 h-full">
                         {DAYS.map(day => <div key={`border-${day}`} className="border-l border-muted"></div>)}
                     </div>
-                </div>
-            </div>
-            {/* Day Headers */}
-            <div className="grid grid-cols-[auto_1fr] min-w-[800px] mt-2">
-                <div />
-                <div className="grid grid-cols-5">
-                    {DAYS.map(day => (
-                        <div key={`header-${day}`} className="text-center font-bold text-primary">{DAY_MAP[day]}</div>
-                    ))}
                 </div>
             </div>
         </div>
