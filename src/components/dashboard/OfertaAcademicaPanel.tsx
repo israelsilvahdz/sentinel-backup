@@ -67,7 +67,7 @@ export function OfertaAcademicaPanel() {
     
     const availableGroups = useMemo(() => {
         const groups = new Set(ofertaAcademica.map(item => item.group));
-        return Array.from(groups).filter(Boolean).sort();
+        return Array.from(groups).filter(group => group && group.trim() !== '').sort();
     }, [ofertaAcademica]);
 
 
