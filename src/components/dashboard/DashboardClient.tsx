@@ -40,7 +40,7 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, Team, OfertaAcademicaItem } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
@@ -144,7 +144,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('seguimiento');
+  const [activeView, setActiveView] = useState<ActiveView>('oferta-academica');
   
   const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
@@ -664,9 +664,9 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Oferta Académica" isActive={activeView === 'oferta-academica'} onClick={() => handleSetActiveView('oferta-academica')}>
+                   <SidebarMenuButton tooltip="Planificador de Horarios" isActive={activeView === 'oferta-academica'} onClick={() => handleSetActiveView('oferta-academica')}>
                     <BookOpen />
-                    <span>Oferta Académica</span>
+                    <span>Planificador de Horarios</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

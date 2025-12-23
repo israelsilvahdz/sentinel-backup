@@ -6,18 +6,18 @@ import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseOfertaAcademicaExcel } from '@/lib/excelParser';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import { Search, Info, Calendar, User, X, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { useDashboardFilters } from './DashboardClient';
-import { StudentSearchPopover } from './BitacoraPanel';
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
-import type { OfertaAcademicaItem, Student } from '@/types/student';
+import type { OfertaAcademicaItem } from '@/types/student';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 
 const DAYS = ['LUN', 'MAR', 'MI', 'JUE', 'VIE'];
@@ -57,12 +57,18 @@ function isClassInSlot(item: OfertaAcademicaItem, slot: string, day: string): bo
 
 export function OfertaAcademicaPanel() {
     const { toast } = useToast();
-    const { ofertaAcademica, setOfertaAcademica, allStudentsMap, loadStudentSubjects } = useDashboardFilters();
+    const { ofertaAcademica, setOfertaAcademica } = useDashboardFilters();
     const [ofertaFile, setOfertaFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     
-    const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
     const [scheduleSubjects, setScheduleSubjects] = useState<OfertaAcademicaItem[]>([]);
+    
+    const availableGroups = useMemo(() => {
+        const groups = new Set(ofertaAcademica.map(item => item.group));
+        return Array.from(groups).sort();
+    }, [ofertaAcademica]);
+
 
     const handleFileUpload = useCallback(async (file: File | null) => {
         if (!file) {
@@ -93,14 +99,13 @@ export function OfertaAcademicaPanel() {
         }
     }, [toast, setOfertaAcademica]);
     
-    const handleStudentSelect = async (studentInfo: { id: string; name: string }) => {
-        const student = allStudentsMap.get(studentInfo.id);
-        if (student) {
-            setSelectedStudent(student);
-            const studentSubjects = await loadStudentSubjects(student.id);
-            const studentCRNs = new Set(studentSubjects.map(s => s.id));
-            const initialSchedule = ofertaAcademica.filter(item => studentCRNs.has(item.crn));
-            setScheduleSubjects(initialSchedule);
+    const handleGroupSelect = (group: string | null) => {
+        setSelectedGroup(group);
+        if (group) {
+            const groupSubjects = ofertaAcademica.filter(item => item.group === group);
+            setScheduleSubjects(groupSubjects);
+        } else {
+            setScheduleSubjects([]);
         }
     };
     
@@ -151,7 +156,7 @@ export function OfertaAcademicaPanel() {
             <header className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Planificador de Horarios</h1>
-                    <p className="text-muted-foreground">Carga la oferta, selecciona un alumno y arma su horario para detectar empalmes.</p>
+                    <p className="text-muted-foreground">Carga la oferta, selecciona un grupo y arma el horario para detectar empalmes.</p>
                 </div>
                 <FileUpload
                     onFileSelect={handleFileUpload}
@@ -165,24 +170,28 @@ export function OfertaAcademicaPanel() {
                 <>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Paso 1: Selecciona un Alumno</CardTitle>
+                            <CardTitle>Paso 1: Selecciona un Grupo Base</CardTitle>
                         </CardHeader>
-                        <CardContent className="flex flex-wrap gap-4 items-center">
-                            <StudentSearchPopover onStudentSelect={handleStudentSelect} />
-                            {selectedStudent && (
-                                 <p className="font-semibold text-primary">
-                                    Horario base para: {selectedStudent.name}
-                                 </p>
-                            )}
+                        <CardContent>
+                             <Select onValueChange={handleGroupSelect} value={selectedGroup || undefined}>
+                                <SelectTrigger className="w-full md:w-[300px]">
+                                    <SelectValue placeholder="Selecciona un grupo..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableGroups.map(group => (
+                                        <SelectItem key={group} value={group}>{group}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </CardContent>
                     </Card>
 
-                    {selectedStudent && (
+                    {selectedGroup && (
                         <>
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Paso 2: Modifica el Horario</CardTitle>
-                                    <CardDescription>Añade materias de otros tetramestres o quita las que no se cursarán.</CardDescription>
+                                    <CardTitle>Paso 2: Edita el Horario</CardTitle>
+                                    <CardDescription>Añade o quita materias para simular el horario de un alumno específico.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <Label>Añadir materia al horario</Label>
