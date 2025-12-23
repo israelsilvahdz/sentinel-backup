@@ -132,34 +132,31 @@ export function OfertaAcademicaPanel() {
         setScheduleSubjects(prev => prev.filter(s => s.crn !== crnToRemove));
     }
 
-    const { clashes, scheduleGrid } = useMemo(() => {
-        const clashMap = new Map<string, string[]>();
-        scheduleSubjects.forEach(subject => {
-            const subjectsInSameSlots = scheduleSubjects.filter(otherSubject => {
-                if (subject.crn === otherSubject.crn) return false;
-                
-                const commonDays = subject.days.filter(day => otherSubject.days.includes(day));
-                if (commonDays.length === 0) return false;
-
-                return isTimeOverlap(subject, otherSubject);
-            });
-
-            if (subjectsInSameSlots.length > 0) {
-                clashMap.set(subject.crn, subjectsInSameSlots.map(s => s.crn));
-            }
-        });
-
+    const { scheduleGrid, visibleTimeSlots } = useMemo(() => {
         const grid: Record<string, (ScheduleGridItem[])[]> = {};
+        const occupiedSlots = new Set<string>();
+
+        // First, determine which time slots are occupied
+        scheduleSubjects.forEach(subject => {
+            TIME_SLOTS.forEach(slot => {
+                if (subject.days.some(day => isClassInSlot(subject, slot, day))) {
+                    occupiedSlots.add(slot);
+                }
+            });
+        });
+        
+        const visibleSlots = TIME_SLOTS.filter(slot => occupiedSlots.has(slot));
+
         DAYS.forEach(day => {
-            grid[day] = Array(TIME_SLOTS.length).fill(null).map(() => []);
+            grid[day] = Array(visibleSlots.length).fill(null).map(() => []);
             const subjectsForDay = scheduleSubjects.filter(s => s.days.includes(day));
 
             subjectsForDay.forEach(subject => {
-                const startIndex = TIME_SLOTS.findIndex(slot => isClassInSlot(subject, slot, day));
+                const startIndex = visibleSlots.findIndex(slot => isClassInSlot(subject, slot, day));
                 if (startIndex === -1) return;
 
                 let endIndex = startIndex;
-                while (endIndex + 1 < TIME_SLOTS.length && isClassInSlot(subject, TIME_SLOTS[endIndex + 1], day)) {
+                while (endIndex + 1 < visibleSlots.length && isClassInSlot(subject, visibleSlots[endIndex + 1], day)) {
                     endIndex++;
                 }
                 const rowSpan = endIndex - startIndex + 1;
@@ -171,7 +168,7 @@ export function OfertaAcademicaPanel() {
             });
         });
         
-        return { clashes: clashMap, scheduleGrid: grid };
+        return { scheduleGrid: grid, visibleTimeSlots: visibleSlots };
     }, [scheduleSubjects]);
     
     return (
@@ -243,7 +240,7 @@ export function OfertaAcademicaPanel() {
                                         className="grid bg-muted/30 rounded-lg p-2 gap-px"
                                         style={{ 
                                             gridTemplateColumns: 'auto repeat(5, minmax(140px, 1fr))',
-                                            gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(60px, auto))`
+                                            gridTemplateRows: `auto repeat(${visibleTimeSlots.length}, minmax(60px, auto))`
                                         }}
                                     >
                                         <div className="p-2 sticky top-0 left-0 z-10 row-start-1 bg-muted/30"></div>
@@ -251,7 +248,7 @@ export function OfertaAcademicaPanel() {
                                             <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1 bg-muted/30" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
                                         ))}
                                         
-                                        {TIME_SLOTS.map((slot, i) => (
+                                        {visibleTimeSlots.map((slot, i) => (
                                             <div key={slot} className="p-2 text-center sticky left-0 z-10 bg-muted/30 flex items-center justify-center" style={{ gridRow: i + 2 }}>
                                                 <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
                                             </div>
@@ -259,11 +256,11 @@ export function OfertaAcademicaPanel() {
 
                                         {DAYS.map((day, dayIndex) => (
                                             <React.Fragment key={day}>
-                                                {TIME_SLOTS.map((slot, slotIndex) => {
+                                                {visibleTimeSlots.map((slot, slotIndex) => {
                                                     const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
                                                     const isSlotOccupiedBySpan = slotIndex > 0 && 
                                                         (scheduleGrid[day]?.[slotIndex - 1] || []).some(prevItem => {
-                                                            const prevSlotIndex = TIME_SLOTS.findIndex(s => s === TIME_SLOTS[slotIndex-1]);
+                                                            const prevSlotIndex = visibleTimeSlots.findIndex(s => s === visibleTimeSlots[slotIndex-1]);
                                                             return prevSlotIndex + prevItem.rowSpan > slotIndex;
                                                         });
                                                     
@@ -318,7 +315,7 @@ export function OfertaAcademicaPanel() {
                                             <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
                                             <TableBody>
                                                 {scheduleSubjects.map(item => (
-                                                    <TableRow key={item.crn} className={cn(clashes.has(item.crn) && 'bg-destructive/10')}>
+                                                    <TableRow key={item.crn}>
                                                         <TableCell className="font-medium">{item.subjectName}</TableCell>
                                                         <TableCell>{item.crn}</TableCell>
                                                         <TableCell>{item.professor}</TableCell>
