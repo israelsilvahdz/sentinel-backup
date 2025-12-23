@@ -552,7 +552,7 @@ const OFERTA_COLUMNS = {
     CRN: 'CRN',
     SUBJECT_NAME: 'NOMBRE LARGO MATERIA',
     PROFESSOR: 'NOMBRE PROFESOR',
-    GROUP: 'NUMERO O GRUPO',
+    GROUP: 'Número grupo',
     CAPACITY: 'CAPACIDAD GRUPO',
     ENROLLED: 'NUMERO ALUMNOS INSCRITOS',
     START_TIME: 'HORA INICIO CLASE',
@@ -603,7 +603,7 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
-                    if (!row || row.length === 0 || !row[headerMap[OFERTA_COLUMNS.CRN]]) continue;
+                    if (!row || row.length === 0 || !row[headerMap[normalizeHeader(OFERTA_COLUMNS.CRN)]]) continue;
                     
                      const getColumnValue = (columnName: string) => {
                         const upperColName = normalizeHeader(columnName);
