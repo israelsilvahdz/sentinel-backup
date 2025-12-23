@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
@@ -31,30 +30,154 @@ const DAY_MAP: Record<string, string> = {
     'VIE': 'Viernes',
 };
 
-const TIME_SLOTS = [
-    '07:00', '08:00', '09:00', '10:00', '11:00', '11:30', '12:00', '12:30', '13:00', '14:00', '15:00', '16:00', '17:00'
-];
+const HOUR_HEIGHT = 60; // 60px por hora
+const START_HOUR = 7;
+const END_HOUR = 18;
 
-interface ScheduleGridItem {
+// --- New Schedule Viewer Components ---
+
+interface TimeBlock {
     item: OfertaAcademicaItem;
-    rowSpan: number;
+    top: number;
+    height: number;
+    width: number;
+    left: number;
+    isConflict: boolean;
+}
+
+const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+};
+
+const minutesToPosition = (minutes: number): number => {
+    return ((minutes - START_HOUR * 60) / 60) * HOUR_HEIGHT;
+};
+
+
+function ScheduleVisualizer({ subjects }: { subjects: OfertaAcademicaItem[] }) {
+    const timeSlots = useMemo(() => {
+        const slots = [];
+        for (let i = START_HOUR; i < END_HOUR; i++) {
+            slots.push(`${String(i).padStart(2, '0')}:00`);
+        }
+        return slots;
+    }, []);
+
+    const dailyBlocks = useMemo(() => {
+        const blocksByDay: Record<string, TimeBlock[]> = {};
+
+        DAYS.forEach(day => {
+            const daySubjects = subjects
+                .filter(s => s.days.includes(day) && s.startTime && s.endTime)
+                .sort((a, b) => timeToMinutes(a.startTime!) - timeToMinutes(b.startTime!));
+
+            const timeBlocks: TimeBlock[] = [];
+            
+            daySubjects.forEach(subject => {
+                const startMinutes = timeToMinutes(subject.startTime!);
+                const endMinutes = timeToMinutes(subject.endTime!);
+                const duration = endMinutes - startMinutes;
+                
+                timeBlocks.push({
+                    item: subject,
+                    top: minutesToPosition(startMinutes),
+                    height: (duration / 60) * HOUR_HEIGHT,
+                    width: 100, // Default width, will be adjusted for conflicts
+                    left: 0,
+                    isConflict: false
+                });
+            });
+
+            // --- Conflict Detection and Positioning ---
+            for (let i = 0; i < timeBlocks.length; i++) {
+                let conflicts: number[] = [i];
+                for (let j = i + 1; j < timeBlocks.length; j++) {
+                    // Check for overlap
+                    if (timeBlocks[i].top < (timeBlocks[j].top + timeBlocks[j].height) && (timeBlocks[i].top + timeBlocks[i].height) > timeBlocks[j].top) {
+                       conflicts.push(j);
+                    }
+                }
+                
+                if (conflicts.length > 1) {
+                    const groupWidth = 100 / conflicts.length;
+                    conflicts.forEach((blockIndex, conflictIndex) => {
+                        timeBlocks[blockIndex].width = groupWidth;
+                        timeBlocks[blockIndex].left = conflictIndex * groupWidth;
+                        timeBlocks[blockIndex].isConflict = true;
+                    });
+                }
+            }
+
+            blocksByDay[day] = timeBlocks;
+        });
+
+        return blocksByDay;
+    }, [subjects]);
+
+
+    return (
+        <div className="overflow-x-auto">
+            <div className="grid grid-cols-[auto_1fr] min-w-[800px]">
+                {/* Time Ruler */}
+                <div className="relative">
+                    {timeSlots.map((time, index) => (
+                        <div key={time} className="h-[60px] text-right pr-2">
+                             <span className="text-xs -translate-y-1/2 relative top-0 text-muted-foreground font-mono">{time}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Schedule Grid */}
+                <div className="grid grid-cols-5 relative">
+                     {/* Background lines */}
+                    {timeSlots.map(time => (
+                        <div key={`line-${time}`} className="col-span-5 h-[60px] border-t border-muted"></div>
+                    ))}
+                    {DAYS.map((day, dayIndex) => (
+                         <div key={day} className="absolute inset-0 grid grid-cols-5">
+                             <div className="relative" style={{ gridColumn: dayIndex + 1 }}>
+                                 {dailyBlocks[day]?.map(block => (
+                                    <div 
+                                        key={block.item.crn}
+                                        className={cn(
+                                            "absolute rounded-lg p-2 text-white shadow-md transition-all duration-300",
+                                            block.isConflict ? 'bg-destructive/80 border-2 border-destructive-foreground' : 'bg-primary/80'
+                                        )}
+                                        style={{
+                                            top: `${block.top}px`,
+                                            height: `${block.height}px`,
+                                            width: `${block.width}%`,
+                                            left: `${block.left}%`,
+                                        }}
+                                    >
+                                        <p className="font-bold text-xs leading-tight">{block.item.subjectName}</p>
+                                        <p className="text-xs opacity-80">{block.item.professor}</p>
+                                        <p className="text-xs opacity-80 font-mono">{block.item.startTime} - {block.item.endTime}</p>
+                                    </div>
+                                 ))}
+                             </div>
+                         </div>
+                    ))}
+                     <div className="col-span-5 grid grid-cols-5 h-full">
+                        {DAYS.map(day => <div key={`border-${day}`} className="border-l border-muted"></div>)}
+                    </div>
+                </div>
+            </div>
+            {/* Day Headers */}
+            <div className="grid grid-cols-[auto_1fr] min-w-[800px] mt-2">
+                <div />
+                <div className="grid grid-cols-5">
+                    {DAYS.map(day => (
+                        <div key={`header-${day}`} className="text-center font-bold text-primary">{DAY_MAP[day]}</div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 
-function isClassInSlot(item: OfertaAcademicaItem, slot: string, day: string): boolean {
-    if (!item.days.includes(day) || !item.startTime || !item.endTime) return false;
-    const itemStart = parseInt(item.startTime.replace(':', ''), 10);
-    const itemEnd = parseInt(item.endTime.replace(':', ''), 10);
-    const slotStart = parseInt(slot.replace(':', ''), 10);
-    
-    const nextSlotIndex = TIME_SLOTS.indexOf(slot) + 1;
-    const slotEnd = nextSlotIndex < TIME_SLOTS.length 
-        ? parseInt(TIME_SLOTS[nextSlotIndex].replace(':', ''), 10)
-        : slotStart + 100; // Asume 1 hora si es el último slot
-
-    // Verifica si hay cualquier superposición
-    return itemStart < slotEnd && itemEnd > slotStart;
-}
 
 export function OfertaAcademicaPanel() {
     const { ofertaAcademica, setOfertaAcademica } = useDashboardFilters();
@@ -122,62 +245,6 @@ export function OfertaAcademicaPanel() {
     const removeSubjectFromSchedule = (crnToRemove: string) => {
         setScheduleSubjects(prev => prev.filter(s => s.crn !== crnToRemove));
     }
-
-    const { scheduleGrid, visibleTimeSlots, clashes } = useMemo(() => {
-        const occupiedSlots = new Set<string>();
-        scheduleSubjects.forEach(subject => {
-            TIME_SLOTS.forEach(slot => {
-                if (subject.days.some(day => isClassInSlot(subject, slot, day))) {
-                    occupiedSlots.add(slot);
-                }
-            });
-        });
-
-        const visibleSlots = TIME_SLOTS
-            .filter(slot => occupiedSlots.has(slot) || ['07:00', '08:00', '09:00', '10:00', '11:00', '11:30', '12:00', '12:30', '13:00', '14:00', '15:00', '16:00', '17:00'].includes(slot))
-            .sort((a, b) => parseInt(a.replace(':', '')) - parseInt(b.replace(':', '')));
-
-        const clashMap = new Map<string, boolean>();
-        const grid: Record<string, ScheduleGridItem[]> = {};
-
-        if(visibleSlots.length > 0) {
-            scheduleSubjects.forEach(subject => {
-                subject.days.forEach(day => {
-                    const keyPrefix = `${day}-`;
-                    let startSlotIndex = -1;
-
-                    for (let i = 0; i < visibleSlots.length; i++) {
-                        if (isClassInSlot(subject, visibleSlots[i], day)) {
-                            if (startSlotIndex === -1) {
-                                startSlotIndex = i;
-                            }
-                        }
-                    }
-
-                    if (startSlotIndex !== -1) {
-                        let endSlotIndex = startSlotIndex;
-                        while(endSlotIndex + 1 < visibleSlots.length && isClassInSlot(subject, visibleSlots[endSlotIndex + 1], day)) {
-                            endSlotIndex++;
-                        }
-                        const rowSpan = endSlotIndex - startSlotIndex + 1;
-                        const key = `${keyPrefix}${visibleSlots[startSlotIndex]}`;
-                        if (!grid[key]) {
-                            grid[key] = [];
-                        }
-                        
-                        grid[key].forEach(existing => clashMap.set(existing.item.crn, true));
-                        if(grid[key].length > 0) {
-                             clashMap.set(subject.crn, true);
-                        }
-
-                        grid[key].push({ item: subject, rowSpan });
-                    }
-                });
-            });
-        }
-        
-        return { scheduleGrid: grid, visibleTimeSlots: visibleSlots, clashes: clashMap };
-    }, [scheduleSubjects]);
     
     return (
         <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -239,90 +306,20 @@ export function OfertaAcademicaPanel() {
                                 <CardHeader>
                                     <CardTitle>Horario Simulado</CardTitle>
                                     <CardDescription>
-                                        Las clases con borde rojo intermitente indican un empalme de horario.
+                                        Los bloques de clase se posicionan y dimensionan según su horario. Los empalmes se muestran uno al lado del otro en rojo.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="overflow-x-auto">
-                                        <div 
-                                            className="grid bg-muted/30 rounded-lg p-2 gap-px"
-                                            style={{ 
-                                                gridTemplateColumns: 'auto repeat(5, minmax(140px, 1fr))',
-                                                gridAutoRows: 'minmax(60px, auto)'
-                                            }}
-                                        >
-                                            <div className="p-2 sticky top-0 left-0 z-10 row-start-1 bg-muted/30"></div>
-                                            {DAYS.map((day, i) => (
-                                                <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1 bg-muted/30" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
-                                            ))}
-                                            
-                                            {visibleTimeSlots.map((slot, i) => (
-                                                <React.Fragment key={slot}>
-                                                    <div className="p-2 text-center sticky left-0 z-10 bg-muted/30 flex items-center justify-center" style={{ gridRow: i + 2 }}>
-                                                        <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
-                                                    </div>
-
-                                                     {DAYS.map((day, dayIndex) => {
-                                                        const itemsInSlot = scheduleGrid[`${day}-${slot}`] || [];
-                                                        const isSlotOccupiedBySpan = i > 0 && 
-                                                            Object.values(scheduleGrid).flat().some(gridItem => 
-                                                                gridItem.item.days.includes(day) && 
-                                                                isClassInSlot(gridItem.item, visibleTimeSlots[i-1], day) &&
-                                                                !isClassInSlot(gridItem.item, slot, day) && // Doesn't start here
-                                                                (visibleTimeSlots.findIndex(s => isClassInSlot(gridItem.item, s, day)) + gridItem.rowSpan > i)
-                                                            );
-                                                            
-                                                        if (isSlotOccupiedBySpan) return null;
-
-                                                        return (
-                                                            <div 
-                                                                key={`${day}-${slot}`} 
-                                                                className="relative min-h-[60px] bg-card flex z-0" 
-                                                                style={{ gridColumn: dayIndex + 2, gridRow: `${i + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
-                                                            >
-                                                                {itemsInSlot.map((gridItem, itemIndex) => {
-                                                                    const lastAddedIndex = scheduleSubjects.length - 1;
-                                                                    const currentItemIndex = scheduleSubjects.findIndex(subj => subj.crn === gridItem.item.crn);
-                                                                    const isLatestAdded = currentItemIndex === lastAddedIndex;
-
-                                                                    return (
-                                                                        <div 
-                                                                            key={gridItem.item.crn} 
-                                                                            className="p-1 w-full"
-                                                                            style={{ flex: `1 1 ${100 / itemsInSlot.length}%` }}
-                                                                        >
-                                                                            <Card className={cn(
-                                                                                "h-full text-xs shadow-sm relative group bg-card hover:shadow-lg transition-shadow", 
-                                                                                clashes.has(gridItem.item.crn) && isLatestAdded && "border-destructive animate-pulse border-2 shadow-destructive/20"
-                                                                            )}>
-                                                                                <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
-                                                                                    <X className="h-3 w-3 text-destructive"/>
-                                                                                </Button>
-                                                                                 <div className="flex flex-col justify-center text-center h-full p-1.5">
-                                                                                    {clashes.has(gridItem.item.crn) && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
-                                                                                    <p className="font-bold leading-tight text-primary whitespace-normal">{gridItem.item.subjectName}</p>
-                                                                                    <p className="text-muted-foreground whitespace-normal">{gridItem.item.professor}</p>
-                                                                                </div>
-                                                                            </Card>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </React.Fragment>
-                                            ))}
-                                        </div>
-                                    </div>
+                                   <ScheduleVisualizer subjects={scheduleSubjects} />
                                 </CardContent>
                             </Card>
 
                             <Card>
                                 <CardHeader><CardTitle>Listado de Materias en Simulación</CardTitle></CardHeader>
                                 <CardContent>
-                                    <div className="max-h-[50vh] overflow-y-auto">
+                                    <ScrollArea className="h-72">
                                         <Table>
-                                            <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
+                                            <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader>
                                             <TableBody>
                                                 {scheduleSubjects.map(item => (
                                                     <TableRow key={item.crn}>
@@ -333,11 +330,16 @@ export function OfertaAcademicaPanel() {
                                                             <div className="flex gap-1 flex-wrap">{item.days.map(d => <Badge key={d} variant="outline">{d}</Badge>)}</div>
                                                             <span className="text-xs">{item.startTime}-{item.endTime}</span>
                                                         </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeSubjectFromSchedule(item.crn)}>
+                                                                <X className="h-4 w-4 text-destructive" />
+                                                            </Button>
+                                                        </TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>
                                         </Table>
-                                    </div>
+                                    </ScrollArea>
                                 </CardContent>
                             </Card>
                         </>
@@ -402,4 +404,3 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
-
