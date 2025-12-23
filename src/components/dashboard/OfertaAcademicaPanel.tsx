@@ -292,14 +292,14 @@ export function OfertaAcademicaPanel() {
                                                                             style={{ flex: `1 1 ${100 / itemsInSlot.length}%` }}
                                                                         >
                                                                             <Card className={cn(
-                                                                                "h-full text-xs p-1.5 shadow-sm relative group bg-card hover:shadow-lg transition-shadow", 
+                                                                                "h-full text-xs shadow-sm relative group bg-card hover:shadow-lg transition-shadow", 
                                                                                 clashes.has(gridItem.item.crn) && isLatestAdded && "border-destructive animate-pulse border-2 shadow-destructive/20"
                                                                             )}>
-                                                                                <div className="flex flex-col justify-center text-center h-full">
+                                                                                <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
+                                                                                    <X className="h-3 w-3 text-destructive"/>
+                                                                                </Button>
+                                                                                 <div className="flex flex-col justify-center text-center h-full p-1.5">
                                                                                     {clashes.has(gridItem.item.crn) && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
-                                                                                    <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
-                                                                                        <X className="h-3 w-3 text-destructive"/>
-                                                                                    </Button>
                                                                                     <p className="font-bold leading-tight text-primary whitespace-normal">{gridItem.item.subjectName}</p>
                                                                                     <p className="text-muted-foreground whitespace-normal">{gridItem.item.professor}</p>
                                                                                 </div>
@@ -320,7 +320,7 @@ export function OfertaAcademicaPanel() {
                             <Card>
                                 <CardHeader><CardTitle>Listado de Materias en Simulación</CardTitle></CardHeader>
                                 <CardContent>
-                                    <div className="max-h-[50vh]">
+                                    <div className="max-h-[50vh] overflow-y-auto">
                                         <Table>
                                             <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
                                             <TableBody>
@@ -402,3 +402,4 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
+
