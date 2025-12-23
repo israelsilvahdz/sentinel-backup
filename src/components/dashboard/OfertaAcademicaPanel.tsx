@@ -37,7 +37,6 @@ const TIME_SLOTS = [
 interface ScheduleGridItem {
     item: OfertaAcademicaItem;
     rowSpan: number;
-    isClashing: boolean;
     isNewestInClash: boolean;
 }
 
@@ -75,6 +74,7 @@ export function OfertaAcademicaPanel() {
     
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
     const [scheduleSubjects, setScheduleSubjects] = useState<OfertaAcademicaItem[]>([]);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
     
     const availableGroups = useMemo(() => {
         const groups = new Set(ofertaAcademica.map(item => item.group));
@@ -134,9 +134,9 @@ export function OfertaAcademicaPanel() {
     }
 
     const { scheduleGrid, clashes } = useMemo(() => {
-        const clashMap = new Map<string, string[]>();
         const subjectIndices = new Map(scheduleSubjects.map((s, i) => [s.crn, i]));
-
+        
+        const clashMap = new Map<string, string[]>();
         for (let i = 0; i < scheduleSubjects.length; i++) {
             for (let j = i + 1; j < scheduleSubjects.length; j++) {
                 const item1 = scheduleSubjects[i];
@@ -151,13 +151,12 @@ export function OfertaAcademicaPanel() {
                 }
             }
         }
-        
+
         const grid: Record<string, (ScheduleGridItem[])[]> = {};
         DAYS.forEach(day => {
             grid[day] = Array(TIME_SLOTS.length).fill(null).map(() => []);
-
             const subjectsForDay = scheduleSubjects.filter(s => s.days.includes(day));
-            
+
             subjectsForDay.forEach(subject => {
                 const startIndex = TIME_SLOTS.findIndex(slot => isClassInSlot(subject, slot, day));
                 if (startIndex === -1) return;
@@ -173,15 +172,12 @@ export function OfertaAcademicaPanel() {
                 if(isClashing) {
                     const myIndex = subjectIndices.get(subject.crn) ?? -1;
                     const clashingIndices = (clashMap.get(subject.crn) || []).map(crn => subjectIndices.get(crn) ?? -1);
-                    if (myIndex > Math.max(...clashingIndices)) {
-                        isNewestInClash = true;
-                    }
+                    isNewestInClash = myIndex > Math.max(...clashingIndices);
                 }
 
                 grid[day][startIndex].push({
                     item: subject,
                     rowSpan,
-                    isClashing,
                     isNewestInClash
                 });
             });
@@ -234,8 +230,8 @@ export function OfertaAcademicaPanel() {
                              <CardContent>
                                  <Label>Añadir materia al horario</Label>
                                  <div className="flex items-center gap-4">
-                                   <SubjectSearchPopover allSubjects={ofertaAcademica} onSubjectSelect={addSubjectToSchedule} />
-                                    <Button onClick={() => document.querySelector<HTMLButtonElement>('[cmdk-input-wrapper] button')?.click()}>
+                                   <SubjectSearchPopover allSubjects={ofertaAcademica} onSubjectSelect={addSubjectToSchedule} isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} />
+                                    <Button onClick={() => setIsSearchOpen(true)}>
                                         <PlusCircle className="mr-2 h-4 w-4" />
                                         Añadir Materia
                                     </Button>
@@ -276,24 +272,25 @@ export function OfertaAcademicaPanel() {
                                         {DAYS.map((day, dayIndex) => (
                                             <React.Fragment key={day}>
                                                 {TIME_SLOTS.map((slot, slotIndex) => {
-                                                     const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
+                                                    const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
                                                     const isSlotOccupiedBySpan = slotIndex > 0 && 
-                                                        scheduleGrid[day]?.[slotIndex - 1]?.some(prevItem => prevItem.rowSpan > 1 && isClassInSlot(prevItem.item, slot, day));
-
-                                                    if (isSlotOccupiedBySpan) return null;
+                                                        (scheduleGrid[day]?.[slotIndex - 1] || []).some(prevItem => {
+                                                            const prevSlotIndex = TIME_SLOTS.findIndex(s => s === TIME_SLOTS[slotIndex-1]);
+                                                            return prevSlotIndex + prevItem.rowSpan > slotIndex;
+                                                        });
+                                                    
+                                                    if (isSlotOccupiedBySpan && itemsInSlot.length === 0) return null;
                                                     
                                                     return (
                                                         <div key={`${day}-${slotIndex}`} className="relative min-h-[60px] bg-card flex" style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}>
-                                                            {itemsInSlot.map((gridItem) => (
+                                                            {itemsInSlot.map((gridItem, itemIndex) => (
                                                                 <div 
                                                                     key={gridItem.item.crn} 
                                                                     className="p-1 w-full"
-                                                                    style={{ 
-                                                                        height: `100%`,
-                                                                    }}
+                                                                    style={{ flex: '1 1 50%' }}
                                                                 >
-                                                                    <Card className={cn("text-xs p-1.5 shadow-md relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", (gridItem.isClashing && gridItem.isNewestInClash) && "border-destructive animate-pulse border-2 shadow-destructive/20")}>
-                                                                        {gridItem.isClashing && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
+                                                                    <Card className={cn("text-xs p-1.5 shadow-md relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", gridItem.isNewestInClash && "border-destructive animate-pulse border-2 shadow-destructive/20")}>
+                                                                        {clashes.has(gridItem.item.crn) && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
                                                                         <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
                                                                             <X className="h-3 w-3 text-destructive"/>
                                                                         </Button>
@@ -355,8 +352,7 @@ export function OfertaAcademicaPanel() {
     );
 }
 
-function SubjectSearchPopover({ allSubjects, onSubjectSelect }: { allSubjects: OfertaAcademicaItem[], onSubjectSelect: (subject: OfertaAcademicaItem) => void }) {
-  const [open, setOpen] = useState(false);
+function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChange }: { allSubjects: OfertaAcademicaItem[], onSubjectSelect: (subject: OfertaAcademicaItem) => void, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
   const [searchValue, setSearchValue] = useState("");
 
   const filteredSubjects = useMemo(() => {
@@ -370,14 +366,14 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect }: { allSubjects: O
 
   const handleSelect = (subject: OfertaAcademicaItem) => {
     onSubjectSelect(subject);
-    setOpen(false);
+    onOpenChange(false);
     setSearchValue('');
   };
   
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={isOpen} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="w-full justify-start" onClick={(e) => e.preventDefault()}>
+        <Button variant="outline" className="w-full justify-start" onClick={(e) => { e.preventDefault(); onOpenChange(true); }}>
             <Search className="mr-2 h-4 w-4" />
             Buscar Materia por nombre o CRN...
         </Button>
@@ -399,5 +395,7 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect }: { allSubjects: O
   );
 }
 
+
+    
 
     
