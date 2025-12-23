@@ -108,7 +108,7 @@ export function OfertaAcademicaPanel() {
         } finally {
             setIsProcessing(false);
         }
-    }, [toast, setOfertaAcademica]);
+    }, [setOfertaAcademica, toast]);
     
     const handleGroupSelect = (group: string | null) => {
         setSelectedGroup(group);
@@ -132,7 +132,23 @@ export function OfertaAcademicaPanel() {
         setScheduleSubjects(prev => prev.filter(s => s.crn !== crnToRemove));
     }
 
-    const { scheduleGrid } = useMemo(() => {
+    const { clashes, scheduleGrid } = useMemo(() => {
+        const clashMap = new Map<string, string[]>();
+        scheduleSubjects.forEach(subject => {
+            const subjectsInSameSlots = scheduleSubjects.filter(otherSubject => {
+                if (subject.crn === otherSubject.crn) return false;
+                
+                const commonDays = subject.days.filter(day => otherSubject.days.includes(day));
+                if (commonDays.length === 0) return false;
+
+                return isTimeOverlap(subject, otherSubject);
+            });
+
+            if (subjectsInSameSlots.length > 0) {
+                clashMap.set(subject.crn, subjectsInSameSlots.map(s => s.crn));
+            }
+        });
+
         const grid: Record<string, (ScheduleGridItem[])[]> = {};
         DAYS.forEach(day => {
             grid[day] = Array(TIME_SLOTS.length).fill(null).map(() => []);
@@ -155,26 +171,7 @@ export function OfertaAcademicaPanel() {
             });
         });
         
-        return { scheduleGrid: grid };
-    }, [scheduleSubjects]);
-    
-    const clashes = useMemo(() => {
-        const clashMap = new Map<string, string[]>();
-        scheduleSubjects.forEach(subject => {
-            const subjectsInSameSlots = scheduleSubjects.filter(otherSubject => {
-                if (subject.crn === otherSubject.crn) return false;
-                
-                const commonDays = subject.days.filter(day => otherSubject.days.includes(day));
-                if (commonDays.length === 0) return false;
-
-                return isTimeOverlap(subject, otherSubject);
-            });
-
-            if (subjectsInSameSlots.length > 0) {
-                clashMap.set(subject.crn, subjectsInSameSlots.map(s => s.crn));
-            }
-        });
-        return clashMap;
+        return { clashes: clashMap, scheduleGrid: grid };
     }, [scheduleSubjects]);
     
     return (
@@ -241,8 +238,7 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                <div className="w-full">
-                                <ScrollArea className="w-full whitespace-nowrap">
+                                <div className="w-full overflow-x-auto">
                                     <div 
                                         className="grid bg-muted/30 rounded-lg p-2 gap-px"
                                         style={{ 
@@ -310,8 +306,7 @@ export function OfertaAcademicaPanel() {
                                             </React.Fragment>
                                         ))}
                                     </div>
-                                    </ScrollArea>
-                                </div>
+                                    </div>
                                 </CardContent>
                             </Card>
 
@@ -398,3 +393,5 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
+
+    
