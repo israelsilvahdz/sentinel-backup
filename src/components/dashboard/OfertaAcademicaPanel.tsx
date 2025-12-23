@@ -6,6 +6,7 @@ import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseOfertaAcademicaExcel } from '@/lib/excelParser';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Search, Info, Calendar, User, X, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
