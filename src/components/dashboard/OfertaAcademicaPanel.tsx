@@ -133,22 +133,6 @@ export function OfertaAcademicaPanel() {
     }
 
     const { clashes, scheduleGrid } = useMemo(() => {
-        const clashMap = new Map<string, string[]>();
-        for (let i = 0; i < scheduleSubjects.length; i++) {
-            for (let j = i + 1; j < scheduleSubjects.length; j++) {
-                const item1 = scheduleSubjects[i];
-                const item2 = scheduleSubjects[j];
-                const commonDays = item1.days.filter(day => item2.days.includes(day));
-                
-                if (commonDays.length > 0 && isTimeOverlap(item1, item2)) {
-                    if (!clashMap.has(item1.crn)) clashMap.set(item1.crn, []);
-                    if (!clashMap.has(item2.crn)) clashMap.set(item2.crn, []);
-                    clashMap.get(item1.crn)!.push(item2.crn);
-                    clashMap.get(item2.crn)!.push(item1.crn);
-                }
-            }
-        }
-
         const grid: Record<string, (ScheduleGridItem[])[]> = {};
         DAYS.forEach(day => {
             grid[day] = Array(TIME_SLOTS.length).fill(null).map(() => []);
@@ -171,6 +155,22 @@ export function OfertaAcademicaPanel() {
             });
         });
         
+        const clashMap = new Map<string, string[]>();
+        scheduleSubjects.forEach(subject => {
+            const subjectsInSameSlots = scheduleSubjects.filter(otherSubject => {
+                if (subject.crn === otherSubject.crn) return false;
+                
+                const commonDays = subject.days.filter(day => otherSubject.days.includes(day));
+                if (commonDays.length === 0) return false;
+
+                return isTimeOverlap(subject, otherSubject);
+            });
+
+            if (subjectsInSameSlots.length > 0) {
+                clashMap.set(subject.crn, subjectsInSameSlots.map(s => s.crn));
+            }
+        });
+
         return { clashes: clashMap, scheduleGrid: grid };
     }, [scheduleSubjects]);
     
@@ -238,21 +238,22 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                <ScrollArea className="w-full border-none">
+                                <div className="w-full border-none">
+                                <ScrollArea className="w-full whitespace-nowrap">
                                     <div 
                                         className="grid bg-muted/30 rounded-lg p-2 gap-px"
                                         style={{ 
-                                            gridTemplateColumns: 'auto repeat(5, 1fr)',
+                                            gridTemplateColumns: 'auto repeat(5, minmax(140px, 1fr))',
                                             gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(60px, auto))`
                                         }}
                                     >
-                                        <div className="p-2 sticky top-0 z-10 row-start-1 bg-muted/30"></div>
+                                        <div className="p-2 sticky top-0 left-0 z-10 row-start-1 bg-muted/30"></div>
                                         {DAYS.map((day, i) => (
                                             <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1 bg-muted/30" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
                                         ))}
                                         
                                         {TIME_SLOTS.map((slot, i) => (
-                                            <div key={slot} className="p-2 text-center sticky left-0 z-10 bg-muted/30" style={{ gridRow: i + 2 }}>
+                                            <div key={slot} className="p-2 text-center sticky left-0 z-10 bg-muted/30 flex items-center justify-center" style={{ gridRow: i + 2 }}>
                                                 <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
                                             </div>
                                         ))}
@@ -278,7 +279,7 @@ export function OfertaAcademicaPanel() {
                                                             style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}
                                                         >
                                                             {itemsInSlot.map((gridItem, itemIndex) => {
-                                                                const isLatest = scheduleSubjects.findIndex(subj => subj.crn === gridItem.item.crn) === latestItemIndex;
+                                                                const isLatestAdded = scheduleSubjects.findIndex(subj => subj.crn === gridItem.item.crn) === scheduleSubjects.length - 1;
 
                                                                 return (
                                                                     <div 
@@ -288,14 +289,14 @@ export function OfertaAcademicaPanel() {
                                                                     >
                                                                         <Card className={cn(
                                                                             "h-full flex flex-col justify-center text-center text-xs p-1.5 shadow-md relative group bg-card hover:shadow-lg transition-shadow", 
-                                                                            itemsInSlot.length > 1 && isLatest && "border-destructive animate-pulse border-2 shadow-destructive/20"
+                                                                            itemsInSlot.length > 1 && isLatestAdded && "border-destructive animate-pulse border-2 shadow-destructive/20"
                                                                         )}>
                                                                             {itemsInSlot.length > 1 && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
                                                                             <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
                                                                                 <X className="h-3 w-3 text-destructive"/>
                                                                             </Button>
-                                                                            <p className="font-bold leading-tight text-primary">{gridItem.item.subjectName}</p>
-                                                                            <p className="text-muted-foreground">{gridItem.item.professor}</p>
+                                                                            <p className="font-bold leading-tight text-primary whitespace-normal">{gridItem.item.subjectName}</p>
+                                                                            <p className="text-muted-foreground whitespace-normal">{gridItem.item.professor}</p>
                                                                         </Card>
                                                                     </div>
                                                                 );
@@ -306,7 +307,8 @@ export function OfertaAcademicaPanel() {
                                             </React.Fragment>
                                         ))}
                                     </div>
-                                </ScrollArea>
+                                    </ScrollArea>
+                                </div>
                                 </CardContent>
                             </Card>
 
@@ -393,8 +395,3 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
-
-
-    
-
-    
