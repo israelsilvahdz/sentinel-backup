@@ -134,13 +134,12 @@ export function OfertaAcademicaPanel() {
         });
 
         const visibleSlots = TIME_SLOTS
-            .filter(slot => occupiedSlots.has(slot))
+            .filter(slot => occupiedSlots.has(slot) || ['07:00', '08:00', '09:00', '10:00', '11:00', '11:30', '12:00', '12:30', '13:00', '14:00', '15:00', '16:00', '17:00'].includes(slot))
             .sort((a, b) => parseInt(a.replace(':', '')) - parseInt(b.replace(':', '')));
 
         const clashMap = new Map<string, boolean>();
         const grid: Record<string, ScheduleGridItem[]> = {};
 
-        // Inicializar el grid solo con los slots visibles
         if(visibleSlots.length > 0) {
             scheduleSubjects.forEach(subject => {
                 subject.days.forEach(day => {
@@ -244,7 +243,7 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="w-full overflow-x-auto">
+                                    <div className="overflow-x-auto">
                                         <div 
                                             className="grid bg-muted/30 rounded-lg p-2 gap-px"
                                             style={{ 
@@ -293,15 +292,17 @@ export function OfertaAcademicaPanel() {
                                                                             style={{ flex: `1 1 ${100 / itemsInSlot.length}%` }}
                                                                         >
                                                                             <Card className={cn(
-                                                                                "h-full flex flex-col justify-center text-center text-xs p-1.5 shadow-sm relative group bg-card hover:shadow-lg transition-shadow", 
+                                                                                "h-full text-xs p-1.5 shadow-sm relative group bg-card hover:shadow-lg transition-shadow", 
                                                                                 clashes.has(gridItem.item.crn) && isLatestAdded && "border-destructive animate-pulse border-2 shadow-destructive/20"
                                                                             )}>
-                                                                                {clashes.has(gridItem.item.crn) && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
-                                                                                <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
-                                                                                    <X className="h-3 w-3 text-destructive"/>
-                                                                                </Button>
-                                                                                <p className="font-bold leading-tight text-primary whitespace-normal">{gridItem.item.subjectName}</p>
-                                                                                <p className="text-muted-foreground whitespace-normal">{gridItem.item.professor}</p>
+                                                                                <div className="flex flex-col justify-center text-center h-full">
+                                                                                    {clashes.has(gridItem.item.crn) && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
+                                                                                    <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
+                                                                                        <X className="h-3 w-3 text-destructive"/>
+                                                                                    </Button>
+                                                                                    <p className="font-bold leading-tight text-primary whitespace-normal">{gridItem.item.subjectName}</p>
+                                                                                    <p className="text-muted-foreground whitespace-normal">{gridItem.item.professor}</p>
+                                                                                </div>
                                                                             </Card>
                                                                         </div>
                                                                     );
@@ -319,22 +320,24 @@ export function OfertaAcademicaPanel() {
                             <Card>
                                 <CardHeader><CardTitle>Listado de Materias en Simulación</CardTitle></CardHeader>
                                 <CardContent>
-                                    <Table>
-                                        <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
-                                        <TableBody>
-                                            {scheduleSubjects.map(item => (
-                                                <TableRow key={item.crn}>
-                                                    <TableCell className="font-medium">{item.subjectName}</TableCell>
-                                                    <TableCell>{item.crn}</TableCell>
-                                                    <TableCell>{item.professor}</TableCell>
-                                                    <TableCell>
-                                                        <div className="flex gap-1 flex-wrap">{item.days.map(d => <Badge key={d} variant="outline">{d}</Badge>)}</div>
-                                                        <span className="text-xs">{item.startTime}-{item.endTime}</span>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                    <div className="max-h-[50vh]">
+                                        <Table>
+                                            <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
+                                            <TableBody>
+                                                {scheduleSubjects.map(item => (
+                                                    <TableRow key={item.crn}>
+                                                        <TableCell className="font-medium">{item.subjectName}</TableCell>
+                                                        <TableCell>{item.crn}</TableCell>
+                                                        <TableCell>{item.professor}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex gap-1 flex-wrap">{item.days.map(d => <Badge key={d} variant="outline">{d}</Badge>)}</div>
+                                                            <span className="text-xs">{item.startTime}-{item.endTime}</span>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
                                 </CardContent>
                             </Card>
                         </>
@@ -399,8 +402,3 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
-
-    
-
-    
-
