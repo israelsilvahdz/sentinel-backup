@@ -7,7 +7,7 @@ import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseOfertaAcademicaExcel } from '@/lib/excelParser';
 import { Input } from '../ui/input';
-import { Search, Info, Calendar, User, X, AlertTriangle } from 'lucide-react';
+import { Search, Info, Calendar, User, X, AlertTriangle, PlusCircle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
@@ -124,7 +124,6 @@ export function OfertaAcademicaPanel() {
 
     const { scheduleGrid, clashes } = useMemo(() => {
         const clashMap = new Map<string, string[]>();
-        // First, calculate all clashes
         for (let i = 0; i < scheduleSubjects.length; i++) {
             for (let j = i + 1; j < scheduleSubjects.length; j++) {
                 const item1 = scheduleSubjects[i];
@@ -139,7 +138,7 @@ export function OfertaAcademicaPanel() {
                 }
             }
         }
-
+        
         const grid: Record<string, (ScheduleGridItem | null)[]> = {};
         DAYS.forEach(day => {
             grid[day] = Array(TIME_SLOTS.length).fill(null);
@@ -199,37 +198,44 @@ export function OfertaAcademicaPanel() {
 
             {ofertaAcademica.length > 0 && (
                 <>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Paso 1: Selecciona un Grupo Base</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                             <Select onValueChange={handleGroupSelect} value={selectedGroup || undefined}>
-                                <SelectTrigger className="w-full md:w-[300px]">
-                                    <SelectValue placeholder="Selecciona un grupo..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availableGroups.map(group => (
-                                        <SelectItem key={group} value={group}>{group}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </CardContent>
-                    </Card>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Paso 1: Selecciona un Grupo Base</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <Select onValueChange={handleGroupSelect} value={selectedGroup || undefined}>
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Selecciona un grupo..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableGroups.map(group => (
+                                            <SelectItem key={group} value={group}>{group}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Paso 2: Edita el Horario</CardTitle>
+                                <CardDescription>Añade o quita materias para simular el horario de un alumno.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex items-center gap-4">
+                                   <SubjectSearchPopover allSubjects={ofertaAcademica} onSubjectSelect={addSubjectToSchedule} />
+                                   <Button onClick={() => document.querySelector<HTMLButtonElement>('[cmdk-input-wrapper] button')?.click()}>
+                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                        Añadir Materia
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
                     {selectedGroup && (
                         <>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Paso 2: Edita el Horario</CardTitle>
-                                    <CardDescription>Añade o quita materias para simular el horario de un alumno específico.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <Label>Añadir materia al horario</Label>
-                                     <SubjectSearchPopover allSubjects={ofertaAcademica} onSubjectSelect={addSubjectToSchedule} />
-                                </CardContent>
-                            </Card>
-
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Horario Simulado</CardTitle>
@@ -255,9 +261,11 @@ export function OfertaAcademicaPanel() {
                                         {DAYS.map((day, dayIndex) => (
                                             <React.Fragment key={day}>
                                                 {scheduleGrid[day]?.map((gridItem, slotIndex) => {
-                                                    if (!gridItem || gridItem.rowSpan === 0) {
-                                                        // Render an empty cell for placeholder or spanned cells
-                                                        return <div key={`${day}-${slotIndex}`} className="p-1 border-t border-l min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}></div>;
+                                                    if (!gridItem) {
+                                                         return <div key={`${day}-${slotIndex}`} className="p-1 border-t border-l min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}></div>;
+                                                    }
+                                                    if (gridItem.rowSpan === 0) {
+                                                        return null;
                                                     }
                                                     
                                                     const { item, rowSpan, isClashing } = gridItem;
@@ -339,19 +347,20 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect }: { allSubjects: O
   const handleSelect = (subject: OfertaAcademicaItem) => {
     onSubjectSelect(subject);
     setOpen(false);
+    setSearchValue('');
   };
   
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full md:w-[400px] justify-between">
-          <User className="mr-2 h-4 w-4" /> Buscar materia por nombre o CRN...
-          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        <Button variant="outline" className="w-full justify-start">
+            <Search className="mr-2 h-4 w-4" />
+            Buscar Materia por nombre o CRN...
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
-          <CommandInput placeholder="Escribe para buscar..." value={searchValue} onValueChange={setSearchValue} />
+          <CommandInput placeholder="Buscar por nombre o CRN..." value={searchValue} onValueChange={setSearchValue} />
           <CommandEmpty>No se encontraron materias.</CommandEmpty>
           <CommandGroup>
             {filteredSubjects.map((subject) => (
