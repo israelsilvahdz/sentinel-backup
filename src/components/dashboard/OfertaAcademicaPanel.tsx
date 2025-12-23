@@ -31,19 +31,13 @@ const DAY_MAP: Record<string, string> = {
 };
 
 const TIME_SLOTS = [
-    '07:00', '08:00', '09:00', '10:00', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '15:00', '16:00', '17:00'
+    '07:00', '08:00', '09:00', '10:00', '11:00', '11:30', '12:00', '12:30', '13:00', '14:00', '15:00', '16:00', '17:00'
 ];
 
-function isTimeOverlap(item1: OfertaAcademicaItem, item2: OfertaAcademicaItem): boolean {
-    if (!item1.startTime || !item1.endTime || !item2.startTime || !item2.endTime) return false;
-    
-    const start1 = parseInt(item1.startTime.replace(':', ''), 10);
-    const end1 = parseInt(item1.endTime.replace(':', ''), 10);
-    const start2 = parseInt(item2.startTime.replace(':', ''), 10);
-    const end2 = parseInt(item2.endTime.replace(':', ''), 10);
-
-    // Overlap exists if one interval starts before the other ends, and vice-versa
-    return start1 < end2 && start2 < end1;
+interface ScheduleGridItem {
+    item: OfertaAcademicaItem;
+    rowSpan: number;
+    isClashing: boolean;
 }
 
 
@@ -52,8 +46,14 @@ function isClassInSlot(item: OfertaAcademicaItem, slot: string, day: string): bo
     const itemStart = parseInt(item.startTime.replace(':', ''), 10);
     const itemEnd = parseInt(item.endTime.replace(':', ''), 10);
     const slotStart = parseInt(slot.replace(':', ''), 10);
-    const slotEnd = slotStart + 59; 
-    return itemStart <= slotEnd && itemEnd > slotStart;
+    
+    // Asumimos que cada slot de tiempo dura hasta el inicio del siguiente
+    const nextSlotIndex = TIME_SLOTS.indexOf(slot) + 1;
+    const slotEnd = nextSlotIndex < TIME_SLOTS.length 
+        ? parseInt(TIME_SLOTS[nextSlotIndex].replace(':', ''), 10)
+        : slotStart + 100; // Asume 1 hora si es el último slot
+
+    return itemStart < slotEnd && itemEnd > slotStart;
 }
 
 export function OfertaAcademicaPanel() {
@@ -123,33 +123,63 @@ export function OfertaAcademicaPanel() {
     }
 
     const { scheduleGrid, clashes } = useMemo(() => {
-        const grid: Record<string, OfertaAcademicaItem[]> = {};
-        const clashMap = new Map<string, string[]>(); // Map CRN to list of CRNs it clashes with
+        const clashMap = new Map<string, string[]>();
+        // First, calculate all clashes
+        for (let i = 0; i < scheduleSubjects.length; i++) {
+            for (let j = i + 1; j < scheduleSubjects.length; j++) {
+                const item1 = scheduleSubjects[i];
+                const item2 = scheduleSubjects[j];
+                const commonDays = item1.days.some(day => item2.days.includes(day));
+                
+                if (commonDays && isTimeOverlap(item1, item2)) {
+                    if (!clashMap.has(item1.crn)) clashMap.set(item1.crn, []);
+                    if (!clashMap.has(item2.crn)) clashMap.set(item2.crn, []);
+                    clashMap.get(item1.crn)!.push(item2.crn);
+                    clashMap.get(item2.crn)!.push(item1.crn);
+                }
+            }
+        }
 
+        const grid: Record<string, (ScheduleGridItem | null)[]> = {};
         DAYS.forEach(day => {
-            TIME_SLOTS.forEach(slot => {
-                const key = `${day}-${slot}`;
-                const itemsInSlot = scheduleSubjects.filter(item => isClassInSlot(item, slot, day));
-                grid[key] = itemsInSlot;
+            grid[day] = Array(TIME_SLOTS.length).fill(null);
+            const subjectsForDay = scheduleSubjects.filter(s => s.days.includes(day));
 
-                if (itemsInSlot.length > 1) {
-                    for (let i = 0; i < itemsInSlot.length; i++) {
-                        for (let j = i + 1; j < itemsInSlot.length; j++) {
-                           if (itemsInSlot[i].days.some(d => itemsInSlot[j].days.includes(d)) && isTimeOverlap(itemsInSlot[i], itemsInSlot[j])) {
-                                const crn1 = itemsInSlot[i].crn;
-                                const crn2 = itemsInSlot[j].crn;
-                                if (!clashMap.has(crn1)) clashMap.set(crn1, []);
-                                if (!clashMap.has(crn2)) clashMap.set(crn2, []);
-                                clashMap.get(crn1)!.push(crn2);
-                                clashMap.get(crn2)!.push(crn1);
-                           }
-                        }
-                    }
+            subjectsForDay.forEach(subject => {
+                const startIndex = TIME_SLOTS.findIndex(slot => isClassInSlot(subject, slot, day));
+                if (startIndex === -1 || grid[day][startIndex] !== null) return;
+
+                let endIndex = startIndex;
+                while (endIndex + 1 < TIME_SLOTS.length && isClassInSlot(subject, TIME_SLOTS[endIndex + 1], day)) {
+                    endIndex++;
+                }
+                const rowSpan = endIndex - startIndex + 1;
+
+                grid[day][startIndex] = {
+                    item: subject,
+                    rowSpan: rowSpan,
+                    isClashing: clashMap.has(subject.crn)
+                };
+                
+                for (let i = startIndex + 1; i <= endIndex; i++) {
+                    grid[day][i] = { item: subject, rowSpan: 0, isClashing: false }; 
                 }
             });
         });
+        
         return { scheduleGrid: grid, clashes: clashMap };
     }, [scheduleSubjects]);
+    
+    function isTimeOverlap(item1: OfertaAcademicaItem, item2: OfertaAcademicaItem): boolean {
+        if (!item1.startTime || !item1.endTime || !item2.startTime || !item2.endTime) return false;
+        
+        const start1 = parseInt(item1.startTime.replace(':', ''), 10);
+        const end1 = parseInt(item1.endTime.replace(':', ''), 10);
+        const start2 = parseInt(item2.startTime.replace(':', ''), 10);
+        const end2 = parseInt(item2.endTime.replace(':', ''), 10);
+
+        return start1 < end2 && start2 < end1;
+    }
 
 
     return (
@@ -208,33 +238,43 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                <ScrollArea className="w-full h-[70vh] border rounded-lg">
-                                    <div className="grid grid-cols-[auto_repeat(5,1fr)]">
-                                        <div className="p-2 bg-card sticky top-0 z-10"></div>
-                                        {DAYS.map(day => (
-                                            <div key={day} className="p-2 text-center font-bold bg-card sticky top-0 z-10 border-b border-l">{DAY_MAP[day]}</div>
+                                <ScrollArea className="w-full h-[80vh] border rounded-lg">
+                                    <div 
+                                        className="grid grid-cols-[auto_repeat(5,1fr)]"
+                                        style={{ gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(60px, auto))`}}
+                                    >
+                                        <div className="p-2 bg-card sticky top-0 z-10 row-start-1"></div>
+                                        {DAYS.map((day, i) => (
+                                            <div key={day} className="p-2 text-center font-bold bg-card sticky top-0 z-10 border-b border-l row-start-1" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
                                         ))}
                                         
-                                        {TIME_SLOTS.map(slot => (
-                                            <React.Fragment key={slot}>
-                                                <div className="p-2 text-center text-xs font-mono bg-card border-r border-t sticky left-0">{slot}</div>
-                                                {DAYS.map(day => (
-                                                    <div key={`${day}-${slot}`} className="p-1 border-t border-l min-h-[60px] space-y-1">
-                                                        {scheduleGrid[`${day}-${slot}`]?.map(item => {
-                                                            const isClashing = clashes.has(item.crn);
-                                                            return (
-                                                                <Card key={item.crn} className={cn("text-xs p-1.5 shadow-sm relative group", isClashing && "border-destructive animate-pulse")}>
-                                                                    {isClashing && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
-                                                                    <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(item.crn)}>
-                                                                        <X className="h-3 w-3 text-destructive"/>
-                                                                    </Button>
-                                                                    <p className="font-bold leading-tight pl-3">{item.subjectName}</p>
-                                                                    <p className="text-muted-foreground">{item.professor}</p>
-                                                                </Card>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                ))}
+                                        {TIME_SLOTS.map((slot, i) => (
+                                            <div key={slot} className="p-2 text-center text-xs font-mono bg-card border-r border-t sticky left-0" style={{ gridRow: i + 2 }}>{slot}</div>
+                                        ))}
+
+                                        {DAYS.map((day, dayIndex) => (
+                                            <React.Fragment key={day}>
+                                                {scheduleGrid[day]?.map((gridItem, slotIndex) => {
+                                                    if (!gridItem || gridItem.rowSpan === 0) {
+                                                        // Render an empty cell for placeholder or spanned cells
+                                                        return <div key={`${day}-${slotIndex}`} className="p-1 border-t border-l min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}></div>;
+                                                    }
+                                                    
+                                                    const { item, rowSpan, isClashing } = gridItem;
+
+                                                    return (
+                                                        <div key={item.crn} className="p-1 border-t border-l" style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${rowSpan}` }}>
+                                                            <Card className={cn("text-xs p-1.5 shadow-sm relative group h-full flex flex-col justify-center", isClashing && "border-destructive animate-pulse")}>
+                                                                {isClashing && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
+                                                                <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(item.crn)}>
+                                                                    <X className="h-3 w-3 text-destructive"/>
+                                                                </Button>
+                                                                <p className="font-bold leading-tight">{item.subjectName}</p>
+                                                                <p className="text-muted-foreground">{item.professor}</p>
+                                                            </Card>
+                                                        </div>
+                                                    )
+                                                })}
                                             </React.Fragment>
                                         ))}
                                     </div>
