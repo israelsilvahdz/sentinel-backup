@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -66,7 +67,7 @@ export function OfertaAcademicaPanel() {
     
     const availableGroups = useMemo(() => {
         const groups = new Set(ofertaAcademica.map(item => item.group));
-        return Array.from(groups).sort();
+        return Array.from(groups).filter(Boolean).sort();
     }, [ofertaAcademica]);
 
 
