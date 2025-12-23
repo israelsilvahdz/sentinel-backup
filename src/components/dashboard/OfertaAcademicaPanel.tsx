@@ -132,7 +132,7 @@ export function OfertaAcademicaPanel() {
         setScheduleSubjects(prev => prev.filter(s => s.crn !== crnToRemove));
     }
 
-    const { clashes, scheduleGrid } = useMemo(() => {
+    const { scheduleGrid } = useMemo(() => {
         const grid: Record<string, (ScheduleGridItem[])[]> = {};
         DAYS.forEach(day => {
             grid[day] = Array(TIME_SLOTS.length).fill(null).map(() => []);
@@ -155,6 +155,10 @@ export function OfertaAcademicaPanel() {
             });
         });
         
+        return { scheduleGrid: grid };
+    }, [scheduleSubjects]);
+    
+    const clashes = useMemo(() => {
         const clashMap = new Map<string, string[]>();
         scheduleSubjects.forEach(subject => {
             const subjectsInSameSlots = scheduleSubjects.filter(otherSubject => {
@@ -170,8 +174,7 @@ export function OfertaAcademicaPanel() {
                 clashMap.set(subject.crn, subjectsInSameSlots.map(s => s.crn));
             }
         });
-
-        return { clashes: clashMap, scheduleGrid: grid };
+        return clashMap;
     }, [scheduleSubjects]);
     
     return (
@@ -238,7 +241,7 @@ export function OfertaAcademicaPanel() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                <div className="w-full border-none">
+                                <div className="w-full">
                                 <ScrollArea className="w-full whitespace-nowrap">
                                     <div 
                                         className="grid bg-muted/30 rounded-lg p-2 gap-px"
@@ -315,7 +318,7 @@ export function OfertaAcademicaPanel() {
                             <Card>
                                 <CardHeader><CardTitle>Listado de Materias en Simulación</CardTitle></CardHeader>
                                 <CardContent>
-                                    <ScrollArea className="h-[50vh]">
+                                    <ScrollArea>
                                         <Table>
                                             <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead></TableRow></TableHeader>
                                             <TableBody>
