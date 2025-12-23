@@ -51,7 +51,13 @@ const timeToMinutes = (time: string): number => {
 function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAcademicaItem[], onRemoveSubject: (crn: string) => void }) {
     const timeSlots = useMemo(() => {
         const slots: string[] = [];
-        if (subjects.length === 0) return slots;
+        if (subjects.length === 0) {
+            // Default view when no subjects are selected
+            for (let i = 7; i < 15; i++) {
+                slots.push(`${String(i).padStart(2, '0')}:00`);
+            }
+            return slots;
+        }
         
         let minHour = 24;
         let maxHour = 0;
@@ -61,11 +67,10 @@ function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAca
             if (s.endTime) maxHour = Math.max(maxHour, parseInt(s.endTime.split(':')[0], 10));
         });
         
-        const startHour = Math.max(0, minHour -1);
+        const startHour = Math.max(0, minHour - 1);
         const endHour = Math.min(23, maxHour + 1);
 
-
-        for (let i = startHour; i < endHour; i++) {
+        for (let i = startHour; i <= endHour; i++) {
             slots.push(`${String(i).padStart(2, '0')}:00`);
         }
         return slots;
@@ -181,7 +186,8 @@ function ScheduleVisualizer({ subjects, onRemoveSubject }: { subjects: OfertaAca
                                         </Button>
                                         <p className="font-bold text-xs leading-tight pr-4">{block.item.subjectName}</p>
                                         <p className="text-xs opacity-80">{block.item.professor}</p>
-                                        <p className="text-xs opacity-80 font-mono">{block.item.startTime} - {block.item.endTime}</p>
+                                        <p className="text-xs opacity-80 font-semibold">Grupo: {block.item.group}</p>
+                                        <p className="text-xs opacity-80 font-mono mt-1">{block.item.startTime} - {block.item.endTime}</p>
                                     </div>
                                  ))}
                              </div>
@@ -434,4 +440,3 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
     </Popover>
   );
 }
-
