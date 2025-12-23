@@ -38,6 +38,7 @@ interface ScheduleGridItem {
     item: OfertaAcademicaItem;
     rowSpan: number;
     isClashing: boolean;
+    isNewestInClash: boolean;
 }
 
 
@@ -134,6 +135,8 @@ export function OfertaAcademicaPanel() {
 
     const { scheduleGrid, clashes } = useMemo(() => {
         const clashMap = new Map<string, string[]>();
+        const subjectIndices = new Map(scheduleSubjects.map((s, i) => [s.crn, i]));
+
         for (let i = 0; i < scheduleSubjects.length; i++) {
             for (let j = i + 1; j < scheduleSubjects.length; j++) {
                 const item1 = scheduleSubjects[i];
@@ -164,11 +167,22 @@ export function OfertaAcademicaPanel() {
                     endIndex++;
                 }
                 const rowSpan = endIndex - startIndex + 1;
+                
+                const isClashing = clashMap.has(subject.crn);
+                let isNewestInClash = false;
+                if(isClashing) {
+                    const myIndex = subjectIndices.get(subject.crn) ?? -1;
+                    const clashingIndices = (clashMap.get(subject.crn) || []).map(crn => subjectIndices.get(crn) ?? -1);
+                    if (myIndex > Math.max(...clashingIndices)) {
+                        isNewestInClash = true;
+                    }
+                }
 
                 grid[day][startIndex].push({
                     item: subject,
-                    rowSpan: rowSpan,
-                    isClashing: clashMap.has(subject.crn)
+                    rowSpan,
+                    isClashing,
+                    isNewestInClash
                 });
             });
         });
@@ -221,7 +235,7 @@ export function OfertaAcademicaPanel() {
                                  <Label>Añadir materia al horario</Label>
                                  <div className="flex items-center gap-4">
                                    <SubjectSearchPopover allSubjects={ofertaAcademica} onSubjectSelect={addSubjectToSchedule} />
-                                   <Button onClick={() => document.querySelector<HTMLButtonElement>('[cmdk-input-wrapper] button')?.click()}>
+                                    <Button onClick={() => document.querySelector<HTMLButtonElement>('[cmdk-input-wrapper] button')?.click()}>
                                         <PlusCircle className="mr-2 h-4 w-4" />
                                         Añadir Materia
                                     </Button>
@@ -248,49 +262,45 @@ export function OfertaAcademicaPanel() {
                                             gridTemplateRows: `auto repeat(${TIME_SLOTS.length}, minmax(60px, auto))`
                                         }}
                                     >
-                                        <div className="p-2 sticky top-0 z-10 row-start-1"></div>
+                                        <div className="p-2 sticky top-0 z-10 row-start-1 bg-muted/30"></div>
                                         {DAYS.map((day, i) => (
-                                            <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
+                                            <div key={day} className="p-2 text-center font-bold text-primary sticky top-0 z-10 row-start-1 bg-muted/30" style={{gridColumn: i + 2}}>{DAY_MAP[day]}</div>
                                         ))}
                                         
                                         {TIME_SLOTS.map((slot, i) => (
-                                            <div key={slot} className="p-2 text-center sticky left-0" style={{ gridRow: i + 2 }}>
-                                                <Badge variant="outline" className="font-mono text-xs">{slot}</Badge>
+                                            <div key={slot} className="p-2 text-center sticky left-0 z-10 bg-muted/30" style={{ gridRow: i + 2 }}>
+                                                <Badge variant="outline" className="font-mono text-xs bg-card">{slot}</Badge>
                                             </div>
                                         ))}
 
                                         {DAYS.map((day, dayIndex) => (
                                             <React.Fragment key={day}>
                                                 {TIME_SLOTS.map((slot, slotIndex) => {
-                                                    const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
+                                                     const itemsInSlot = scheduleGrid[day]?.[slotIndex] || [];
                                                     const isSlotOccupiedBySpan = slotIndex > 0 && 
                                                         scheduleGrid[day]?.[slotIndex - 1]?.some(prevItem => prevItem.rowSpan > 1 && isClassInSlot(prevItem.item, slot, day));
 
                                                     if (isSlotOccupiedBySpan) return null;
                                                     
                                                     return (
-                                                        <div key={`${day}-${slotIndex}`} className="relative min-h-[60px]" style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}>
-                                                            {itemsInSlot.map((gridItem, itemIndex) => (
+                                                        <div key={`${day}-${slotIndex}`} className="relative min-h-[60px] bg-card flex" style={{ gridColumn: dayIndex + 2, gridRow: `${slotIndex + 2} / span ${itemsInSlot[0]?.rowSpan || 1}` }}>
+                                                            {itemsInSlot.map((gridItem) => (
                                                                 <div 
                                                                     key={gridItem.item.crn} 
-                                                                    className="p-1 absolute w-full h-full"
+                                                                    className="p-1 w-full"
                                                                     style={{ 
-                                                                        height: `calc(${gridItem.rowSpan * 100}% + ${gridItem.rowSpan-1}px)`,
-                                                                        zIndex: 10 + itemIndex,
-                                                                        ...(itemsInSlot.length > 1 && {
-                                                                            marginLeft: `${itemIndex * 8}px`,
-                                                                            marginTop: `${itemIndex * 8}px`,
-                                                                            width: `calc(100% - ${itemIndex * 8}px)`
-                                                                        })
+                                                                        height: `100%`,
                                                                     }}
                                                                 >
-                                                                    <Card className={cn("text-xs p-1.5 shadow-md relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", gridItem.isClashing && "border-destructive animate-pulse border-2 shadow-destructive/20")}>
+                                                                    <Card className={cn("text-xs p-1.5 shadow-md relative group h-full flex flex-col justify-center bg-card hover:shadow-lg transition-shadow", (gridItem.isClashing && gridItem.isNewestInClash) && "border-destructive animate-pulse border-2 shadow-destructive/20")}>
                                                                         {gridItem.isClashing && <AlertTriangle className="absolute top-1 left-1 h-3 w-3 text-destructive" />}
                                                                         <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => removeSubjectFromSchedule(gridItem.item.crn)}>
                                                                             <X className="h-3 w-3 text-destructive"/>
                                                                         </Button>
-                                                                        <p className="font-bold leading-tight text-primary">{gridItem.item.subjectName}</p>
-                                                                        <p className="text-muted-foreground">{gridItem.item.professor}</p>
+                                                                        <div className="text-center">
+                                                                            <p className="font-bold leading-tight text-primary">{gridItem.item.subjectName}</p>
+                                                                            <p className="text-muted-foreground">{gridItem.item.professor}</p>
+                                                                        </div>
                                                                     </Card>
                                                                 </div>
                                                             ))}
@@ -367,7 +377,7 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect }: { allSubjects: O
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="w-full justify-start">
+        <Button variant="outline" className="w-full justify-start" onClick={(e) => e.preventDefault()}>
             <Search className="mr-2 h-4 w-4" />
             Buscar Materia por nombre o CRN...
         </Button>
@@ -388,3 +398,6 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect }: { allSubjects: O
     </Popover>
   );
 }
+
+
+    
