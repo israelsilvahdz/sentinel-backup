@@ -32,6 +32,7 @@ import { TeamTasksPanel } from './TeamTasksPanel';
 import { SeguimientoPanel } from './SeguimientoPanel';
 import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { AcademicCommitteePanel } from './AcademicCommitteePanel';
+import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -40,7 +41,7 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem, Team } from '@/types/student';
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
@@ -50,7 +51,7 @@ import professorContactsData from '@/lib/professor-contacts.json';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'oferta-academica';
+export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'oferta-academica' | 'irregular-students';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -144,7 +145,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('oferta-academica');
+  const [activeView, setActiveView] = useState<ActiveView>('irregular-students');
   
   const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
@@ -604,6 +605,7 @@ export function DashboardClient() {
         case 'teams-management': return <TeamsManagementPanel />;
         case 'academic-committee': return <AcademicCommitteePanel />;
         case 'oferta-academica': return <OfertaAcademicaPanel />;
+        case 'irregular-students': return <IrregularStudentsPanel />;
         default: return <SeguimientoPanel />;
     }
   }
@@ -643,6 +645,12 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')}>
                     <BarChart3 />
                     <span>Análisis de Cambios</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Análisis de Irregulares" isActive={activeView === 'irregular-students'} onClick={() => handleSetActiveView('irregular-students')}>
+                    <Users />
+                    <span>Análisis de Irregulares</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

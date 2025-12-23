@@ -149,3 +149,11 @@ export interface OfertaAcademicaItem {
     building: string;
     room: string;
 }
+
+// Nuevo tipo para el parser del kardex
+export interface IrregularStudentInfo {
+    id: string;
+    name: string;
+    currentTerm: number;
+    pendingSubjects: { name: string; term: number }[];
+}
