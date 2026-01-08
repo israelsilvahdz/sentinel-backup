@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,7 @@ interface TimeBlock {
 }
 
 const timeToMinutes = (time: string): number => {
+    if (!time) return 0;
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
 };
@@ -216,7 +217,8 @@ export function OfertaAcademicaPanel() {
     
     const availableGroups = useMemo(() => {
         const groups = new Set(ofertaAcademica.map(item => item.group));
-        return Array.from(groups).filter(group => group && group.trim() !== '' && !group.toUpperCase().startsWith('F')).sort();
+        // No longer filtering out 'F' groups from the selection list itself.
+        return Array.from(groups).filter(group => group && group.trim() !== '').sort();
     }, [ofertaAcademica]);
 
 
@@ -252,8 +254,10 @@ export function OfertaAcademicaPanel() {
     const handleGroupSelect = (group: string | null) => {
         setSelectedGroup(group);
         if (group) {
-            const groupSubjects = ofertaAcademica.filter(item => item.group === group && !item.group.toUpperCase().startsWith('F'));
-            setScheduleSubjects(groupSubjects);
+            // Do not filter out 'F' groups here. Let them be added but not visualized.
+            const groupSubjects = ofertaAcademica.filter(item => item.group === group);
+            const regularSubjects = groupSubjects.filter(item => !item.group.toUpperCase().startsWith('F'));
+            setScheduleSubjects(regularSubjects);
         } else {
             setScheduleSubjects([]);
         }
@@ -315,11 +319,13 @@ export function OfertaAcademicaPanel() {
                              <CardContent>
                                  <Label>Añadir materia al horario</Label>
                                  <div className="flex items-center gap-4">
-                                   <SubjectSearchPopover allSubjects={ofertaAcademica} onSubjectSelect={addSubjectToSchedule} isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} />
-                                    <Button onClick={() => setIsSearchOpen(true)}>
-                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                        Añadir Materia
-                                    </Button>
+                                   <SubjectSearchPopover 
+                                     allSubjects={ofertaAcademica} 
+                                     currentSchedule={scheduleSubjects}
+                                     onSubjectSelect={addSubjectToSchedule} 
+                                     isOpen={isSearchOpen} 
+                                     onOpenChange={setIsSearchOpen} 
+                                   />
                                 </div>
                             </CardContent>
                         </Card>
@@ -354,12 +360,13 @@ export function OfertaAcademicaPanel() {
                                 <CardContent>
                                     <ScrollArea className="h-72">
                                         <Table>
-                                            <TableHeader><TableRow><TableHead>Materia</TableHead><TableHead>CRN</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader>
+                                            <TableHeader><TableRow><TableHead>CRN</TableHead><TableHead>Clave</TableHead><TableHead>Materia</TableHead><TableHead>Profesor</TableHead><TableHead>Horario</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader>
                                             <TableBody>
                                                 {scheduleSubjects.map(item => (
                                                     <TableRow key={item.crn}>
-                                                        <TableCell className="font-medium">{item.subjectName}</TableCell>
                                                         <TableCell>{item.crn}</TableCell>
+                                                        <TableCell>{item.subjectKey}</TableCell>
+                                                        <TableCell className="font-medium">{item.subjectName}</TableCell>
                                                         <TableCell>{item.professor}</TableCell>
                                                         <TableCell>
                                                             <div className="flex gap-1 flex-wrap">{item.days.map(d => <Badge key={d} variant="outline">{d}</Badge>)}</div>
@@ -395,14 +402,37 @@ export function OfertaAcademicaPanel() {
     );
 }
 
-function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChange }: { allSubjects: OfertaAcademicaItem[], onSubjectSelect: (subject: OfertaAcademicaItem) => void, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+function hasConflict(subject: OfertaAcademicaItem, schedule: OfertaAcademicaItem[]): boolean {
+    if (!subject.startTime || !subject.endTime) return false;
+
+    const newStart = timeToMinutes(subject.startTime);
+    const newEnd = timeToMinutes(subject.endTime);
+    
+    for (const scheduledItem of schedule) {
+        if (!scheduledItem.startTime || !scheduledItem.endTime) continue;
+        
+        const commonDays = subject.days.some(day => scheduledItem.days.includes(day));
+        if (!commonDays) continue;
+
+        const scheduledStart = timeToMinutes(scheduledItem.startTime);
+        const scheduledEnd = timeToMinutes(scheduledItem.endTime);
+
+        // Check for overlap: (StartA < EndB) and (EndA > StartB)
+        if (newStart < scheduledEnd && newEnd > scheduledStart) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+function SubjectSearchPopover({ allSubjects, currentSchedule, onSubjectSelect, isOpen, onOpenChange }: { allSubjects: OfertaAcademicaItem[], currentSchedule: OfertaAcademicaItem[], onSubjectSelect: (subject: OfertaAcademicaItem) => void, isOpen: boolean, onOpenChange: (open: boolean) => void }) {
   const [searchValue, setSearchValue] = useState("");
 
   const filteredSubjects = useMemo(() => {
     if (!searchValue) return [];
     const lowercasedFilter = searchValue.toLowerCase();
     return allSubjects.filter(subject => 
-        !subject.group.toUpperCase().startsWith('F') &&
         (subject.subjectName.toLowerCase().includes(lowercasedFilter) || 
         subject.crn.includes(lowercasedFilter))
     ).slice(0, 50);
@@ -417,7 +447,7 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
   return (
     <Popover open={isOpen} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="w-full justify-start" onClick={(e) => { e.preventDefault(); onOpenChange(true); }}>
+         <Button variant="outline" className="w-full justify-start" onClick={(e) => { e.preventDefault(); onOpenChange(true); }}>
             <Search className="mr-2 h-4 w-4" />
             Buscar Materia por nombre o CRN...
         </Button>
@@ -428,11 +458,23 @@ function SubjectSearchPopover({ allSubjects, onSubjectSelect, isOpen, onOpenChan
           <CommandEmpty>No se encontraron materias.</CommandEmpty>
           <CommandGroup>
             <ScrollArea className="h-72">
-                {filteredSubjects.map((subject) => (
-                <CommandItem key={subject.crn} onSelect={() => handleSelect(subject)}>
-                    {subject.subjectName} ({subject.crn}) - {subject.professor}
-                </CommandItem>
-                ))}
+                {filteredSubjects.map((subject) => {
+                    const conflict = hasConflict(subject, currentSchedule);
+                    return (
+                        <CommandItem key={subject.crn} onSelect={() => handleSelect(subject)} className="flex justify-between items-center">
+                            <div>
+                                <p>{subject.subjectName} ({subject.crn})</p>
+                                <p className="text-xs text-muted-foreground">{subject.professor} | Gpo: {subject.group} | {subject.days.join(', ')} {subject.startTime}-{subject.endTime}</p>
+                            </div>
+                            {conflict && (
+                                <Badge variant="destructive" className="flex items-center gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    ¡Conflicto!
+                                </Badge>
+                            )}
+                        </CommandItem>
+                    )
+                })}
             </ScrollArea>
           </CommandGroup>
         </Command>

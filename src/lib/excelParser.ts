@@ -1,23 +1,11 @@
 
 
 import * as XLSX from 'xlsx';
-import type { StudentData, Subject, Student, StudentContact, ProfessorContact, Team } from '@/types/student';
+import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team } from '@/types/student';
 import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams } from './firebase-services';
+import type { StudentData, Subject } from '@/types/student';
 
 // --- NUEVA INTERFAZ PARA OFERTA ACADÉMICA ---
-export interface OfertaAcademicaItem {
-    crn: string;
-    subjectName: string;
-    group: string;
-    capacity: number;
-    enrolled: number;
-    professor: string;
-    days: string[];
-    startTime: string;
-    endTime: string;
-    building: string;
-    room: string;
-}
 
 
 // Columnas validadas según la lista proporcionada por el usuario.
@@ -550,6 +538,7 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
 
 const OFERTA_COLUMNS = {
     CRN: 'CRN',
+    SUBJECT_KEY: 'CLAVE MATERIA',
     SUBJECT_NAME: 'NOMBRE LARGO MATERIA',
     PROFESSOR: 'NOMBRE PROFESOR',
     GROUP: 'Número grupo',
@@ -623,6 +612,7 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
 
                     const item: OfertaAcademicaItem = {
                         crn: getColumnValue(OFERTA_COLUMNS.CRN),
+                        subjectKey: getColumnValue(OFERTA_COLUMNS.SUBJECT_KEY),
                         subjectName: normalizeSubjectName(getColumnValue(OFERTA_COLUMNS.SUBJECT_NAME)),
                         group: getColumnValue(OFERTA_COLUMNS.GROUP),
                         capacity: parseInt(getColumnValue(OFERTA_COLUMNS.CAPACITY) || '0', 10),
@@ -649,4 +639,3 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
     });
 }
     
-

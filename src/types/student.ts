@@ -138,6 +138,7 @@ export interface Team {
 
 export interface OfertaAcademicaItem {
     crn: string;
+    subjectKey: string;
     subjectName: string;
     group: string;
     capacity: number;
