@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -74,7 +73,7 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
                     </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>¡Copiado!</p>
+                    <span>¡Copiado!</span>
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
