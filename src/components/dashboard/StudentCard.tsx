@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, FileText, Award } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Award, Copy, Check } from 'lucide-react';
 import { type Student, type SubjectSummary, type Team } from "@/types/student";
 import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -46,6 +46,41 @@ function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (
     return <Badge variant="outline" className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
 }
 
+function MatriculaCopy({ studentId }: { studentId: string }) {
+    const [isCopied, setIsCopied] = useState(false);
+    const { toast } = useDashboardFilters();
+
+    const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(studentId).then(() => {
+            setIsCopied(true);
+            toast({
+                title: "¡Matrícula copiada!",
+                description: `Se copió la matrícula ${studentId}.`,
+            });
+            setTimeout(() => setIsCopied(false), 2000);
+        });
+    };
+
+    return (
+        <TooltipProvider>
+            <Tooltip open={isCopied}>
+                <TooltipTrigger asChild>
+                    <span onClick={handleCopy} className="group/copy-id inline-flex items-center gap-1 cursor-pointer rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors">
+                        {studentId}
+                        <span className="opacity-0 group-hover/copy-id:opacity-50 transition-opacity">
+                            {isCopied ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                        </span>
+                    </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>¡Copiado!</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+}
+
 export function StudentCard({ student, teams, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
   
@@ -79,6 +114,12 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
     </div>
   );
 
+  const cardDescriptionContent = (
+     <>
+        Matrícula: <MatriculaCopy studentId={student.id} /> | Líder: {student.leader} | Tutor: {student.tutor}
+    </>
+  )
+
   if (isDialog) {
     // Render content directly without collapsible for Dialog view
     return (
@@ -89,7 +130,7 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
                     <CardTitle className="flex items-center text-lg">
                       {cardTitleContent}
                     </CardTitle>
-                    <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
+                    <CardDescription>{cardDescriptionContent}</CardDescription>
                 </div>
             </div>
         </CardHeader>
@@ -116,7 +157,7 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
                         <CardTitle className="flex items-center text-lg">
                         {cardTitleContent}
                         </CardTitle>
-                        <CardDescription>Matrícula: {student.id} | Líder: {student.leader} | Tutor: {student.tutor}</CardDescription>
+                        <CardDescription>{cardDescriptionContent}</CardDescription>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">

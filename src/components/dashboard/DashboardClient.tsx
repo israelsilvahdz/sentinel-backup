@@ -99,6 +99,7 @@ interface DashboardContextType {
   planType: PlanType;
   ofertaAcademica: OfertaAcademicaItem[];
   setOfertaAcademica: React.Dispatch<React.SetStateAction<OfertaAcademicaItem[]>>;
+  toast: (options: any) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -145,7 +146,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('irregular-students');
+  const [activeView, setActiveView] = useState<ActiveView>('academic-calendar');
   
   const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
@@ -587,6 +588,7 @@ export function DashboardClient() {
     activeView, setActiveView: handleSetActiveView,
     planType,
     ofertaAcademica, setOfertaAcademica,
+    toast,
   };
 
   const renderActiveView = () => {
