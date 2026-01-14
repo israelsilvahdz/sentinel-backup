@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Day, type DayProps } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Skeleton } from '../ui/skeleton';
 
 
 type CalendarType = 'tetra' | 'semestral';
@@ -57,6 +58,11 @@ const CATEGORY_BG_TEXT_COLORS: Record<AcademicEventCategory, string> = {
 export function AcademicCalendar() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [calendarType, setCalendarType] = useState<CalendarType>('tetra');
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const { eventsByDate, currentEvents } = useMemo(() => {
     const events = calendarType === 'tetra' ? academicEventsTetra : academicEventsSemestral;
@@ -114,6 +120,19 @@ export function AcademicCalendar() {
     return new Date();
   }, []);
 
+  if (!isClient) {
+    return (
+        <div className="space-y-8 p-4 md:p-8 pt-6">
+            <header className="mb-8">
+                <Skeleton className="h-10 w-3/4" />
+                <Skeleton className="h-4 w-1/2 mt-2" />
+            </header>
+             <Skeleton className="h-10 w-full" />
+             <Skeleton className="h-24 w-full" />
+             <Skeleton className="h-96 w-full" />
+        </div>
+    );
+  }
 
   return (
    <TooltipProvider>
