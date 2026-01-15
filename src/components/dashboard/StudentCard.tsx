@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send } from 'lucide-react';
 import { type Student, type SubjectSummary, type Team, type Change } from "@/types/student";
 import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -82,11 +82,22 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
     );
 }
 
-function NotificationCopy({ student, changes }: { student: Student, changes: Change[] }) {
-    const { toast } = useDashboardFilters();
+function WhatsAppNotification({ student, changes }: { student: Student, changes: Change[] }) {
+    const { studentContacts, toast } = useDashboardFilters();
+    
+    const phoneNumber = studentContacts[student.id]?.studentPhone?.replace(/\D/g, '');
 
-    const handleCopy = (e: React.MouseEvent) => {
+    const handleSend = (e: React.MouseEvent) => {
         e.stopPropagation();
+
+        if (!phoneNumber) {
+            toast({
+                variant: "destructive",
+                title: "Teléfono no encontrado",
+                description: "No hay un número de teléfono registrado para este alumno.",
+            });
+            return;
+        }
 
         const changesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
 
@@ -115,26 +126,23 @@ function NotificationCopy({ student, changes }: { student: Student, changes: Cha
 
         message += `\nRecuerda que es importante cuidar tu asistencia y la entrega de actividades para no afectar tu calificación. ¡Estoy para apoyarte si tienes alguna duda!`;
         
-        navigator.clipboard.writeText(message).then(() => {
-            toast({
-                title: "¡Mensaje copiado!",
-                description: "El recordatorio para el alumno está en tu portapapeles.",
-            });
-        });
+        const whatsappUrl = `https://wa.me/52${phoneNumber}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
     };
-
-    if (!changes || changes.length === 0) return null;
+    
+    // Only show the button if there are changes AND a phone number exists
+    if (!changes || changes.length === 0 || !phoneNumber) return null;
 
     return (
         <TooltipProvider>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={handleCopy}>
-                        <ClipboardCopy className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={handleSend}>
+                        <Send className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>Copiar notificación de cambios para WhatsApp</p>
+                    <p>Enviar recordatorio por WhatsApp</p>
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
@@ -221,7 +229,7 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <NotificationCopy student={student} changes={changes} />
+                    <WhatsAppNotification student={student} changes={changes} />
                     <Dialog>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>EXPEDIENTE</Button>
