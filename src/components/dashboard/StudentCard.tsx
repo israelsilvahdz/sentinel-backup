@@ -112,7 +112,7 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
 
         changes.forEach(change => {
             if (change.fieldName === 'absences' || change.fieldName === 'missedAssignments') {
-                const subject = student.subjects?.find(s => s.id === change.subjectId);
+                const subject = student.subjectSummaries?.find(s => s.id === change.subjectId);
                 if (subject) {
                     if (!changesBySubject[subject.name]) {
                         changesBySubject[subject.name] = { absences: false, missed: false };
@@ -126,11 +126,18 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
         let message = `Hola ${student.name.split(' ')[0]}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
 
         for (const subjectName in changesBySubject) {
+            const subjectInfo = student.subjectSummaries?.find(s => s.name === subjectName);
+            if (!subjectInfo) continue;
+            
             const { absences, missed } = changesBySubject[subjectName];
-            let changeTypes = [];
-            if (absences) changeTypes.push('faltas');
-            if (missed) changeTypes.push('NE');
-            message += `• *${subjectName}*: Nuevas ${changeTypes.join(' y ')}.\n`;
+            let changeDetails: string[] = [];
+            if (absences) {
+                changeDetails.push(`ahora tienes ${subjectInfo.absences} de ${subjectInfo.absenceLimit} faltas`);
+            }
+            if (missed) {
+                changeDetails.push(`ahora tienes ${subjectInfo.missedAssignments} de ${subjectInfo.missedAssignmentLimit} tareas NE`);
+            }
+            message += `• *${subjectName}*: ${changeDetails.join(' y ')}.\n`;
         }
 
         message += `\nRecuerda que es importante cuidar tu asistencia y la entrega de actividades para no afectar tu calificación. ¡Estoy para apoyarte si tienes alguna duda!`;
