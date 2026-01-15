@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
@@ -13,6 +14,7 @@ import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { parseExcel } from '@/lib/excelParser';
 import { Progress } from '../ui/progress';
+import { addStudentChanges } from '@/lib/firebase-services';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -44,8 +46,9 @@ export function ChangeStats() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
 
-    const processAndCompareData = (previousData: StudentData, currentData: Student[]) => {
-        const newHistory: Record<string, Change[]> = {};
+    const processAndCompareData = async (previousData: StudentData, currentData: Student[]) => {
+        const deltaHistory: Record<string, Change[]> = {};
+        const allChangesToSave: Change[] = [];
         let changesCount = 0;
         
         const currentDataMap: StudentData = currentData.reduce((acc, student) => {
@@ -58,25 +61,26 @@ export function ChangeStats() {
             const currentStudent = currentDataMap[studentId];
             const previousStudent = previousData[studentId];
             
-            if (!newHistory[studentId]) {
-                newHistory[studentId] = [];
+            if (!deltaHistory[studentId]) {
+                deltaHistory[studentId] = [];
             }
 
             if (previousStudent) {
-                // Compare Leader and Tutor
+                 const createChange = (fieldName: Change['fieldName'], subjectId: string, oldValue: any, newValue: any) => {
+                    const change: Change = {
+                        date: new Date().toISOString(), studentId: studentId, subjectId: subjectId,
+                        fieldName: fieldName, oldValue: oldValue, newValue: newValue
+                    };
+                    deltaHistory[studentId].push(change);
+                    allChangesToSave.push(change);
+                    changesCount++;
+                };
+
                 if (currentStudent.leader !== previousStudent.leader) {
-                newHistory[studentId].push({
-                    date: new Date().toISOString(), studentId: studentId, subjectId: 'N/A',
-                    fieldName: 'leader', oldValue: previousStudent.leader, newValue: currentStudent.leader
-                });
-                changesCount++;
+                    createChange('leader', 'N/A', previousStudent.leader, currentStudent.leader);
                 }
                 if (currentStudent.tutor !== previousStudent.tutor) {
-                newHistory[studentId].push({
-                    date: new Date().toISOString(), studentId: studentId, subjectId: 'N/A',
-                    fieldName: 'tutor', oldValue: previousStudent.tutor, newValue: currentStudent.tutor
-                });
-                changesCount++;
+                    createChange('tutor', 'N/A', previousStudent.tutor, currentStudent.tutor);
                 }
                  if (currentStudent.subjects) {
                     currentStudent.subjects.forEach(currentSubject => {
@@ -84,32 +88,48 @@ export function ChangeStats() {
 
                         if (previousSubject) {
                             if (currentSubject.absences > previousSubject.absences) {
-                                newHistory[studentId].push({
-                                    date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
-                                    fieldName: 'absences', oldValue: previousSubject.absences, newValue: currentSubject.absences,
-                                });
-                                changesCount++;
+                                createChange('absences', currentSubject.id, previousSubject.absences, currentSubject.absences);
                             }
                             if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
-                                newHistory[studentId].push({
-                                    date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
-                                    fieldName: 'missedAssignments', oldValue: previousSubject.missedAssignments, newValue: currentSubject.missedAssignments,
-                                });
-                                changesCount++;
+                                createChange('missedAssignments', currentSubject.id, previousSubject.missedAssignments, currentSubject.missedAssignments);
                             }
                             if (currentSubject.group !== previousSubject.group) {
-                                newHistory[studentId].push({
-                                    date: new Date().toISOString(), studentId: studentId, subjectId: currentSubject.id,
-                                    fieldName: 'group', oldValue: previousSubject.group, newValue: currentSubject.group
-                                });
-                                changesCount++;
+                                createChange('group', currentSubject.id, previousSubject.group, currentSubject.group);
                             }
                         }
                     });
                 }
             }
         }
-        setStudentHistory(newHistory);
+        
+        if (allChangesToSave.length > 0) {
+            try {
+                await addStudentChanges(allChangesToSave);
+                toast({
+                    title: 'Historial Guardado',
+                    description: `Se guardaron ${allChangesToSave.length} cambios en la base de datos.`,
+                });
+            } catch (error) {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Error de Base de Datos',
+                    description: 'No se pudieron guardar los cambios en el historial.',
+                });
+            }
+        }
+
+        setStudentHistory(prevHistory => {
+            const mergedHistory = { ...prevHistory };
+            for (const studentId in deltaHistory) {
+                if (mergedHistory[studentId]) {
+                    mergedHistory[studentId] = [...deltaHistory[studentId], ...mergedHistory[studentId]];
+                } else {
+                    mergedHistory[studentId] = deltaHistory[studentId];
+                }
+            }
+            return mergedHistory;
+        });
+
         return { processed: Object.keys(currentData).length, changes: changesCount };
     };
     
@@ -145,7 +165,7 @@ export function ChangeStats() {
                     return;
                 }
 
-                const { processed, changes } = processAndCompareData(previousData, allStudents);
+                const { processed, changes } = await processAndCompareData(previousData, allStudents);
                 setProgress(90);
                 
                 setUploadHistory(prev => [{ 
@@ -274,7 +294,7 @@ export function ChangeStats() {
             <Card>
                 <CardHeader>
                     <CardTitle>Iniciar Comparación</CardTitle>
-                    <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado.</CardDescription>
+                    <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado. Los cambios detectados se guardarán en el historial.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
                     <FileUpload onFileSelect={setPreviousFile} selectedFile={previousFile} isLoading={isProcessing} label="Cargar Reporte Anterior" icon={<FileClock />} />

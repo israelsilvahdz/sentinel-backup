@@ -33,8 +33,9 @@ import { SeguimientoPanel } from './SeguimientoPanel';
 import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { AcademicCommitteePanel } from './AcademicCommitteePanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
+import { ProjectionsPanel } from './ProjectionsPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
@@ -45,13 +46,13 @@ import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSumma
 import { parseExcel } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'oferta-academica' | 'irregular-students';
+export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'oferta-academica' | 'irregular-students' | 'projections';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -114,7 +115,6 @@ export function useDashboardFilters() {
 
 const LOCAL_STORAGE_KEYS = {
     STUDENTS: 'academic_sentinel_students',
-    HISTORY: 'academic_sentinel_history',
     UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
     PROFESSOR_CONTACTS_MIGRATED: 'academic_sentinel_prof_contacts_migrated',
@@ -219,8 +219,8 @@ export function DashboardClient() {
           const storedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
           if (storedStudents) setAllStudents(JSON.parse(storedStudents));
 
-          const storedHistory = localStorage.getItem(LOCAL_STORAGE_KEYS.HISTORY);
-          if (storedHistory) setStudentHistory(JSON.parse(storedHistory));
+          const historyFromDb = await getAllStudentChanges();
+          setStudentHistory(historyFromDb);
           
           const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
           if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
@@ -282,9 +282,6 @@ export function DashboardClient() {
         if(allStudents.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENTS, JSON.stringify(allStudents));
         }
-        if(Object.keys(studentHistory).length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEYS.HISTORY, JSON.stringify(studentHistory));
-        }
         if(uploadHistory.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
         }
@@ -301,7 +298,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, studentHistory, uploadHistory, planType, ofertaAcademica, toast]);
+  }, [allStudents, uploadHistory, planType, ofertaAcademica, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -442,7 +439,6 @@ export function DashboardClient() {
     setProgress(20);
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.HISTORY);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
       
@@ -614,6 +610,7 @@ export function DashboardClient() {
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'change-stats': return <ChangeStats />;
+        case 'projections': return <ProjectionsPanel />;
         case 'map-planner': return <MapPlanner />;
         case 'ponderaciones': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
@@ -667,24 +664,18 @@ export function DashboardClient() {
                     <span>Análisis de Cambios</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                {/* <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Análisis de Irregulares" isActive={activeView === 'irregular-students'} onClick={() => handleSetActiveView('irregular-students')}>
-                    <Users />
-                    <span>Análisis de Irregulares</span>
+                 <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Proyecciones de Riesgo" isActive={activeView === 'projections'} onClick={() => handleSetActiveView('projections')}>
+                    <TrendingUp />
+                    <span>Proyecciones de Riesgo</span>
                   </SidebarMenuButton>
-                </SidebarMenuItem> */}
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
                     <Users />
                     <span>Panel de Alumnos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                 {/* <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Comité Académico" isActive={activeView === 'academic-committee'} onClick={() => handleSetActiveView('academic-committee')}>
-                    <Gavel />
-                    <span>Comité Académico</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem> */}
                 <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')}>
                     <Contact />

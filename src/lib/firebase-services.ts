@@ -17,7 +17,7 @@ import {
   where
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student } from '@/types/student';
+import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student, Change } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -28,6 +28,57 @@ const PROFESSOR_CONTACTS_COLLECTION = 'professorContacts';
 const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
 const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
 const TEAMS_COLLECTION = 'teams';
+const CHANGE_LOG_COLLECTION = 'studentChangeLog';
+
+
+/**
+ * Guarda una serie de cambios de alumnos en Firestore.
+ * @param changes - Un array de objetos de cambio.
+ */
+export const addStudentChanges = async (changes: Change[]): Promise<void> => {
+  if (changes.length === 0) return;
+  try {
+    const batch = writeBatch(db);
+    changes.forEach(change => {
+      const docRef = doc(collection(db, CHANGE_LOG_COLLECTION));
+      // Ensure date is a Firestore Timestamp
+      const changeData = { ...change, date: Timestamp.fromDate(new Date(change.date)) };
+      batch.set(docRef, changeData);
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Error al guardar cambios de alumnos en lote: ", error);
+    throw new Error("No se pudieron guardar los cambios en la base de datos.");
+  }
+};
+
+/**
+ * Obtiene todo el historial de cambios de Firestore, agrupado por studentId.
+ * @returns Un objeto donde la clave es el studentId y el valor es un array de cambios.
+ */
+export const getAllStudentChanges = async (): Promise<Record<string, Change[]>> => {
+  try {
+    const q = query(collection(db, CHANGE_LOG_COLLECTION), orderBy('date', 'desc'));
+    const querySnapshot = await getDocs(q);
+    const history: Record<string, Change[]> = {};
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      const change = { 
+        ...data,
+        date: (data.date as Timestamp).toDate().toISOString(), // Convert timestamp to string for client
+      } as Change;
+
+      if (!history[change.studentId]) {
+        history[change.studentId] = [];
+      }
+      history[change.studentId].push(change);
+    });
+    return history;
+  } catch (error) {
+    console.error("Error al obtener el historial de cambios de Firestore: ", error);
+    return {};
+  }
+};
 
 
 /**
@@ -492,6 +543,7 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
     }
 };
   
+
 
 
 
