@@ -123,14 +123,13 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
             }
         });
         
-        let firstName = student.name;
+        let firstName = student.name.split(' ')[0]; // Default fallback
         if (student.name.includes(',')) {
             // Assumes "LASTNAME, FIRSTNAME" format
             const nameParts = student.name.split(',');
-            firstName = nameParts[1].trim().split(' ')[0];
-        } else {
-            // Assumes "FIRSTNAME LASTNAME" format
-            firstName = student.name.split(' ')[0];
+            if (nameParts.length > 1 && nameParts[1].trim()) {
+                firstName = nameParts[1].trim().split(' ')[0];
+            }
         }
         
         let message = `Hola ${firstName}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
