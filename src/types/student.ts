@@ -77,6 +77,7 @@ export interface BitacoraEntry {
   parentsContacted: boolean;
   absencesAtFollowUp?: number;
   missedAssignmentsAtFollowUp?: number;
+  createdAt: any; // For compatibility with SeguimientoEntry
 }
 
 export interface TeamTask {

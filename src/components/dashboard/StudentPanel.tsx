@@ -499,7 +499,14 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
     );
 }
 
-function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: { open: boolean, onOpenChange: (open: boolean) => void, students: Student[], loadStudentSubjects: (studentId: string) => Promise<Subject[]> }) {
+interface MailerDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  students: Student[];
+  loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
+}
+
+function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: MailerDialogProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const { toast } = useToast();
@@ -626,6 +633,7 @@ export function StudentPanel() {
     allStudentsMap,
     filteredStudents: initialFilteredStudents, 
     studentHistory,
+    seguimientoEntries,
     studentContacts,
     setStudentContacts,
     teams,
@@ -1080,6 +1088,7 @@ export function StudentPanel() {
                     student={student} 
                     teams={teams}
                     changes={studentHistory[student.id] || []}
+                    seguimiento={seguimientoEntries[student.id] as any || []}
                     startOpen={false} 
                     isSelected={selectedStudents.has(student.id)}
                     onSelectionChange={handleSelectionChange}

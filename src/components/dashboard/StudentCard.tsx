@@ -6,7 +6,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send } from 'lucide-react';
-import { type Student, type SubjectSummary, type Team, type Change } from "@/types/student";
+import { type Student, type SubjectSummary, type Team, type Change, type SeguimientoEntry } from "@/types/student";
 import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from '../ui/button';
@@ -17,12 +17,15 @@ import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { StudentSubjects } from './StudentSubjects';
 import { Checkbox } from '../ui/checkbox';
-
+import { addSeguimientoEntry } from '@/lib/firebase-services';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface StudentCardProps {
   student: Student;
   teams: Team[];
   changes: Change[];
+  seguimiento: (SeguimientoEntry)[];
   startOpen?: boolean;
   isDialog?: boolean;
   isSelected?: boolean;
@@ -82,10 +85,16 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
     );
 }
 
-function WhatsAppNotification({ student, changes }: { student: Student, changes: Change[] }) {
+function WhatsAppNotification({ student, changes, seguimiento, onSent }: { student: Student, changes: Change[], seguimiento: SeguimientoEntry[], onSent: () => void }) {
     const { studentContacts, toast } = useDashboardFilters();
     
     const phoneNumber = studentContacts[student.id]?.studentPhone?.replace(/\D/g, '');
+
+    const lastSentNotification = useMemo(() => {
+        return seguimiento
+            .filter(s => s.topic === 'Notificación WhatsApp (Auto)')
+            .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())[0];
+    }, [seguimiento]);
 
     const handleSend = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -128,29 +137,72 @@ function WhatsAppNotification({ student, changes }: { student: Student, changes:
         
         const whatsappUrl = `https://wa.me/52${phoneNumber}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
+        
+        // Registrar el envío en Firestore
+        const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
+        const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
+        const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
+            studentId: student.id,
+            studentName: student.name,
+            attendedBy: 'Sistema Automático',
+            topic: 'Notificación WhatsApp (Auto)',
+            notes: message,
+            absencesAtFollowUp: totalAbsences,
+            missedAssignmentsAtFollowUp: totalMissed,
+        };
+
+        addSeguimientoEntry(newEntry).then(() => {
+            onSent(); // Actualiza la UI
+            toast({
+                title: "Notificación Registrada",
+                description: `Se ha guardado un registro del envío para ${student.name}.`
+            });
+        }).catch(err => {
+            console.error("Failed to log notification:", err);
+        });
     };
     
-    // Only show the button if there are changes AND a phone number exists
-    if (!changes || changes.length === 0 || !phoneNumber) return null;
-
-    return (
-        <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={handleSend}>
-                        <Send className="h-4 w-4" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p>Enviar recordatorio por WhatsApp</p>
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-    );
+    // Si hay cambios y un número de teléfono...
+    if (changes && changes.length > 0 && phoneNumber) {
+        if (lastSentNotification) {
+            return (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" disabled>
+                                <Check className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Notificación enviada el {format(lastSentNotification.createdAt.toDate(), "d MMM, HH:mm", { locale: es })}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            );
+        }
+        
+        return (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={handleSend}>
+                            <Send className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Enviar recordatorio por WhatsApp</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    }
+    
+    return null;
 }
 
-export function StudentCard({ student, teams, changes, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
+export function StudentCard({ student, teams, changes, seguimiento, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
+  const { fetchSeguimientoEntries } = useDashboardFilters();
   
   const teamName = useMemo(() => {
     if (!teams || teams.length === 0) return null;
@@ -229,7 +281,7 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <WhatsAppNotification student={student} changes={changes} />
+                    <WhatsAppNotification student={student} changes={changes} seguimiento={seguimiento} onSent={fetchSeguimientoEntries} />
                     <Dialog>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>EXPEDIENTE</Button>
