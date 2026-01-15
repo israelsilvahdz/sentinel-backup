@@ -625,6 +625,7 @@ export function StudentPanel() {
     allStudents,
     allStudentsMap,
     filteredStudents: initialFilteredStudents, 
+    studentHistory,
     studentContacts,
     setStudentContacts,
     teams,
@@ -1078,6 +1079,7 @@ export function StudentPanel() {
                     key={student.id} 
                     student={student} 
                     teams={teams}
+                    changes={studentHistory[student.id] || []}
                     startOpen={false} 
                     isSelected={selectedStudents.has(student.id)}
                     onSelectionChange={handleSelectionChange}

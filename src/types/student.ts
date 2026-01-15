@@ -52,7 +52,7 @@ export interface Change {
   date: any; // Firestore Timestamp on server, string on client
   studentId: string;
   subjectId: string; // CRN
-  fieldName: string; // p. ej. 'absences', 'grade', 'activities.A5'
+  fieldName: 'absences' | 'missedAssignments' | 'leader' | 'tutor' | 'group';
   oldValue: any;
   newValue: any;
 }

@@ -5,8 +5,8 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, FileText, Award, Copy, Check } from 'lucide-react';
-import { type Student, type SubjectSummary, type Team } from "@/types/student";
+import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy } from 'lucide-react';
+import { type Student, type SubjectSummary, type Team, type Change } from "@/types/student";
 import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from '../ui/button';
@@ -22,6 +22,7 @@ import { Checkbox } from '../ui/checkbox';
 interface StudentCardProps {
   student: Student;
   teams: Team[];
+  changes: Change[];
   startOpen?: boolean;
   isDialog?: boolean;
   isSelected?: boolean;
@@ -81,7 +82,66 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
     );
 }
 
-export function StudentCard({ student, teams, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
+function NotificationCopy({ student, changes }: { student: Student, changes: Change[] }) {
+    const { toast } = useDashboardFilters();
+
+    const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation();
+
+        const changesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
+
+        changes.forEach(change => {
+            if (change.fieldName === 'absences' || change.fieldName === 'missedAssignments') {
+                const subject = student.subjects?.find(s => s.id === change.subjectId);
+                if (subject) {
+                    if (!changesBySubject[subject.name]) {
+                        changesBySubject[subject.name] = { absences: false, missed: false };
+                    }
+                    if (change.fieldName === 'absences') changesBySubject[subject.name].absences = true;
+                    if (change.fieldName === 'missedAssignments') changesBySubject[subject.name].missed = true;
+                }
+            }
+        });
+
+        let message = `Hola ${student.name.split(' ')[0]}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
+
+        for (const subjectName in changesBySubject) {
+            const { absences, missed } = changesBySubject[subjectName];
+            let changeTypes = [];
+            if (absences) changeTypes.push('faltas');
+            if (missed) changeTypes.push('NE');
+            message += `• *${subjectName}*: Nuevas ${changeTypes.join(' y ')}.\n`;
+        }
+
+        message += `\nRecuerda que es importante cuidar tu asistencia y la entrega de actividades para no afectar tu calificación. ¡Estoy para apoyarte si tienes alguna duda!`;
+        
+        navigator.clipboard.writeText(message).then(() => {
+            toast({
+                title: "¡Mensaje copiado!",
+                description: "El recordatorio para el alumno está en tu portapapeles.",
+            });
+        });
+    };
+
+    if (!changes || changes.length === 0) return null;
+
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={handleCopy}>
+                        <ClipboardCopy className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Copiar notificación de cambios para WhatsApp</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
+}
+
+export function StudentCard({ student, teams, changes, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
   
   const teamName = useMemo(() => {
@@ -161,6 +221,7 @@ export function StudentCard({ student, teams, startOpen = false, isDialog = fals
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <NotificationCopy student={student} changes={changes} />
                     <Dialog>
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>EXPEDIENTE</Button>
