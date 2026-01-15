@@ -345,10 +345,28 @@ export function DashboardClient() {
     setAllStudents(studentsArray);
     
     // Determine plan type from filename
-    if (fileName.includes('40') || fileName.includes('50') || fileName.includes('60')) {
-        setPlanType('semestral');
-    } else {
-        setPlanType('tetramestral');
+    const numbersInFile = fileName.match(/\d+/g);
+    let planSet = false;
+
+    if (numbersInFile && numbersInFile.length > 0) {
+        // Check the last number segment in the filename, which usually contains the plan code
+        const lastNumberSegment = numbersInFile[numbersInFile.length - 1];
+        if (['40', '50', '60'].some(ending => lastNumberSegment.endsWith(ending))) {
+            setPlanType('semestral');
+            planSet = true;
+        } else if (['10', '20', '30'].some(ending => lastNumberSegment.endsWith(ending))) {
+            setPlanType('tetramestral');
+            planSet = true;
+        }
+    }
+
+    // Fallback to simpler check if the new logic doesn't determine the plan
+    if (!planSet) {
+        if (fileName.includes('40') || fileName.includes('50') || fileName.includes('60')) {
+            setPlanType('semestral');
+        } else {
+            setPlanType('tetramestral');
+        }
     }
 
     return studentsArray.length;
