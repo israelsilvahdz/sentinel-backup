@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -251,9 +250,9 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
   );
 
   const cardDescriptionContent = (
-     <>
+    <div className="text-sm text-muted-foreground">
         Matrícula: <MatriculaCopy studentId={student.id} /> | Líder: {student.leader} | Tutor: {student.tutor}
-    </>
+    </div>
   )
 
   if (isDialog) {
@@ -266,7 +265,7 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
                     <CardTitle className="flex items-center text-lg">
                       {cardTitleContent}
                     </CardTitle>
-                    <CardDescription>{cardDescriptionContent}</CardDescription>
+                    {cardDescriptionContent}
                 </div>
             </div>
         </CardHeader>
@@ -293,7 +292,7 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
                         <CardTitle className="flex items-center text-lg">
                         {cardTitleContent}
                         </CardTitle>
-                        <CardDescription>{cardDescriptionContent}</CardDescription>
+                        {cardDescriptionContent}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
