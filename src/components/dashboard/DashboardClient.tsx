@@ -649,24 +649,24 @@ export function DashboardClient() {
                     <span>Análisis de Cambios</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
+                {/* <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Análisis de Irregulares" isActive={activeView === 'irregular-students'} onClick={() => handleSetActiveView('irregular-students')}>
                     <Users />
                     <span>Análisis de Irregulares</span>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItem> */}
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
                     <Users />
                     <span>Panel de Alumnos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                 <SidebarMenuItem>
+                 {/* <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Comité Académico" isActive={activeView === 'academic-committee'} onClick={() => handleSetActiveView('academic-committee')}>
                     <Gavel />
                     <span>Comité Académico</span>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItem> */}
                 <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')}>
                     <Contact />
