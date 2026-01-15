@@ -122,8 +122,9 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
                 }
             }
         });
-
-        let message = `Hola ${student.name.split(' ')[0]}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
+        
+        const firstName = student.name.split(' ')[0];
+        let message = `Hola ${firstName}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
 
         for (const subjectName in changesBySubject) {
             const subjectInfo = student.subjectSummaries?.find(s => s.name === subjectName);
