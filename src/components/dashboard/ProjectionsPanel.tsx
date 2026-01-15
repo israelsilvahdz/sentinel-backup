@@ -19,6 +19,7 @@ interface Projection {
     velocity: number; // units per day
     projectedDate: Date;
     daysUntilLimit: number;
+    changeCount: number;
 }
 
 const calculateProjections = (students: Student[], history: Record<string, Change[]>): Projection[] => {
@@ -74,6 +75,7 @@ const calculateProjections = (students: Student[], history: Record<string, Chang
                         velocity,
                         projectedDate,
                         daysUntilLimit,
+                        changeCount: relevantChanges.length,
                     });
                 }
             };
@@ -109,7 +111,7 @@ export function ProjectionsPanel() {
                 <CardHeader>
                     <CardTitle>Alumnos en Trayectoria de Riesgo</CardTitle>
                     <CardDescription>
-                        Esta tabla muestra a los alumnos cuya tendencia de acumulación de faltas/NE los pone en riesgo de alcanzar el límite en los próximos 6 meses.
+                        Esta tabla muestra a los alumnos cuya tendencia de acumulación de faltas/NE los pone en riesgo. Se requiere un mínimo de 2 cambios registrados en un período de 7 días para generar una proyección.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -119,8 +121,9 @@ export function ProjectionsPanel() {
                                 <TableRow>
                                     <TableHead>Alumno</TableHead>
                                     <TableHead>Materia</TableHead>
-                                    <TableHead>Riesgo</TableHead>
+                                    <TableHead>Riesgo Actual</TableHead>
                                     <TableHead>Tendencia (eventos/semana)</TableHead>
+                                    <TableHead>Puntos de Datos</TableHead>
                                     <TableHead className="text-right">Fecha de Riesgo Proyectada</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -139,6 +142,9 @@ export function ProjectionsPanel() {
                                                 <span>{(p.velocity * 7).toFixed(2)}</span>
                                             </div>
                                         </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{p.changeCount}</Badge>
+                                        </TableCell>
                                         <TableCell className="text-right font-semibold">
                                             {format(p.projectedDate, "d 'de' LLLL, yyyy", { locale: es })}
                                             <br/>
@@ -152,8 +158,8 @@ export function ProjectionsPanel() {
                         <div className="text-center py-12">
                            <AlertTriangle className="mx-auto h-12 w-12 text-muted-foreground" />
                            <h3 className="mt-4 text-lg font-medium">No hay proyecciones de riesgo</h3>
-                           <p className="mt-1 text-sm text-muted-foreground">
-                             Se necesita más historial de cambios para poder generar proyecciones. Sigue usando el "Análisis de Cambios" para acumular datos.
+                           <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
+                             No se encontraron proyecciones. Se requiere un mínimo de 2 cambios en 7 días para cada materia. Sigue usando el "Análisis de Cambios" para acumular más datos históricos.
                            </p>
                         </div>
                     )}
