@@ -38,7 +38,7 @@ const legendFormatter = (value: string) => {
 }
 
 export function ChangeStats() {
-    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType } = useDashboardFilters();
+    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType, selectedValue, filterType } = useDashboardFilters();
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
@@ -190,7 +190,7 @@ export function ChangeStats() {
 
         runComparison();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [previousFile, hasCurrentData, allStudents]);
+    }, [previousFile, hasCurrentData]);
 
 
     const { 
@@ -212,24 +212,34 @@ export function ChangeStats() {
             };
         }
 
-        const riskChanges = Object.values(historyToUse).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
-        const studentsWithChangesSet = new Set(riskChanges.map(c => c.studentId));
+        const allRiskChanges = Object.values(historyToUse).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
+        
+        const kpiRiskChanges = (filterType === 'leader' && selectedValue)
+            ? allRiskChanges.filter(change => {
+                const student = allStudents.find(s => s.id === change.studentId);
+                return student?.leader === selectedValue;
+              })
+            : allRiskChanges;
+
+
+        const studentsWithChangesSet = new Set(kpiRiskChanges.map(c => c.studentId));
 
 
         let newAbsences = 0;
         let newMissedAssignments = 0;
 
+        for (const change of kpiRiskChanges) {
+            const increment = (change.newValue as number) - (change.oldValue as number);
+            if (change.fieldName === 'absences') newAbsences += increment;
+            if (change.fieldName === 'missedAssignments') newMissedAssignments += increment;
+        }
+        
         const leaderCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const onlineCounts: Record<string, number> = { 'El mundo contemporáneo': 0, 'Ciencias de la Vida': 0 };
 
-        for (const change of riskChanges) {
-            const isRiskIncrement = change.fieldName === 'absences' || change.fieldName === 'missedAssignments';
-            if (!isRiskIncrement) continue;
-
+        for (const change of allRiskChanges) {
             const increment = (change.newValue as number) - (change.oldValue as number);
-            if (change.fieldName === 'absences') newAbsences += increment;
-            if (change.fieldName === 'missedAssignments') newMissedAssignments += increment;
             
             const student = allStudents.find(s => s.id === change.studentId);
             if (!student) continue;
@@ -255,7 +265,7 @@ export function ChangeStats() {
         const onlineChartData = Object.entries(onlineCounts).map(([name, value]) => ({ name, value }));
 
         return {
-            totalChanges: riskChanges.length,
+            totalChanges: kpiRiskChanges.length,
             studentsWithChanges: studentsWithChangesSet.size,
             totalNewAbsences: newAbsences,
             totalNewMissedAssignments: newMissedAssignments,
@@ -264,7 +274,7 @@ export function ChangeStats() {
             onlineSubjectChanges: onlineChartData
         };
 
-    }, [latestComparison, allStudents]);
+    }, [latestComparison, allStudents, filterType, selectedValue]);
 
     const handleCaseClick = (caseType: 'changes' | 'newAbsences' | 'newMissedAssignments') => {
         setCaseType(caseType);
