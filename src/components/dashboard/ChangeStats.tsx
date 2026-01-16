@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
@@ -185,7 +184,6 @@ export function ChangeStats() {
                 setTimeout(() => {
                     setIsProcessing(false);
                     setProgress(0);
-                    setPreviousFile(null);
                 }, 500);
             }
         };
