@@ -64,6 +64,8 @@ interface DashboardContextType {
   setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   studentHistory: Record<string, Change[]>;
   setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
+  latestComparison: Record<string, Change[]>;
+  setLatestComparison: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
   studentContacts: Record<string, StudentContact>;
   setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
   professorContacts: Record<string, ProfessorContact>;
@@ -92,6 +94,7 @@ interface DashboardContextType {
   setCaseType: (caseType: CaseType | null) => void;
   subjectRiskFilter: SubjectRiskFilter | null;
   setSubjectRiskFilter: (filter: SubjectRiskFilter | null) => void;
+  contextualStudentIds: Set<string> | null;
   setContextualStudentIds: React.Dispatch<React.SetStateAction<Set<string> | null>>;
   loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
   getStudentChanges: (studentId: string) => Promise<Change[]>;
@@ -126,6 +129,7 @@ export function DashboardClient() {
   const { toast } = useToast();
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
+  const [latestComparison, setLatestComparison] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
   const [teams, setTeams] = useState<Team[]>([]);
@@ -617,7 +621,7 @@ export function DashboardClient() {
   }, [uploadHistory, planType]);
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, latestComparison, setLatestComparison, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, subjects, professors, groups, groupsForSubject,
@@ -626,6 +630,7 @@ export function DashboardClient() {
     groupId, setGroupId,
     caseType, setCaseType: handleSetCaseType,
     subjectRiskFilter, setSubjectRiskFilter: handleSetSubjectRiskFilter,
+    contextualStudentIds,
     setContextualStudentIds,
     loadStudentSubjects: loadStudentSubjectsWrapper,
     getStudentChanges: getStudentChangesWrapper,

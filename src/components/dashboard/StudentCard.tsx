@@ -89,11 +89,29 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
     
     const phoneNumber = studentContacts[student.id]?.studentPhone?.replace(/\D/g, '');
 
+    const { lastChangeDate, hasChanges } = useMemo(() => {
+        if (!changes || changes.length === 0) {
+            return { lastChangeDate: null, hasChanges: false };
+        }
+        // All changes in this analysis batch have roughly the same timestamp.
+        const lastChangeDate = new Date(changes[0].date);
+        return { lastChangeDate, hasChanges: true };
+    }, [changes]);
+
     const lastSentNotification = useMemo(() => {
         return seguimiento
             .filter(s => s.topic === 'Notificación WhatsApp (Auto)')
             .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())[0];
     }, [seguimiento]);
+
+    const notificationAlreadySentForThisBatch = useMemo(() => {
+        if (!lastSentNotification || !lastChangeDate) {
+            return false;
+        }
+        const notificationDate = lastSentNotification.createdAt.toDate();
+        // If a notification was sent *after* the changes were detected, we assume it's for this batch.
+        return notificationDate > lastChangeDate;
+    }, [lastSentNotification, lastChangeDate]);
 
     const handleSend = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -122,12 +140,12 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
             }
         });
         
-        let firstName = student.name.split(' ')[0]; // Default fallback
+        let firstName = student.name.split(' ')[0];
         if (student.name.includes(',')) {
-            // Assumes "LASTNAME, FIRSTNAME" format
             const nameParts = student.name.split(',');
             if (nameParts.length > 1 && nameParts[1].trim()) {
-                firstName = nameParts[1].trim().split(' ')[0];
+                const firstPart = nameParts[1].trim();
+                firstName = firstPart.split(' ')[0];
             }
         }
         
@@ -153,7 +171,6 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
         const whatsappUrl = `https://wa.me/52${phoneNumber}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
         
-        // Registrar el envío en Firestore
         const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
         const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
         const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
@@ -167,7 +184,7 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
         };
 
         addSeguimientoEntry(newEntry).then(() => {
-            onSent(); // Actualiza la UI
+            onSent();
             toast({
                 title: "Notificación Registrada",
                 description: `Se ha guardado un registro del envío para ${student.name}.`
@@ -177,9 +194,8 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
         });
     };
     
-    // Si hay cambios y un número de teléfono...
-    if (changes && changes.length > 0 && phoneNumber) {
-        if (lastSentNotification) {
+    if (hasChanges && phoneNumber) {
+        if (notificationAlreadySentForThisBatch) {
             return (
                 <TooltipProvider>
                     <Tooltip>
@@ -189,7 +205,7 @@ function WhatsAppNotification({ student, changes, seguimiento, onSent }: { stude
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Notificación enviada el {format(lastSentNotification.createdAt.toDate(), "d MMM, HH:mm", { locale: es })}</p>
+                            <p>Notificación enviada el {format(lastSentNotification!.createdAt.toDate(), "d MMM, HH:mm", { locale: es })}</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
@@ -251,7 +267,7 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
 
   const cardDescriptionContent = (
     <div className="text-sm text-muted-foreground">
-        Matrícula: <MatriculaCopy studentId={student.id} /> | Líder: {student.leader} | Tutor: {student.tutor}
+        Matrícula: <MatriculaCopy studentId={student.id} /> | Líder: {student.leader}
     </div>
   )
 
@@ -308,7 +324,7 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
                                     Expediente del Alumno
                                 </DialogTitle>
                                 <DialogDescription>
-                                  {student.name} ({student.id}) | Líder: {student.leader} | Tutor: {student.tutor}
+                                  {student.name} ({student.id}) | Líder: {student.leader}
                                 </DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="pr-6 flex-1">

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -330,7 +329,6 @@ interface PrintOptions {
   includeId: boolean;
   includeName: boolean;
   includeLeader: boolean;
-  includeTutor: boolean;
   includeGroups: boolean;
   includeOnlineFlexGroups: boolean;
   includeStudentPhone: boolean;
@@ -343,7 +341,6 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
         includeId: true,
         includeName: true,
         includeLeader: false,
-        includeTutor: false,
         includeGroups: true,
         includeOnlineFlexGroups: false,
         includeStudentPhone: false,
@@ -355,7 +352,6 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
             ...(options.includeId ? [{ key: 'includeId', label: 'Matrícula' }] : []),
             ...(options.includeName ? [{ key: 'includeName', label: 'Nombre Completo' }] : []),
             ...(options.includeLeader ? [{ key: 'includeLeader', label: 'Líder' }] : []),
-            ...(options.includeTutor ? [{ key: 'includeTutor', label: 'Tutor' }] : []),
             ...(options.includeGroups ? [{ key: 'includeGroups', label: 'Grupos Regulares' }] : []),
             ...(options.includeOnlineFlexGroups ? [{ key: 'includeOnlineFlexGroups', label: 'Grupos Online/Flex' }] : []),
             ...(options.includeStudentPhone ? [{ key: 'includeStudentPhone', label: 'Teléfono Alumno' }] : []),
@@ -401,7 +397,6 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                         includeId: student.id,
                         includeName: student.name,
                         includeLeader: student.leader,
-                        includeTutor: student.tutor,
                         includeGroups: regularGroups,
                         includeOnlineFlexGroups: onlineFlexGroups,
                         includeStudentPhone: studentContact.studentPhone || 'No disponible',
@@ -467,10 +462,6 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                  <div className="flex items-center space-x-2">
                     <Checkbox id="print-leader" checked={options.includeLeader} onCheckedChange={(checked) => setOptions(o => ({...o, includeLeader: !!checked}))} />
                     <Label htmlFor="print-leader">Líder</Label>
-                </div>
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="print-tutor" checked={options.includeTutor} onCheckedChange={(checked) => setOptions(o => ({...o, includeTutor: !!checked}))} />
-                    <Label htmlFor="print-tutor">Tutor</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="print-groups" checked={options.includeGroups} onCheckedChange={(checked) => setOptions(o => ({...o, includeGroups: !!checked}))} />
@@ -633,6 +624,8 @@ export function StudentPanel() {
     allStudentsMap,
     filteredStudents: initialFilteredStudents, 
     studentHistory,
+    latestComparison,
+    contextualStudentIds,
     seguimientoEntries,
     studentContacts,
     setStudentContacts,
@@ -955,6 +948,8 @@ export function StudentPanel() {
   };
   
   const hasActiveFilter = !!caseType || !!subjectRiskFilter;
+  const isContextualAnalysis = !!contextualStudentIds && contextualStudentIds.size > 0;
+
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -1082,18 +1077,23 @@ export function StudentPanel() {
                 <div className="text-sm text-muted-foreground font-medium">
                   Mostrando {filteredStudents.length} de {initialFilteredStudents.length} alumnos.
                 </div>
-                {filteredStudents.map(student => (
-                  <StudentCard 
-                    key={student.id} 
-                    student={student} 
-                    teams={teams}
-                    changes={studentHistory[student.id] || []}
-                    seguimiento={seguimientoEntries[student.id] as any || []}
-                    startOpen={false} 
-                    isSelected={selectedStudents.has(student.id)}
-                    onSelectionChange={handleSelectionChange}
-                  />
-                ))}
+                {filteredStudents.map(student => {
+                  const changesForCard = isContextualAnalysis
+                    ? latestComparison[student.id] || []
+                    : studentHistory[student.id] || [];
+                  return (
+                    <StudentCard 
+                      key={student.id} 
+                      student={student} 
+                      teams={teams}
+                      changes={changesForCard}
+                      seguimiento={seguimientoEntries[student.id] as any || []}
+                      startOpen={false} 
+                      isSelected={selectedStudents.has(student.id)}
+                      onSelectionChange={handleSelectionChange}
+                    />
+                  );
+                })}
             </div>
           ) : (
             <Card className="text-center p-12">

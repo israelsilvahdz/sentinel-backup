@@ -38,13 +38,12 @@ const legendFormatter = (value: string) => {
 }
 
 export function ChangeStats() {
-    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType, selectedValue, filterType, setContextualStudentIds } = useDashboardFilters();
+    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType, selectedValue, filterType, setContextualStudentIds, latestComparison, setLatestComparison } = useDashboardFilters();
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [latestComparison, setLatestComparison] = useState<Record<string, Change[]>>({});
 
 
     const processAndCompareData = async (previousData: StudentData, currentData: Student[]) => {
