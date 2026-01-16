@@ -35,11 +35,12 @@ import { AcademicCommitteePanel } from './AcademicCommitteePanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { ProjectionsPanel } from './ProjectionsPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp, Calendar } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
+import { Badge } from '@/components/ui/badge';
 
 
 import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem, Team } from '@/types/student';
@@ -340,12 +341,10 @@ export function DashboardClient() {
     }));
     setAllStudents(studentsArray);
     
-    // Determine plan type from filename
     const numbersInFile = fileName.match(/\d+/g);
     let planSet = false;
 
     if (numbersInFile && numbersInFile.length > 0) {
-        // Check the last number segment in the filename, which usually contains the plan code
         const lastNumberSegment = numbersInFile[numbersInFile.length - 1];
         if (['40', '50', '60'].some(ending => lastNumberSegment.endsWith(ending))) {
             setPlanType('semestral');
@@ -356,7 +355,6 @@ export function DashboardClient() {
         }
     }
 
-    // Fallback to simpler check if the new logic doesn't determine the plan
     if (!planSet) {
         if (fileName.includes('40') || fileName.includes('50') || fileName.includes('60')) {
             setPlanType('semestral');
@@ -584,6 +582,31 @@ export function DashboardClient() {
      return studentHistory[studentId] || [];
   }
 
+  const reportInfo = useMemo(() => {
+    if (uploadHistory.length === 0) {
+        return null;
+    }
+    const latestUpload = uploadHistory[0];
+    const fileName = latestUpload.fileName;
+
+    const dateMatch = fileName.match(/(\d{2})\.(\d{2})\.(\d{4}|\d{2})/);
+    let displayDate: string | null = null;
+    if (dateMatch) {
+        const day = dateMatch[1];
+        const month = dateMatch[2];
+        let year = dateMatch[3];
+        if (year.length === 2) {
+            year = `20${year}`;
+        }
+        displayDate = `${day}/${month}/${year}`;
+    }
+
+    return {
+        date: displayDate,
+        plan: planType === 'tetramestral' ? 'Tetramestral' : 'Semestral'
+    };
+  }, [uploadHistory, planType]);
+
   const contextValue: DashboardContextType = {
     filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
@@ -752,6 +775,15 @@ export function DashboardClient() {
                     </div>
                  </div>
                  <div className="flex items-center gap-2 flex-wrap">
+                    {allStudents.length > 0 && reportInfo?.date && (
+                        <div className="flex items-center gap-3 text-sm font-medium text-muted-foreground p-2 rounded-md bg-muted/50">
+                            <div className="flex items-center gap-1.5">
+                                <Calendar size={14} />
+                                <span>Reporte del {reportInfo.date}</span>
+                            </div>
+                            <Badge variant="secondary">{reportInfo.plan}</Badge>
+                        </div>
+                    )}
                     <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" />
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
