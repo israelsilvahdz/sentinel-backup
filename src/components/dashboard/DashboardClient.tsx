@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -93,6 +92,7 @@ interface DashboardContextType {
   setCaseType: (caseType: CaseType | null) => void;
   subjectRiskFilter: SubjectRiskFilter | null;
   setSubjectRiskFilter: (filter: SubjectRiskFilter | null) => void;
+  setContextualStudentIds: React.Dispatch<React.SetStateAction<Set<string> | null>>;
   loadStudentSubjects: (studentId: string) => Promise<Subject[]>;
   getStudentChanges: (studentId: string) => Promise<Change[]>;
   activeView: ActiveView;
@@ -147,6 +147,7 @@ export function DashboardClient() {
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>('academic-calendar');
+  const [contextualStudentIds, setContextualStudentIds] = useState<Set<string> | null>(null);
   
   const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
@@ -307,6 +308,7 @@ export function DashboardClient() {
     setCaseType(null);
     setSubjectRiskFilter(null);
     setGroupId(null);
+    setContextualStudentIds(null);
   };
 
   const handleSetActiveView = (view: ActiveView) => {
@@ -315,6 +317,7 @@ export function DashboardClient() {
       setCaseType(null);
       setSubjectRiskFilter(null);
       setGroupId(null);
+      setContextualStudentIds(null);
     }
   }
 
@@ -322,12 +325,14 @@ export function DashboardClient() {
     setCaseType(type);
     setSubjectRiskFilter(null);
     setGroupId(null);
+    setContextualStudentIds(null);
   };
 
   const handleSetSubjectRiskFilter = (filter: SubjectRiskFilter | null) => {
     setSubjectRiskFilter(filter);
     setCaseType(null);
     setGroupId(null);
+    setContextualStudentIds(null);
   };
   
   const processSingleFile = (studentData: StudentData, fileName: string) => {
@@ -495,6 +500,10 @@ export function DashboardClient() {
   
 
   const filteredStudents = useMemo(() => {
+    if (contextualStudentIds) {
+        return allStudents.filter(s => contextualStudentIds.has(s.id));
+    }
+    
     let students = allStudents;
 
     if (selectedValue) {
@@ -571,7 +580,7 @@ export function DashboardClient() {
     }
 
     return students;
-  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, studentHistory, groupId]);
+  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, studentHistory, groupId, contextualStudentIds]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     const student = allStudentsMap.get(studentId);
@@ -617,6 +626,7 @@ export function DashboardClient() {
     groupId, setGroupId,
     caseType, setCaseType: handleSetCaseType,
     subjectRiskFilter, setSubjectRiskFilter: handleSetSubjectRiskFilter,
+    setContextualStudentIds,
     loadStudentSubjects: loadStudentSubjectsWrapper,
     getStudentChanges: getStudentChangesWrapper,
     activeView, setActiveView: handleSetActiveView,

@@ -38,7 +38,7 @@ const legendFormatter = (value: string) => {
 }
 
 export function ChangeStats() {
-    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType, selectedValue, filterType } = useDashboardFilters();
+    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType, selectedValue, filterType, setContextualStudentIds } = useDashboardFilters();
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
@@ -190,12 +190,13 @@ export function ChangeStats() {
 
         runComparison();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [previousFile, hasCurrentData]);
+    }, [previousFile]);
 
 
     const { 
         totalChanges, studentsWithChanges, totalNewAbsences, totalNewMissedAssignments, 
-        changesByLeader, changesBySubject, onlineSubjectChanges
+        changesByLeader, changesBySubject, onlineSubjectChanges,
+        studentsWithChangesSet, studentsWithNewAbsencesSet, studentsWithNewMissedAssignmentsSet
     } = useMemo(() => {
         const historyToUse = latestComparison;
         const hasHistory = Object.keys(historyToUse).length > 0;
@@ -208,7 +209,10 @@ export function ChangeStats() {
                 changesByLeader: [],
                 changesByTutor: [],
                 changesBySubject: [],
-                onlineSubjectChanges: []
+                onlineSubjectChanges: [],
+                studentsWithChangesSet: new Set<string>(),
+                studentsWithNewAbsencesSet: new Set<string>(),
+                studentsWithNewMissedAssignmentsSet: new Set<string>(),
             };
         }
 
@@ -224,15 +228,20 @@ export function ChangeStats() {
 
         const studentsWithChangesSet = new Set(kpiRiskChanges.map(c => c.studentId));
 
-
+        const newAbsencesChanges = kpiRiskChanges.filter(c => c.fieldName === 'absences');
+        const studentsWithNewAbsencesSet = new Set(newAbsencesChanges.map(c => c.studentId));
         let newAbsences = 0;
-        let newMissedAssignments = 0;
+        newAbsencesChanges.forEach(change => {
+            newAbsences += (change.newValue as number) - (change.oldValue as number);
+        });
 
-        for (const change of kpiRiskChanges) {
-            const increment = (change.newValue as number) - (change.oldValue as number);
-            if (change.fieldName === 'absences') newAbsences += increment;
-            if (change.fieldName === 'missedAssignments') newMissedAssignments += increment;
-        }
+        const newMissedAssignmentsChanges = kpiRiskChanges.filter(c => c.fieldName === 'missedAssignments');
+        const studentsWithNewMissedAssignmentsSet = new Set(newMissedAssignmentsChanges.map(c => c.studentId));
+        let newMissedAssignments = 0;
+        newMissedAssignmentsChanges.forEach(change => {
+            newMissedAssignments += (change.newValue as number) - (change.oldValue as number);
+        });
+        
         
         const leaderCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
@@ -271,13 +280,22 @@ export function ChangeStats() {
             totalNewMissedAssignments: newMissedAssignments,
             changesByLeader: formatChartData(leaderCounts),
             changesBySubject: formatChartData(subjectCounts),
-            onlineSubjectChanges: onlineChartData
+            onlineSubjectChanges: onlineChartData,
+            studentsWithChangesSet,
+            studentsWithNewAbsencesSet,
+            studentsWithNewMissedAssignmentsSet,
         };
 
     }, [latestComparison, allStudents, filterType, selectedValue]);
 
     const handleCaseClick = (caseType: 'changes' | 'newAbsences' | 'newMissedAssignments') => {
-        setCaseType(caseType);
+        if (caseType === 'changes') {
+            setContextualStudentIds(studentsWithChangesSet);
+        } else if (caseType === 'newAbsences') {
+            setContextualStudentIds(studentsWithNewAbsencesSet);
+        } else if (caseType === 'newMissedAssignments') {
+            setContextualStudentIds(studentsWithNewMissedAssignmentsSet);
+        }
         setActiveView('students');
     };
     
