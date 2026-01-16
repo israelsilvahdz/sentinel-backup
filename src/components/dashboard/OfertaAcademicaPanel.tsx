@@ -22,11 +22,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ScrollArea } from '../ui/scroll-area';
 
 
-const DAYS = ['LUN', 'MAR', 'MI', 'JUE', 'VIE'];
+const DAYS = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
 const DAY_MAP: Record<string, string> = {
     'LUN': 'Lunes',
     'MAR': 'Martes',
-    'MI': 'Miércoles',
+    'MIE': 'Miércoles',
     'JUE': 'Jueves',
     'VIE': 'Viernes',
 };

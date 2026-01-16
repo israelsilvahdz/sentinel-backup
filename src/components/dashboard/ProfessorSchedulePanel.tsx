@@ -260,9 +260,9 @@ export function ProfessorSchedulePanel() {
                     <SelectItem value="all">Todos los días</SelectItem>
                     <SelectItem value="LUN">Lunes</SelectItem>
                     <SelectItem value="MAR">Martes</SelectItem>
-                    <SelectItem value="MIER">Miércoles</SelectItem>
+                    <SelectItem value="MIE">Miércoles</SelectItem>
                     <SelectItem value="JUE">Jueves</SelectItem>
-                    <SelectItem value="VIER">Viernes</SelectItem>
+                    <SelectItem value="VIE">Viernes</SelectItem>
                 </SelectContent>
             </Select>
             <Button onClick={handleCopyEmails} variant="outline">

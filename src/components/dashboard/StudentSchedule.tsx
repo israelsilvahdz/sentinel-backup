@@ -31,22 +31,22 @@ interface StudentScheduleProps {
   professorContacts: Record<string, ProfessorContact>;
 }
 
-const DAYS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIER'];
+const DAYS = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
 const DAY_MAP: Record<string, string> = {
     'LUN': 'Lunes',
     'MAR': 'Martes',
-    'MIER': 'Miércoles',
+    'MIE': 'Miércoles',
     'JUE': 'Jueves',
-    'VIER': 'Viernes',
+    'VIE': 'Viernes',
 };
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
 const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
     1: 'LUN',
     2: 'MAR',
-    3: 'MIER',
+    3: 'MIE',
     4: 'JUE',
-    5: 'VIER',
+    5: 'VIE',
 };
 
 const ONLINE_SUBJECTS = ['Ciencias de la Vida', 'El mundo contemporáneo'];
@@ -491,4 +491,3 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
     </TooltipProvider>
   );
 }
-

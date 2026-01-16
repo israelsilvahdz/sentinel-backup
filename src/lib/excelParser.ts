@@ -7,6 +7,33 @@ import type { StudentData, Subject } from '@/types/student';
 
 // --- NUEVA INTERFAZ PARA OFERTA ACADÉMICA ---
 
+function normalizeHeader(header: string): string {
+    return header
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toUpperCase();
+}
+
+function findColumnIndex(headerMap: Record<string, number>, headers: string[], possibleNames: string[]): number | undefined {
+    for (const name of possibleNames) {
+        const normalized = normalizeHeader(name);
+        // Prioritize exact match
+        if (headerMap[normalized] !== undefined) {
+            return headerMap[normalized];
+        }
+    }
+    // Fallback to partial match
+    for (const name of possibleNames) {
+        const normalized = normalizeHeader(name);
+        const partialIndex = headers.findIndex(h => h.includes(normalized));
+        if (partialIndex !== -1) {
+            return partialIndex;
+        }
+    }
+    return undefined;
+}
+
 
 // Columnas validadas según la lista proporcionada por el usuario.
 const COLUMNS = {
@@ -34,7 +61,7 @@ const COLUMNS = {
 };
 
 // Se usan los encabezados exactos proporcionados por el usuario.
-const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIER', 'JUE', 'VIE'];
+const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
 
 const ACTIVITY_REGEX = /^A\d+$/;
 
@@ -93,15 +120,6 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'soccer': 'IGNORE',
     'tochito': 'IGNORE'
 };
-
-function normalizeHeader(header: string): string {
-    return header
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .trim()
-        .toUpperCase();
-}
-
 
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
@@ -165,49 +183,53 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
         });
         
         const dayHeadersInFile = headers.filter(h => POSSIBLE_DAY_HEADERS.includes(h));
+        
+        const getColumnIdx = (names: string[]) => findColumnIndex(headerMap, headers, names);
 
-        const requiredCols = [COLUMNS.STUDENT_ID, COLUMNS.STUDENT_NAME, COLUMNS.SUBJECT_CRN, COLUMNS.SUBJECT_NAME];
-        for (const col of requiredCols) {
-            const normalizedCol = normalizeHeader(col);
-            const mappedKey = Object.keys(headerMap).find(key => key === normalizedCol);
-            if (!mappedKey) {
-                console.error(`Error de formato: Falta la columna requerida '${col}'.`);
-                resolve(null);
-                return;
-            }
+        const requiredCols = {
+            studentId: getColumnIdx([COLUMNS.STUDENT_ID]),
+            studentName: getColumnIdx([COLUMNS.STUDENT_NAME]),
+            subjectCrn: getColumnIdx([COLUMNS.SUBJECT_CRN]),
+            subjectName: getColumnIdx([COLUMNS.SUBJECT_NAME]),
+        };
+
+        if (Object.values(requiredCols).some(val => val === undefined)) {
+            const missing = Object.entries(requiredCols).filter(([,val]) => val === undefined).map(([key]) => key).join(', ');
+            console.error(`Error de formato: Faltan columnas requeridas: ${missing}.`);
+            resolve(null);
+            return;
         }
         
         const studentData: StudentData = {};
         const dataRows = jsonData.slice(1);
 
         for (const row of dataRows) {
-            const getColumnValue = (columnName: string) => {
-                const upperColName = normalizeHeader(columnName);
-                const index = headerMap[upperColName];
+            const getColumnValue = (names: string[]) => {
+                const index = getColumnIdx(names);
                 return index !== undefined ? String(row[index] || '').trim() : '';
             }
             
-            if (!row || row.length === 0 || !getColumnValue(COLUMNS.STUDENT_ID)) {
+            if (!row || row.length === 0 || !getColumnValue([COLUMNS.STUDENT_ID])) {
                 continue; 
             }
             
-            const rawSubjectName = getColumnValue(COLUMNS.SUBJECT_NAME);
+            const rawSubjectName = getColumnValue([COLUMNS.SUBJECT_NAME]);
             const normalizedSubjectName = normalizeSubjectName(rawSubjectName);
 
             if (normalizedSubjectName === 'IGNORE') {
                 continue; // Saltar materias extracurriculares
             }
 
-            const studentId = getColumnValue(COLUMNS.STUDENT_ID);
-            const studentName = getColumnValue(COLUMNS.STUDENT_NAME);
+            const studentId = getColumnValue([COLUMNS.STUDENT_ID]);
+            const studentName = getColumnValue([COLUMNS.STUDENT_NAME]);
 
             if (!studentData[studentId]) {
                 studentData[studentId] = {
                     id: studentId,
                     name: studentName,
-                    leader: getColumnValue(COLUMNS.LEADER),
-                    tutor: getColumnValue(COLUMNS.TUTOR),
-                    isGraduationCandidate: getColumnValue(COLUMNS.IS_GRADUATION_CANDIDATE).toLowerCase() === 'si',
+                    leader: getColumnValue([COLUMNS.LEADER]),
+                    tutor: getColumnValue([COLUMNS.TUTOR]),
+                    isGraduationCandidate: getColumnValue([COLUMNS.IS_GRADUATION_CANDIDATE]).toLowerCase() === 'si',
                     subjects: [],
                 };
             }
@@ -223,30 +245,29 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             for (const dayHeader of dayHeadersInFile) {
                 const colIndex = headerMap[dayHeader];
                 if (colIndex !== undefined && String(row[colIndex]).trim().toUpperCase() === 'SI') {
-                    // Guarda el día tal como está en la lista `dayHeadersInFile` sin normalizar
                     scheduleDays.push(dayHeader);
                 }
             }
 
             const subject: Subject = {
-                id: getColumnValue(COLUMNS.SUBJECT_CRN),
-                key: getColumnValue(COLUMNS.SUBJECT_KEY),
+                id: getColumnValue([COLUMNS.SUBJECT_CRN]),
+                key: getColumnValue([COLUMNS.SUBJECT_KEY]),
                 name: normalizedSubjectName, // Usar el nombre normalizado
-                group: getColumnValue(COLUMNS.SUBJECT_GROUP),
-                professorName: getColumnValue(COLUMNS.PROFESSOR_NAME),
-                statusDescription: getColumnValue(COLUMNS.SUBJECT_STATUS_DESCRIPTION),
-                absences: parseInt(getColumnValue(COLUMNS.ABSENCES) || '0', 10),
-                absenceLimit: parseInt(getColumnValue(COLUMNS.ABSENCE_LIMIT) || '1', 10) || 1,
-                missedAssignments: parseInt(getColumnValue(COLUMNS.MISSED_ASSIGNMENTS) || '0', 10),
-                missedAssignmentLimit: parseInt(getColumnValue(COLUMNS.MISSED_ASSIGNMENT_LIMIT) || '1', 10) || 1,
-                grade: parseFloat(getColumnValue(COLUMNS.GRADE) || '0'),
-                finalGrade: parseFloat(getColumnValue(COLUMNS.FINAL_GRADE)) || null,
-                finalGradeReason: getColumnValue(COLUMNS.FINAL_GRADE_REASON) || null,
+                group: getColumnValue([COLUMNS.SUBJECT_GROUP]),
+                professorName: getColumnValue([COLUMNS.PROFESSOR_NAME]),
+                statusDescription: getColumnValue([COLUMNS.SUBJECT_STATUS_DESCRIPTION]),
+                absences: parseInt(getColumnValue([COLUMNS.ABSENCES]) || '0', 10),
+                absenceLimit: parseInt(getColumnValue([COLUMNS.ABSENCE_LIMIT]) || '1', 10) || 1,
+                missedAssignments: parseInt(getColumnValue([COLUMNS.MISSED_ASSIGNMENTS]) || '0', 10),
+                missedAssignmentLimit: parseInt(getColumnValue([COLUMNS.MISSED_ASSIGNMENT_LIMIT]) || '1', 10) || 1,
+                grade: parseFloat(getColumnValue([COLUMNS.GRADE]) || '0'),
+                finalGrade: parseFloat(getColumnValue([COLUMNS.FINAL_GRADE])) || null,
+                finalGradeReason: getColumnValue([COLUMNS.FINAL_GRADE_REASON]) || null,
                 activities,
                 schedule: {
                   days: scheduleDays,
-                  startTime: getColumnValue(COLUMNS.START_TIME),
-                  endTime: getColumnValue(COLUMNS.END_TIME)
+                  startTime: getColumnValue([COLUMNS.START_TIME]),
+                  endTime: getColumnValue([COLUMNS.END_TIME])
                 }
             };
             
@@ -277,25 +298,18 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 }
 
 
-const DIRECTORY_COLUMNS = {
-  MATRICULA: 'Matrícula',
-  NOMBRE: 'Nombre',
-  REGULARES: 'regulares',
-  PAPA: 'Papá',
-  MAMA: 'Mamá',
-  TEL_ALUMNO: 'Tel alumno',
-  TEL_PAPA: 'Tel Papá',
-  TEL_MAMA: 'Tel Mamá',
-  CORREO_ALUMNO: 'Correo alumno',
-  CORREO_PAPA: 'Correo Papá',
-  CORREO_MAMA: 'Correo Mamá',
-  CUMPLEANOS: 'Cumpleaños',
-  MODALIDAD: 'Modalidad',
-  IDIOMA: 'IDIOMA',
-  CONTACTO: 'Contacto',
-  SEDENA: 'SEDENA',
-  BECA: 'BECA',
-  CONFIRMACION_ASISTENCIA: 'Confirmacion asistencia taller',
+const DIRECTORY_COLUMNS_SYNONYMS = {
+  STUDENT_ID: ['Matrícula', 'Número de matrícula', 'ID'],
+  STUDENT_NAME: ['Nombre', 'Nombre Completo', 'Contacto: Nombre completo'],
+  STUDENT_PHONE: ['Tel alumno', 'Teléfono Alumno'],
+  STUDENT_EMAIL: ['Correo alumno', 'Correo Alumno'],
+  DAD_NAME: ['Papá', 'Nombre Papá'],
+  DAD_PHONE: ['Tel Papá', 'Teléfono Papá'],
+  DAD_EMAIL: ['Correo Papá'],
+  MOM_NAME: ['Mamá', 'Nombre Mamá'],
+  MOM_PHONE: ['Tel Mamá', 'Teléfono Mamá'],
+  MOM_EMAIL: ['Correo Mamá'],
+  SEDENA: ['SEDENA'],
 };
 
 
@@ -326,17 +340,10 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                     headerMap[header] = index;
                 });
                 
-                const getColumnIndex = (possibleNames: string[]): number | undefined => {
-                    for(const name of possibleNames) {
-                        const normalizedName = normalizeHeader(name);
-                        const idx = headerMap[normalizedName];
-                        if (idx !== undefined) return idx;
-                    }
-                    return undefined;
-                }
-
-                const studentIdIndex = getColumnIndex([DIRECTORY_COLUMNS.MATRICULA, 'Número de matrícula']);
-                const nameIndex = getColumnIndex([DIRECTORY_COLUMNS.NOMBRE, 'Contacto: Nombre completo']);
+                const getColumnIdx = (possibleNames: string[]) => findColumnIndex(headerMap, headers, possibleNames);
+                
+                const studentIdIndex = getColumnIdx(DIRECTORY_COLUMNS_SYNONYMS.STUDENT_ID);
+                const nameIndex = getColumnIdx(DIRECTORY_COLUMNS_SYNONYMS.STUDENT_NAME);
 
                 if (studentIdIndex === undefined || nameIndex === undefined) {
                     throw new Error(`Faltan columnas requeridas en el directorio: 'Matrícula' y 'Nombre'`);
@@ -351,23 +358,23 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                         continue;
                     }
                     
-                    const getValue = (key: keyof typeof DIRECTORY_COLUMNS, oldKey?: string) => {
-                       const index = getColumnIndex(oldKey ? [DIRECTORY_COLUMNS[key], oldKey] : [DIRECTORY_COLUMNS[key]]);
+                    const getValue = (names: string[]) => {
+                       const index = getColumnIdx(names);
                        return index !== undefined ? String(row[index] || '').trim() : '';
                     }
 
                     contacts[studentId] = {
                         studentId: studentId,
                         name: String(row[nameIndex]).trim(),
-                        studentPhone: getValue('TEL_ALUMNO'),
-                        studentEmail: getValue('CORREO_ALUMNO'),
-                        dadName: getValue('PAPA', 'Nombre Papá'),
-                        dadPhone: getValue('TEL_PAPA', 'Teléfono Papá'),
-                        dadEmail: getValue('CORREO_PAPA'),
-                        momName: getValue('MAMA', 'Nombre Mamá'),
-                        momPhone: getValue('TEL_MAMA', 'Teléfono Mamá'),
-                        momEmail: getValue('CORREO_MAMA'),
-                        sedena: getValue('SEDENA'),
+                        studentPhone: getValue(DIRECTORY_COLUMNS_SYNONYMS.STUDENT_PHONE),
+                        studentEmail: getValue(DIRECTORY_COLUMNS_SYNONYMS.STUDENT_EMAIL),
+                        dadName: getValue(DIRECTORY_COLUMNS_SYNONYMS.DAD_NAME),
+                        dadPhone: getValue(DIRECTORY_COLUMNS_SYNONYMS.DAD_PHONE),
+                        dadEmail: getValue(DIRECTORY_COLUMNS_SYNONYMS.DAD_EMAIL),
+                        momName: getValue(DIRECTORY_COLUMNS_SYNONYMS.MOM_NAME),
+                        momPhone: getValue(DIRECTORY_COLUMNS_SYNONYMS.MOM_PHONE),
+                        momEmail: getValue(DIRECTORY_COLUMNS_SYNONYMS.MOM_EMAIL),
+                        sedena: getValue(DIRECTORY_COLUMNS_SYNONYMS.SEDENA),
                         // --- campos que no se guardan pero se parsean por retrocompatibilidad ---
                         group: '', 
                         mentoringId: ''
@@ -391,8 +398,8 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
 
 
 const PROFESSOR_DIRECTORY_COLUMNS = {
-  NAME: 'Nombre del profesor',
-  EMAIL: 'Correo',
+  NAME: ['Nombre del profesor', 'Nombre'],
+  EMAIL: ['Correo', 'Email'],
 };
 
 export async function parseProfessorDirectoryExcel(file: File): Promise<Record<string, ProfessorContact> | null> {
@@ -421,20 +428,22 @@ export async function parseProfessorDirectoryExcel(file: File): Promise<Record<s
                 headers.forEach((header, index) => {
                     headerMap[header] = index;
                 });
+                
+                const getColumnIdx = (names: string[]) => findColumnIndex(headerMap, headers, names);
 
-                const nameIndex = headers.indexOf(normalizeHeader(PROFESSOR_DIRECTORY_COLUMNS.NAME));
-                const emailIndex = headers.indexOf(normalizeHeader(PROFESSOR_DIRECTORY_COLUMNS.EMAIL));
+                const nameIndex = getColumnIdx(PROFESSOR_DIRECTORY_COLUMNS.NAME);
+                const emailIndex = getColumnIdx(PROFESSOR_DIRECTORY_COLUMNS.EMAIL);
 
                 if (nameIndex === -1 || emailIndex === -1) {
-                    throw new Error(`Faltan columnas requeridas: '${PROFESSOR_DIRECTORY_COLUMNS.NAME}' y '${PROFESSOR_DIRECTORY_COLUMNS.EMAIL}'`);
+                    throw new Error(`Faltan columnas requeridas: '${PROFESSOR_DIRECTORY_COLUMNS.NAME.join(' o ')}' y '${PROFESSOR_DIRECTORY_COLUMNS.EMAIL.join(' o ')}'`);
                 }
 
                 const contacts: Record<string, ProfessorContact> = {};
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
-                    const name = String(row[nameIndex]).trim();
-                    const email = String(row[emailIndex]).trim();
+                    const name = String(row[nameIndex!]).trim();
+                    const email = String(row[emailIndex!]).trim();
                     if (!name || !email) {
                         continue;
                     }
@@ -462,8 +471,8 @@ export async function parseProfessorDirectoryExcel(file: File): Promise<Record<s
 }
 
 const ATHLETES_COLUMNS = {
-  NAME: 'Nombre Completo',
-  SPORT: 'Deporte',
+  NAME: ['Nombre Completo', 'Nombre'],
+  SPORT: ['Deporte'],
 };
 
 export async function parseAthletesExcel(file: File, allStudentsMap: Map<string, Student>): Promise<void> {
@@ -483,11 +492,18 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
                 if (jsonData.length < 2) return resolve();
 
                 const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h)));
-                const nameIndex = headers.indexOf(normalizeHeader(ATHLETES_COLUMNS.NAME));
-                const sportIndex = headers.indexOf(normalizeHeader(ATHLETES_COLUMNS.SPORT));
+                const headerMap: Record<string, number> = {};
+                headers.forEach((header, index) => {
+                    headerMap[header] = index;
+                });
+                
+                const getColumnIdx = (names: string[]) => findColumnIndex(headerMap, headers, names);
+                
+                const nameIndex = getColumnIdx(ATHLETES_COLUMNS.NAME);
+                const sportIndex = getColumnIdx(ATHLETES_COLUMNS.SPORT);
 
                 if (nameIndex === -1 || sportIndex === -1) {
-                    throw new Error(`Faltan columnas requeridas: '${ATHLETES_COLUMNS.NAME}' y '${ATHLETES_COLUMNS.SPORT}'`);
+                    throw new Error(`Faltan columnas requeridas: '${ATHLETES_COLUMNS.NAME.join(' o ')}' y '${ATHLETES_COLUMNS.SPORT.join(' o ')}'`);
                 }
                 
                 const studentNameToIdMap = new Map<string, string>();
@@ -499,8 +515,8 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
-                    const name = String(row[nameIndex]).trim();
-                    const sport = String(row[sportIndex]).trim();
+                    const name = String(row[nameIndex!]).trim();
+                    const sport = String(row[sportIndex!]).trim();
                     const studentId = studentNameToIdMap.get(name.toUpperCase());
 
                     if (name && sport && studentId) {
@@ -537,26 +553,18 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
 // --- PARSER PARA OFERTA ACADÉMICA ---
 
 const OFERTA_COLUMNS = {
-    CRN: 'CRN',
-    SUBJECT_KEY: 'CLAVE MATERIA',
-    SUBJECT_NAME: 'NOMBRE LARGO MATERIA',
-    PROFESSOR: 'NOMBRE PROFESOR',
-    GROUP: 'Número grupo',
-    CAPACITY: 'CAPACIDAD GRUPO',
-    ENROLLED: 'NUMERO ALUMNOS INSCRITOS',
-    START_TIME: 'HORA INICIO CLASE',
-    END_TIME: 'HORA FIN CLASE',
-    BUILDING: 'EDIFICIO',
-    ROOM: 'SALON'
+    CRN: ['CRN'],
+    SUBJECT_KEY: ['CLAVE MATERIA', 'Clave'],
+    SUBJECT_NAME: ['NOMBRE LARGO MATERIA', 'Materia'],
+    PROFESSOR: ['NOMBRE PROFESOR', 'Profesor'],
+    GROUP: ['Número grupo', 'Grupo'],
+    CAPACITY: ['CAPACIDAD GRUPO', 'Capacidad'],
+    ENROLLED: ['NUMERO ALUMNOS INSCRITOS', 'Inscritos'],
+    START_TIME: ['HORA INICIO CLASE', 'Inicio'],
+    END_TIME: ['HORA FIN CLASE', 'Fin'],
+    BUILDING: ['EDIFICIO', 'Edif'],
+    ROOM: ['SALON', 'Salon']
 };
-const OFERTA_DAYS_ABBR = {
-    'LUN': 'L',
-    'MAR': 'M',
-    'MI': 'MI',
-    'JUE': 'J',
-    'VIE': 'V'
-};
-
 
 export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcademicaItem[] | null> {
     return new Promise((resolve, reject) => {
@@ -574,41 +582,33 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
 
                 if (jsonData.length < 2) return resolve(null);
 
-                const headers: string[] = jsonData[0].map((h: any) => String(h || '').trim());
+                const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h || '')));
                 const headerMap: Record<string, number> = {};
                 headers.forEach((header, index) => {
-                    const normalized = normalizeHeader(header);
-                    if (!headerMap[normalized]) {
-                      headerMap[normalized] = index;
-                    }
-                    // Special handling for 'M' which can be Martes or Miercoles
-                    if(header.toUpperCase() === 'M' && 'MAR' in headerMap) {
-                        headerMap['MI'] = index;
+                    if (!headerMap[header]) {
+                      headerMap[header] = index;
                     }
                 });
 
-                const getColumnIndex = (name: string): number | undefined => {
-                    const normalizedName = normalizeHeader(name);
-                    return headerMap[normalizedName];
-                }
+                const getColumnIdx = (names: string[]) => findColumnIndex(headerMap, headers, names);
 
                 const oferta: OfertaAcademicaItem[] = [];
                 const dataRows = jsonData.slice(1);
 
                 for (const row of dataRows) {
-                    if (!row || row.length === 0 || !row[getColumnIndex(OFERTA_COLUMNS.CRN)!]) continue;
-                    
-                     const getColumnValue = (columnName: string) => {
-                        const index = getColumnIndex(columnName);
+                     const getColumnValue = (names: string[]) => {
+                        const index = getColumnIdx(names);
                         return index !== undefined ? String(row[index] || '').trim() : '';
                     }
 
+                    if (!row || row.length === 0 || !getColumnValue(OFERTA_COLUMNS.CRN)) continue;
+
                     const days: string[] = [];
-                    if (getColumnValue('Lunes') === 'SI') days.push('LUN');
-                    if (getColumnValue('Martes') === 'SI') days.push('MAR');
-                    if (getColumnValue('Miércoles') === 'SI') days.push('MI');
-                    if (getColumnValue('Jueves') === 'SI') days.push('JUE');
-                    if (getColumnValue('Viernes') === 'SI') days.push('VIE');
+                    if (getColumnValue(['Lunes', 'LUN']) === 'SI') days.push('LUN');
+                    if (getColumnValue(['Martes', 'MAR']) === 'SI') days.push('MAR');
+                    if (getColumnValue(['Miércoles', 'MIE', 'MIÉRCOLES']) === 'SI') days.push('MIE');
+                    if (getColumnValue(['Jueves', 'JUE']) === 'SI') days.push('JUE');
+                    if (getColumnValue(['Viernes', 'VIE']) === 'SI') days.push('VIE');
 
                     const item: OfertaAcademicaItem = {
                         crn: getColumnValue(OFERTA_COLUMNS.CRN),
