@@ -45,6 +45,8 @@ export function ChangeStats() {
     const [previousFile, setPreviousFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [latestComparison, setLatestComparison] = useState<Record<string, Change[]>>({});
+
 
     const processAndCompareData = async (previousData: StudentData, currentData: Student[]) => {
         const deltaHistory: Record<string, Change[]> = {};
@@ -76,12 +78,6 @@ export function ChangeStats() {
                     changesCount++;
                 };
 
-                if (currentStudent.leader !== previousStudent.leader) {
-                    createChange('leader', 'N/A', previousStudent.leader, currentStudent.leader);
-                }
-                if (currentStudent.tutor !== previousStudent.tutor) {
-                    createChange('tutor', 'N/A', previousStudent.tutor, currentStudent.tutor);
-                }
                  if (currentStudent.subjects) {
                     currentStudent.subjects.forEach(currentSubject => {
                         const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
@@ -92,9 +88,6 @@ export function ChangeStats() {
                             }
                             if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
                                 createChange('missedAssignments', currentSubject.id, previousSubject.missedAssignments, currentSubject.missedAssignments);
-                            }
-                            if (currentSubject.group !== previousSubject.group) {
-                                createChange('group', currentSubject.id, previousSubject.group, currentSubject.group);
                             }
                         }
                     });
@@ -130,12 +123,13 @@ export function ChangeStats() {
             return mergedHistory;
         });
 
-        return { processed: Object.keys(currentData).length, changes: changesCount };
+        return { processed: Object.keys(currentData).length, changes: changesCount, deltaHistory };
     };
     
     useEffect(() => {
         const runComparison = async () => {
             if (!previousFile) {
+                setLatestComparison({});
                 return;
             }
             if (!hasCurrentData) {
@@ -165,7 +159,8 @@ export function ChangeStats() {
                     return;
                 }
 
-                const { processed, changes } = await processAndCompareData(previousData, allStudents);
+                const { processed, changes, deltaHistory } = await processAndCompareData(previousData, allStudents);
+                setLatestComparison(deltaHistory);
                 setProgress(90);
                 
                 setUploadHistory(prev => [{ 
@@ -202,9 +197,10 @@ export function ChangeStats() {
 
     const { 
         totalChanges, studentsWithChanges, totalNewAbsences, totalNewMissedAssignments, 
-        changesByLeader, changesByTutor, changesBySubject, onlineSubjectChanges
+        changesByLeader, changesBySubject, onlineSubjectChanges
     } = useMemo(() => {
-        const hasHistory = Object.keys(studentHistory).length > 0;
+        const historyToUse = latestComparison;
+        const hasHistory = Object.keys(historyToUse).length > 0;
         if (!hasHistory) {
             return {
                 totalChanges: 0,
@@ -218,7 +214,7 @@ export function ChangeStats() {
             };
         }
 
-        const riskChanges = Object.values(studentHistory).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
+        const riskChanges = Object.values(historyToUse).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
         const studentsWithChangesSet = new Set(riskChanges.map(c => c.studentId));
 
 
@@ -226,7 +222,6 @@ export function ChangeStats() {
         let newMissedAssignments = 0;
 
         const leaderCounts: Record<string, { absences: number, missedAssignments: number }> = {};
-        const tutorCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const onlineCounts: Record<string, number> = { 'El mundo contemporáneo': 0, 'Ciencias de la Vida': 0 };
 
@@ -252,9 +247,6 @@ export function ChangeStats() {
             if (change.fieldName === 'absences') leaderCounts[student.leader].absences += increment;
             else leaderCounts[student.leader].missedAssignments += increment;
             
-            if (!tutorCounts[student.tutor]) tutorCounts[student.tutor] = { absences: 0, missedAssignments: 0 };
-            if (change.fieldName === 'absences') tutorCounts[student.tutor].absences += increment;
-            else tutorCounts[student.tutor].missedAssignments += increment;
 
             if (!subjectCounts[subjectName]) subjectCounts[subjectName] = { absences: 0, missedAssignments: 0 };
             if (change.fieldName === 'absences') subjectCounts[subjectName].absences += increment;
@@ -270,31 +262,30 @@ export function ChangeStats() {
             totalNewAbsences: newAbsences,
             totalNewMissedAssignments: newMissedAssignments,
             changesByLeader: formatChartData(leaderCounts),
-            changesByTutor: formatChartData(tutorCounts),
             changesBySubject: formatChartData(subjectCounts),
             onlineSubjectChanges: onlineChartData
         };
 
-    }, [studentHistory, allStudents]);
+    }, [latestComparison, allStudents]);
 
     const handleCaseClick = (caseType: 'changes' | 'newAbsences' | 'newMissedAssignments') => {
         setCaseType(caseType);
         setActiveView('students');
     };
     
-    const hasComparisonData = useMemo(() => Object.keys(studentHistory).length > 0, [studentHistory]);
+    const hasComparisonData = useMemo(() => Object.keys(latestComparison).length > 0, [latestComparison]);
 
     return (
         <div className="space-y-8 p-4 md:p-8 pt-6">
             <header className="mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">Análisis de Cambios</h1>
-                <p className="text-muted-foreground">Compara el reporte diario actual con uno anterior para detectar nuevas faltas, tareas no entregadas y cambios de grupo.</p>
+                <p className="text-muted-foreground">Compara el reporte diario actual con uno anterior para detectar nuevas faltas y tareas no entregadas.</p>
             </header>
 
             <Card>
                 <CardHeader>
                     <CardTitle>Iniciar Comparación</CardTitle>
-                    <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado. Los cambios detectados se guardarán en el historial.</CardDescription>
+                    <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado. Los cambios de riesgo (Faltas y NE) se mostrarán aquí y se guardarán en el historial de la base de datos para las proyecciones.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
                     <FileUpload onFileSelect={setPreviousFile} selectedFile={previousFile} isLoading={isProcessing} label="Cargar Reporte Anterior" icon={<FileClock />} />
@@ -330,7 +321,7 @@ export function ChangeStats() {
                             </CardHeader>
                             <CardContent>
                                 <p className="text-muted-foreground">
-                                    No se detectaron nuevas faltas o tareas no entregadas entre los dos reportes. Puede haber otros cambios (ej. de grupo o tutor).
+                                    No se detectaron nuevas faltas o tareas no entregadas entre los dos reportes.
                                 </p>
                             </CardContent>
                         </Card>
@@ -379,25 +370,7 @@ export function ChangeStats() {
                                     </CardContent>
                                 </Card>
                             </div>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Cambios por Tutor</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ResponsiveContainer width="100%" height={300}>
-                                            <BarChart data={changesByTutor} layout="vertical" margin={{ left: 100 }}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis type="number" />
-                                                <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 12 }} />
-                                                <Tooltip content={<CustomTooltip />} />
-                                                <Legend formatter={legendFormatter} />
-                                                <Bar dataKey="Faltas" name="Nuevas Faltas" stackId="a" fill="hsl(var(--chart-4))" />
-                                                <Bar dataKey="Tareas (NE)" name="Nuevas Tareas (NE)" stackId="a" fill="hsl(var(--chart-3))" />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </CardContent>
-                                </Card>
+                            <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
                                  <Card>
                                     <CardHeader>
                                         <CardTitle>Cambios por Materia</CardTitle>

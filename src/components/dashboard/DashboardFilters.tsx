@@ -17,7 +17,6 @@ import { useMemo } from 'react';
 export function DashboardFilters() {
   const {
     leaders,
-    tutors,
     subjects,
     professors,
     groups,
@@ -51,7 +50,6 @@ export function DashboardFilters() {
 
   const options: string[] = {
     leader: leaders,
-    tutor: tutors,
     subject: subjects,
     professor: professors,
     group: groups,
@@ -83,7 +81,6 @@ export function DashboardFilters() {
 
   const filterTypeOptions: { value: FilterType; label: string }[] = [
     { value: 'leader', label: 'Líder' },
-    { value: 'tutor', label: 'Tutor' },
     { value: 'professor', label: 'Profesor' },
     { value: 'subject', label: 'Materia' },
     { value: 'group', label: 'Grupo' },

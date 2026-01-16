@@ -69,9 +69,6 @@ export function TeamTasksPanel() {
         if (filterType === 'leader') {
             return task.assignedTo !== 'tutor' && task.leader === selectedValue;
         }
-        if (filterType === 'tutor') {
-            return task.assignedTo !== 'leader' && task.tutor === selectedValue;
-        }
         return true;
     });
 

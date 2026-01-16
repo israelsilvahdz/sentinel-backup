@@ -46,14 +46,13 @@ const bitacoraSchema = z.object({
 type BitacoraFormValues = z.infer<typeof bitacoraSchema>;
 
 export function BitacoraPanel() {
-  const { allStudents, seguimientoEntries, leaders, tutors, fetchSeguimientoEntries, allStudentsMap } = useDashboardFilters();
+  const { allStudents, seguimientoEntries, leaders, fetchSeguimientoEntries, allStudentsMap } = useDashboardFilters();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // States for filtering
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLeader, setSelectedLeader] = useState<string | null>(null);
-  const [selectedTutor, setSelectedTutor] = useState<string | null>(null);
   const [selectedReporter, setSelectedReporter] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
 
@@ -130,7 +129,7 @@ export function BitacoraPanel() {
   }, [bitacoraEntries]);
 
   const filteredEntries = useMemo(() => {
-      const hasActiveFilters = searchTerm || selectedLeader || selectedTutor || selectedReporter || selectedDate;
+      const hasActiveFilters = searchTerm || selectedLeader || selectedReporter || selectedDate;
       if (!hasActiveFilters) return bitacoraEntries || [];
 
       return (bitacoraEntries || []).filter(entry => {
@@ -142,19 +141,17 @@ export function BitacoraPanel() {
               entry.studentId.toLowerCase().includes(lowercasedSearch);
 
           const leaderMatch = !selectedLeader || (student && student.leader === selectedLeader);
-          const tutorMatch = !selectedTutor || (student && student.tutor === selectedTutor);
           const reporterMatch = !selectedReporter || entry.reportedBy === selectedReporter;
           const dateMatch = !selectedDate || isSameDay(entry.eventDate.toDate(), selectedDate);
 
 
-          return searchMatch && leaderMatch && tutorMatch && reporterMatch && dateMatch;
+          return searchMatch && leaderMatch && reporterMatch && dateMatch;
       });
-  }, [searchTerm, selectedLeader, selectedTutor, selectedReporter, selectedDate, bitacoraEntries, allStudentsMap]);
+  }, [searchTerm, selectedLeader, selectedReporter, selectedDate, bitacoraEntries, allStudentsMap]);
   
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedLeader(null);
-    setSelectedTutor(null);
     setSelectedReporter(null);
     setSelectedDate(undefined);
   };
@@ -198,7 +195,7 @@ export function BitacoraPanel() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reportedBy">Reportado por</Label>
-                <Input id="reportedBy" {...register('reportedBy')} placeholder="Ej. Juan Pérez (Tutor)" />
+                <Input id="reportedBy" {...register('reportedBy')} placeholder="Ej. Juan Pérez (Líder)" />
                  {errors.reportedBy && <p className="text-sm text-destructive">{errors.reportedBy.message?.toString()}</p>}
               </div>
             </div>
@@ -274,7 +271,7 @@ export function BitacoraPanel() {
         </CardHeader>
         <CardContent>
              <Card className="mb-6 bg-muted/50 p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="lg:col-span-2 space-y-2">
                         <Label htmlFor="search-term">Buscar Alumno</Label>
                         <div className="relative">
@@ -312,17 +309,13 @@ export function BitacoraPanel() {
                         <Label htmlFor="filter-leader">Líder</Label>
                         <Select value={selectedLeader || 'all'} onValueChange={(val) => setSelectedLeader(val === 'all' ? null : val)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem>{leaders.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent></Select>
                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="filter-tutor">Tutor</Label>
-                        <Select value={selectedTutor || 'all'} onValueChange={(val) => setSelectedTutor(val === 'all' ? null : val)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem>{tutors.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select>
-                    </div>
                     <div className="space-y-2">
                         <Label htmlFor="filter-reporter">Reportado por</Label>
                         <Select value={selectedReporter || 'all'} onValueChange={(val) => setSelectedReporter(val === 'all' ? null : val)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">Todos</SelectItem>{reporters.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select>
                     </div>
                 </div>
                 <div className="mt-4 flex justify-end">
-                    <Button variant="ghost" onClick={clearFilters} disabled={!searchTerm && !selectedLeader && !selectedTutor && !selectedReporter && !selectedDate}><X className="mr-2 h-4 w-4"/>Limpiar Filtros</Button>
+                    <Button variant="ghost" onClick={clearFilters} disabled={!searchTerm && !selectedLeader && !selectedReporter && !selectedDate}><X className="mr-2 h-4 w-4"/>Limpiar Filtros</Button>
                 </div>
             </Card>
 
