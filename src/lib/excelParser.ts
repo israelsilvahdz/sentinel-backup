@@ -60,9 +60,6 @@ const COLUMNS = {
   END_TIME: 'FIN',
 };
 
-// Se usan los encabezados exactos proporcionados por el usuario.
-const POSSIBLE_DAY_HEADERS = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
-
 const ACTIVITY_REGEX = /^A\d+$/;
 
 // --- Data Normalization ---
@@ -182,8 +179,6 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             headerMap[header] = index;
         });
         
-        const dayHeadersInFile = headers.filter(h => POSSIBLE_DAY_HEADERS.includes(h));
-        
         const getColumnIdx = (names: string[]) => findColumnIndex(headerMap, headers, names);
 
         const requiredCols = {
@@ -240,14 +235,23 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                     activities[header] = row[headerMap[header]];
                 }
             }
-
+            
             const scheduleDays: string[] = [];
-            for (const dayHeader of dayHeadersInFile) {
-                const colIndex = headerMap[dayHeader];
+            const daySynonyms: Record<string, string[]> = {
+                'LUN': ['LUN', 'LUNES'],
+                'MAR': ['MAR', 'MARTES'],
+                'MIE': ['MIE', 'MIERCOLES', 'MIÉRCOLES', 'MIER'],
+                'JUE': ['JUE', 'JUEVES'],
+                'VIE': ['VIE', 'VIERNES', 'VIER'],
+            };
+
+            for (const [dayKey, synonyms] of Object.entries(daySynonyms)) {
+                const colIndex = getColumnIdx(synonyms);
                 if (colIndex !== undefined && String(row[colIndex]).trim().toUpperCase() === 'SI') {
-                    scheduleDays.push(dayHeader);
+                    scheduleDays.push(dayKey);
                 }
             }
+
 
             const subject: Subject = {
                 id: getColumnValue([COLUMNS.SUBJECT_CRN]),
@@ -606,9 +610,9 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
                     const days: string[] = [];
                     if (getColumnValue(['Lunes', 'LUN']) === 'SI') days.push('LUN');
                     if (getColumnValue(['Martes', 'MAR']) === 'SI') days.push('MAR');
-                    if (getColumnValue(['Miércoles', 'MIE', 'MIÉRCOLES']) === 'SI') days.push('MIE');
+                    if (getColumnValue(['Miércoles', 'MIE', 'MIÉRCOLES', 'MIER']) === 'SI') days.push('MIE');
                     if (getColumnValue(['Jueves', 'JUE']) === 'SI') days.push('JUE');
-                    if (getColumnValue(['Viernes', 'VIE']) === 'SI') days.push('VIE');
+                    if (getColumnValue(['Viernes', 'VIE', 'VIER']) === 'SI') days.push('VIE');
 
                     const item: OfertaAcademicaItem = {
                         crn: getColumnValue(OFERTA_COLUMNS.CRN),
