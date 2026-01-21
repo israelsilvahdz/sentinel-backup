@@ -23,10 +23,10 @@ function findColumnIndex(headerMap: Record<string, number>, headers: string[], p
             return headerMap[normalized];
         }
     }
-    // Fallback to partial match
+    // Fallback to partial match, but stricter (starts with)
     for (const name of possibleNames) {
         const normalized = normalizeHeader(name);
-        const partialIndex = headers.findIndex(h => h.includes(normalized));
+        const partialIndex = headers.findIndex(h => h.startsWith(normalized)); // Use startsWith instead of includes
         if (partialIndex !== -1) {
             return partialIndex;
         }
