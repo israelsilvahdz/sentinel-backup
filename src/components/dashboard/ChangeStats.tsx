@@ -96,10 +96,13 @@ export function ChangeStats() {
                         createChange(studentId, currentSubject.id, 'missedAssignments', 0, currentSubject.missedAssignments);
                     }
                 } else { // La materia existe en ambos, comparar
-                    if (currentSubject.absences > previousSubject.absences) {
+                    const absenceChange = currentSubject.absences - previousSubject.absences;
+                    const missedAssignmentChange = currentSubject.missedAssignments - previousSubject.missedAssignments;
+
+                    if (absenceChange > 0) {
                         createChange(studentId, currentSubject.id, 'absences', previousSubject.absences, currentSubject.absences);
                     }
-                    if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
+                    if (missedAssignmentChange > 0) {
                         createChange(studentId, currentSubject.id, 'missedAssignments', previousSubject.missedAssignments, currentSubject.missedAssignments);
                     }
                 }
@@ -140,7 +143,8 @@ export function ChangeStats() {
     useEffect(() => {
         const runComparison = async () => {
             if (!previousFile) {
-                setLatestComparison({});
+                // No limpiar los datos si el archivo es null, para mantener la vista
+                // setLatestComparison({});
                 return;
             }
             if (!hasCurrentData) {
@@ -195,7 +199,7 @@ export function ChangeStats() {
 
         runComparison();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [previousFile]);
+    }, [previousFile, hasCurrentData, allStudents, toast]); // Dependency on `allStudents` and `hasCurrentData` ensures re-run if main report changes.
 
 
     const { 
@@ -220,15 +224,15 @@ export function ChangeStats() {
                 studentsWithNewMissedAssignmentsSet: new Set<string>(),
             };
         }
-
-        const allRiskChanges = Object.values(historyToUse).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
         
-        const kpiRiskChanges = (filterType === 'leader' && selectedValue)
-            ? allRiskChanges.filter(change => {
-                const student = allStudents.find(s => s.id === change.studentId);
-                return student?.leader === selectedValue;
-              })
-            : allRiskChanges;
+        let studentsToConsider = allStudents;
+        if (filterType === 'leader' && selectedValue) {
+            studentsToConsider = allStudents.filter(student => student.leader === selectedValue);
+        }
+        const studentIdsToConsider = new Set(studentsToConsider.map(s => s.id));
+
+        const kpiRiskChanges = Object.values(historyToUse).flat()
+            .filter(c => (c.fieldName === 'absences' || c.fieldName === 'missedAssignments') && studentIdsToConsider.has(c.studentId));
 
 
         const studentsWithChangesSet = new Set(kpiRiskChanges.map(c => c.studentId));
@@ -247,6 +251,8 @@ export function ChangeStats() {
             newMissedAssignments += (change.newValue as number) - (change.oldValue as number);
         });
         
+        // Charts still show general data, not filtered by leader
+        const allRiskChanges = Object.values(historyToUse).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
         
         const leaderCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
@@ -294,17 +300,24 @@ export function ChangeStats() {
     }, [latestComparison, allStudents, filterType, selectedValue]);
 
     const handleCaseClick = (caseType: 'changes' | 'newAbsences' | 'newMissedAssignments') => {
+        let studentSet: Set<string>;
         if (caseType === 'changes') {
-            setContextualStudentIds(studentsWithChangesSet);
+            studentSet = studentsWithChangesSet;
         } else if (caseType === 'newAbsences') {
-            setContextualStudentIds(studentsWithNewAbsencesSet);
-        } else if (caseType === 'newMissedAssignments') {
-            setContextualStudentIds(studentsWithNewMissedAssignmentsSet);
+            studentSet = studentsWithNewAbsencesSet;
+        } else {
+            studentSet = studentsWithNewMissedAssignmentsSet;
         }
+        setContextualStudentIds(studentSet);
         setActiveView('students');
     };
     
     const hasComparisonData = useMemo(() => Object.keys(latestComparison).length > 0, [latestComparison]);
+
+    const handleFileClear = () => {
+        setPreviousFile(null);
+        setLatestComparison({}); // Limpia los resultados cuando se quita el archivo
+    }
 
     return (
         <div className="space-y-8 p-4 md:p-8 pt-6">
@@ -319,7 +332,13 @@ export function ChangeStats() {
                     <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado. Los cambios de riesgo (Faltas y NE) se mostrarán aquí y se guardarán en el historial de la base de datos para las proyecciones.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
-                    <FileUpload onFileSelect={setPreviousFile} selectedFile={previousFile} isLoading={isProcessing} label="Cargar Reporte Anterior" icon={<FileClock />} />
+                    <FileUpload onFileSelect={(file) => {
+                        if (file) {
+                            setPreviousFile(file);
+                        } else {
+                            handleFileClear();
+                        }
+                    }} selectedFile={previousFile} isLoading={isProcessing} label="Cargar Reporte Anterior" icon={<FileClock />} />
                 </CardContent>
                 {isProcessing && <Progress value={progress} className="w-full h-1 mt-2" />}
             </Card>
@@ -428,3 +447,5 @@ export function ChangeStats() {
         </div>
     );
 }
+
+    
