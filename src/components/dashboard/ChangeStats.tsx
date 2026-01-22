@@ -38,7 +38,7 @@ const legendFormatter = (value: string) => {
 }
 
 export function ChangeStats() {
-    const { allStudents, hasData: hasCurrentData, studentHistory, setStudentHistory, setUploadHistory, setActiveView, setCaseType, selectedValue, filterType, setContextualStudentIds, latestComparison, setLatestComparison } = useDashboardFilters();
+    const { allStudents, hasData: hasCurrentData, setStudentHistory, setActiveView, setContextualStudentIds, latestComparison, setLatestComparison, filterType, selectedValue } = useDashboardFilters();
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
@@ -46,51 +46,64 @@ export function ChangeStats() {
     const [progress, setProgress] = useState(0);
 
 
-    const processAndCompareData = async (previousData: StudentData, currentData: Student[]) => {
+    const processAndCompareData = async (currentStudents: Student[], previousStudentData: StudentData) => {
         const deltaHistory: Record<string, Change[]> = {};
         const allChangesToSave: Change[] = [];
         let changesCount = 0;
         
-        const currentDataMap: StudentData = currentData.reduce((acc, student) => {
+        const currentStudentsMap = currentStudents.reduce((acc, student) => {
             acc[student.id] = student;
             return acc;
         }, {} as StudentData);
 
-
-        for (const studentId in currentDataMap) {
-            const currentStudent = currentDataMap[studentId];
-            const previousStudent = previousData[studentId];
-            
+        const createChange = (studentId: string, subjectId: string, fieldName: Change['fieldName'], oldValue: any, newValue: any) => {
+            const change: Change = {
+                date: new Date().toISOString(), studentId, subjectId,
+                fieldName, oldValue, newValue
+            };
             if (!deltaHistory[studentId]) {
                 deltaHistory[studentId] = [];
             }
+            deltaHistory[studentId].push(change);
+            allChangesToSave.push(change);
+            changesCount++;
+        };
 
-            if (previousStudent) {
-                 const createChange = (fieldName: Change['fieldName'], subjectId: string, oldValue: any, newValue: any) => {
-                    const change: Change = {
-                        date: new Date().toISOString(), studentId: studentId, subjectId: subjectId,
-                        fieldName: fieldName, oldValue: oldValue, newValue: newValue
-                    };
-                    deltaHistory[studentId].push(change);
-                    allChangesToSave.push(change);
-                    changesCount++;
-                };
+        for (const studentId in currentStudentsMap) {
+            const currentStudent = currentStudentsMap[studentId];
+            const previousStudent = previousStudentData[studentId];
 
-                 if (currentStudent.subjects) {
-                    currentStudent.subjects.forEach(currentSubject => {
-                        const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
-
-                        if (previousSubject) {
-                            if (currentSubject.absences > previousSubject.absences) {
-                                createChange('absences', currentSubject.id, previousSubject.absences, currentSubject.absences);
-                            }
-                            if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
-                                createChange('missedAssignments', currentSubject.id, previousSubject.missedAssignments, currentSubject.missedAssignments);
-                            }
-                        }
-                    });
-                }
+            if (!previousStudent) { // El alumno es nuevo en el reporte actual
+                currentStudent.subjects?.forEach(currentSubject => {
+                    if (currentSubject.absences > 0) {
+                        createChange(studentId, currentSubject.id, 'absences', 0, currentSubject.absences);
+                    }
+                    if (currentSubject.missedAssignments > 0) {
+                        createChange(studentId, currentSubject.id, 'missedAssignments', 0, currentSubject.missedAssignments);
+                    }
+                });
+                continue;
             }
+
+            currentStudent.subjects?.forEach(currentSubject => {
+                const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
+
+                if (!previousSubject) { // La materia es nueva para el alumno
+                    if (currentSubject.absences > 0) {
+                        createChange(studentId, currentSubject.id, 'absences', 0, currentSubject.absences);
+                    }
+                    if (currentSubject.missedAssignments > 0) {
+                        createChange(studentId, currentSubject.id, 'missedAssignments', 0, currentSubject.missedAssignments);
+                    }
+                } else { // La materia existe en ambos, comparar
+                    if (currentSubject.absences > previousSubject.absences) {
+                        createChange(studentId, currentSubject.id, 'absences', previousSubject.absences, currentSubject.absences);
+                    }
+                    if (currentSubject.missedAssignments > previousSubject.missedAssignments) {
+                        createChange(studentId, currentSubject.id, 'missedAssignments', previousSubject.missedAssignments, currentSubject.missedAssignments);
+                    }
+                }
+            });
         }
         
         if (allChangesToSave.length > 0) {
@@ -108,7 +121,7 @@ export function ChangeStats() {
                 });
             }
         }
-
+        
         setStudentHistory(prevHistory => {
             const mergedHistory = { ...prevHistory };
             for (const studentId in deltaHistory) {
@@ -121,7 +134,7 @@ export function ChangeStats() {
             return mergedHistory;
         });
 
-        return { processed: Object.keys(currentData).length, changes: changesCount, deltaHistory };
+        return { processed: Object.keys(currentStudents).length, changes: changesCount, deltaHistory };
     };
     
     useEffect(() => {
@@ -136,7 +149,6 @@ export function ChangeStats() {
                     title: 'Falta reporte actual',
                     description: 'Por favor, carga primero el reporte diario general en la barra superior.',
                 });
-                setPreviousFile(null);
                 return;
             }
 
@@ -157,16 +169,10 @@ export function ChangeStats() {
                     return;
                 }
 
-                const { processed, changes, deltaHistory } = await processAndCompareData(previousData, allStudents);
+                const { processed, changes, deltaHistory } = await processAndCompareData(allStudents, previousData);
                 setLatestComparison(deltaHistory);
                 setProgress(90);
                 
-                setUploadHistory(prev => [{ 
-                    id: Date.now().toString(), 
-                    fileName: `COMPARE: ${previousFile.name} vs Reporte Actual`, 
-                    uploadedAt: new Date().toISOString() 
-                }, ...prev].slice(0, 10));
-
                 toast({
                     title: 'Éxito',
                     description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
