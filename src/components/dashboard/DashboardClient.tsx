@@ -434,7 +434,7 @@ export function DashboardClient() {
     };
     processFile();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentFile, toast, teams]);
+  }, [currentFile, toast]);
 
 
   const handleDeleteAllData = () => {
