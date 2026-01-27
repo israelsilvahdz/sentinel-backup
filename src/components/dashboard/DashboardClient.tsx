@@ -50,7 +50,7 @@ import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, g
 import professorContactsData from '@/lib/professor-contacts.json';
 
 
-type FilterType = 'leader' | 'subject' | 'professor' | 'group';
+type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
 export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'oferta-academica' | 'irregular-students' | 'projections';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
@@ -80,6 +80,7 @@ interface DashboardContextType {
   isLoading: boolean;
   hasData: boolean;
   leaders: string[];
+  tutors: string[];
   subjects: string[];
   professors: string[];
   groups: string[];
@@ -428,7 +429,6 @@ export function DashboardClient() {
             setTimeout(() => {
                 setIsProcessing(false);
                 setProgress(0);
-                setCurrentFile(null);
             }, 500);
         }
     };
@@ -474,6 +474,7 @@ export function DashboardClient() {
   };
   
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))].sort(), [allStudents]);
+  const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))].sort(), [allStudents]);
   const professors = useMemo(() => {
     const allProfessors = allStudents.flatMap(s => s.subjects?.map(sub => sub.professorName) || []);
     return [...new Set(allProfessors.filter(Boolean))].sort();
@@ -512,6 +513,7 @@ export function DashboardClient() {
 
     if (selectedValue) {
         if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
+        if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
         if (filterType === 'professor') students = students.filter(s => s.subjects?.some(sub => sub.professorName === selectedValue));
         if (filterType === 'group') students = students.filter(s => s.subjectSummaries?.some(sub => sub.group === selectedValue));
         if (filterType === 'subject') {
@@ -624,7 +626,7 @@ export function DashboardClient() {
     filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, latestComparison, setLatestComparison, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
-    leaders, subjects, professors, groups, groupsForSubject,
+    leaders, tutors, subjects, professors, groups, groupsForSubject,
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
     groupId, setGroupId,

@@ -228,6 +228,8 @@ export function ChangeStats() {
         let studentsToConsider = allStudents;
         if (filterType === 'leader' && selectedValue) {
             studentsToConsider = allStudents.filter(student => student.leader === selectedValue);
+        } else if (filterType === 'tutor' && selectedValue) {
+            studentsToConsider = allStudents.filter(student => student.tutor === selectedValue);
         }
         const studentIdsToConsider = new Set(studentsToConsider.map(s => s.id));
 
@@ -447,5 +449,3 @@ export function ChangeStats() {
         </div>
     );
 }
-
-    
