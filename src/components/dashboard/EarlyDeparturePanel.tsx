@@ -39,74 +39,106 @@ export function EarlyDeparturePanel() {
 
         const lastBlockStartTime = '13:30';
         const earlyLeaveTimeMinutes = timeToMinutes('13:30');
+        const DAYS = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
 
-        // 1. Find all groups that have a class in the last block
-        const groupsWithLastClass = new Set<string>();
+        const leavingVeryEarlyMap = new Map<string, { student: Student; days: { day: string; time: string }[] }>();
+        const skippingLastBlockMap = new Map<string, { student: Student; days: string[] }>();
+
+        // Get all groups that have a class in the last block, per day
+        const groupsWithLastClassByDay: Record<string, Set<string>> = { LUN: new Set(), MAR: new Set(), MIE: new Set(), JUE: new Set(), VIE: new Set() };
         allStudents.forEach(student => {
             student.subjects?.forEach(subject => {
-                if (
-                    subject.group &&
-                    !onlineFlexSubjects.has(subject.name) &&
-                    subject.schedule?.startTime === lastBlockStartTime
-                ) {
-                    groupsWithLastClass.add(subject.group);
+                if (subject.group && !onlineFlexSubjects.has(subject.name) && subject.schedule?.startTime === lastBlockStartTime) {
+                    subject.schedule.days.forEach(day => {
+                        if (groupsWithLastClassByDay[day]) {
+                            groupsWithLastClassByDay[day].add(subject.group!);
+                        }
+                    });
                 }
             });
         });
 
-        const skippingLastBlock: EarlyLeaver[] = [];
-        const leavingVeryEarly: EarlyLeaver[] = [];
-        const processedIds = new Set<string>(); // To avoid duplicating students in lists
-
         allStudents.forEach(student => {
-            if (!student.subjects || student.subjects.length === 0) return;
+            const lastClassByDay: Record<string, string> = {};
+            const studentGroupsByDay: Record<string, Set<string>> = { LUN: new Set(), MAR: new Set(), MIE: new Set(), JUE: new Set(), VIE: new Set() };
+            let hasAnyClass = false;
 
-            // 2. Find student's latest non-flex class
-            let latestEndTime = '00:00';
-            student.subjects.forEach(subject => {
+            student.subjects?.forEach(subject => {
                 if (!onlineFlexSubjects.has(subject.name) && subject.schedule?.endTime) {
-                    if (timeToMinutes(subject.schedule.endTime) > timeToMinutes(latestEndTime)) {
-                        latestEndTime = subject.schedule.endTime;
-                    }
+                    hasAnyClass = true;
+                    subject.schedule.days.forEach(day => {
+                        if (!lastClassByDay[day] || timeToMinutes(subject.schedule!.endTime!) > timeToMinutes(lastClassByDay[day])) {
+                            lastClassByDay[day] = subject.schedule!.endTime!;
+                        }
+                        if (subject.group) {
+                        studentGroupsByDay[day].add(subject.group);
+                        }
+                    });
                 }
             });
             
-            // Check for Condition 2: Leaving before 1:30 PM
-            if (latestEndTime !== '00:00' && timeToMinutes(latestEndTime) <= earlyLeaveTimeMinutes) {
-                if (!processedIds.has(student.id)) {
-                    leavingVeryEarly.push({ student, detail: `Última clase termina a las ${latestEndTime}` });
-                    processedIds.add(student.id);
+            if (!hasAnyClass) return; // Skip students with no physical classes
+
+            // Condition 2: Leaving before 1:30 PM on any day
+            const earlyDays: { day: string; time: string }[] = [];
+            DAYS.forEach(day => {
+                const lastTime = lastClassByDay[day];
+                // Student has a class that day, but it ends early
+                if (lastTime && timeToMinutes(lastTime) <= earlyLeaveTimeMinutes) {
+                    earlyDays.push({ day, time: lastTime });
                 }
+            });
+
+            if (earlyDays.length > 0) {
+                leavingVeryEarlyMap.set(student.id, { student, days: earlyDays });
             }
-
-            // Check for Condition 1: Skipping the last block of their group
-            if (!processedIds.has(student.id)) {
-                const studentGroups = new Set(
-                    student.subjects
-                        .filter(s => s.group && !onlineFlexSubjects.has(s.name))
-                        .map(s => s.group)
-                );
-
-                const isInLastBlockGroup = [...studentGroups].some(g => groupsWithLastClass.has(g));
+            
+            // Condition 1: Skipping the last block on any day
+            const skippingDays: string[] = [];
+            DAYS.forEach(day => {
+                const studentGroups = studentGroupsByDay[day];
+                const lastClassGroupsForDay = groupsWithLastClassByDay[day];
+                const isInLastBlockGroup = [...studentGroups].some(g => lastClassGroupsForDay.has(g));
 
                 if (isInLastBlockGroup) {
-                    const hasPersonalLastClass = student.subjects.some(
-                        s => !onlineFlexSubjects.has(s.name) && s.schedule?.startTime === lastBlockStartTime
+                    const hasPersonalLastClass = student.subjects!.some(
+                        s => !onlineFlexSubjects.has(s.name) &&
+                            s.schedule?.days.includes(day) &&
+                            s.schedule?.startTime === lastBlockStartTime
                     );
 
                     if (!hasPersonalLastClass) {
-                        skippingLastBlock.push({ student, detail: `Su grupo tiene clase de 13:30 a 14:50, pero el/ella no.` });
-                        processedIds.add(student.id);
+                        skippingDays.push(day);
                     }
                 }
+            });
+
+            if (skippingDays.length > 0) {
+                skippingLastBlockMap.set(student.id, { student, days: skippingDays });
             }
         });
 
-        // Sort lists alphabetically by student name
-        leavingVeryEarly.sort((a, b) => a.student.name.localeCompare(b.student.name));
-        skippingLastBlock.sort((a, b) => a.student.name.localeCompare(b.student.name));
+        const formatEarlyLeaverDetail = (days: { day: string; time: string }[]) => {
+            if (days.length === 5) return "Sale temprano todos los días.";
+            const details = days.map(d => `${d.day} (${d.time})`).join(', ');
+            return `Sale temprano: ${details}`;
+        }
 
-        return { studentsSkippingLastBlock: skippingLastBlock, studentsLeavingVeryEarly: leavingVeryEarly };
+        const formatSkippingDetail = (days: string[]) => {
+            if (days.length === 5) return "No cursa el último bloque ningún día.";
+            return `No cursa el último bloque: ${days.join(', ')}`;
+        }
+        
+        const studentsLeavingVeryEarly = Array.from(leavingVeryEarlyMap.values())
+            .map(({ student, days }) => ({ student, detail: formatEarlyLeaverDetail(days) }))
+            .sort((a, b) => a.student.name.localeCompare(b.student.name));
+            
+        const studentsSkippingLastBlock = Array.from(skippingLastBlockMap.values())
+            .map(({ student, days }) => ({ student, detail: formatSkippingDetail(days) }))
+            .sort((a, b) => a.student.name.localeCompare(b.student.name));
+
+
+        return { studentsSkippingLastBlock, studentsLeavingVeryEarly };
     }, [allStudents]);
 
     return (
@@ -114,7 +146,7 @@ export function EarlyDeparturePanel() {
             <header className="mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">Análisis de Salida Temprano</h1>
                 <p className="text-muted-foreground">
-                    Identifica alumnos que no cursan el último bloque de su grupo o que se retiran antes de las 13:30.
+                    Identifica alumnos que no cursan el último bloque de su grupo o que se retiran antes de las 13:30 en días específicos.
                 </p>
             </header>
 
@@ -129,7 +161,7 @@ export function EarlyDeparturePanel() {
                                 </div>
                             </AccordionTrigger>
                             <CardDescription>
-                                Alumnos cuyo grupo tiene clase en el bloque de 13:30-14:50, pero ellos no tienen una materia asignada en ese horario (excluyendo materias flex).
+                                Alumnos cuyo grupo tiene clase en el bloque de 13:30-14:50 en ciertos días, pero ellos no tienen una materia asignada en ese horario.
                             </CardDescription>
                         </CardHeader>
                         <AccordionContent>
@@ -165,7 +197,7 @@ export function EarlyDeparturePanel() {
                                 </div>
                             </AccordionTrigger>
                             <CardDescription>
-                                Alumnos cuya última clase presencial del día termina a las 13:30 o antes.
+                                Alumnos cuya última clase presencial del día termina a las 13:30 o antes en uno o más días de la semana.
                             </CardDescription>
                         </CardHeader>
                         <AccordionContent>
