@@ -33,8 +33,9 @@ import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { AcademicCommitteePanel } from './AcademicCommitteePanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { ProjectionsPanel } from './ProjectionsPanel';
+import { EarlyDeparturePanel } from './EarlyDeparturePanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp, Calendar } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp, Calendar, TimerOff } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
@@ -52,7 +53,7 @@ import professorContactsData from '@/lib/professor-contacts.json';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'professor-schedule' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'oferta-academica' | 'irregular-students' | 'projections';
+export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections' | 'early-departure';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -275,13 +276,6 @@ export function DashboardClient() {
     loadInitialData();
   }, [fetchSeguimientoEntries, fetchTeamTasks]);
 
-  useEffect(() => {
-    // Fetch teams whenever student data changes (so we can map names to IDs)
-    if(allStudents.length > 0) {
-        fetchTeams();
-    }
-  }, [allStudents, fetchTeams]);
-
   // Persist data to local storage whenever it changes (contacts are now in DB)
   useEffect(() => {
     try {
@@ -429,11 +423,11 @@ export function DashboardClient() {
             setTimeout(() => {
                 setIsProcessing(false);
                 setProgress(0);
+                setCurrentFile(null); // Reset file to allow re-upload of same file
             }, 500);
         }
     };
     processFile();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFile, toast]);
 
 
@@ -526,33 +520,27 @@ export function DashboardClient() {
     }
     
     if (caseType) {
-        const getStudentIdsWithChange = (fieldName: 'absences' | 'missedAssignments') => {
-            const studentIds = new Set<string>();
-            Object.entries(studentHistory).forEach(([studentId, changes]) => {
-                if (changes.some(c => c.fieldName === fieldName)) {
-                    studentIds.add(studentId);
-                }
-            });
-            return studentIds;
-        }
-
         if (caseType === 'changes') {
-            const changedStudentIds = new Set<string>();
-            Object.entries(studentHistory).forEach(([studentId, changes]) => {
-                const hasRiskChange = changes.some(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
-                if (hasRiskChange) {
-                    changedStudentIds.add(studentId);
-                }
-            });
+            const changedStudentIds = new Set(Object.keys(latestComparison));
             return students.filter(s => changedStudentIds.has(s.id));
         }
         if (caseType === 'newAbsences') {
-            const studentIds = getStudentIdsWithChange('absences');
-            return students.filter(s => studentIds.has(s.id));
+             const studentIdsWithNewAbsences = new Set<string>();
+             Object.entries(latestComparison).forEach(([studentId, changes]) => {
+                if (changes.some(c => c.fieldName === 'absences')) {
+                    studentIdsWithNewAbsences.add(studentId);
+                }
+            });
+            return students.filter(s => studentIdsWithNewAbsences.has(s.id));
         }
         if (caseType === 'newMissedAssignments') {
-            const studentIds = getStudentIdsWithChange('missedAssignments');
-            return students.filter(s => studentIds.has(s.id));
+            const studentIdsWithNewNE = new Set<string>();
+             Object.entries(latestComparison).forEach(([studentId, changes]) => {
+                if (changes.some(c => c.fieldName === 'missedAssignments')) {
+                    studentIdsWithNewNE.add(studentId);
+                }
+            });
+            return students.filter(s => studentIdsWithNewNE.has(s.id));
         }
         if(caseType === 'lost') return findLostCases(students);
         if(caseType === 'extraordinary') return findExtraordinaryCases(students);
@@ -586,7 +574,7 @@ export function DashboardClient() {
     }
 
     return students;
-  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, studentHistory, groupId, contextualStudentIds]);
+  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, latestComparison, groupId, contextualStudentIds]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     const student = allStudentsMap.get(studentId);
@@ -660,6 +648,7 @@ export function DashboardClient() {
         case 'academic-committee': return <AcademicCommitteePanel />;
         case 'oferta-academica': return <OfertaAcademicaPanel />;
         case 'irregular-students': return <IrregularStudentsPanel />;
+        case 'early-departure': return <EarlyDeparturePanel />;
         default: return <SeguimientoPanel />;
     }
   }
@@ -711,6 +700,12 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
                     <Users />
                     <span>Panel de Alumnos</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Alumnos con Salida Temprano" isActive={activeView === 'early-departure'} onClick={() => handleSetActiveView('early-departure')}>
+                    <TimerOff />
+                    <span>Salida Temprano</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
