@@ -40,7 +40,6 @@ const DAY_MAP: Record<string, string> = {
     'VIE': 'Viernes',
 };
 
-// JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
 const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
     1: 'LUN',
     2: 'MAR',
@@ -476,6 +475,7 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                                             <div>
                                                 <p className="font-semibold text-xs leading-tight">{subject.name}</p>
                                                 <p className="text-xs text-muted-foreground">{subject.professorName}</p>
+                                                <p className="text-xs text-muted-foreground">Grupo: {subject.group}</p>
                                             </div>
                                         </div>
                                     ) : (
