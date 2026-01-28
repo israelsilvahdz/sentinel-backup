@@ -71,7 +71,7 @@ export function EarlyDeparturePanel() {
                             lastClassByDay[day] = subject.schedule!.endTime!;
                         }
                         if (subject.group) {
-                        studentGroupsByDay[day].add(subject.group);
+                           studentGroupsByDay[day].add(subject.group);
                         }
                     });
                 }
@@ -79,21 +79,7 @@ export function EarlyDeparturePanel() {
             
             if (!hasAnyClass) return; // Skip students with no physical classes
 
-            // Condition 2: Leaving before 1:30 PM on any day
-            const earlyDays: { day: string; time: string }[] = [];
-            DAYS.forEach(day => {
-                const lastTime = lastClassByDay[day];
-                // Student has a class that day, but it ends early
-                if (lastTime && timeToMinutes(lastTime) <= earlyLeaveTimeMinutes) {
-                    earlyDays.push({ day, time: lastTime });
-                }
-            });
-
-            if (earlyDays.length > 0) {
-                leavingVeryEarlyMap.set(student.id, { student, days: earlyDays });
-            }
-            
-            // Condition 1: Skipping the last block on any day
+            // Condition 1: Skipping the last block on any day (HIGHEST PRIORITY)
             const skippingDays: string[] = [];
             DAYS.forEach(day => {
                 const studentGroups = studentGroupsByDay[day];
@@ -115,6 +101,22 @@ export function EarlyDeparturePanel() {
 
             if (skippingDays.length > 0) {
                 skippingLastBlockMap.set(student.id, { student, days: skippingDays });
+                return; // This student is categorized, move to the next student
+            }
+            
+            // Condition 2: Leaving at or before 1:30 PM on any day
+            // This runs ONLY if the student is not already categorized as skipping.
+            const earlyDays: { day: string; time: string }[] = [];
+            DAYS.forEach(day => {
+                const lastTime = lastClassByDay[day];
+                // Student has a class that day, and it ends at or before the cutoff time
+                if (lastTime && timeToMinutes(lastTime) <= earlyLeaveTimeMinutes) {
+                    earlyDays.push({ day, time: lastTime });
+                }
+            });
+
+            if (earlyDays.length > 0) {
+                leavingVeryEarlyMap.set(student.id, { student, days: earlyDays });
             }
         });
 
