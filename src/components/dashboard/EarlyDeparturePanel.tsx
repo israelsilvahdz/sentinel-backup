@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import { useDashboardFilters } from './DashboardClient';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { User, Clock, DoorOpen } from 'lucide-react';
+import { User, Clock } from 'lucide-react';
 import { curriculum } from '@/lib/curriculum';
 import type { Student } from '@/types/student';
 import { Badge } from '../ui/badge';
@@ -32,9 +32,9 @@ interface EarlyLeaver {
 export function EarlyDeparturePanel() {
     const { allStudents } = useDashboardFilters();
 
-    const { studentsSkippingLastBlock, studentsLeavingVeryEarly } = useMemo(() => {
+    const { studentsSkippingLastBlock, studentsLeavingEveryDay, studentsLeavingSomeDays } = useMemo(() => {
         if (!allStudents || allStudents.length === 0) {
-            return { studentsSkippingLastBlock: [], studentsLeavingVeryEarly: [] };
+            return { studentsSkippingLastBlock: [], studentsLeavingEveryDay: [], studentsLeavingSomeDays: [] };
         }
 
         const lastBlockStartTime = '13:30';
@@ -119,26 +119,34 @@ export function EarlyDeparturePanel() {
         });
 
         const formatEarlyLeaverDetail = (days: { day: string; time: string }[]) => {
-            if (days.length === 5) return "Sale temprano todos los días.";
             const details = days.map(d => `${d.day} (${d.time})`).join(', ');
             return `Sale temprano: ${details}`;
-        }
+        };
 
         const formatSkippingDetail = (days: string[]) => {
             if (days.length === 5) return "No cursa el último bloque ningún día.";
             return `No cursa el último bloque: ${days.join(', ')}`;
-        }
+        };
         
-        const studentsLeavingVeryEarly = Array.from(leavingVeryEarlyMap.values())
-            .map(({ student, days }) => ({ student, detail: formatEarlyLeaverDetail(days) }))
-            .sort((a, b) => a.student.name.localeCompare(b.student.name));
-            
         const studentsSkippingLastBlock = Array.from(skippingLastBlockMap.values())
             .map(({ student, days }) => ({ student, detail: formatSkippingDetail(days) }))
             .sort((a, b) => a.student.name.localeCompare(b.student.name));
+            
+        const studentsLeavingEveryDay: EarlyLeaver[] = [];
+        const studentsLeavingSomeDays: EarlyLeaver[] = [];
 
+        Array.from(leavingVeryEarlyMap.values()).forEach(({ student, days }) => {
+            if (days.length === 5) {
+                studentsLeavingEveryDay.push({ student, detail: "Sale temprano todos los días." });
+            } else {
+                studentsLeavingSomeDays.push({ student, detail: formatEarlyLeaverDetail(days) });
+            }
+        });
 
-        return { studentsSkippingLastBlock, studentsLeavingVeryEarly };
+        studentsLeavingEveryDay.sort((a, b) => a.student.name.localeCompare(b.student.name));
+        studentsLeavingSomeDays.sort((a, b) => a.student.name.localeCompare(b.student.name));
+
+        return { studentsSkippingLastBlock, studentsLeavingEveryDay, studentsLeavingSomeDays };
     }, [allStudents]);
 
     return (
@@ -146,11 +154,11 @@ export function EarlyDeparturePanel() {
             <header className="mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">Análisis de Salida Temprano</h1>
                 <p className="text-muted-foreground">
-                    Identifica alumnos que no cursan el último bloque de su grupo o que se retiran antes de las 13:30 en días específicos.
+                    Identifica alumnos que no cursan el último bloque de su grupo o que se retiran antes de las 13:30.
                 </p>
             </header>
 
-            <Accordion type="multiple" defaultValue={['skipping-last', 'leaving-early']} className="w-full space-y-6">
+            <Accordion type="multiple" defaultValue={['skipping-last', 'leaving-early-everyday', 'leaving-early-somedays']} className="w-full space-y-6">
                 <Card>
                     <AccordionItem value="skipping-last">
                         <CardHeader>
@@ -188,23 +196,23 @@ export function EarlyDeparturePanel() {
                 </Card>
 
                  <Card>
-                    <AccordionItem value="leaving-early">
+                    <AccordionItem value="leaving-early-everyday">
                          <CardHeader>
                             <AccordionTrigger>
                                 <div className="flex items-center gap-4">
-                                     <CardTitle className="text-xl">Alumnos que salen antes de las 13:30</CardTitle>
-                                     <Badge>{studentsLeavingVeryEarly.length} Alumnos</Badge>
+                                     <CardTitle className="text-xl">Alumnos que salen temprano todos los días</CardTitle>
+                                     <Badge>{studentsLeavingEveryDay.length} Alumnos</Badge>
                                 </div>
                             </AccordionTrigger>
                             <CardDescription>
-                                Alumnos cuya última clase presencial del día termina a las 13:30 o antes en uno o más días de la semana.
+                                Alumnos cuya última clase presencial del día termina a las 13:30 o antes, todos los días de la semana.
                             </CardDescription>
                         </CardHeader>
                         <AccordionContent>
                            <CardContent>
-                                {studentsLeavingVeryEarly.length > 0 ? (
+                                {studentsLeavingEveryDay.length > 0 ? (
                                 <ul className="space-y-2">
-                                    {studentsLeavingVeryEarly.map(({ student, detail }) => (
+                                    {studentsLeavingEveryDay.map(({ student, detail }) => (
                                         <li key={student.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-muted/50">
                                             <Clock className="h-5 w-5 text-muted-foreground" />
                                             <div className="flex-1">
@@ -212,6 +220,42 @@ export function EarlyDeparturePanel() {
                                                 <p className="text-sm text-muted-foreground">{student.id}</p>
                                             </div>
                                             <p className="text-sm font-mono text-green-600">{detail}</p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-center text-muted-foreground py-4">No se encontraron alumnos en esta categoría.</p>
+                            )}
+                           </CardContent>
+                        </AccordionContent>
+                    </AccordionItem>
+                 </Card>
+
+                 <Card>
+                    <AccordionItem value="leaving-early-somedays">
+                         <CardHeader>
+                            <AccordionTrigger>
+                                <div className="flex items-center gap-4">
+                                     <CardTitle className="text-xl">Alumnos que salen temprano algunos días</CardTitle>
+                                     <Badge>{studentsLeavingSomeDays.length} Alumnos</Badge>
+                                </div>
+                            </AccordionTrigger>
+                            <CardDescription>
+                                Alumnos cuya última clase presencial termina a las 13:30 o antes, en uno o más días (pero no todos).
+                            </CardDescription>
+                        </CardHeader>
+                        <AccordionContent>
+                           <CardContent>
+                                {studentsLeavingSomeDays.length > 0 ? (
+                                <ul className="space-y-2">
+                                    {studentsLeavingSomeDays.map(({ student, detail }) => (
+                                        <li key={student.id} className="flex items-center gap-4 p-2 rounded-md hover:bg-muted/50">
+                                            <Clock className="h-5 w-5 text-muted-foreground" />
+                                            <div className="flex-1">
+                                                <p className="font-semibold">{student.name}</p>
+                                                <p className="text-sm text-muted-foreground">{student.id}</p>
+                                            </div>
+                                            <p className="text-sm font-mono text-orange-500">{detail}</p>
                                         </li>
                                     ))}
                                 </ul>
