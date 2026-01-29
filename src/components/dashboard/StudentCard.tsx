@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2 } from 'lucide-react';
 import { type Student, type SubjectSummary, type Team, type Change, type SeguimientoEntry, type BitacoraEntry, type Subject } from "@/types/student";
-import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
+import { getStudentOverallRisk, type RiskLevel, getRisk } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
@@ -128,8 +128,33 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
             toast({ variant: 'destructive', title: "Teléfono no encontrado", description: "No hay teléfono de padres para este alumno." });
             return;
         }
+
+        let summaryMessage = '';
+        const highRiskSubjects: string[] = [];
+
+        if (subjects) {
+             subjects.forEach(subject => {
+                const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
+                const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
+
+                if (['high', 'at_limit', 'sd'].includes(absenceRisk.level) || ['high', 'at_limit', 'sd'].includes(assignmentRisk.level)) {
+                    let details = [];
+                    if (['high', 'at_limit', 'sd'].includes(absenceRisk.level)) {
+                        details.push(`Faltas: ${subject.absences}/${subject.absenceLimit}`);
+                    }
+                    if (['high', 'at_limit', 'sd'].includes(assignmentRisk.level)) {
+                        details.push(`Tareas NE: ${subject.missedAssignments}/${subject.missedAssignmentLimit}`);
+                    }
+                    highRiskSubjects.push(`• *${subject.name}* (${details.join(', ')})`);
+                }
+            });
+        }
         
-        const message = `Estimados padres de ${student.name}, les comparto su reporte de calificaciones y asistencias. Por favor, peguen la imagen que acaban de copiar para verla.`;
+        if (highRiskSubjects.length > 0) {
+            summaryMessage = `\n\nResumen de puntos de atención:\n${highRiskSubjects.join('\n')}`;
+        }
+
+        const message = `Estimados padres de ${student.name}, les comparto su reporte detallado de calificaciones y asistencias. ${summaryMessage}\n\nPara ver el reporte completo, por favor, peguen la imagen que acabas de copiar en este chat.`;
         
         const cleanParentPhone = parentPhone.replace(/\D/g, '');
         const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
@@ -237,7 +262,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             if (recipient === 'student') {
                  message += `Hola ${firstName}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
             } else {
-                 message += `Estimados padres de ${firstName}, les notificamos que ha acumulado nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
+                 message += `Estimados padres de ${firstName}, les notificamos que ha habido un aumento en el riesgo académico de su hijo/a en las siguientes materias:\n\n`;
             }
 
             for (const subjectName in increaseChangesBySubject) {
@@ -247,14 +272,18 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
                 const { absences, missed } = increaseChangesBySubject[subjectName];
                 let changeDetails: string[] = [];
                 if (absences) {
-                    changeDetails.push(`ahora tiene ${subjectInfo.absences} de ${subjectInfo.absenceLimit} faltas`);
+                    changeDetails.push(`Faltas: ${subjectInfo.absences}/${subjectInfo.absenceLimit}`);
                 }
                 if (missed) {
-                    changeDetails.push(`ahora tiene ${subjectInfo.missedAssignments} de ${subjectInfo.missedAssignmentLimit} tareas NE`);
+                    changeDetails.push(`Tareas NE: ${subjectInfo.missedAssignments}/${subjectInfo.missedAssignmentLimit}`);
                 }
                 message += `• *${subjectName}*: ${changeDetails.join(' y ')}.\n`;
             }
-            message += `\nRecuerden que es importante cuidar la asistencia y la entrega de actividades. ¡Estamos para apoyarles!`;
+            if (recipient === 'student') {
+                message += `\nRecuerda que es importante cuidar tu asistencia y la entrega de actividades. ¡Estoy para apoyarte!`;
+            } else {
+                message += `\nLes recomendamos conversar con él/ella sobre estos puntos para evitar que el riesgo aumente. Quedamos a su disposición para cualquier duda o para agendar una reunión si lo consideran necesario.`;
+            }
         }
 
         if (hasDecreases) {
@@ -489,3 +518,5 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
     </Card>
   );
 }
+
+    
