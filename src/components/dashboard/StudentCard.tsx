@@ -130,7 +130,11 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
         }
         
         const message = `Estimados padres de ${student.name}, les comparto su reporte de calificaciones y asistencias. Por favor, peguen la imagen que acaban de copiar para verla.`;
-        const whatsappUrl = `https://wa.me/52${parentPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+        
+        const cleanParentPhone = parentPhone.replace(/\D/g, '');
+        const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
+        const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(message)}`;
+
         window.open(whatsappUrl, '_blank');
         onOpenChange(false);
     };
@@ -301,7 +305,10 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             return;
         }
 
-        const whatsappUrl = `https://wa.me/52${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+        const cleanNumber = phoneNumber.replace(/\D/g, '');
+        const finalPhoneNumber = `52${cleanNumber.slice(-10)}`;
+        const whatsappUrl = `https://wa.me/${finalPhoneNumber}?text=${encodeURIComponent(message)}`;
+        
         window.open(whatsappUrl, '_blank');
         
         const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
