@@ -172,7 +172,8 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
 
     const { lastChangeDate, hasChanges } = useMemo(() => {
         if (!changes || changes.length === 0) return { lastChangeDate: null, hasChanges: false };
-        const lastChangeDate = new Date(changes[0].date);
+        const sortedChanges = [...changes].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const lastChangeDate = new Date(sortedChanges[0].date);
         return { lastChangeDate, hasChanges: true };
     }, [changes]);
 
@@ -199,21 +200,27 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
     }, [lastParentNotification, lastChangeDate]);
 
     const generateMessage = (recipient: 'student' | 'parent'): string => {
-        const changesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
+        const increaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
+        const decreaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
 
         changes.forEach(change => {
             if (change.fieldName === 'absences' || change.fieldName === 'missedAssignments') {
                 const subject = student.subjectSummaries?.find(s => s.id === change.subjectId);
                 if (subject) {
-                    if (!changesBySubject[subject.name]) {
-                        changesBySubject[subject.name] = { absences: false, missed: false };
+                    const target = change.changeType === 'decrease' ? decreaseChangesBySubject : increaseChangesBySubject;
+                    if (!target[subject.name]) {
+                        target[subject.name] = { absences: false, missed: false };
                     }
-                    if (change.fieldName === 'absences') changesBySubject[subject.name].absences = true;
-                    if (change.fieldName === 'missedAssignments') changesBySubject[subject.name].missed = true;
+                    if (change.fieldName === 'absences') target[subject.name].absences = true;
+                    if (change.fieldName === 'missedAssignments') target[subject.name].missed = true;
                 }
             }
         });
         
+        const hasIncreases = Object.keys(increaseChangesBySubject).length > 0;
+        const hasDecreases = Object.keys(decreaseChangesBySubject).length > 0;
+        
+        let message = '';
         let firstName = student.name.split(' ')[0];
         if (student.name.includes(',')) {
             const nameParts = student.name.split(',');
@@ -222,29 +229,49 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             }
         }
         
-        let message = '';
-        if (recipient === 'student') {
-             message = `Hola ${firstName}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
-        } else {
-             message = `Estimados padres de ${firstName}, les notificamos que ha acumulado nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
+        if (hasIncreases) {
+            if (recipient === 'student') {
+                 message += `Hola ${firstName}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
+            } else {
+                 message += `Estimados padres de ${firstName}, les notificamos que ha acumulado nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
+            }
+
+            for (const subjectName in increaseChangesBySubject) {
+                const subjectInfo = student.subjectSummaries?.find(s => s.name === subjectName);
+                if (!subjectInfo) continue;
+                
+                const { absences, missed } = increaseChangesBySubject[subjectName];
+                let changeDetails: string[] = [];
+                if (absences) {
+                    changeDetails.push(`ahora tiene ${subjectInfo.absences} de ${subjectInfo.absenceLimit} faltas`);
+                }
+                if (missed) {
+                    changeDetails.push(`ahora tiene ${subjectInfo.missedAssignments} de ${subjectInfo.missedAssignmentLimit} tareas NE`);
+                }
+                message += `• *${subjectName}*: ${changeDetails.join(' y ')}.\n`;
+            }
+            message += `\nRecuerden que es importante cuidar la asistencia y la entrega de actividades. ¡Estamos para apoyarles!`;
         }
 
-        for (const subjectName in changesBySubject) {
-            const subjectInfo = student.subjectSummaries?.find(s => s.name === subjectName);
-            if (!subjectInfo) continue;
-            
-            const { absences, missed } = changesBySubject[subjectName];
-            let changeDetails: string[] = [];
-            if (absences) {
-                changeDetails.push(`ahora tiene ${subjectInfo.absences} de ${subjectInfo.absenceLimit} faltas`);
+        if (hasDecreases) {
+            if (hasIncreases) {
+                message += '\n\n---\n\n';
             }
-            if (missed) {
-                changeDetails.push(`ahora tiene ${subjectInfo.missedAssignments} de ${subjectInfo.missedAssignmentLimit} tareas NE`);
+            if (recipient === 'student') {
+                message += `¡Felicidades, ${firstName}! Veo que has mejorado tu situación en las siguientes materias:\n\n`;
+                for (const subjectName in decreaseChangesBySubject) {
+                    message += `• *${subjectName}*: ¡Me alegro de que hayas entregado actividades pendientes y/o mejorado tu asistencia!\n`;
+                }
+                message += `\n¡Sigue así, vas por excelente camino!`;
+            } else { // Parent message
+                message += `Adicionalmente, nos complace informarles de una mejora en la situación de ${firstName}:\n\n`;
+                 for (const subjectName in decreaseChangesBySubject) {
+                    message += `• *${subjectName}*: Ha habido una mejora en la entrega de actividades y/o en la asistencia.\n`;
+                }
+                message += `\nReconocemos su esfuerzo y el de ${firstName}.`;
             }
-            message += `• *${subjectName}*: ${changeDetails.join(' y ')}.\n`;
         }
 
-        message += `\nRecuerden que es importante cuidar la asistencia y la entrega de actividades. ¡Estamos para apoyarles!`;
         return message;
     }
     
@@ -269,6 +296,11 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
         }
 
         const message = generateMessage(recipient);
+        if (!message) {
+            toast({ title: "Sin nada que notificar", description: "No se generó ningún mensaje para este alumno."});
+            return;
+        }
+
         const whatsappUrl = `https://wa.me/52${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
         

@@ -49,37 +49,35 @@ export function ChangeStats() {
     const processAndCompareData = async (currentStudents: Student[], previousStudentData: StudentData) => {
         const deltaHistory: Record<string, Change[]> = {};
         const allChangesToSave: Change[] = [];
-        let changesCount = 0;
         
         const currentStudentsMap = currentStudents.reduce((acc, student) => {
             acc[student.id] = student;
             return acc;
         }, {} as StudentData);
 
-        const createChange = (studentId: string, subjectId: string, fieldName: Change['fieldName'], oldValue: any, newValue: any) => {
+        const createChange = (studentId: string, subjectId: string, fieldName: Change['fieldName'], oldValue: any, newValue: any, changeType: Change['changeType']) => {
             const change: Change = {
                 date: new Date().toISOString(), studentId, subjectId,
-                fieldName, oldValue, newValue
+                fieldName, oldValue, newValue, changeType
             };
             if (!deltaHistory[studentId]) {
                 deltaHistory[studentId] = [];
             }
             deltaHistory[studentId].push(change);
             allChangesToSave.push(change);
-            changesCount++;
         };
 
         for (const studentId in currentStudentsMap) {
             const currentStudent = currentStudentsMap[studentId];
             const previousStudent = previousStudentData[studentId];
 
-            if (!previousStudent) { // El alumno es nuevo en el reporte actual
+            if (!previousStudent) {
                 currentStudent.subjects?.forEach(currentSubject => {
                     if (currentSubject.absences > 0) {
-                        createChange(studentId, currentSubject.id, 'absences', 0, currentSubject.absences);
+                        createChange(studentId, currentSubject.id, 'absences', 0, currentSubject.absences, 'increase');
                     }
                     if (currentSubject.missedAssignments > 0) {
-                        createChange(studentId, currentSubject.id, 'missedAssignments', 0, currentSubject.missedAssignments);
+                        createChange(studentId, currentSubject.id, 'missedAssignments', 0, currentSubject.missedAssignments, 'increase');
                     }
                 });
                 continue;
@@ -88,27 +86,34 @@ export function ChangeStats() {
             currentStudent.subjects?.forEach(currentSubject => {
                 const previousSubject = previousStudent.subjects?.find(s => s.id === currentSubject.id);
 
-                if (!previousSubject) { // La materia es nueva para el alumno
+                if (!previousSubject) {
                     if (currentSubject.absences > 0) {
-                        createChange(studentId, currentSubject.id, 'absences', 0, currentSubject.absences);
+                        createChange(studentId, currentSubject.id, 'absences', 0, currentSubject.absences, 'increase');
                     }
                     if (currentSubject.missedAssignments > 0) {
-                        createChange(studentId, currentSubject.id, 'missedAssignments', 0, currentSubject.missedAssignments);
+                        createChange(studentId, currentSubject.id, 'missedAssignments', 0, currentSubject.missedAssignments, 'increase');
                     }
-                } else { // La materia existe en ambos, comparar
+                } else {
                     const absenceChange = currentSubject.absences - previousSubject.absences;
                     const missedAssignmentChange = currentSubject.missedAssignments - previousSubject.missedAssignments;
 
                     if (absenceChange > 0) {
-                        createChange(studentId, currentSubject.id, 'absences', previousSubject.absences, currentSubject.absences);
+                        createChange(studentId, currentSubject.id, 'absences', previousSubject.absences, currentSubject.absences, 'increase');
+                    } else if (absenceChange < 0) {
+                        createChange(studentId, currentSubject.id, 'absences', previousSubject.absences, currentSubject.absences, 'decrease');
                     }
+                    
                     if (missedAssignmentChange > 0) {
-                        createChange(studentId, currentSubject.id, 'missedAssignments', previousSubject.missedAssignments, currentSubject.missedAssignments);
+                        createChange(studentId, currentSubject.id, 'missedAssignments', previousSubject.missedAssignments, currentSubject.missedAssignments, 'increase');
+                    } else if (missedAssignmentChange < 0) {
+                         createChange(studentId, currentSubject.id, 'missedAssignments', previousSubject.missedAssignments, currentSubject.missedAssignments, 'decrease');
                     }
                 }
             });
         }
         
+        const increaseChanges = allChangesToSave.filter(c => c.changeType === 'increase');
+
         if (allChangesToSave.length > 0) {
             try {
                 await addStudentChanges(allChangesToSave);
@@ -137,14 +142,12 @@ export function ChangeStats() {
             return mergedHistory;
         });
 
-        return { processed: Object.keys(currentStudents).length, changes: changesCount, deltaHistory };
+        return { processed: Object.keys(currentStudents).length, changes: increaseChanges.length, deltaHistory };
     };
     
     useEffect(() => {
         const runComparison = async () => {
             if (!previousFile) {
-                // No limpiar los datos si el archivo es null, para mantener la vista
-                // setLatestComparison({});
                 return;
             }
             if (!hasCurrentData) {
@@ -179,7 +182,7 @@ export function ChangeStats() {
                 
                 toast({
                     title: 'Éxito',
-                    description: `Se procesaron ${processed} alumnos y se detectaron ${changes} cambios.`,
+                    description: `Se procesaron ${processed} alumnos y se detectaron ${changes} nuevos riesgos.`,
                 });
 
             } catch (error) {
@@ -199,7 +202,7 @@ export function ChangeStats() {
 
         runComparison();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [previousFile, hasCurrentData, allStudents, toast]); // Dependency on `allStudents` and `hasCurrentData` ensures re-run if main report changes.
+    }, [previousFile, hasCurrentData, allStudents, toast]);
 
 
     const { 
@@ -232,9 +235,13 @@ export function ChangeStats() {
             studentsToConsider = allStudents.filter(student => student.tutor === selectedValue);
         }
         const studentIdsToConsider = new Set(studentsToConsider.map(s => s.id));
-
+        
         const kpiRiskChanges = Object.values(historyToUse).flat()
-            .filter(c => (c.fieldName === 'absences' || c.fieldName === 'missedAssignments') && studentIdsToConsider.has(c.studentId));
+            .filter(c => 
+                (c.fieldName === 'absences' || c.fieldName === 'missedAssignments') && 
+                studentIdsToConsider.has(c.studentId) &&
+                c.changeType === 'increase'
+            );
 
 
         const studentsWithChangesSet = new Set(kpiRiskChanges.map(c => c.studentId));
@@ -253,14 +260,13 @@ export function ChangeStats() {
             newMissedAssignments += (change.newValue as number) - (change.oldValue as number);
         });
         
-        // Charts still show general data, not filtered by leader
-        const allRiskChanges = Object.values(historyToUse).flat().filter(c => c.fieldName === 'absences' || c.fieldName === 'missedAssignments');
+        const allIncreaseChanges = Object.values(historyToUse).flat().filter(c => c.changeType === 'increase' && (c.fieldName === 'absences' || c.fieldName === 'missedAssignments'));
         
         const leaderCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const subjectCounts: Record<string, { absences: number, missedAssignments: number }> = {};
         const onlineCounts: Record<string, number> = { 'El mundo contemporáneo': 0, 'Ciencias de la Vida': 0 };
 
-        for (const change of allRiskChanges) {
+        for (const change of allIncreaseChanges) {
             const increment = (change.newValue as number) - (change.oldValue as number);
             
             const student = allStudents.find(s => s.id === change.studentId);
@@ -380,8 +386,8 @@ export function ChangeStats() {
                     ) : (
                         <>
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                <KpiCard title="Alumnos con Cambios" value={studentsWithChanges} icon={Users} onClick={() => handleCaseClick('changes')} />
-                                <KpiCard title="Total de Cambios de Riesgo" value={totalChanges} icon={AlertTriangle} onClick={() => handleCaseClick('changes')} />
+                                <KpiCard title="Alumnos con Nuevos Riesgos" value={studentsWithChanges} icon={Users} onClick={() => handleCaseClick('changes')} />
+                                <KpiCard title="Total de Riesgos Incrementados" value={totalChanges} icon={AlertTriangle} onClick={() => handleCaseClick('changes')} />
                                 <KpiCard title="Total Faltas (nuevas)" value={totalNewAbsences} icon={FileWarning} color="yellow" onClick={() => handleCaseClick('newAbsences')} />
                                 <KpiCard title="Total Tareas NE (nuevas)" value={totalNewMissedAssignments} icon={BadgeAlert} color="red" onClick={() => handleCaseClick('newMissedAssignments')} />
                             </div>
@@ -405,7 +411,7 @@ export function ChangeStats() {
                                 </Card>
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle>Cambios por Líder de Campus</CardTitle>
+                                        <CardTitle>Nuevos Riesgos por Líder de Campus</CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <ResponsiveContainer width="100%" height={300}>
@@ -425,7 +431,7 @@ export function ChangeStats() {
                             <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
                                  <Card>
                                     <CardHeader>
-                                        <CardTitle>Cambios por Materia</CardTitle>
+                                        <CardTitle>Nuevos Riesgos por Materia</CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <ResponsiveContainer width="100%" height={300}>

@@ -55,6 +55,7 @@ export interface Change {
   fieldName: 'absences' | 'missedAssignments';
   oldValue: any;
   newValue: any;
+  changeType: 'increase' | 'decrease';
 }
 
 export interface UploadHistory {
