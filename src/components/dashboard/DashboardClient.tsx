@@ -471,6 +471,23 @@ export function DashboardClient() {
                                 studentToUpdate.subjectSummaries?.push(newSummary);
                             }
                         });
+                    } else {
+                        // Alumno no existe, añadirlo completamente
+                         const newStudentWithSummary = {
+                            ...newStudentInfo,
+                            subjectSummaries: (newStudentInfo.subjects || []).map(s => ({
+                                id: s.id,
+                                name: s.name,
+                                group: s.group,
+                                absences: s.absences,
+                                absenceLimit: s.absenceLimit,
+                                missedAssignments: s.missedAssignments,
+                                missedAssignmentLimit: s.missedAssignmentLimit,
+                                grade: s.grade,
+                                finalGrade: s.finalGrade,
+                            })),
+                        };
+                        studentMap.set(studentId, newStudentWithSummary);
                     }
                 }
                 return Array.from(studentMap.values());
