@@ -106,6 +106,7 @@ interface DashboardContextType {
   ofertaAcademica: OfertaAcademicaItem[];
   setOfertaAcademica: React.Dispatch<React.SetStateAction<OfertaAcademicaItem[]>>;
   toast: (options: any) => void;
+  mergeStudentData: (file: File) => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -430,6 +431,65 @@ export function DashboardClient() {
     processFile();
   }, [currentFile, toast]);
 
+    const handleMergeUpload = useCallback(async (file: File) => {
+        try {
+            const newStudentData = await parseExcel(file);
+            if (!newStudentData) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Error de Formato',
+                    description: 'El archivo para fusionar no tiene el formato esperado o está vacío.',
+                });
+                return;
+            }
+
+            setAllStudents(prevStudents => {
+                const studentMap: Map<string, Student> = new Map(prevStudents.map(s => [s.id, JSON.parse(JSON.stringify(s))]));
+
+                for (const studentId in newStudentData) {
+                    const newStudentInfo = newStudentData[studentId];
+                    if (studentMap.has(studentId)) {
+                        const studentToUpdate = studentMap.get(studentId)!;
+                        
+                        const existingSubjectIds = new Set(studentToUpdate.subjects?.map((s: Subject) => s.id));
+                        
+                        newStudentInfo.subjects?.forEach(newSubject => {
+                            if (!existingSubjectIds.has(newSubject.id)) {
+                                studentToUpdate.subjects?.push(newSubject);
+                                
+                                const newSummary: SubjectSummary = {
+                                    id: newSubject.id,
+                                    name: newSubject.name,
+                                    group: newSubject.group,
+                                    absences: newSubject.absences,
+                                    absenceLimit: newSubject.absenceLimit,
+                                    missedAssignments: newSubject.missedAssignments,
+                                    missedAssignmentLimit: newSubject.missedAssignmentLimit,
+                                    grade: newSubject.grade,
+                                    finalGrade: newSubject.finalGrade,
+                                };
+                                studentToUpdate.subjectSummaries?.push(newSummary);
+                            }
+                        });
+                    }
+                }
+                return Array.from(studentMap.values());
+            });
+
+            toast({
+                title: 'Datos Fusionados',
+                description: 'Se han añadido los datos del nuevo reporte para una vista de horarios completa.'
+            });
+
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Error al fusionar',
+                description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
+            });
+            console.error(error);
+        }
+    }, [toast]);
 
   const handleDeleteAllData = () => {
     if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) {
@@ -628,6 +688,7 @@ export function DashboardClient() {
     planType,
     ofertaAcademica, setOfertaAcademica,
     toast,
+    mergeStudentData: handleMergeUpload,
   };
 
   const renderActiveView = () => {

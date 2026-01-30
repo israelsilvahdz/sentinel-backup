@@ -2,13 +2,14 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
-import { type Subject } from '@/types/student';
+import React, { useMemo, useState, useCallback } from 'react';
+import { type Subject, type ProfessorContact } from '@/types/student';
 import { useDashboardFilters } from './DashboardClient';
 import { Badge } from '@/components/ui/badge';
-import { Clock, User, Info, Printer } from 'lucide-react';
+import { Clock, User, Info, Printer, UploadCloud } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
+import { FileUpload } from './FileUpload';
 
 const DAYS = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
 const DAY_MAP: Record<string, string> = {
@@ -40,7 +41,9 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string })
 }
 
 export function StudentProfessorsSchedule({ studentSubjects, studentName }: { studentSubjects: Subject[], studentName: string }) {
-  const { allStudents } = useDashboardFilters();
+  const { allStudents, planType, mergeStudentData } = useDashboardFilters();
+  const [isMerging, setIsMerging] = useState(false);
+  const [mergeFile, setMergeFile] = useState<File | null>(null);
 
   const scheduleByDayAndSlot = useMemo(() => {
     // 1. Get unique professor names from the current student's subjects.
@@ -134,21 +137,47 @@ export function StudentProfessorsSchedule({ studentSubjects, studentName }: { st
         printWindow.focus();
     }
   };
+  
+    const otherModality = planType === 'tetramestral' ? 'Semestre' : 'Tetramestre';
+
+    const handleMergeUpload = useCallback(async (file: File | null) => {
+        setMergeFile(file);
+        if (!file || !mergeStudentData) {
+            setIsMerging(false);
+            setMergeFile(null); // Reset
+            return;
+        }
+        setIsMerging(true);
+        await mergeStudentData(file);
+        setIsMerging(false);
+        setMergeFile(null); // Reset
+    }, [mergeStudentData]);
+
 
   return (
     <div className="p-4 bg-muted/5 rounded-lg space-y-6">
-        <div className="flex justify-between items-start gap-4">
+        <div className="flex justify-between items-start gap-4 flex-wrap">
             <Alert className="flex-grow">
               <Info className="h-4 w-4" />
               <AlertTitle>Información Completa</AlertTitle>
               <AlertDescription>
-                Este horario muestra todas las clases de los profesores de este alumno. Para una vista completa que incluya horarios de tetramestre y semestre, asegúrate de que el archivo de Excel cargado contenga los datos de ambos periodos.
+                Este horario muestra todas las clases de los profesores del alumno. Para una vista completa que incluya horarios de tetramestre y semestre, puedes cargar el reporte de la otra modalidad.
               </AlertDescription>
             </Alert>
-            <Button onClick={handlePrint} variant="outline" className="no-print">
-                <Printer className="mr-2 h-4 w-4" />
-                Imprimir
-            </Button>
+            <div className="flex items-center gap-2">
+                 <FileUpload 
+                    onFileSelect={handleMergeUpload}
+                    selectedFile={mergeFile}
+                    isLoading={isMerging}
+                    label={`Cargar ${otherModality}`}
+                    icon={<UploadCloud />}
+                    variant="secondary"
+                />
+                <Button onClick={handlePrint} variant="outline" className="no-print">
+                    <Printer className="mr-2 h-4 w-4" />
+                    Imprimir
+                </Button>
+            </div>
         </div>
 
         <div className="grid grid-cols-6 gap-px bg-border rounded-lg border overflow-hidden">
