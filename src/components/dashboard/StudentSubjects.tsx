@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentSchedule } from './StudentSchedule';
+import { StudentProfessorsSchedule } from './StudentProfessorsSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { ActivityBreakdown } from './ActivityBreakdown';
 import { GradesTable } from './GradesTable';
@@ -123,6 +124,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                 <TabsTrigger value="materias">Materias</TabsTrigger>
                 <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
                 <TabsTrigger value="horario">Horario</TabsTrigger>
+                <TabsTrigger value="horario-profes">Horario Profesores</TabsTrigger>
                 <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
             </TabsList>
             <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
@@ -227,6 +229,9 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
         </TabsContent>
         <TabsContent value="horario">
           <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} professorContacts={professorContacts} />
+        </TabsContent>
+        <TabsContent value="horario-profes">
+          <StudentProfessorsSchedule studentSubjects={subjects} />
         </TabsContent>
          <TabsContent value="contacto">
           <StudentContactInfo studentId={student.id} />

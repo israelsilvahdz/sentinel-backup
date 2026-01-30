@@ -7,7 +7,7 @@ import { type Subject, type ProfessorContact } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Copy, Mail, Clock, Users, Link as LinkIcon, Check, Info } from 'lucide-react';
+import { Copy, Mail, Clock, Users, Link as LinkIcon, Check, Info, User as UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Label } from '../ui/label';
@@ -22,6 +22,7 @@ import { Badge } from '../ui/badge';
 import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { Switch } from '../ui/switch';
+import { useDashboardFilters } from './DashboardClient';
 
 
 interface StudentScheduleProps {
@@ -82,6 +83,7 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string },
 
 export function StudentSchedule({ subjects, studentName, planType, professorContacts }: StudentScheduleProps) {
   const { toast } = useToast();
+  const { setActiveView, setFilterType, setSelectedValue } = useDashboardFilters();
   const [notificationReason, setNotificationReason] = useState("Ausencia");
   const [customNotes, setCustomNotes] = useState("");
   const [isFutureNotice, setIsFutureNotice] = useState(false);
@@ -99,6 +101,12 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
       const normalizedNameId = name.toLowerCase().replace(/\s+/g, '');
       return professorContacts[normalizedNameId]?.email || null;
   }, [professorContacts]);
+  
+  const handleProfessorClick = (professorName: string) => {
+    setFilterType('professor');
+    setSelectedValue(professorName);
+    setActiveView('professor-schedule');
+  };
 
   useEffect(() => {
     if (dateRange?.from) {
@@ -474,7 +482,12 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                                         <div className="p-2 bg-card rounded-md h-full flex flex-col justify-center">
                                             <div>
                                                 <p className="font-semibold text-xs leading-tight">{subject.name}</p>
-                                                <p className="text-xs text-muted-foreground">{subject.professorName}</p>
+                                                {subject.professorName ? (
+                                                    <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-primary justify-start" onClick={() => handleProfessorClick(subject.professorName!)}>
+                                                        <UserIcon className="h-3 w-3 mr-1" />
+                                                        {subject.professorName}
+                                                    </Button>
+                                                ) : <p className="text-xs text-muted-foreground">N/A</p>}
                                                 <p className="text-xs text-muted-foreground">Grupo: {subject.group}</p>
                                             </div>
                                         </div>
