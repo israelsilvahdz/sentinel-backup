@@ -231,7 +231,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
           <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} professorContacts={professorContacts} />
         </TabsContent>
         <TabsContent value="horario-profes">
-          <StudentProfessorsSchedule studentSubjects={subjects} />
+          <StudentProfessorsSchedule studentSubjects={subjects} studentName={student.name} />
         </TabsContent>
          <TabsContent value="contacto">
           <StudentContactInfo studentId={student.id} />
