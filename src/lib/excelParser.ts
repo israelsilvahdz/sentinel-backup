@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team } from '@/types/student';
 import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams } from './firebase-services';
 import type { StudentData, Subject } from '@/types/student';
+import { generateKeyFromData } from './utils';
 
 // --- NUEVA INTERFAZ PARA OFERTA ACADÉMICA ---
 
@@ -142,6 +143,51 @@ function normalizeSubjectName(name: string): string {
     }
 
     return name;
+}
+
+export async function getHeaderKey(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          return reject("No se pudo leer el contenido del archivo.");
+        }
+
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, {
+            header: 1, 
+            defval: '',
+            range: 0 // Only read the first row
+        });
+
+        if (jsonData.length < 1) {
+            return reject("El archivo está vacío o no tiene una fila de encabezado.");
+        }
+        
+        const headers: string[] = jsonData[0].map((h: any) => String(h).trim());
+        const headerString = headers.join('|'); // Use a separator to be safe
+        const key = generateKeyFromData(headerString);
+        resolve(key);
+
+      } catch (error) {
+        console.error("Error al generar la clave desde el encabezado:", error);
+        reject(error);
+      }
+    };
+
+    reader.onerror = (error) => {
+      console.error("Error al leer el archivo para la clave:", error);
+      reject(error);
+    };
+
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 

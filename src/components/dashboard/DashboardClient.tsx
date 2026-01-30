@@ -44,7 +44,7 @@ import { Badge } from '@/components/ui/badge';
 
 
 import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem, Team } from '@/types/student';
-import { parseExcel } from '@/lib/excelParser';
+import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
 import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges } from '@/lib/firebase-services';
@@ -349,8 +349,7 @@ export function DashboardClient() {
         setIsProcessing(true);
         setProgress(10);
         try {
-            const fileContent = await currentFile.text();
-            const newKey = generateKeyFromData(fileContent);
+            const newKey = await getHeaderKey(currentFile);
             setDataKey(newKey);
             setProgress(20);
 
