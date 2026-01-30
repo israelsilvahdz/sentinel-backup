@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Minus, Plus, Phone, Camera, Download } from 'lucide-react';
+import { Minus, Plus, Phone, Camera, Download, User as UserIcon } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
 import { calculateFinalGrade } from '@/lib/ponderaciones';
 import { isWithoutRight } from '@/lib/dataProcessor';
@@ -75,7 +75,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
 
 
 export function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
-    const { loadStudentSubjects, planType, professorContacts } = useDashboardFilters();
+    const { loadStudentSubjects, planType, professorContacts, setActiveView, setFilterType, setSelectedValue } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [openSubject, setOpenSubject] = useState<string | null>(null);
@@ -97,6 +97,12 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
         }
         loadSubjects();
     }, [isOpen, student.id, subjects.length, loadStudentSubjects]);
+    
+    const handleProfessorClick = (professorName: string) => {
+        setFilterType('professor');
+        setSelectedValue(professorName);
+        setActiveView('professor-schedule');
+    };
 
     if (isLoading) {
         return <div className="p-4"><Skeleton className="h-24 w-full" /></div>;
@@ -161,12 +167,25 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                               {subject.name}
                               <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                  <span>{subject.professorName}</span>
-                                  {subject.professorName && <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />}
-                              </div>
-                          </TableCell>
+                         <TableCell className="text-muted-foreground">
+                            {subject.professorName ? (
+                                <div className="flex items-center gap-1">
+                                <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-muted-foreground hover:text-primary justify-start"
+                                    onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleProfessorClick(subject.professorName!);
+                                    }}
+                                >
+                                    {subject.professorName}
+                                </Button>
+                                <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />
+                                </div>
+                            ) : (
+                                <span>N/A</span>
+                            )}
+                         </TableCell>
                           <TableCell className="text-center">
                               <div className='inline-block'>
                                   <RiskCell value={subject.absences} limit={subject.absenceLimit} />

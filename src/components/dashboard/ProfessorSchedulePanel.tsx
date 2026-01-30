@@ -74,7 +74,7 @@ function ProfessorSearchPopover({ professorList, onProfessorSelect, selectedProf
 }
 
 export function ProfessorSchedulePanel() {
-  const { allStudents, filteredStudents, isLoading, selectedValue, professorContacts, setProfessorContacts } = useDashboardFilters();
+  const { allStudents, isLoading, selectedValue, professorContacts, setProfessorContacts, filterType } = useDashboardFilters();
   const [selectedProfessorName, setSelectedProfessorName] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [isEditing, setIsEditing] = useState(false);
@@ -83,6 +83,12 @@ export function ProfessorSchedulePanel() {
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (filterType === 'professor' && selectedValue) {
+        setSelectedProfessorName(selectedValue);
+    }
+  }, [selectedValue, filterType]);
 
   const handleDirectoryUpload = useCallback(async (file: File | null) => {
     if (!file) {
@@ -116,9 +122,8 @@ export function ProfessorSchedulePanel() {
 
 
   const professorList = useMemo(() => {
-    const studentSource = selectedValue ? filteredStudents : allStudents;
     const professors = new Set<string>();
-    studentSource.forEach(student => {
+    allStudents.forEach(student => {
         student.subjects?.forEach(subject => {
             if (subject.professorName) {
                 professors.add(subject.professorName);
@@ -126,7 +131,7 @@ export function ProfessorSchedulePanel() {
         });
     });
     return Array.from(professors).sort();
-  }, [allStudents, filteredStudents, selectedValue]);
+  }, [allStudents]);
 
 
   const professorSchedule = useMemo(() => {
