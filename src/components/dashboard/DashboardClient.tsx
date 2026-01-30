@@ -31,6 +31,8 @@ import { TeamTasksPanel } from './TeamTasksPanel';
 import { SeguimientoPanel } from './SeguimientoPanel';
 import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { AcademicCommitteePanel } from './AcademicCommitteePanel';
+import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
+import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { ProjectionsPanel } from './ProjectionsPanel';
 import { EarlyDeparturePanel } from './EarlyDeparturePanel';
@@ -38,8 +40,6 @@ import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp, Calendar, TimerOff } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
-import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { Badge } from '@/components/ui/badge';
 
 
@@ -49,6 +49,7 @@ import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
 import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
+import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
@@ -143,6 +144,7 @@ export function DashboardClient() {
   const [ofertaAcademica, setOfertaAcademica] = useState<OfertaAcademicaItem[]>([]);
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [dataKey, setDataKey] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -220,12 +222,11 @@ export function DashboardClient() {
     }
   }, [toast]);
 
-  // Load data from local storage on initial mount
+  // Load non-sensitive data from local storage on initial mount
   useEffect(() => {
     async function loadInitialData() {
         try {
-          const storedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
-          if (storedStudents) setAllStudents(JSON.parse(storedStudents));
+          // Student data is no longer loaded from here. It will be loaded on file upload.
 
           const historyFromDb = await getAllStudentChanges();
           setStudentHistory(historyFromDb);
@@ -236,15 +237,12 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
-          const storedOferta = localStorage.getItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
-          if (storedOferta) setOfertaAcademica(JSON.parse(storedOferta));
-
+          // Contacts and other Firebase data will be fetched.
           const studentContactsFromDb = await getContacts();
           setStudentContacts(studentContactsFromDb);
           
           let profContactsFromDb = await getProfessorContacts();
 
-          // One-time migration from JSON to Firestore for professors
           const profMigrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED);
           if (!profMigrationDone && Object.keys(professorContactsData).length > 0) {
               console.log("Migrating professor contacts from JSON to Firestore...");
@@ -257,37 +255,39 @@ export function DashboardClient() {
               await bulkAddOrUpdateProfessorContacts(formattedContacts);
               localStorage.setItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED, 'true');
               console.log("Professor contacts migration complete.");
-              profContactsFromDb = await getProfessorContacts(); // Re-fetch after migration
+              profContactsFromDb = await getProfessorContacts();
           }
           setProfessorContacts(profContactsFromDb);
 
           await Promise.all([
             fetchSeguimientoEntries(),
             fetchTeamTasks(),
+            fetchTeams(),
           ]);
-
 
         } catch (error) {
             console.error("Error loading data from Local Storage or DB", error);
-            localStorage.clear(); // Clear all local storage on critical error
+            Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
         } finally {
             setIsLoading(false);
         }
     }
     loadInitialData();
-  }, [fetchSeguimientoEntries, fetchTeamTasks]);
+  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams]);
 
-  // Persist data to local storage whenever it changes (contacts are now in DB)
+  // Persist data to local storage whenever it changes, now with encryption
   useEffect(() => {
     try {
-        if(allStudents.length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENTS, JSON.stringify(allStudents));
+        if(allStudents.length > 0 && dataKey) {
+            const encryptedStudents = xorCipher(JSON.stringify(allStudents), dataKey);
+            localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENTS, encryptedStudents);
         }
         if(uploadHistory.length > 0) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
         }
-        if (ofertaAcademica.length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA, JSON.stringify(ofertaAcademica));
+        if (ofertaAcademica.length > 0 && dataKey) {
+            const encryptedOferta = xorCipher(JSON.stringify(ofertaAcademica), dataKey);
+            localStorage.setItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA, encryptedOferta);
         }
         localStorage.setItem(LOCAL_STORAGE_KEYS.PLAN_TYPE, planType);
 
@@ -299,7 +299,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, uploadHistory, planType, ofertaAcademica, toast]);
+  }, [allStudents, uploadHistory, planType, ofertaAcademica, dataKey, toast]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -335,42 +335,6 @@ export function DashboardClient() {
     setContextualStudentIds(null);
   };
   
-  const processSingleFile = (studentData: StudentData, fileName: string) => {
-    const studentsArray = Object.values(studentData).map(student => ({
-        ...student,
-        subjectSummaries: (student.subjects || []).map(s => ({
-          id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-          missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-          grade: s.grade, finalGrade: s.finalGrade, group: s.group
-        })),
-    }));
-    setAllStudents(studentsArray);
-    
-    const numbersInFile = fileName.match(/\d+/g);
-    let planSet = false;
-
-    if (numbersInFile && numbersInFile.length > 0) {
-        const lastNumberSegment = numbersInFile[numbersInFile.length - 1];
-        if (['40', '50', '60'].some(ending => lastNumberSegment.endsWith(ending))) {
-            setPlanType('semestral');
-            planSet = true;
-        } else if (['10', '20', '30'].some(ending => lastNumberSegment.endsWith(ending))) {
-            setPlanType('tetramestral');
-            planSet = true;
-        }
-    }
-
-    if (!planSet) {
-        if (fileName.includes('40') || fileName.includes('50') || fileName.includes('60')) {
-            setPlanType('semestral');
-        } else {
-            setPlanType('tetramestral');
-        }
-    }
-
-    return studentsArray.length;
-  };
-
   const handleFileUpload = useCallback((file: File | null) => {
     if (!file) {
       return;
@@ -385,47 +349,94 @@ export function DashboardClient() {
         setIsProcessing(true);
         setProgress(10);
         try {
-            const studentData = await parseExcel(currentFile);
-            setProgress(50);
-            
-            if (!studentData) {
-                toast({
-                  variant: 'destructive',
-                  title: 'Error de Formato',
-                  description: 'El archivo Excel no tiene el formato esperado o está vacío.',
-                });
-                setIsProcessing(false);
-                setProgress(0);
-                return;
+            const fileContent = await currentFile.text();
+            const newKey = generateKeyFromData(fileContent);
+            setDataKey(newKey);
+            setProgress(20);
+
+            let studentsArray: Student[] = [];
+            let ofertaArray: OfertaAcademicaItem[] = [];
+            let loadedFromStorage = false;
+
+            const encryptedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
+            if (encryptedStudents) {
+                try {
+                    const decryptedData = xorCipher(encryptedStudents, newKey);
+                    const parsedData = JSON.parse(decryptedData);
+                    if (Array.isArray(parsedData) && (parsedData.length === 0 || 'name' in parsedData[0])) {
+                        studentsArray = parsedData;
+                        loadedFromStorage = true;
+                    }
+                } catch (e) {
+                    console.warn("Could not decrypt student data with the provided file key.");
+                }
             }
 
-            const processedCount = processSingleFile(studentData, currentFile.name);
-            setProgress(90);
+            const encryptedOferta = localStorage.getItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
+            if (encryptedOferta) {
+                try {
+                    const decryptedData = xorCipher(encryptedOferta, newKey);
+                    const parsedData = JSON.parse(decryptedData);
+                    if (Array.isArray(parsedData)) ofertaArray = parsedData;
+                } catch(e) {
+                    console.warn("Could not decrypt oferta académica data.");
+                }
+            }
+            
+            if (loadedFromStorage) {
+                setAllStudents(studentsArray);
+                setOfertaAcademica(ofertaArray);
+                toast({
+                    title: 'Datos Desbloqueados',
+                    description: `Se han cargado ${studentsArray.length} alumnos de tus datos guardados.`,
+                });
+            } else {
+                const studentData = await parseExcel(currentFile);
+                setProgress(50);
+                
+                if (!studentData) {
+                    toast({ variant: 'destructive', title: 'Error de Formato', description: 'El archivo Excel no tiene el formato esperado o está vacío.' });
+                    setIsProcessing(false); setProgress(0); setCurrentFile(null); return;
+                }
+                
+                const processedStudents = Object.values(studentData).map(student => ({
+                    ...student,
+                    subjectSummaries: (student.subjects || []).map(s => ({
+                      id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+                      missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+                      grade: s.grade, finalGrade: s.finalGrade, group: s.group
+                    })),
+                }));
+                setAllStudents(processedStudents);
+                
+                // Clear potentially stale oferta academica if starting a new "session"
+                setOfertaAcademica([]); 
+                localStorage.removeItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
 
-            setUploadHistory(prev => [{ 
-                id: Date.now().toString(), 
-                fileName: currentFile.name, 
-                uploadedAt: new Date().toISOString() 
-            }, ...prev].slice(0, 10));
+                const numbersInFile = currentFile.name.match(/\d+/g);
+                if (numbersInFile && numbersInFile.length > 0) {
+                    const lastNumberSegment = numbersInFile[numbersInFile.length - 1];
+                    if (['40', '50', '60'].some(ending => lastNumberSegment.endsWith(ending))) setPlanType('semestral');
+                    else if (['10', '20', '30'].some(ending => lastNumberSegment.endsWith(ending))) setPlanType('tetramestral');
+                } else if (currentFile.name.includes('40') || currentFile.name.includes('50') || currentFile.name.includes('60')) {
+                    setPlanType('semestral');
+                } else {
+                    setPlanType('tetramestral');
+                }
 
-            toast({
-                title: 'Éxito',
-                description: `Se procesaron ${processedCount} alumnos del reporte actual.`,
-            });
+                setProgress(90);
+                toast({
+                    title: 'Éxito',
+                    description: `Se procesaron ${processedStudents.length} alumnos del reporte.`,
+                });
+            }
+            setUploadHistory(prev => [{ id: Date.now().toString(), fileName: currentFile.name, uploadedAt: new Date().toISOString() }, ...prev].slice(0, 10));
 
         } catch (error) {
-           toast({
-            variant: 'destructive',
-            title: 'Error al procesar',
-            description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
-          });
-          console.error(error);
+           toast({ variant: 'destructive', title: 'Error al procesar', description: `Hubo un problema al procesar el archivo. Revisa la consola.`});
+           console.error(error);
         } finally {
-            setTimeout(() => {
-                setIsProcessing(false);
-                setProgress(0);
-                setCurrentFile(null); // Reset file to allow re-upload of same file
-            }, 500);
+            setTimeout(() => { setIsProcessing(false); setProgress(0); setCurrentFile(null); }, 500);
         }
     };
     processFile();
@@ -435,11 +446,7 @@ export function DashboardClient() {
         try {
             const newStudentData = await parseExcel(file);
             if (!newStudentData) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Error de Formato',
-                    description: 'El archivo para fusionar no tiene el formato esperado o está vacío.',
-                });
+                toast({ variant: 'destructive', title: 'Error de Formato', description: 'El archivo para fusionar está vacío o tiene un formato incorrecto.' });
                 return;
             }
 
@@ -450,97 +457,57 @@ export function DashboardClient() {
                     const newStudentInfo = newStudentData[studentId];
                     if (studentMap.has(studentId)) {
                         const studentToUpdate = studentMap.get(studentId)!;
-                        
                         const existingSubjectIds = new Set(studentToUpdate.subjects?.map((s: Subject) => s.id));
-                        
                         newStudentInfo.subjects?.forEach(newSubject => {
                             if (!existingSubjectIds.has(newSubject.id)) {
                                 studentToUpdate.subjects?.push(newSubject);
-                                
-                                const newSummary: SubjectSummary = {
-                                    id: newSubject.id,
-                                    name: newSubject.name,
-                                    group: newSubject.group,
-                                    absences: newSubject.absences,
-                                    absenceLimit: newSubject.absenceLimit,
-                                    missedAssignments: newSubject.missedAssignments,
-                                    missedAssignmentLimit: newSubject.missedAssignmentLimit,
-                                    grade: newSubject.grade,
-                                    finalGrade: newSubject.finalGrade,
-                                };
-                                studentToUpdate.subjectSummaries?.push(newSummary);
+                                studentToUpdate.subjectSummaries?.push({
+                                    id: newSubject.id, name: newSubject.name, group: newSubject.group, absences: newSubject.absences, absenceLimit: newSubject.absenceLimit,
+                                    missedAssignments: newSubject.missedAssignments, missedAssignmentLimit: newSubject.missedAssignmentLimit, grade: newSubject.grade, finalGrade: newSubject.finalGrade,
+                                });
                             }
                         });
                     } else {
-                        // Alumno no existe, añadirlo completamente
-                         const newStudentWithSummary = {
+                        studentMap.set(studentId, {
                             ...newStudentInfo,
                             subjectSummaries: (newStudentInfo.subjects || []).map(s => ({
-                                id: s.id,
-                                name: s.name,
-                                group: s.group,
-                                absences: s.absences,
-                                absenceLimit: s.absenceLimit,
-                                missedAssignments: s.missedAssignments,
-                                missedAssignmentLimit: s.missedAssignmentLimit,
-                                grade: s.grade,
-                                finalGrade: s.finalGrade,
+                                id: s.id, name: s.name, group: s.group, absences: s.absences, absenceLimit: s.absenceLimit,
+                                missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit, grade: s.grade, finalGrade: s.finalGrade,
                             })),
-                        };
-                        studentMap.set(studentId, newStudentWithSummary);
+                        });
                     }
                 }
                 return Array.from(studentMap.values());
             });
-
-            toast({
-                title: 'Datos Fusionados',
-                description: 'Se han añadido los datos del nuevo reporte para una vista de horarios completa.'
-            });
-
+            toast({ title: 'Datos Fusionados', description: 'Se han añadido los datos del nuevo reporte.' });
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Error al fusionar',
-                description: `Hubo un problema al procesar el archivo. Revisa la consola.`,
-            });
+            toast({ variant: 'destructive', title: 'Error al fusionar', description: `Hubo un problema al procesar el archivo. Revisa la consola.` });
             console.error(error);
         }
     }, [toast]);
 
   const handleDeleteAllData = () => {
-    if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) {
-      return;
-    }
+    if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) return;
+    
     setIsProcessing(true);
     setProgress(20);
     try {
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.UPLOADS);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
+      Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
       
       setAllStudents([]);
       setStudentHistory({});
       setUploadHistory([]);
       setCurrentFile(null);
       setPlanType('tetramestral');
-      // No se borran datos de Firebase intencionadamente
-      toast({
-          title: 'Datos Locales Eliminados',
-          description: 'Los datos guardados en el navegador han sido borrados. Los datos en la nube (bitácora, tareas, equipos, contactos, etc.) permanecen.',
-      });
+      setOfertaAcademica([]);
+      setDataKey(null);
+
+      toast({ title: 'Datos Locales Eliminados', description: 'Los datos guardados en el navegador han sido borrados. Los datos en la nube permanecen.' });
     } catch (error) {
        console.error("Error clearing Local Storage", error);
-       toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'No se pudieron borrar los datos del almacenamiento local.',
-       });
+       toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron borrar los datos.' });
     } finally {
-      setTimeout(() => {
-        setIsProcessing(false);
-        setProgress(0);
-      }, 500);
+      setTimeout(() => { setIsProcessing(false); setProgress(0); }, 500);
     }
   };
   
