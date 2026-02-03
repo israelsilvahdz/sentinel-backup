@@ -41,9 +41,7 @@ function isSubjectInSlot(subject: Subject, slot: { start: string, end: string })
 }
 
 export function StudentProfessorsSchedule({ studentSubjects, studentName }: { studentSubjects: Subject[], studentName: string }) {
-  const { allStudents, planType, mergeStudentData } = useDashboardFilters();
-  const [isMerging, setIsMerging] = useState(false);
-  const [mergeFile, setMergeFile] = useState<File | null>(null);
+  const { allStudents, planType } = useDashboardFilters();
 
   const scheduleByDayAndSlot = useMemo(() => {
     // 1. Get unique professor names from the current student's subjects.
@@ -140,20 +138,6 @@ export function StudentProfessorsSchedule({ studentSubjects, studentName }: { st
   
     const otherModality = planType === 'tetramestral' ? 'Semestre' : 'Tetramestre';
 
-    const handleMergeUpload = useCallback(async (file: File | null) => {
-        setMergeFile(file);
-        if (!file || !mergeStudentData) {
-            setIsMerging(false);
-            setMergeFile(null); // Reset
-            return;
-        }
-        setIsMerging(true);
-        await mergeStudentData(file);
-        setIsMerging(false);
-        setMergeFile(null); // Reset
-    }, [mergeStudentData]);
-
-
   return (
     <div className="p-4 bg-muted/5 rounded-lg space-y-6">
         <div className="flex justify-between items-start gap-4 flex-wrap">
@@ -161,18 +145,10 @@ export function StudentProfessorsSchedule({ studentSubjects, studentName }: { st
               <Info className="h-4 w-4" />
               <AlertTitle>Información Completa</AlertTitle>
               <AlertDescription>
-                Este horario muestra todas las clases de los profesores del alumno. Para una vista completa que incluya horarios de tetramestre y semestre, puedes cargar el reporte de la otra modalidad.
+                Este horario muestra todas las clases de los profesores del alumno. Para una visión completa que incluya horarios de tetramestre y semestre, puedes usar el botón de <strong>"Fusionar Reporte"</strong> en el encabezado principal para cargar el reporte de la otra modalidad.
               </AlertDescription>
             </Alert>
             <div className="flex items-center gap-2">
-                 <FileUpload 
-                    onFileSelect={handleMergeUpload}
-                    selectedFile={mergeFile}
-                    isLoading={isMerging}
-                    label={`Cargar ${otherModality}`}
-                    icon={<UploadCloud />}
-                    variant="secondary"
-                />
                 <Button onClick={handlePrint} variant="outline" className="no-print">
                     <Printer className="mr-2 h-4 w-4" />
                     Imprimir

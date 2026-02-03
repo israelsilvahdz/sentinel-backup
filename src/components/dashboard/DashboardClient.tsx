@@ -145,6 +145,8 @@ export function DashboardClient() {
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [dataKey, setDataKey] = useState<string | null>(null);
+  const [mergeFile, setMergeFile] = useState<File | null>(null);
+  const [isMerging, setIsMerging] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -484,6 +486,19 @@ export function DashboardClient() {
             console.error(error);
         }
     }, [toast]);
+    
+  const handleMergeUploadWrapper = useCallback(async (file: File | null) => {
+    if (!file) {
+      setMergeFile(null);
+      return;
+    }
+    setMergeFile(file);
+    setIsMerging(true);
+    await handleMergeUpload(file);
+    setIsMerging(false);
+    setMergeFile(null);
+  }, [handleMergeUpload]);
+
 
   const handleDeleteAllData = () => {
     if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) return;
@@ -841,6 +856,16 @@ export function DashboardClient() {
                         </div>
                     )}
                     <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" />
+                    <FileUpload
+                        onFileSelect={handleMergeUploadWrapper}
+                        selectedFile={mergeFile}
+                        isLoading={isMerging}
+                        variant="secondary"
+                        size="sm"
+                        label="Fusionar Reporte"
+                        icon={<UploadCloud />}
+                        disabled={allStudents.length === 0 || isProcessing}
+                    />
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
                         <span className="sr-only">Recargar</span>
