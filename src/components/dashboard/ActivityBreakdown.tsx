@@ -25,24 +25,6 @@ export function ActivityBreakdown({ subject, schemes }: ActivityBreakdownProps) 
             </div>
         );
     }
-
-    const { totalEarnedPoints, maxPossiblePoints } = useMemo(() => {
-        let earned = 0;
-        let possible = 0;
-
-        activityList.forEach(item => {
-            const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
-            
-            if (isGraded) {
-                const score = Number(item.score) || 0;
-                earned += (score / 100) * item.weight;
-                possible += item.weight;
-            }
-        });
-        
-        return { totalEarnedPoints: earned, maxPossiblePoints: possible };
-
-    }, [activityList]);
     
     const schemeUsed = schemes.find(s => s.subjectNames.includes(subject.name));
 
@@ -50,24 +32,10 @@ export function ActivityBreakdown({ subject, schemes }: ActivityBreakdownProps) 
         <div className="bg-muted/30 p-4">
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle className="text-lg">Desglose de Calificaciones</CardTitle>
-                            <CardDescription>
-                                Ponderaciones para: {subject.name} (Esquema: {schemeUsed?.name || 'No definido'})
-                            </CardDescription>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6 text-right">
-                           <div>
-                               <p className="text-sm font-medium text-muted-foreground">Puntos Acumulados</p>
-                               <p className="text-2xl font-bold text-primary">{totalEarnedPoints.toFixed(2)}</p>
-                           </div>
-                           <div>
-                               <p className="text-sm font-medium text-muted-foreground">Máximo Obtenible (hasta ahora)</p>
-                               <p className="text-2xl font-bold">{maxPossiblePoints.toFixed(2)}</p>
-                           </div>
-                        </div>
-                    </div>
+                    <CardTitle className="text-lg">Desglose de Calificaciones</CardTitle>
+                    <CardDescription>
+                        Ponderaciones para: {subject.name} (Esquema: {schemeUsed?.name || 'No definido'})
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-6">

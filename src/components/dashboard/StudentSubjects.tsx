@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Minus, Plus, Phone, Camera, Download, User as UserIcon } from 'lucide-react';
 import { type Student, type Subject, type SubjectSummary } from "@/types/student";
-import { calculateFinalGrade } from '@/lib/ponderaciones';
+import { getActivityList } from '@/lib/ponderaciones';
 import { isWithoutRight } from '@/lib/dataProcessor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '../ui/button';
@@ -157,7 +157,25 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                  {subjects.map((subject) => (
+                  {subjects.map((subject) => {
+                    const activityList = getActivityList(subject, weightingSchemes);
+                      
+                    let totalEarnedPoints = 0;
+                    let maxPossiblePoints = 0;
+
+                    if (activityList.length > 0) {
+                      activityList.forEach(item => {
+                          const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+                          
+                          if (isGraded) {
+                              const score = Number(item.score) || 0;
+                              totalEarnedPoints += (score / 100) * item.weight;
+                              maxPossiblePoints += item.weight;
+                          }
+                      });
+                    }
+                    
+                    return (
                     <React.Fragment key={subject.id}>
                       <TableRow className="cursor-pointer" onClick={() => handleToggleSubject(subject.id)}>
                           <TableCell>
@@ -202,16 +220,26 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                               {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
                           </TableCell>
                           <TableCell className="text-right font-mono font-bold text-primary">
-                              {isWithoutRight(subject) ? (
+                                {isWithoutRight(subject) ? (
                                 <Badge variant="destructive">SD</Badge>
-                              ) : (
-                                (() => {
-                                    const calculatedGrade = calculateFinalGrade(subject, weightingSchemes);
-                                    return isNaN(calculatedGrade) 
-                                        ? <Badge variant="secondary">N/D</Badge> 
-                                        : calculatedGrade.toFixed(2);
-                                })()
-                              )}
+                                ) : activityList.length > 0 && maxPossiblePoints > 0 ? (
+                                <TooltipProvider>
+                                    <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span>{`${totalEarnedPoints.toFixed(
+                                        2
+                                        )} / ${maxPossiblePoints.toFixed(2)}`}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>
+                                        Puntos acumulados / Puntos posibles hasta ahora
+                                        </p>
+                                    </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                                ) : (
+                                <Badge variant="secondary">N/D</Badge>
+                                )}
                           </TableCell>
                       </TableRow>
                       {openSubject === subject.id && (
@@ -222,7 +250,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                         </TableRow>
                       )}
                     </React.Fragment>
-                  ))}
+                  )})}
                   </TableBody>
               </Table>
           </div>
