@@ -51,9 +51,10 @@ interface ActivityGroup {
 const parseRange = (rangeStr: string): number[] => {
   if (!rangeStr) return [];
   const result: Set<number> = new Set();
-  const parts = rangeStr.split(',');
+  const parts = rangeStr.replace(/;/g, ',').split(',');
   for (const part of parts) {
     const trimmedPart = part.trim();
+    if (!trimmedPart) continue;
     if (trimmedPart.includes('-')) {
       const [start, end] = trimmedPart.split('-').map(Number);
       if (!isNaN(start) && !isNaN(end) && start <= end) {
