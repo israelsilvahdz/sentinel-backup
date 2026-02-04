@@ -52,7 +52,7 @@ export interface Change {
   date: any; // Firestore Timestamp on server, string on client
   studentId: string;
   subjectId: string; // CRN
-  fieldName: 'absences' | 'missedAssignments';
+  fieldName: 'absences' | 'missedAssignments' | 'leader' | 'tutor' | 'group';
   oldValue: any;
   newValue: any;
   changeType: 'increase' | 'decrease';
@@ -159,4 +159,14 @@ export interface IrregularStudentInfo {
     name: string;
     currentTerm: number;
     pendingSubjects: { name: string; term: number }[];
+}
+
+export interface WeightingScheme {
+  id?: string;
+  name: string;
+  activities: {
+    name: string;
+    weight: number;
+  }[];
+  subjectNames: string[];
 }

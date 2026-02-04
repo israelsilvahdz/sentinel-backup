@@ -76,7 +76,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
 
 
 export function StudentSubjects({ student, isOpen }: { student: Student, isOpen: boolean }) {
-    const { loadStudentSubjects, planType, professorContacts, setActiveView, setFilterType, setSelectedValue } = useDashboardFilters();
+    const { loadStudentSubjects, planType, professorContacts, weightingSchemes, setActiveView, setFilterType, setSelectedValue } = useDashboardFilters();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [openSubject, setOpenSubject] = useState<string | null>(null);
@@ -205,14 +205,19 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                               {isWithoutRight(subject) ? (
                                 <Badge variant="destructive">SD</Badge>
                               ) : (
-                                calculateFinalGrade(subject, planType).toFixed(2)
+                                (() => {
+                                    const calculatedGrade = calculateFinalGrade(subject, weightingSchemes);
+                                    return isNaN(calculatedGrade) 
+                                        ? <Badge variant="secondary">N/D</Badge> 
+                                        : calculatedGrade.toFixed(2);
+                                })()
                               )}
                           </TableCell>
                       </TableRow>
                       {openSubject === subject.id && (
                         <TableRow>
                             <TableCell colSpan={7} className="p-0">
-                              <ActivityBreakdown subject={subject} planType={planType} />
+                              <ActivityBreakdown subject={subject} schemes={weightingSchemes} />
                             </TableCell>
                         </TableRow>
                       )}

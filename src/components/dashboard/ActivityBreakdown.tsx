@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo } from 'react';
-import type { Subject } from '@/types/student';
+import type { Subject, WeightingScheme } from '@/types/student';
 import { getActivityList } from '@/lib/ponderaciones';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -10,17 +10,17 @@ import { Clock } from 'lucide-react';
 
 interface ActivityBreakdownProps {
     subject: Subject;
-    planType: 'tetramestral' | 'semestral';
+    schemes: WeightingScheme[];
 }
 
-export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps) {
-    const activityList = useMemo(() => getActivityList(subject, planType), [subject, planType]);
+export function ActivityBreakdown({ subject, schemes }: ActivityBreakdownProps) {
+    const activityList = useMemo(() => getActivityList(subject, schemes), [subject, schemes]);
     
     if (activityList.length === 0) {
         return (
             <div className="bg-muted/50 p-4">
                 <p className="text-center text-sm text-muted-foreground">
-                    No hay desglose de ponderación definido para la materia "{subject.name}".
+                    No hay un esquema de ponderación definido para la materia "{subject.name}".
                 </p>
             </div>
         );
@@ -44,8 +44,7 @@ export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps)
 
     }, [activityList]);
     
-    const schemeUsed = (planType === 'semestral' && subject.name in PONDERACIONES_SEMESTRAL_POR_MATERIA) ? 'Semestral' : 'Tetramestral';
-
+    const schemeUsed = schemes.find(s => s.subjectNames.includes(subject.name));
 
     return (
         <div className="bg-muted/30 p-4">
@@ -55,7 +54,7 @@ export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps)
                         <div>
                             <CardTitle className="text-lg">Desglose de Calificaciones</CardTitle>
                             <CardDescription>
-                                Ponderaciones para: {subject.name} (Esquema: {schemeUsed})
+                                Ponderaciones para: {subject.name} (Esquema: {schemeUsed?.name || 'No definido'})
                             </CardDescription>
                         </div>
                         <div className="grid grid-cols-2 gap-6 text-right">
@@ -103,15 +102,3 @@ export function ActivityBreakdown({ subject, planType }: ActivityBreakdownProps)
         </div>
     );
 }
-
-// Need to add this here since it's used in the component
-const PONDERACIONES_SEMESTRAL_POR_MATERIA: Record<string, number[]> = {
-    'Materia y energía I': [3, 3, 3, 3, 3, 11, 3, 3, 3, 3, 3, 12, 3, 3, 3, 3, 3, 12, 20],
-    'Ciencias de la Vida': [4, 4, 4, 14, 5, 4, 4, 14, 4, 4, 14, 5, 20],
-    'Expresión Literaria': [1, 1, 5, 1, 1, 5, 10, 1, 1, 5, 2, 2, 5, 10, 2, 2, 5, 1, 1, 5, 4, 10, 20],
-    'Habilidades y valores IV: plan de vida y carrera': [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 31, 10, 10],
-    'Antropología: cultura y consciencia social': [4, 5, 3, 5, 10, 3, 5, 3, 5, 10, 3, 5, 4, 5, 10, 20],
-    'Matemáticas IV: modelos matemáticos': [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 16],
-    'Optativa de lengua adicional al español I': [8, 8, 10, 8, 8, 11, 8, 8, 11, 20],
-};
-    

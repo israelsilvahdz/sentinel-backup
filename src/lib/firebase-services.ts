@@ -17,7 +17,7 @@ import {
   where
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student, Change } from '@/types/student';
+import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student, Change, WeightingScheme } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -29,6 +29,7 @@ const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
 const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
 const TEAMS_COLLECTION = 'teams';
 const CHANGE_LOG_COLLECTION = 'studentChangeLog';
+const WEIGHTING_SCHEMES_COLLECTION = 'weightingSchemes';
 
 
 /**
@@ -542,15 +543,42 @@ export const removeStudentFromTeam = async (team: Team, studentId: string): Prom
         throw error;
     }
 };
+
+// --- Funciones para Esquemas de Ponderación ---
+
+export const getWeightingSchemes = async (): Promise<WeightingScheme[]> => {
+    try {
+        const querySnapshot = await getDocs(collection(db, WEIGHTING_SCHEMES_COLLECTION));
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WeightingScheme));
+    } catch (error) {
+        console.error("Error getting weighting schemes:", error);
+        return [];
+    }
+};
+
+export const addOrUpdateWeightingScheme = async (scheme: WeightingScheme): Promise<string> => {
+    try {
+        const { id, ...schemeData } = scheme;
+        if (id) {
+            const docRef = doc(db, WEIGHTING_SCHEMES_COLLECTION, id);
+            await setDoc(docRef, schemeData, { merge: true });
+            return id;
+        } else {
+            const docRef = await addDoc(collection(db, WEIGHTING_SCHEMES_COLLECTION), schemeData);
+            return docRef.id;
+        }
+    } catch (error) {
+        console.error("Error adding/updating weighting scheme:", error);
+        throw error;
+    }
+};
+
+export const deleteWeightingScheme = async (schemeId: string): Promise<void> => {
+    try {
+        await deleteDoc(doc(db, WEIGHTING_SCHEMES_COLLECTION, schemeId));
+    } catch (error) {
+        console.error("Error deleting weighting scheme:", error);
+        throw error;
+    }
+};
   
-
-
-
-
-
-
-
-
-
-
-

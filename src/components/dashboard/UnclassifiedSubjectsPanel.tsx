@@ -5,35 +5,38 @@ import { useMemo } from 'react';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDashboardFilters } from './DashboardClient';
-import { getAreaForMateria } from '@/lib/ponderaciones';
 import { HelpCircle, CheckCircle2 } from 'lucide-react';
 
 export function UnclassifiedSubjectsPanel() {
-  const { allStudents, isLoading } = useDashboardFilters();
+  const { allStudents, isLoading, weightingSchemes } = useDashboardFilters();
 
   const unclassifiedSubjects = useMemo(() => {
     if (isLoading || !allStudents) return [];
 
     const subjectSet = new Set<string>();
 
+    const classifiedSubjects = new Set<string>();
+    weightingSchemes.forEach(scheme => {
+        scheme.subjectNames.forEach(name => classifiedSubjects.add(name));
+    });
+
     allStudents.forEach(student => {
-      student.subjects?.forEach(subject => {
-        const area = getAreaForMateria(subject.name);
-        if (area === 'Unknown') {
+      student.subjectSummaries?.forEach(subject => {
+        if (!classifiedSubjects.has(subject.name)) {
           subjectSet.add(subject.name);
         }
       });
     });
 
     return Array.from(subjectSet).sort();
-  }, [allStudents, isLoading]);
+  }, [allStudents, isLoading, weightingSchemes]);
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Materias Sin Clasificar</h1>
         <p className="text-muted-foreground">
-          Un listado de todas las materias encontradas en los reportes que no corresponden a ninguna área académica definida.
+          Un listado de todas las materias encontradas en los reportes que no corresponden a ningún esquema de ponderación definido.
         </p>
       </header>
 
@@ -41,7 +44,7 @@ export function UnclassifiedSubjectsPanel() {
         <CardHeader>
           <CardTitle>Listado de Materias No Reconocidas</CardTitle>
           <CardDescription>
-            Utiliza esta lista para identificar discrepancias en los nombres de las materias y añadirlas al mapa de normalización en el código.
+            Utiliza esta lista para identificar qué materias necesitan ser añadidas a un esquema en el Gestor de Ponderaciones.
           </CardDescription>
         </CardHeader>
         <CardContent>

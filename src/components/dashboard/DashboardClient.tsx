@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -43,18 +44,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem, Team } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges, getWeightingSchemes } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
 import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'ponderaciones' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections' | 'early-departure';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections' | 'early-departure';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -78,6 +79,8 @@ interface DashboardContextType {
   fetchSeguimientoEntries: () => Promise<void>;
   teamTasks: TeamTask[];
   fetchTeamTasks: () => Promise<void>;
+  weightingSchemes: WeightingScheme[];
+  fetchWeightingSchemes: () => Promise<void>;
   setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
   isLoading: boolean;
   hasData: boolean;
@@ -140,6 +143,7 @@ export function DashboardClient() {
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
+  const [weightingSchemes, setWeightingSchemes] = useState<WeightingScheme[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
   const [ofertaAcademica, setOfertaAcademica] = useState<OfertaAcademicaItem[]>([]);
   
@@ -224,6 +228,17 @@ export function DashboardClient() {
     }
   }, [toast]);
 
+  const fetchWeightingSchemes = useCallback(async () => {
+    try {
+        const schemes = await getWeightingSchemes();
+        setWeightingSchemes(schemes);
+    } catch (error) {
+        console.error("Failed to fetch weighting schemes:", error);
+        toast({ variant: "destructive", title: "Error de Ponderaciones", description: "No se pudieron cargar los esquemas de evaluación." });
+    }
+  }, [toast]);
+
+
   // Load non-sensitive data from local storage on initial mount
   useEffect(() => {
     async function loadInitialData() {
@@ -265,6 +280,7 @@ export function DashboardClient() {
             fetchSeguimientoEntries(),
             fetchTeamTasks(),
             fetchTeams(),
+            fetchWeightingSchemes(),
           ]);
 
         } catch (error) {
@@ -275,7 +291,7 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams]);
+  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams, fetchWeightingSchemes]);
 
   // Persist data to local storage whenever it changes, now with encryption
   useEffect(() => {
@@ -669,7 +685,7 @@ export function DashboardClient() {
   }, [uploadHistory, planType]);
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, latestComparison, setLatestComparison, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, latestComparison, setLatestComparison, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -696,7 +712,7 @@ export function DashboardClient() {
         case 'change-stats': return <ChangeStats />;
         case 'projections': return <ProjectionsPanel />;
         case 'map-planner': return <MapPlanner />;
-        case 'ponderaciones': return <PonderacionesDashboard />;
+        case 'weighting-schemes': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
@@ -798,9 +814,9 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Guía de Ponderación" isActive={activeView === 'ponderaciones'} onClick={() => handleSetActiveView('ponderaciones')}>
+                   <SidebarMenuButton tooltip="Gestor de Ponderaciones" isActive={activeView === 'weighting-schemes'} onClick={() => handleSetActiveView('weighting-schemes')}>
                     <BookCopy />
-                    <span>Guía de Ponderación</span>
+                    <span>Gestor de Ponderaciones</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
