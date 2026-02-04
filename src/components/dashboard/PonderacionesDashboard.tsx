@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDashboardFilters } from './DashboardClient';
@@ -40,26 +40,134 @@ const schemeSchema = z.object({
 
 type SchemeFormValues = z.infer<typeof schemeSchema>;
 
+
+// --- Componente de Formulario con Nueva Lógica de Grupos ---
+
+interface ActivityGroup {
+  range: string;
+  weight: number;
+}
+
+const parseRange = (rangeStr: string): number[] => {
+  if (!rangeStr) return [];
+  const result: Set<number> = new Set();
+  const parts = rangeStr.split(',');
+  for (const part of parts) {
+    const trimmedPart = part.trim();
+    if (trimmedPart.includes('-')) {
+      const [start, end] = trimmedPart.split('-').map(Number);
+      if (!isNaN(start) && !isNaN(end) && start <= end) {
+        for (let i = start; i <= end; i++) {
+          result.add(i);
+        }
+      }
+    } else {
+      const num = Number(trimmedPart);
+      if (!isNaN(num) && num > 0) {
+        result.add(num);
+      }
+    }
+  }
+  return Array.from(result).sort((a, b) => a - b);
+};
+
+const groupActivities = (activities: {name: string, weight: number}[]): ActivityGroup[] => {
+    if (!activities || activities.length === 0) return [{ range: '', weight: 0 }];
+
+    const weightsToActivities: Record<string, number[]> = {};
+    activities.forEach(act => {
+        const numMatch = act.name.match(/\d+$/);
+        if (numMatch) {
+            const num = parseInt(numMatch[0], 10);
+            const weightKey = String(act.weight);
+            if (!weightsToActivities[weightKey]) {
+                weightsToActivities[weightKey] = [];
+            }
+            weightsToActivities[weightKey].push(num);
+        }
+    });
+
+    const groups: ActivityGroup[] = [];
+    for (const weight in weightsToActivities) {
+        const nums = weightsToActivities[weight].sort((a,b) => a - b);
+        let rangeStr = '';
+        let startOfRange = -1;
+        
+        for (let i = 0; i < nums.length; i++) {
+            if (startOfRange === -1) {
+                startOfRange = nums[i];
+            }
+            if (i === nums.length - 1 || nums[i+1] !== nums[i] + 1) {
+                if (rangeStr) rangeStr += ', ';
+                if (startOfRange === nums[i]) {
+                    rangeStr += `${startOfRange}`;
+                } else {
+                    rangeStr += `${startOfRange}-${nums[i]}`;
+                }
+                startOfRange = -1;
+            }
+        }
+        groups.push({ range: rangeStr, weight: Number(weight) });
+    }
+    return groups.length > 0 ? groups : [{ range: '', weight: 0 }];
+};
+
 function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }: { onFormSubmit: (data: SchemeFormValues) => void, existingScheme?: WeightingScheme, allSubjectNames: string[], onCancel: () => void }) {
-  const { register, control, handleSubmit, watch, formState: { errors } } = useForm<SchemeFormValues>({
+  const { register, control, handleSubmit, watch, formState: { errors }, setValue, trigger } = useForm<SchemeFormValues>({
     resolver: zodResolver(schemeSchema),
     defaultValues: existingScheme ? {
       ...existingScheme,
-      activities: existingScheme.activities.map(a => ({...a}))
     } : {
       name: '',
-      activities: [{ name: 'Actividad 1', weight: 100 }],
+      activities: [],
       subjectNames: []
     }
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "activities"
-  });
+  const [activityGroups, setActivityGroups] = useState<ActivityGroup[]>(
+    existingScheme ? groupActivities(existingScheme.activities) : [{ range: '', weight: 0 }]
+  );
+
+  useEffect(() => {
+    const flattenedActivities: { name: string; weight: number }[] = [];
+    activityGroups.forEach(group => {
+        const activityNumbers = parseRange(group.range);
+        activityNumbers.forEach(num => {
+            flattenedActivities.push({
+                name: `Actividad ${num}`,
+                weight: group.weight || 0,
+            });
+        });
+    });
+    setValue('activities', flattenedActivities, { shouldValidate: true });
+    // Trigger validation for the root path of activities array if needed
+    if (errors.activities?.root) {
+        trigger('activities');
+    }
+  }, [activityGroups, setValue, errors.activities?.root, trigger]);
+
+  const totalWeight = useMemo(() => {
+    return activityGroups.reduce((total, group) => {
+        const count = parseRange(group.range).length;
+        return total + (count * (group.weight || 0));
+    }, 0);
+  }, [activityGroups]);
+
+  const handleGroupChange = (index: number, field: keyof ActivityGroup, value: string | number) => {
+    const newGroups = [...activityGroups];
+    (newGroups[index] as any)[field] = value;
+    setActivityGroups(newGroups);
+  };
   
-  const activities = watch('activities');
-  const totalWeight = useMemo(() => activities.reduce((sum, act) => sum + (act.weight || 0), 0), [activities]);
+  const addGroup = () => {
+    setActivityGroups([...activityGroups, { range: '', weight: 0 }]);
+  };
+
+  const removeGroup = (index: number) => {
+    if (activityGroups.length > 1) {
+      setActivityGroups(activityGroups.filter((_, i) => i !== index));
+    }
+  };
   
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
@@ -100,17 +208,31 @@ function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }:
         <Card className="p-4 bg-muted/50">
           <ScrollArea className="h-48">
             <div className="space-y-3 pr-4">
-              {fields.map((field, index) => (
-                <div key={field.id} className="flex items-center gap-2">
-                  <Input {...register(`activities.${index}.name`)} placeholder={`Nombre Actividad ${index + 1}`} className="flex-1"/>
-                  <Input type="number" {...register(`activities.${index}.weight`)} placeholder="%" className="w-24" />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+              {activityGroups.map((group, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input 
+                    placeholder="Ej: 1-3, 5, 8" 
+                    value={group.range} 
+                    onChange={(e) => handleGroupChange(index, 'range', e.target.value)}
+                    className="flex-1"
+                  />
+                  <div className="relative">
+                    <Input 
+                      type="number" 
+                      placeholder="%" 
+                      value={group.weight} 
+                      onChange={(e) => handleGroupChange(index, 'weight', e.target.valueAsNumber)}
+                      className="w-28 pr-6"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeGroup(index)} disabled={activityGroups.length <= 1}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                 </div>
               ))}
             </div>
           </ScrollArea>
-           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ name: `Actividad ${fields.length + 1}`, weight: 0 })}>
-             <PlusCircle className="mr-2 h-4 w-4" /> Añadir Actividad
+           <Button type="button" variant="outline" size="sm" className="mt-4" onClick={addGroup}>
+             <PlusCircle className="mr-2 h-4 w-4" /> Añadir Grupo
           </Button>
         </Card>
       </div>
