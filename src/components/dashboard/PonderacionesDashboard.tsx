@@ -277,7 +277,7 @@ export function PonderacionesDashboard() {
        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{existingScheme ? 'Editar Esquema de Ponderación' : 'Crear Nuevo Esquema'}</DialogTitle>
+            <DialogTitle>{editingScheme ? 'Editar Esquema de Ponderación' : 'Crear Nuevo Esquema'}</DialogTitle>
           </DialogHeader>
           <SchemeForm 
             onFormSubmit={handleFormSubmit}
