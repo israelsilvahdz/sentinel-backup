@@ -26,7 +26,6 @@ import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
 import { MapPlanner } from './MapPlanner';
 import { AcademicCalendar } from './AcademicCalendar';
 import { DashboardFilters } from './DashboardFilters';
-import { BitacoraPanel } from './BitacoraPanel';
 import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { AcademicCommitteePanel } from './AcademicCommitteePanel';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
@@ -51,7 +50,7 @@ import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -671,7 +670,6 @@ export function DashboardClient() {
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'academic-calendar': return <AcademicCalendar />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
-        case 'bitacora': return <BitacoraPanel />;
         case 'teams-management': return <TeamsManagementPanel />;
         case 'academic-committee': return <AcademicCommitteePanel />;
         case 'oferta-academica': return <OfertaAcademicaPanel />;
@@ -757,12 +755,6 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')}>
                     <HelpCircle />
                     <span>Materias sin Clasificar</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Bitácora de Casos" isActive={activeView === 'bitacora'} onClick={() => handleSetActiveView('bitacora')}>
-                    <FileText />
-                    <span>Bitácora de Casos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
