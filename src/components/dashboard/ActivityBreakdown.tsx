@@ -47,7 +47,10 @@ export function ActivityBreakdown({ subject, schemes }: ActivityBreakdownProps) 
                             return (
                                 <div key={index} className="space-y-1">
                                     <div className="flex justify-between items-center text-sm">
-                                        <span className="font-semibold text-muted-foreground">{item.name}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-muted-foreground">{item.name}</span>
+                                            {item.label && <Badge variant="outline">{item.label}</Badge>}
+                                        </div>
                                         <Badge variant="secondary">{item.weight}%</Badge>
                                     </div>
                                     {isGraded ? (

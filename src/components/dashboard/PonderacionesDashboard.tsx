@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -28,6 +29,7 @@ const schemeSchema = z.object({
   activities: z.array(z.object({
     name: z.string().min(1, 'El nombre es requerido'),
     weight: z.coerce.number().min(0, 'El valor debe ser positivo').max(100, 'El valor no puede ser mayor a 100'),
+    label: z.string().optional(),
   })).min(1, "Debe haber al menos una actividad."),
   subjectNames: z.array(z.string()).min(1, "Debe seleccionar al menos una materia."),
 }).refine(data => {
@@ -46,6 +48,7 @@ type SchemeFormValues = z.infer<typeof schemeSchema>;
 interface ActivityGroup {
   range: string;
   weight: number;
+  label?: string;
 }
 
 const parseRange = (rangeStr: string): number[] => {
@@ -72,25 +75,27 @@ const parseRange = (rangeStr: string): number[] => {
   return Array.from(result).sort((a, b) => a - b);
 };
 
-const groupActivities = (activities: {name: string, weight: number}[]): ActivityGroup[] => {
-    if (!activities || activities.length === 0) return [{ range: '', weight: 0 }];
+const groupActivities = (activities: {name: string, weight: number, label?: string}[]): ActivityGroup[] => {
+    if (!activities || activities.length === 0) return [{ range: '', weight: 0, label: '' }];
 
-    const weightsToActivities: Record<string, number[]> = {};
+    const weightsToActivities: Record<string, { nums: number[], label?: string }> = {};
+    
     activities.forEach(act => {
         const numMatch = act.name.match(/\d+$/);
         if (numMatch) {
             const num = parseInt(numMatch[0], 10);
-            const weightKey = String(act.weight);
-            if (!weightsToActivities[weightKey]) {
-                weightsToActivities[weightKey] = [];
+            const key = `${act.weight}-${act.label || ''}`;
+            if (!weightsToActivities[key]) {
+                weightsToActivities[key] = { nums: [], label: act.label };
             }
-            weightsToActivities[weightKey].push(num);
+            weightsToActivities[key].nums.push(num);
         }
     });
 
     const groups: ActivityGroup[] = [];
-    for (const weight in weightsToActivities) {
-        const nums = weightsToActivities[weight].sort((a,b) => a - b);
+    for (const key in weightsToActivities) {
+        const { nums, label } = weightsToActivities[key];
+        nums.sort((a,b) => a - b);
         let rangeStr = '';
         let startOfRange = -1;
         
@@ -108,9 +113,9 @@ const groupActivities = (activities: {name: string, weight: number}[]): Activity
                 startOfRange = -1;
             }
         }
-        groups.push({ range: rangeStr, weight: Number(weight) });
+        groups.push({ range: rangeStr, weight: parseFloat(key.split('-')[0]), label: label || '' });
     }
-    return groups.length > 0 ? groups : [{ range: '', weight: 0 }];
+    return groups.length > 0 ? groups : [{ range: '', weight: 0, label: '' }];
 };
 
 function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }: { onFormSubmit: (data: SchemeFormValues) => void, existingScheme?: WeightingScheme, allSubjectNames: string[], onCancel: () => void }) {
@@ -126,22 +131,22 @@ function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }:
   });
 
   const [activityGroups, setActivityGroups] = useState<ActivityGroup[]>(
-    existingScheme ? groupActivities(existingScheme.activities) : [{ range: '', weight: 0 }]
+    existingScheme ? groupActivities(existingScheme.activities) : [{ range: '', weight: 0, label: '' }]
   );
 
   useEffect(() => {
-    const flattenedActivities: { name: string; weight: number }[] = [];
+    const flattenedActivities: { name: string; weight: number; label?: string }[] = [];
     activityGroups.forEach(group => {
         const activityNumbers = parseRange(group.range);
         activityNumbers.forEach(num => {
             flattenedActivities.push({
                 name: `Actividad ${num}`,
                 weight: group.weight || 0,
+                label: group.label || undefined,
             });
         });
     });
     setValue('activities', flattenedActivities, { shouldValidate: true });
-    // Trigger validation for the root path of activities array if needed
     if (errors.activities?.root) {
         trigger('activities');
     }
@@ -161,7 +166,7 @@ function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }:
   };
   
   const addGroup = () => {
-    setActivityGroups([...activityGroups, { range: '', weight: 0 }]);
+    setActivityGroups([...activityGroups, { range: '', weight: 0, label: '' }]);
   };
 
   const removeGroup = (index: number) => {
@@ -212,9 +217,15 @@ function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }:
               {activityGroups.map((group, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <Input 
-                    placeholder="Ej: 1-3, 5, 8" 
+                    placeholder="Ej: 1-3, 5" 
                     value={group.range} 
                     onChange={(e) => handleGroupChange(index, 'range', e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="Etiqueta (Ej. Examen)"
+                    value={group.label || ''}
+                    onChange={(e) => handleGroupChange(index, 'label', e.target.value)}
                     className="flex-1"
                   />
                   <div className="relative">
@@ -301,8 +312,10 @@ export function PonderacionesDashboard() {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchWeightingSchemes();
-  }, []);
+    if (!isFormOpen) {
+        fetchWeightingSchemes();
+    }
+  }, [isFormOpen, fetchWeightingSchemes]);
 
   const handleFormSubmit = async (data: SchemeFormValues) => {
     try {
@@ -375,7 +388,7 @@ export function PonderacionesDashboard() {
                 <h4 className="font-semibold mb-2">Actividades:</h4>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                     {scheme.activities.map((act, i) => (
-                        <li key={i}><strong>{act.name}:</strong> {act.weight}%</li>
+                        <li key={i}><strong>{act.name}:</strong> {act.weight}% {act.label && <span className="text-blue-600 font-semibold">({act.label})</span>}</li>
                     ))}
                 </ul>
               </div>

@@ -167,6 +167,7 @@ export interface WeightingScheme {
   activities: {
     name: string;
     weight: number;
+    label?: string;
   }[];
   subjectNames: string[];
 }

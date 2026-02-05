@@ -56,21 +56,22 @@ export function calculateFinalGrade(subject: Subject, schemes: WeightingScheme[]
  * @param schemes An array of all available WeightingScheme objects.
  * @returns An array of activity breakdown items, or an empty array if no scheme is found.
  */
-export function getActivityList(subject: Subject, schemes: WeightingScheme[]): { name: string; score: number | string; weight: number }[] {
+export function getActivityList(subject: Subject, schemes: WeightingScheme[]): { name: string; score: number | string; weight: number; label?: string; }[] {
     const scheme = findSchemeForSubject(subject.name, schemes);
     if (!scheme) {
         return [];
     }
 
     const sortedScores = getSortedScores(subject);
-    const activityItems: { name: string; score: number | string; weight: number }[] = [];
+    const activityItems: { name: string; score: number | string; weight: number; label?: string }[] = [];
 
     scheme.activities.forEach((activity, index) => {
         const rawScore = sortedScores[index] ?? 'SC'; // Default to 'SC' if no score is present
         activityItems.push({
             name: activity.name,
             score: rawScore,
-            weight: activity.weight
+            weight: activity.weight,
+            label: activity.label
         });
     });
 
