@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -20,6 +21,7 @@ import { addSeguimientoEntry } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getActivityList } from '@/lib/ponderaciones';
+import { cn } from '@/lib/utils';
 
 
 interface StudentCardProps {
@@ -108,6 +110,12 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             .filter((s): s is SeguimientoEntry => 'topic' in s && s.topic === 'Notificación WhatsApp (Padres)')
             .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())[0];
     }, [seguimiento]);
+    
+    const lastDetailedReportNotification = useMemo(() => {
+        return seguimiento
+            .filter((s): s is SeguimientoEntry => 'topic' in s && s.topic === 'Reporte Detallado a Padres (WhatsApp)')
+            .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())[0];
+    }, [seguimiento]);
 
     const studentNotifiedForThisBatch = useMemo(() => {
         if (!lastStudentNotification || !lastChangeDate) return false;
@@ -118,6 +126,11 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
         if (!lastParentNotification || !lastChangeDate) return false;
         return lastParentNotification.createdAt.toDate() > lastChangeDate;
     }, [lastParentNotification, lastChangeDate]);
+    
+    const detailedReportSentForThisBatch = useMemo(() => {
+        if (!lastDetailedReportNotification || !lastChangeDate) return false;
+        return lastDetailedReportNotification.createdAt.toDate() > lastChangeDate;
+    }, [lastDetailedReportNotification, lastChangeDate]);
 
     const generateMessage = (recipient: 'student' | 'parent'): string => {
         const increaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
@@ -357,7 +370,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
                  <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSendDetailedReport} disabled={isGeneratingReport}>
-                           {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                           {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className={cn("h-4 w-4", detailedReportSentForThisBatch ? 'text-green-600' : 'text-red-600')} />}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent><p>Enviar reporte detallado a padres</p></TooltipContent>
