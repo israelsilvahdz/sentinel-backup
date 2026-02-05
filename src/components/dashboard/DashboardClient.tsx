@@ -218,13 +218,6 @@ export function DashboardClient() {
 }, [toast]);
   
   const fetchTeamTasks = useCallback(async () => {
-    try {
-        const entries = await getTeamTasks();
-        setTeamTasks(entries);
-    } catch (error) {
-        console.error("Failed to fetch team tasks:", error);
-        toast({ variant: "destructive", title: "Error de Tareas de Equipo", description: "No se pudieron cargar las tareas." });
-    }
   }, [toast]);
 
   const fetchWeightingSchemes = useCallback(async () => {
@@ -472,18 +465,21 @@ export function DashboardClient() {
                 for (const studentId in newStudentData) {
                     const newStudentInfo = newStudentData[studentId];
                     if (studentMap.has(studentId)) {
+                        // Student exists, merge subjects
                         const studentToUpdate = studentMap.get(studentId)!;
-                        const existingSubjectIds = new Set(studentToUpdate.subjects?.map((s: Subject) => s.id));
-                        newStudentInfo.subjects?.forEach(newSubject => {
-                            if (!existingSubjectIds.has(newSubject.id)) {
-                                studentToUpdate.subjects?.push(newSubject);
-                                studentToUpdate.subjectSummaries?.push({
-                                    id: newSubject.id, name: newSubject.name, group: newSubject.group, absences: newSubject.absences, absenceLimit: newSubject.absenceLimit,
-                                    missedAssignments: newSubject.missedAssignments, missedAssignmentLimit: newSubject.missedAssignmentLimit, grade: newSubject.grade, finalGrade: newSubject.finalGrade,
-                                });
-                            }
+                        const subjectsMap = new Map((studentToUpdate.subjects || []).map(s => [s.id, s]));
+
+                        (newStudentInfo.subjects || []).forEach(newSubject => {
+                            subjectsMap.set(newSubject.id, newSubject); // This adds new or overwrites existing subjects
                         });
+
+                        studentToUpdate.subjects = Array.from(subjectsMap.values());
+                        studentToUpdate.subjectSummaries = studentToUpdate.subjects.map(s => ({
+                            id: s.id, name: s.name, group: s.group, absences: s.absences, absenceLimit: s.absenceLimit,
+                            missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit, grade: s.grade, finalGrade: s.finalGrade,
+                        }));
                     } else {
+                         // Student is new, add them
                         studentMap.set(studentId, {
                             ...newStudentInfo,
                             subjectSummaries: (newStudentInfo.subjects || []).map(s => ({
