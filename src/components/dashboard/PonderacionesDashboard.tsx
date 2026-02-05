@@ -221,7 +221,7 @@ function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }:
                     <Input 
                       type="number" 
                       placeholder="%" 
-                      value={group.weight} 
+                      value={Number.isNaN(group.weight) ? '' : group.weight}
                       onChange={(e) => handleGroupChange(index, 'weight', e.target.valueAsNumber)}
                       className="w-28 pr-6"
                     />
