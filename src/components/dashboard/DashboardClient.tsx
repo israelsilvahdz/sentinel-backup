@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -291,7 +290,7 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, []);
+  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams, fetchWeightingSchemes, toast]);
 
   // Persist data to local storage whenever it changes, now with encryption
   useEffect(() => {
@@ -717,14 +716,11 @@ export function DashboardClient() {
         case 'academic-calendar': return <AcademicCalendar />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
         case 'bitacora': return <BitacoraPanel />;
-        case 'team-tasks': return <TeamTasksPanel />;
-        case 'seguimiento': return <SeguimientoPanel />;
         case 'teams-management': return <TeamsManagementPanel />;
         case 'academic-committee': return <AcademicCommitteePanel />;
         case 'oferta-academica': return <OfertaAcademicaPanel />;
         case 'irregular-students': return <IrregularStudentsPanel />;
-        case 'early-departure': return <EarlyDeparturePanel />;
-        default: return <SeguimientoPanel />;
+        default: return <Dashboard />;
     }
   }
 
@@ -745,12 +741,6 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Calendario Académico" isActive={activeView === 'academic-calendar'} onClick={() => handleSetActiveView('academic-calendar')}>
                     <CalendarDays />
                     <span>Calendario Académico</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Tablero de Seguimiento" isActive={activeView === 'seguimiento'} onClick={() => handleSetActiveView('seguimiento')}>
-                    <FileText />
-                    <span>Tablero de Seguimiento</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
@@ -778,12 +768,6 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Alumnos con Salida Temprano" isActive={activeView === 'early-departure'} onClick={() => handleSetActiveView('early-departure')}>
-                    <TimerOff />
-                    <span>Salida Temprano</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')}>
                     <Contact />
                     <span>Horarios de Profesores</span>
@@ -793,12 +777,6 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Planificador de Horarios" isActive={activeView === 'oferta-academica'} onClick={() => handleSetActiveView('oferta-academica')}>
                     <BookOpen />
                     <span>Planificador de Horarios</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Tareas de Equipo" isActive={activeView === 'team-tasks'} onClick={() => handleSetActiveView('team-tasks')}>
-                    <ClipboardList />
-                    <span>Tareas de Equipo</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
