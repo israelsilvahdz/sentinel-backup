@@ -5,56 +5,89 @@ import { useMemo } from 'react';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDashboardFilters } from './DashboardClient';
-import { HelpCircle, CheckCircle2 } from 'lucide-react';
+import { HelpCircle, CheckCircle2, User, BookOpen } from 'lucide-react';
+import { type Student, type SubjectSummary } from '@/types/student';
+
+// New interface for the component's state
+interface StudentWithUnclassified {
+    student: Student;
+    unclassifiedSubjects: SubjectSummary[];
+}
 
 export function UnclassifiedSubjectsPanel() {
-  const { allStudents, isLoading, weightingSchemes } = useDashboardFilters();
+  // Use filteredStudents to respect the global leader filter
+  const { filteredStudents, isLoading, weightingSchemes } = useDashboardFilters();
 
-  const unclassifiedSubjects = useMemo(() => {
-    if (isLoading || !allStudents) return [];
+  const studentsWithUnclassifiedSubjects = useMemo(() => {
+    if (isLoading || !filteredStudents) return [];
 
-    const subjectSet = new Set<string>();
-
+    // 1. Create a set of all subjects that have a weighting scheme.
     const classifiedSubjects = new Set<string>();
     weightingSchemes.forEach(scheme => {
         scheme.subjectNames.forEach(name => classifiedSubjects.add(name));
     });
 
-    allStudents.forEach(student => {
-      student.subjectSummaries?.forEach(subject => {
-        if (!classifiedSubjects.has(subject.name)) {
-          subjectSet.add(subject.name);
-        }
-      });
-    });
+    const result: StudentWithUnclassified[] = [];
 
-    return Array.from(subjectSet).sort();
-  }, [allStudents, isLoading, weightingSchemes]);
+    // 2. Iterate through the (already filtered) students.
+    for (const student of filteredStudents) {
+      // 3. Find subjects for this student that are not in the classified set.
+      const unclassified = (student.subjectSummaries || []).filter(
+        subject => !classifiedSubjects.has(subject.name)
+      );
+
+      // 4. If the student has any unclassified subjects, add them to the result list.
+      if (unclassified.length > 0) {
+        result.push({
+          student: student,
+          unclassifiedSubjects: unclassified,
+        });
+      }
+    }
+
+    return result;
+  }, [filteredStudents, isLoading, weightingSchemes]);
 
   return (
     <div className="space-y-8 p-4 md:p-8 pt-6">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Materias Sin Clasificar</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Materias Sin Ponderación por Alumno</h1>
         <p className="text-muted-foreground">
-          Un listado de todas las materias encontradas en los reportes que no corresponden a ningún esquema de ponderación definido.
+          Listado de alumnos que cursan materias sin un esquema de ponderación asignado. Usa el filtro global para ver por líder de generación.
         </p>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle>Listado de Materias No Reconocidas</CardTitle>
+          <CardTitle>Resultados del Análisis</CardTitle>
           <CardDescription>
-            Utiliza esta lista para identificar qué materias necesitan ser añadidas a un esquema en el Gestor de Ponderaciones.
+            A continuación se muestran los alumnos y las materias específicas que no están clasificadas en ningún esquema de ponderación.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {unclassifiedSubjects.length > 0 ? (
-            <div className="flex flex-wrap gap-3">
-              {unclassifiedSubjects.map(subjectName => (
-                <Badge key={subjectName} variant="destructive" className="text-base px-3 py-1">
-                  <HelpCircle className="mr-2 h-4 w-4" />
-                  {subjectName}
-                </Badge>
+          {studentsWithUnclassifiedSubjects.length > 0 ? (
+            <div className="space-y-6">
+              {studentsWithUnclassifiedSubjects.map(({ student, unclassifiedSubjects }) => (
+                <Card key={student.id} className="p-4">
+                  <div className="flex items-center gap-4">
+                     <User className="h-5 w-5 text-primary" />
+                     <div>
+                        <h3 className="font-semibold">{student.name}</h3>
+                        <p className="text-sm text-muted-foreground">{student.id} | Líder: {student.leader}</p>
+                     </div>
+                  </div>
+                  <div className="mt-4 pl-9">
+                    <h4 className="text-sm font-medium mb-2 flex items-center gap-2"><BookOpen className="h-4 w-4 text-muted-foreground" />Materias sin ponderación:</h4>
+                    <div className="flex flex-wrap gap-2">
+                        {unclassifiedSubjects.map(subject => (
+                          <Badge key={subject.id} variant="destructive">
+                            <HelpCircle className="mr-2 h-4 w-4" />
+                            {subject.name}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+                </Card>
               ))}
             </div>
           ) : (
@@ -62,7 +95,7 @@ export function UnclassifiedSubjectsPanel() {
                 <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
                 <h3 className="text-xl font-semibold">¡Todo en orden!</h3>
                 <p className="text-muted-foreground mt-2">
-                    No se encontraron materias sin clasificar en los datos cargados actualmente.
+                    No se encontraron alumnos con materias sin clasificar para el filtro seleccionado.
                 </p>
             </div>
           )}
