@@ -73,7 +73,7 @@ export function BitacoraPanel() {
 
   useEffect(() => {
     fetchSeguimientoEntries();
-  }, [fetchSeguimientoEntries]);
+  }, []);
 
   const onSubmit = async (data: BitacoraFormValues) => {
     setIsSubmitting(true);

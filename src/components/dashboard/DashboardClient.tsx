@@ -291,7 +291,7 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams, fetchWeightingSchemes]);
+  }, []);
 
   // Persist data to local storage whenever it changes, now with encryption
   useEffect(() => {

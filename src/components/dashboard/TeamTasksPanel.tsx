@@ -54,7 +54,7 @@ export function TeamTasksPanel() {
 
   useEffect(() => {
     fetchTeamTasks().finally(() => setIsLoading(false));
-  }, [fetchTeamTasks]);
+  }, []);
 
   const filteredTasks = useMemo(() => {
     let baseTasks = teamTasks;

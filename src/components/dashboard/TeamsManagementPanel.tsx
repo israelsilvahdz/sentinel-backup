@@ -347,7 +347,7 @@ export function TeamsManagementPanel() {
 
   useEffect(() => {
     fetchTeams();
-  }, [fetchTeams]);
+  }, []);
   
   const { deportivoTeams, culturalTeams, unclassifiedTeams } = useMemo(() => {
     const deportivo: Team[] = [];

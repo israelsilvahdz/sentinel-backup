@@ -302,7 +302,7 @@ export function PonderacionesDashboard() {
 
   useEffect(() => {
     fetchWeightingSchemes();
-  }, [fetchWeightingSchemes]);
+  }, []);
 
   const handleFormSubmit = async (data: SchemeFormValues) => {
     try {
