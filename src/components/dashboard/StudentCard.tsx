@@ -19,8 +19,8 @@ import { Checkbox } from '../ui/checkbox';
 import { addSeguimientoEntry } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import * as htmlToImage from 'html-to-image';
-import { StudentReportImage } from './StudentReportImage';
+import { getActivityList } from '@/lib/ponderaciones';
+
 
 interface StudentCardProps {
   student: Student;
@@ -87,41 +87,21 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
 }
 
 function DetailedReportDialog({ student, onOpenChange }: { student: Student; onOpenChange: (open: boolean) => void }) {
-    const { loadStudentSubjects, studentContacts, toast } = useDashboardFilters();
-    const reportRef = useRef<HTMLDivElement>(null);
-    const [subjects, setSubjects] = useState<SubjectSummary[] | undefined>(undefined);
+    const { loadStudentSubjects, studentContacts, toast, weightingSchemes } = useDashboardFilters();
+    const [subjects, setSubjects] = useState<Subject[] | undefined>(undefined);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         async function getSubjects() {
             setIsLoading(true);
             const fullSubjects = await loadStudentSubjects(student.id);
-            const summaries = fullSubjects.map(s => ({
-                id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-                missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-                grade: s.grade, finalGrade: s.finalGrade, group: s.group
-            }));
-            setSubjects(summaries);
+            setSubjects(fullSubjects);
             setIsLoading(false);
         }
         getSubjects();
     }, [student.id, loadStudentSubjects]);
-
-    const handleCopyImage = () => {
-        if (!reportRef.current) return;
-        htmlToImage.toBlob(reportRef.current, { pixelRatio: 2 })
-            .then(blob => {
-                if (blob) {
-                    navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                    toast({ title: "Reporte Copiado", description: "La imagen del reporte está en tu portapapeles." });
-                }
-            }).catch(err => {
-                toast({ variant: "destructive", title: "Error", description: "No se pudo copiar la imagen." });
-                console.error(err);
-            });
-    };
     
-    const handleOpenWhatsApp = () => {
+    const handleCopyAndOpenWhatsApp = () => {
         const contact = studentContacts[student.id];
         const parentPhone = contact?.dadPhone || contact?.momPhone;
         if (!parentPhone) {
@@ -129,66 +109,116 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
             return;
         }
 
-        let summaryMessage = '';
-        const highRiskSubjects: string[] = [];
-
-        if (subjects) {
-             subjects.forEach(subject => {
-                const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
-                const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
-
-                if (['high', 'at_limit', 'sd'].includes(absenceRisk.level) || ['high', 'at_limit', 'sd'].includes(assignmentRisk.level)) {
-                    let details = [];
-                    if (['high', 'at_limit', 'sd'].includes(absenceRisk.level)) {
-                        details.push(`Faltas: ${subject.absences}/${subject.absenceLimit}`);
-                    }
-                    if (['high', 'at_limit', 'sd'].includes(assignmentRisk.level)) {
-                        details.push(`Tareas NE: ${subject.missedAssignments}/${subject.missedAssignmentLimit}`);
-                    }
-                    highRiskSubjects.push(`• *${subject.name}* (${details.join(', ')})`);
-                }
-            });
-        }
-        
-        if (highRiskSubjects.length > 0) {
-            summaryMessage = `\n\nResumen de puntos de atención:\n${highRiskSubjects.join('\n')}`;
+        if (!subjects) {
+            toast({ variant: 'destructive', title: "Datos no cargados", description: "Las materias del alumno aún no se han cargado." });
+            return;
         }
 
-        const message = `Estimados padres de ${student.name}, les comparto su reporte detallado de calificaciones y asistencias. ${summaryMessage}\n\nPara ver el reporte completo, por favor, peguen la imagen que acabas de copiar en este chat.`;
-        
-        const cleanParentPhone = parentPhone.replace(/\D/g, '');
-        const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
-        const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(message)}`;
+        let reportMessage = `Estimados padres de ${student.name}, a continuación se presenta un resumen de su progreso académico:\n\n`;
 
-        window.open(whatsappUrl, '_blank');
-        onOpenChange(false);
+        subjects.forEach(subject => {
+            const activityList = getActivityList(subject, weightingSchemes);
+            let totalEarnedPoints = 0;
+            let maxPossiblePoints = 0;
+
+            if (activityList.length > 0) {
+                activityList.forEach(item => {
+                    const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+                    if (isGraded) {
+                        const score = Number(item.score) || 0;
+                        totalEarnedPoints += (score / 100) * item.weight;
+                        maxPossiblePoints += item.weight;
+                    }
+                });
+            }
+            
+            const calculatedGradeText = maxPossiblePoints > 0 
+                ? `${totalEarnedPoints.toFixed(2)} de ${maxPossiblePoints.toFixed(2)} pts` 
+                : 'N/D';
+
+            reportMessage += `*${subject.name}*:\n`;
+            reportMessage += `  • Faltas: ${subject.absences} de ${subject.absenceLimit}\n`;
+            reportMessage += `  • Tareas NE: ${subject.missedAssignments} de ${subject.missedAssignmentLimit}\n`;
+            reportMessage += `  • Calif. Calculada: ${calculatedGradeText}\n\n`;
+        });
+        
+        reportMessage += `Quedamos a su disposición para cualquier duda.`;
+        
+        navigator.clipboard.writeText(reportMessage).then(() => {
+            toast({ title: "Mensaje Copiado", description: "El reporte en texto para WhatsApp está en tu portapapeles." });
+            
+            const cleanParentPhone = parentPhone.replace(/\D/g, '');
+            const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
+            const whatsappUrl = `https://wa.me/${finalParentPhone}`;
+
+            window.open(whatsappUrl, '_blank');
+            onOpenChange(false);
+        }).catch(err => {
+            toast({ variant: "destructive", title: "Error al copiar", description: "No se pudo copiar el mensaje al portapapeles." });
+            console.error(err);
+        });
+    };
+
+    const generateMessagePreview = () => {
+        if (isLoading || !subjects) return "Cargando vista previa...";
+        
+        let preview = `Estimados padres de ${student.name}, a continuación se presenta un resumen de su progreso académico:\n\n`;
+        
+        subjects.forEach(subject => {
+            const activityList = getActivityList(subject, weightingSchemes);
+            let totalEarnedPoints = 0;
+            let maxPossiblePoints = 0;
+             if (activityList.length > 0) {
+                activityList.forEach(item => {
+                    const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+                    if (isGraded) {
+                        const score = Number(item.score) || 0;
+                        totalEarnedPoints += (score / 100) * item.weight;
+                        maxPossiblePoints += item.weight;
+                    }
+                });
+            }
+            const calculatedGradeText = maxPossiblePoints > 0 ? `${totalEarnedPoints.toFixed(2)} de ${maxPossiblePoints.toFixed(2)} pts` : 'N/D';
+            preview += `*${subject.name}*:\n`;
+            preview += `  • Faltas: ${subject.absences} de ${subject.absenceLimit}\n`;
+            preview += `  • Tareas NE: ${subject.missedAssignments} de ${subject.missedAssignmentLimit}\n`;
+            preview += `  • Calif. Calculada: ${calculatedGradeText}\n\n`;
+        });
+        preview += `Quedamos a su disposición para cualquier duda.`;
+        return preview;
     };
 
     return (
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-2xl">
             <DialogHeader>
-                <DialogTitle>Reporte Detallado de {student.name}</DialogTitle>
+                <DialogTitle>Generar Mensaje de Reporte para Padres</DialogTitle>
                 <DialogDescription>
-                    Copia la imagen del reporte y luego abre WhatsApp para enviarla a los padres.
+                    Revisa el mensaje de texto, luego cópialo y abre WhatsApp para enviarlo.
                 </DialogDescription>
             </DialogHeader>
             {isLoading ? (
-                <div className="flex items-center justify-center h-96">
+                <div className="flex items-center justify-center h-64">
                     <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
             ) : (
                 <div className="py-4">
-                    <div ref={reportRef} className="inline-block">
-                        <StudentReportImage student={student} subjects={subjects} />
-                    </div>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Vista Previa del Mensaje</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                           <ScrollArea className="h-72 border bg-muted/50 p-4 rounded-md">
+                                <pre className="whitespace-pre-wrap text-sm">
+                                    {generateMessagePreview()}
+                                </pre>
+                           </ScrollArea>
+                        </CardContent>
+                    </Card>
                 </div>
             )}
             <DialogFooter>
-                <Button variant="outline" onClick={handleCopyImage} disabled={isLoading}>
-                    <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Imagen
-                </Button>
-                <Button onClick={handleOpenWhatsApp} disabled={isLoading}>
-                    <Send className="mr-2 h-4 w-4" /> Abrir WhatsApp y Pegar
+                <Button onClick={handleCopyAndOpenWhatsApp} disabled={isLoading}>
+                    <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar y Abrir WhatsApp
                 </Button>
             </DialogFooter>
         </DialogContent>
@@ -518,5 +548,3 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
     </Card>
   );
 }
-
-    
