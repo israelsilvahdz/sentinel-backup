@@ -27,15 +27,12 @@ import { MapPlanner } from './MapPlanner';
 import { AcademicCalendar } from './AcademicCalendar';
 import { DashboardFilters } from './DashboardFilters';
 import { BitacoraPanel } from './BitacoraPanel';
-import { TeamTasksPanel } from './TeamTasksPanel';
-import { SeguimientoPanel } from './SeguimientoPanel';
 import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { AcademicCommitteePanel } from './AcademicCommitteePanel';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { ProjectionsPanel } from './ProjectionsPanel';
-import { EarlyDeparturePanel } from './EarlyDeparturePanel';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp, Calendar, TimerOff } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -54,7 +51,7 @@ import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'team-tasks' | 'seguimiento' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections' | 'early-departure';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'bitacora' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -363,82 +360,45 @@ export function DashboardClient() {
             setDataKey(newKey);
             setProgress(20);
 
-            let studentsArray: Student[] = [];
-            let ofertaArray: OfertaAcademicaItem[] = [];
-            let loadedFromStorage = false;
-
-            const encryptedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
-            if (encryptedStudents) {
-                try {
-                    const decryptedData = xorCipher(encryptedStudents, newKey);
-                    const parsedData = JSON.parse(decryptedData);
-                    if (Array.isArray(parsedData) && (parsedData.length === 0 || 'name' in parsedData[0])) {
-                        studentsArray = parsedData;
-                        loadedFromStorage = true;
-                    }
-                } catch (e) {
-                    console.warn("Could not decrypt student data with the provided file key.");
-                }
-            }
-
-            const encryptedOferta = localStorage.getItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
-            if (encryptedOferta) {
-                try {
-                    const decryptedData = xorCipher(encryptedOferta, newKey);
-                    const parsedData = JSON.parse(decryptedData);
-                    if (Array.isArray(parsedData)) ofertaArray = parsedData;
-                } catch(e) {
-                    console.warn("Could not decrypt oferta académica data.");
-                }
+            const studentData = await parseExcel(currentFile);
+            setProgress(50);
+            
+            if (!studentData) {
+                toast({ variant: 'destructive', title: 'Error de Formato', description: 'El archivo Excel no tiene el formato esperado o está vacío.' });
+                setIsProcessing(false); setProgress(0); setCurrentFile(null); return;
             }
             
-            if (loadedFromStorage) {
-                setAllStudents(studentsArray);
-                setOfertaAcademica(ofertaArray);
-                toast({
-                    title: 'Datos Desbloqueados',
-                    description: `Se han cargado ${studentsArray.length} alumnos de tus datos guardados.`,
-                });
+            const processedStudents = Object.values(studentData).map(student => ({
+                ...student,
+                subjectSummaries: (student.subjects || []).map(s => ({
+                  id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+                  missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+                  grade: s.grade, finalGrade: s.finalGrade, group: s.group
+                })),
+            }));
+            
+            setAllStudents(processedStudents);
+            
+            setOfertaAcademica([]); 
+            localStorage.removeItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
+
+            const numbersInFile = currentFile.name.match(/\d+/g);
+            if (numbersInFile && numbersInFile.length > 0) {
+                const lastNumberSegment = numbersInFile[numbersInFile.length - 1];
+                if (['40', '50', '60'].some(ending => lastNumberSegment.endsWith(ending))) setPlanType('semestral');
+                else if (['10', '20', '30'].some(ending => lastNumberSegment.endsWith(ending))) setPlanType('tetramestral');
+            } else if (currentFile.name.includes('40') || currentFile.name.includes('50') || currentFile.name.includes('60')) {
+                setPlanType('semestral');
             } else {
-                const studentData = await parseExcel(currentFile);
-                setProgress(50);
-                
-                if (!studentData) {
-                    toast({ variant: 'destructive', title: 'Error de Formato', description: 'El archivo Excel no tiene el formato esperado o está vacío.' });
-                    setIsProcessing(false); setProgress(0); setCurrentFile(null); return;
-                }
-                
-                const processedStudents = Object.values(studentData).map(student => ({
-                    ...student,
-                    subjectSummaries: (student.subjects || []).map(s => ({
-                      id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-                      missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-                      grade: s.grade, finalGrade: s.finalGrade, group: s.group
-                    })),
-                }));
-                setAllStudents(processedStudents);
-                
-                // Clear potentially stale oferta academica if starting a new "session"
-                setOfertaAcademica([]); 
-                localStorage.removeItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
-
-                const numbersInFile = currentFile.name.match(/\d+/g);
-                if (numbersInFile && numbersInFile.length > 0) {
-                    const lastNumberSegment = numbersInFile[numbersInFile.length - 1];
-                    if (['40', '50', '60'].some(ending => lastNumberSegment.endsWith(ending))) setPlanType('semestral');
-                    else if (['10', '20', '30'].some(ending => lastNumberSegment.endsWith(ending))) setPlanType('tetramestral');
-                } else if (currentFile.name.includes('40') || currentFile.name.includes('50') || currentFile.name.includes('60')) {
-                    setPlanType('semestral');
-                } else {
-                    setPlanType('tetramestral');
-                }
-
-                setProgress(90);
-                toast({
-                    title: 'Éxito',
-                    description: `Se procesaron ${processedStudents.length} alumnos del reporte.`,
-                });
+                setPlanType('tetramestral');
             }
+
+            setProgress(90);
+            toast({
+                title: 'Éxito',
+                description: `Se procesaron ${processedStudents.length} alumnos del reporte.`,
+            });
+            
             setUploadHistory(prev => [{ id: Date.now().toString(), fileName: currentFile.name, uploadedAt: new Date().toISOString() }, ...prev].slice(0, 10));
 
         } catch (error) {
@@ -449,7 +409,7 @@ export function DashboardClient() {
         }
     };
     processFile();
-  }, [currentFile, toast]);
+  }, [currentFile, toast, setAllStudents, setOfertaAcademica, setPlanType, setUploadHistory, setDataKey]);
 
     const handleMergeUpload = useCallback(async (file: File) => {
         try {
