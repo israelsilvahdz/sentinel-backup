@@ -139,11 +139,14 @@ function SchemeForm({ onFormSubmit, existingScheme, allSubjectNames, onCancel }:
     activityGroups.forEach(group => {
         const activityNumbers = parseRange(group.range);
         activityNumbers.forEach(num => {
-            flattenedActivities.push({
+            const activity: { name: string; weight: number; label?: string } = {
                 name: `Actividad ${num}`,
                 weight: group.weight || 0,
-                label: group.label || undefined,
-            });
+            };
+            if (group.label && group.label.trim() !== '') {
+                activity.label = group.label;
+            }
+            flattenedActivities.push(activity);
         });
     });
     setValue('activities', flattenedActivities, { shouldValidate: true });
