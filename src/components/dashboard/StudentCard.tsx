@@ -101,7 +101,7 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
         getSubjects();
     }, [student.id, loadStudentSubjects]);
     
-    const handleCopyAndOpenWhatsApp = () => {
+    const handleOpenWhatsApp = () => {
         const contact = studentContacts[student.id];
         const parentPhone = contact?.dadPhone || contact?.momPhone;
         if (!parentPhone) {
@@ -109,54 +109,19 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
             return;
         }
 
-        if (!subjects) {
-            toast({ variant: 'destructive', title: "Datos no cargados", description: "Las materias del alumno aún no se han cargado." });
-            return;
+        const reportMessage = generateMessagePreview();
+        if (isLoading || !subjects || reportMessage.startsWith("Cargando")) {
+             toast({ variant: 'destructive', title: "Mensaje no listo", description: "La vista previa del mensaje aún se está generando." });
+             return;
         }
-
-        let reportMessage = `Estimados padres de ${student.name}, a continuación se presenta un resumen de su progreso académico:\n\n`;
-
-        subjects.forEach(subject => {
-            const activityList = getActivityList(subject, weightingSchemes);
-            let totalEarnedPoints = 0;
-            let maxPossiblePoints = 0;
-
-            if (activityList.length > 0) {
-                activityList.forEach(item => {
-                    const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
-                    if (isGraded) {
-                        const score = Number(item.score) || 0;
-                        totalEarnedPoints += (score / 100) * item.weight;
-                        maxPossiblePoints += item.weight;
-                    }
-                });
-            }
-            
-            const calculatedGradeText = maxPossiblePoints > 0 
-                ? `${totalEarnedPoints.toFixed(2)} de ${maxPossiblePoints.toFixed(2)} pts` 
-                : 'N/D';
-
-            reportMessage += `*${subject.name}*:\n`;
-            reportMessage += `  • Faltas: ${subject.absences} de ${subject.absenceLimit}\n`;
-            reportMessage += `  • Tareas NE: ${subject.missedAssignments} de ${subject.missedAssignmentLimit}\n`;
-            reportMessage += `  • Calif. Calculada: ${calculatedGradeText}\n\n`;
-        });
         
-        reportMessage += `Quedamos a su disposición para cualquier duda.`;
-        
-        navigator.clipboard.writeText(reportMessage).then(() => {
-            toast({ title: "Mensaje Copiado", description: "El reporte en texto para WhatsApp está en tu portapapeles." });
-            
-            const cleanParentPhone = parentPhone.replace(/\D/g, '');
-            const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
-            const whatsappUrl = `https://wa.me/${finalParentPhone}`;
+        const cleanParentPhone = parentPhone.replace(/\D/g, '');
+        const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
+        const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(reportMessage)}`;
 
-            window.open(whatsappUrl, '_blank');
-            onOpenChange(false);
-        }).catch(err => {
-            toast({ variant: "destructive", title: "Error al copiar", description: "No se pudo copiar el mensaje al portapapeles." });
-            console.error(err);
-        });
+        window.open(whatsappUrl, '_blank');
+        toast({ title: "Abriendo WhatsApp", description: "El mensaje está listo para ser enviado." });
+        onOpenChange(false);
     };
 
     const generateMessagePreview = () => {
@@ -193,7 +158,7 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
             <DialogHeader>
                 <DialogTitle>Generar Mensaje de Reporte para Padres</DialogTitle>
                 <DialogDescription>
-                    Revisa el mensaje de texto, luego cópialo y abre WhatsApp para enviarlo.
+                    Revisa el mensaje de texto, luego ábrelo en WhatsApp para enviarlo.
                 </DialogDescription>
             </DialogHeader>
             {isLoading ? (
@@ -217,8 +182,8 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
                 </div>
             )}
             <DialogFooter>
-                <Button onClick={handleCopyAndOpenWhatsApp} disabled={isLoading}>
-                    <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar y Abrir WhatsApp
+                <Button onClick={handleOpenWhatsApp} disabled={isLoading}>
+                    <Send className="mr-2 h-4 w-4" /> Abrir en WhatsApp
                 </Button>
             </DialogFooter>
         </DialogContent>
