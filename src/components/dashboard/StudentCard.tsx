@@ -269,9 +269,9 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
                 throw new Error("No se encontraron materias para este alumno.");
             }
             
-            let reportMessage = `A continuación, les compartimos un resumen del progreso académico de su hijo.\nLas calificaciones se presentan en puntos obtenidos respecto al total posible en cada materia, lo cual nos permite ver con claridad su desempeño hasta este momento.\n\n`;
-            
-            subjects.forEach(subject => {
+            const intro = `Estimados padres de ${student.name},\n\nA continuación, les compartimos un resumen del progreso académico de su hijo/a.\nLas calificaciones se presentan en puntos obtenidos respecto al total posible en cada materia, lo cual nos permite ver con claridad su desempeño hasta este momento.`;
+
+            const subjectReports = subjects.map(subject => {
                 const activityList = getActivityList(subject, weightingSchemes);
                 let totalEarnedPoints = 0;
                 let maxPossiblePoints = 0;
@@ -286,19 +286,29 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
                     });
                 }
                 const calculatedGradeText = maxPossiblePoints > 0 ? `${totalEarnedPoints.toFixed(2)} de ${maxPossiblePoints.toFixed(2)} pts` : 'N/D';
-                reportMessage += `*${subject.name}*:\n`;
-                reportMessage += `  • Faltas: ${subject.absences} de ${subject.absenceLimit}\n`;
-                reportMessage += `  • Tareas NE: ${subject.missedAssignments} de ${subject.missedAssignmentLimit}\n`;
-                reportMessage += `  • Calif. Calculada: ${calculatedGradeText}\n\n`;
+                
+                return [
+                    `*${subject.name}*:`,
+                    `  • Faltas: ${subject.absences} de ${subject.absenceLimit}`,
+                    `  • Tareas NE: ${subject.missedAssignments} de ${subject.missedAssignmentLimit}`,
+                    `  • Calif. Calculada: ${calculatedGradeText}`
+                ].join('\n');
             });
-            reportMessage += `Quedamos a su disposición para cualquier duda.`;
+            
+            const outro = `Quedamos a su disposición para cualquier duda.`;
+            
+            const reportMessage = [
+                intro,
+                ...subjectReports,
+                outro
+            ].join('\n\n');
+
 
             const cleanParentPhone = parentPhone.replace(/\D/g, '');
             const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
             const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(reportMessage)}`;
 
             window.open(whatsappUrl, '_blank');
-            toast({ title: "Abriendo WhatsApp", description: "El mensaje está listo para ser enviado." });
 
             const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
             const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
@@ -474,4 +484,3 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
     </Card>
   );
 }
-
