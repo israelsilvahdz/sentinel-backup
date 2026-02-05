@@ -127,7 +127,7 @@ function DetailedReportDialog({ student, onOpenChange }: { student: Student; onO
     const generateMessagePreview = () => {
         if (isLoading || !subjects) return "Cargando vista previa...";
         
-        let preview = `Estimados padres de ${student.name}, a continuación se presenta un resumen de su progreso académico:\n\n`;
+        let preview = `A continuación, les compartimos un resumen del progreso académico de su hijo.\nLas calificaciones se presentan en puntos obtenidos respecto al total posible en cada materia, lo cual nos permite ver con claridad su desempeño hasta este momento.\n\n`;
         
         subjects.forEach(subject => {
             const activityList = getActivityList(subject, weightingSchemes);
