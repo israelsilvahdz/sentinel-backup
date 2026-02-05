@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useDashboardFilters } from './DashboardClient';
 import { KpiCard } from './KpiCard';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2, Library, BadgeAlert, FileWarning, BookX } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BookOpenCheck, User, Users, FileText, UploadCloud, FileClock, FileCheck2, Library, BadgeAlert, FileWarning, BookX, ClipboardCopy } from 'lucide-react';
 import { type Change, type Student, type StudentData } from '@/types/student';
 import { FileUpload } from './FileUpload';
 import { Button } from '../ui/button';
@@ -327,11 +327,52 @@ export function ChangeStats() {
         setLatestComparison({}); // Limpia los resultados cuando se quita el archivo
     }
 
+    const handleCopySummary = () => {
+    const summary = `*Resumen del Análisis de Cambios* 📄
+
+*KPIs Principales:*
+• Alumnos con Nuevos Riesgos: *${studentsWithChanges}*
+• Total de Riesgos Incrementados: *${totalChanges}*
+• Total Faltas (nuevas): *${totalNewAbsences}*
+• Total Tareas NE (nuevas): *${totalNewMissedAssignments}*
+
+---
+
+*Top 5 Materias con más Nuevos Riesgos:*
+${changesBySubject.slice(0, 5).map(s => `• ${s.name}: ${s.Faltas} F, ${s['Tareas (NE)']} NE`).join('\n')}
+
+---
+
+*Top 5 Líderes con más Nuevos Riesgos:*
+${changesByLeader.slice(0, 5).map(l => `• ${l.name}: ${l.Faltas} F, ${l['Tareas (NE)']} NE`).join('\n')}
+
+---
+
+*Nuevas Tareas NE en Materias Online:*
+${onlineSubjectChanges.map(s => `• ${s.name}: ${s.value} NE`).join('\n')}
+    `.trim();
+
+    navigator.clipboard.writeText(summary).then(() => {
+        toast({
+            title: 'Resumen Copiado',
+            description: 'El resumen del análisis se ha copiado al portapapeles.',
+        });
+    });
+};
+
     return (
         <div className="space-y-8 p-4 md:p-8 pt-6">
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight">Análisis de Cambios</h1>
-                <p className="text-muted-foreground">Compara el reporte diario actual con uno anterior para detectar nuevas faltas y tareas no entregadas.</p>
+            <header className="flex items-center justify-between flex-wrap gap-4 mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Análisis de Cambios</h1>
+                    <p className="text-muted-foreground">Compara el reporte diario actual con uno anterior para detectar nuevas faltas y tareas no entregadas.</p>
+                </div>
+                {hasComparisonData && (
+                    <Button onClick={handleCopySummary} variant="outline">
+                        <ClipboardCopy className="mr-2 h-4 w-4" />
+                        Copiar Resumen
+                    </Button>
+                )}
             </header>
 
             <Card>
