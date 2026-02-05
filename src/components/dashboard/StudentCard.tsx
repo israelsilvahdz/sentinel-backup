@@ -86,113 +86,9 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
     );
 }
 
-function DetailedReportDialog({ student, onOpenChange }: { student: Student; onOpenChange: (open: boolean) => void }) {
-    const { loadStudentSubjects, studentContacts, toast, weightingSchemes } = useDashboardFilters();
-    const [subjects, setSubjects] = useState<Subject[] | undefined>(undefined);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        async function getSubjects() {
-            setIsLoading(true);
-            const fullSubjects = await loadStudentSubjects(student.id);
-            setSubjects(fullSubjects);
-            setIsLoading(false);
-        }
-        getSubjects();
-    }, [student.id, loadStudentSubjects]);
-    
-    const handleOpenWhatsApp = () => {
-        const contact = studentContacts[student.id];
-        const parentPhone = contact?.dadPhone || contact?.momPhone;
-        if (!parentPhone) {
-            toast({ variant: 'destructive', title: "Teléfono no encontrado", description: "No hay teléfono de padres para este alumno." });
-            return;
-        }
-
-        const reportMessage = generateMessagePreview();
-        if (isLoading || !subjects || reportMessage.startsWith("Cargando")) {
-             toast({ variant: 'destructive', title: "Mensaje no listo", description: "La vista previa del mensaje aún se está generando." });
-             return;
-        }
-        
-        const cleanParentPhone = parentPhone.replace(/\D/g, '');
-        const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
-        const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(reportMessage)}`;
-
-        window.open(whatsappUrl, '_blank');
-        toast({ title: "Abriendo WhatsApp", description: "El mensaje está listo para ser enviado." });
-        onOpenChange(false);
-    };
-
-    const generateMessagePreview = () => {
-        if (isLoading || !subjects) return "Cargando vista previa...";
-        
-        let preview = `A continuación, les compartimos un resumen del progreso académico de su hijo.\nLas calificaciones se presentan en puntos obtenidos respecto al total posible en cada materia, lo cual nos permite ver con claridad su desempeño hasta este momento.\n\n`;
-        
-        subjects.forEach(subject => {
-            const activityList = getActivityList(subject, weightingSchemes);
-            let totalEarnedPoints = 0;
-            let maxPossiblePoints = 0;
-             if (activityList.length > 0) {
-                activityList.forEach(item => {
-                    const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
-                    if (isGraded) {
-                        const score = Number(item.score) || 0;
-                        totalEarnedPoints += (score / 100) * item.weight;
-                        maxPossiblePoints += item.weight;
-                    }
-                });
-            }
-            const calculatedGradeText = maxPossiblePoints > 0 ? `${totalEarnedPoints.toFixed(2)} de ${maxPossiblePoints.toFixed(2)} pts` : 'N/D';
-            preview += `*${subject.name}*:\n`;
-            preview += `  • Faltas: ${subject.absences} de ${subject.absenceLimit}\n`;
-            preview += `  • Tareas NE: ${subject.missedAssignments} de ${subject.missedAssignmentLimit}\n`;
-            preview += `  • Calif. Calculada: ${calculatedGradeText}\n\n`;
-        });
-        preview += `Quedamos a su disposición para cualquier duda.`;
-        return preview;
-    };
-
-    return (
-        <DialogContent className="max-w-2xl">
-            <DialogHeader>
-                <DialogTitle>Generar Mensaje de Reporte para Padres</DialogTitle>
-                <DialogDescription>
-                    Revisa el mensaje de texto, luego ábrelo en WhatsApp para enviarlo.
-                </DialogDescription>
-            </DialogHeader>
-            {isLoading ? (
-                <div className="flex items-center justify-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
-            ) : (
-                <div className="py-4">
-                     <Card>
-                        <CardHeader>
-                            <CardTitle>Vista Previa del Mensaje</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                           <ScrollArea className="h-72 border bg-muted/50 p-4 rounded-md">
-                                <pre className="whitespace-pre-wrap text-sm">
-                                    {generateMessagePreview()}
-                                </pre>
-                           </ScrollArea>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-            <DialogFooter>
-                <Button onClick={handleOpenWhatsApp} disabled={isLoading}>
-                    <Send className="mr-2 h-4 w-4" /> Abrir en WhatsApp
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    );
-}
-
 function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { student: Student, changes: Change[], seguimiento: (SeguimientoEntry | BitacoraEntry)[], onSent: () => void }) {
-    const { studentContacts, toast } = useDashboardFilters();
-    const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+    const { studentContacts, toast, loadStudentSubjects, weightingSchemes } = useDashboardFilters();
+    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
     const { lastChangeDate, hasChanges } = useMemo(() => {
         if (!changes || changes.length === 0) return { lastChangeDate: null, hasChanges: false };
@@ -356,6 +252,75 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
         }
     };
     
+    const handleSendDetailedReport = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsGeneratingReport(true);
+        toast({ title: "Generando reporte detallado...", description: "Por favor, espera un momento." });
+
+        try {
+            const contact = studentContacts[student.id];
+            const parentPhone = contact?.dadPhone || contact?.momPhone;
+            if (!parentPhone) {
+                throw new Error("No hay teléfono de padres para este alumno.");
+            }
+
+            const subjects = await loadStudentSubjects(student.id);
+            if (!subjects || subjects.length === 0) {
+                throw new Error("No se encontraron materias para este alumno.");
+            }
+            
+            let reportMessage = `A continuación, les compartimos un resumen del progreso académico de su hijo.\nLas calificaciones se presentan en puntos obtenidos respecto al total posible en cada materia, lo cual nos permite ver con claridad su desempeño hasta este momento.\n\n`;
+            
+            subjects.forEach(subject => {
+                const activityList = getActivityList(subject, weightingSchemes);
+                let totalEarnedPoints = 0;
+                let maxPossiblePoints = 0;
+                if (activityList.length > 0) {
+                    activityList.forEach(item => {
+                        const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+                        if (isGraded) {
+                            const score = Number(item.score) || 0;
+                            totalEarnedPoints += (score / 100) * item.weight;
+                            maxPossiblePoints += item.weight;
+                        }
+                    });
+                }
+                const calculatedGradeText = maxPossiblePoints > 0 ? `${totalEarnedPoints.toFixed(2)} de ${maxPossiblePoints.toFixed(2)} pts` : 'N/D';
+                reportMessage += `*${subject.name}*:\n`;
+                reportMessage += `  • Faltas: ${subject.absences} de ${subject.absenceLimit}\n`;
+                reportMessage += `  • Tareas NE: ${subject.missedAssignments} de ${subject.missedAssignmentLimit}\n`;
+                reportMessage += `  • Calif. Calculada: ${calculatedGradeText}\n\n`;
+            });
+            reportMessage += `Quedamos a su disposición para cualquier duda.`;
+
+            const cleanParentPhone = parentPhone.replace(/\D/g, '');
+            const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
+            const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(reportMessage)}`;
+
+            window.open(whatsappUrl, '_blank');
+            toast({ title: "Abriendo WhatsApp", description: "El mensaje está listo para ser enviado." });
+
+            const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
+            const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
+            const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
+                studentId: student.id,
+                studentName: student.name,
+                attendedBy: 'Sistema Automático',
+                topic: 'Reporte Detallado a Padres (WhatsApp)',
+                notes: reportMessage,
+                absencesAtFollowUp: totalAbsences,
+                missedAssignmentsAtFollowUp: totalMissed,
+            };
+            await addSeguimientoEntry(newEntry);
+            onSent();
+
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Error al generar reporte", description: error.message });
+        } finally {
+            setIsGeneratingReport(false);
+        }
+    };
+    
     if (!hasChanges) {
         return null;
     }
@@ -381,17 +346,13 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
                 </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => {e.stopPropagation(); setIsReportDialogOpen(true);}}>
-                            <FileText className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSendDetailedReport} disabled={isGeneratingReport}>
+                           {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent><p>Enviar reporte detallado a padres</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
-
-            <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-                <DetailedReportDialog student={student} onOpenChange={setIsReportDialogOpen} />
-            </Dialog>
         </div>
     );
 }
@@ -513,3 +474,4 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
     </Card>
   );
 }
+
