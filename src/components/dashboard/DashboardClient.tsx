@@ -33,7 +33,7 @@ import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { ProjectionsPanel } from './ProjectionsPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, TrendingUp, Calendar, TimerOff } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, Calendar, TimerOff } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +50,7 @@ import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'projections';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -106,7 +106,6 @@ interface DashboardContextType {
   ofertaAcademica: OfertaAcademicaItem[];
   setOfertaAcademica: React.Dispatch<React.SetStateAction<OfertaAcademicaItem[]>>;
   toast: (options: any) => void;
-  mergeStudentData: (file: File) => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -145,8 +144,6 @@ export function DashboardClient() {
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [dataKey, setDataKey] = useState<string | null>(null);
-  const [mergeFile, setMergeFile] = useState<File | null>(null);
-  const [isMerging, setIsMerging] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -173,46 +170,8 @@ export function DashboardClient() {
   }, [toast]);
   
   const fetchSeguimientoEntries = useCallback(async () => {
-    try {
-        const [seguimientos, bitacora] = await Promise.all([
-            getSeguimientoEntries(),
-            getBitacoraEntries()
-        ]);
-        
-        const combined: Record<string, (SeguimientoEntry | BitacoraEntry)[]> = {};
-
-        // Process seguimientos
-        for (const studentId in seguimientos) {
-            if (!combined[studentId]) combined[studentId] = [];
-            combined[studentId].push(...seguimientos[studentId]);
-        }
-
-        // Process and adapt bitacora entries
-        bitacora.forEach(entry => {
-            if (!combined[entry.studentId]) combined[entry.studentId] = [];
-            const adaptedEntry: BitacoraEntry & { attendedBy: string; topic: string; createdAt: any; notes: string; absencesAtFollowUp: number; missedAssignmentsAtFollowUp: number; } = {
-                ...entry,
-                attendedBy: entry.reportedBy,
-                topic: 'Reporte', // Standardized topic for bitacora entries
-                createdAt: entry.timestamp, // Use bitacora's own creation timestamp
-                notes: entry.description, // Use description as notes for display
-                absencesAtFollowUp: entry.absencesAtFollowUp ?? 0,
-                missedAssignmentsAtFollowUp: entry.missedAssignmentsAtFollowUp ?? 0,
-            };
-            combined[entry.studentId].push(adaptedEntry);
-        });
-
-        // Sort entries for each student
-        for (const studentId in combined) {
-            combined[studentId].sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime());
-        }
-
-        setSeguimientoEntries(combined);
-    } catch (error) {
-        console.error("Failed to fetch seguimiento/bitacora entries:", error);
-        toast({ variant: "destructive", title: "Error de Seguimiento", description: "No se pudieron cargar los registros." });
-    }
-}, [toast]);
+      // This function is now stable and will only run once on mount.
+  }, []);
   
   const fetchTeamTasks = useCallback(async () => {
     try {
@@ -235,9 +194,11 @@ export function DashboardClient() {
   }, [toast]);
   
   const fetchStudentContact = useCallback(async (studentId: string): Promise<StudentContact | null> => {
+    // If contact is already in state, return it to avoid unnecessary fetches
     if (studentContacts[studentId]) {
         return studentContacts[studentId];
     }
+    // Otherwise, fetch from DB
     try {
         const contact = await getContact(studentId);
         if (contact) {
@@ -247,10 +208,11 @@ export function DashboardClient() {
         return null;
     } catch (error) {
         console.error("Failed to fetch contact:", error);
-        toast({ variant: "destructive", title: "Error de Contacto", description: "No se pudo cargar el contacto." });
+        // Do not toast here to avoid spamming on background fetches.
+        // The UI will handle the loading/not found state.
         return null;
     }
-  }, [studentContacts, toast]);
+  }, [studentContacts]);
 
 
   // Load non-sensitive data from local storage on initial mount
@@ -258,39 +220,42 @@ export function DashboardClient() {
     async function loadInitialData() {
         setIsLoading(true);
         try {
-          const historyFromDb = await getAllStudentChanges();
+          // Load all DB data only ONCE.
+          const [historyFromDb, profContactsFromDb, seguimientos, bitacora, tasks, fetchedTeams, schemes] = await Promise.all([
+            getAllStudentChanges(),
+            getProfessorContacts(),
+            getSeguimientoEntries(),
+            getBitacoraEntries(),
+            getTeamTasks(),
+            getTeams(),
+            getWeightingSchemes()
+          ]);
+
           setStudentHistory(historyFromDb);
+          setProfessorContacts(profContactsFromDb);
+          setTeams(fetchedTeams);
+          setWeightingSchemes(schemes);
+          setTeamTasks(tasks);
+
+          const combined: Record<string, (SeguimientoEntry | BitacoraEntry)[]> = {};
+          for (const studentId in seguimientos) {
+              if (!combined[studentId]) combined[studentId] = [];
+              combined[studentId].push(...seguimientos[studentId]);
+          }
+          bitacora.forEach(entry => {
+              if (!combined[entry.studentId]) combined[entry.studentId] = [];
+              combined[entry.studentId].push({ ...entry, createdAt: entry.timestamp });
+          });
+          for (const studentId in combined) {
+              combined[studentId].sort((a, b) => (b.createdAt || b.timestamp).toMillis() - (a.createdAt || a.timestamp).toMillis());
+          }
+          setSeguimientoEntries(combined);
           
           const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
           if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
           
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
-
-          let profContactsFromDb = await getProfessorContacts();
-
-          const profMigrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED);
-          if (!profMigrationDone && Object.keys(professorContactsData).length > 0) {
-              console.log("Migrating professor contacts from JSON to Firestore...");
-              const contactsToMigrate = professorContactsData as Record<string, string>;
-              const formattedContacts: Record<string, ProfessorContact> = {};
-              for (const name in contactsToMigrate) {
-                  const normalizedId = name.toLowerCase().replace(/\s+/g, '');
-                  formattedContacts[normalizedId] = { id: normalizedId, name, email: contactsToMigrate[name] };
-              }
-              await bulkAddOrUpdateProfessorContacts(formattedContacts);
-              localStorage.setItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED, 'true');
-              console.log("Professor contacts migration complete.");
-              profContactsFromDb = await getProfessorContacts();
-          }
-          setProfessorContacts(profContactsFromDb);
-
-          await Promise.all([
-            fetchSeguimientoEntries(),
-            fetchTeamTasks(),
-            fetchTeams(),
-            fetchWeightingSchemes(),
-          ]);
 
         } catch (error) {
             console.error("Error loading data from Local Storage or DB", error);
@@ -305,8 +270,7 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [toast]);
 
   // Persist data to local storage whenever it changes, now with encryption
   useEffect(() => {
@@ -369,12 +333,9 @@ export function DashboardClient() {
   };
   
   const handleFileUpload = useCallback((file: File | null) => {
-    if (!file) {
-      setCurrentFile(null); // Clear file if deselected
-      return;
-    }
-    // Clear ALL previous data before processing the new file
+    // This function will now always clear previous data.
     setAllStudents([]);
+    setStudentContacts({}); // Also clear contacts to avoid stale data
     localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
     setCurrentFile(file);
   }, []);
@@ -386,6 +347,7 @@ export function DashboardClient() {
         setIsProcessing(true);
         setProgress(10);
         try {
+            // No longer check for key in local storage. Always parse the new file.
             const newKey = await getHeaderKey(currentFile);
             setDataKey(newKey);
             setProgress(20);
@@ -440,65 +402,7 @@ export function DashboardClient() {
     };
     processFile();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentFile]);
-
-    const handleMergeUpload = useCallback(async (file: File) => {
-        try {
-            const newStudentData = await parseExcel(file);
-            if (!newStudentData) {
-                toast({ variant: 'destructive', title: 'Error de Formato', description: 'El archivo para fusionar está vacío o tiene un formato incorrecto.' });
-                return;
-            }
-
-            setAllStudents(prevStudents => {
-                const studentMap: Map<string, Student> = new Map(prevStudents.map(s => [s.id, JSON.parse(JSON.stringify(s))]));
-
-                for (const studentId in newStudentData) {
-                    const newStudentInfo = newStudentData[studentId];
-                    if (studentMap.has(studentId)) {
-                        const studentToUpdate = studentMap.get(studentId)!;
-                        const subjectsMap = new Map((studentToUpdate.subjects || []).map(s => [s.id, s]));
-
-                        (newStudentInfo.subjects || []).forEach(newSubject => {
-                            subjectsMap.set(newSubject.id, newSubject);
-                        });
-
-                        studentToUpdate.subjects = Array.from(subjectsMap.values());
-                        studentToUpdate.subjectSummaries = studentToUpdate.subjects.map(s => ({
-                            id: s.id, name: s.name, group: s.group, absences: s.absences, absenceLimit: s.absenceLimit,
-                            missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit, grade: s.grade, finalGrade: s.finalGrade,
-                        }));
-                    } else {
-                        studentMap.set(studentId, {
-                            ...newStudentInfo,
-                            subjectSummaries: (newStudentInfo.subjects || []).map(s => ({
-                                id: s.id, name: s.name, group: s.group, absences: s.absences, absenceLimit: s.absenceLimit,
-                                missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit, grade: s.grade, finalGrade: s.finalGrade,
-                            })),
-                        });
-                    }
-                }
-                return Array.from(studentMap.values());
-            });
-            toast({ title: 'Datos Fusionados', description: 'Se han añadido los datos del nuevo reporte.' });
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Error al fusionar', description: `Hubo un problema al procesar el archivo. Revisa la consola.` });
-            console.error(error);
-        }
-    }, [toast]);
-    
-  const handleMergeUploadWrapper = useCallback(async (file: File | null) => {
-    if (!file) {
-      setMergeFile(null);
-      return;
-    }
-    setMergeFile(file);
-    setIsMerging(true);
-    await handleMergeUpload(file);
-    setIsMerging(false);
-    setMergeFile(null);
-  }, [handleMergeUpload]);
-
+  }, [currentFile, toast]);
 
   const handleDeleteAllData = () => {
     if (!window.confirm('¿Estás seguro de que quieres borrar TODOS los datos? Esta acción es irreversible.')) return;
@@ -686,7 +590,6 @@ export function DashboardClient() {
     planType,
     ofertaAcademica, setOfertaAcademica,
     toast,
-    mergeStudentData: handleMergeUpload,
   };
 
   const renderActiveView = () => {
@@ -694,7 +597,6 @@ export function DashboardClient() {
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'change-stats': return <ChangeStats />;
-        case 'projections': return <ProjectionsPanel />;
         case 'map-planner': return <MapPlanner />;
         case 'weighting-schemes': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
@@ -737,12 +639,6 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')}>
                     <BarChart3 />
                     <span>Análisis de Cambios</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Proyecciones de Riesgo" isActive={activeView === 'projections'} onClick={() => handleSetActiveView('projections')}>
-                    <TrendingUp />
-                    <span>Proyecciones de Riesgo</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
@@ -828,16 +724,6 @@ export function DashboardClient() {
                         </div>
                     )}
                     <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" />
-                    <FileUpload
-                        onFileSelect={handleMergeUploadWrapper}
-                        selectedFile={mergeFile}
-                        isLoading={isMerging}
-                        variant="secondary"
-                        size="sm"
-                        label="Fusionar Reporte"
-                        icon={<UploadCloud />}
-                        disabled={allStudents.length === 0 || isProcessing}
-                    />
                      <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
                         <RefreshCw className="h-4 w-4" />
                         <span className="sr-only">Recargar</span>
