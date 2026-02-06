@@ -169,7 +169,7 @@ export function DashboardClient() {
           console.error("Failed to fetch teams:", error);
           toast({ variant: "destructive", title: "Error de Equipos", description: "No se pudieron cargar los equipos." });
       }
-  }, [toast]);
+  }, []);
   
   const fetchSeguimientoEntries = useCallback(async () => {
     try {
@@ -211,10 +211,17 @@ export function DashboardClient() {
         console.error("Failed to fetch seguimiento/bitacora entries:", error);
         toast({ variant: "destructive", title: "Error de Seguimiento", description: "No se pudieron cargar los registros." });
     }
-}, [toast]);
+}, []);
   
   const fetchTeamTasks = useCallback(async () => {
-  }, [toast]);
+    try {
+        const tasks = await getTeamTasks();
+        setTeamTasks(tasks);
+    } catch (error) {
+        console.error("Failed to fetch team tasks:", error);
+        toast({ variant: "destructive", title: "Error de Tareas", description: "No se pudieron cargar las tareas de equipo." });
+    }
+  }, []);
 
   const fetchWeightingSchemes = useCallback(async () => {
     try {
@@ -224,7 +231,7 @@ export function DashboardClient() {
         console.error("Failed to fetch weighting schemes:", error);
         toast({ variant: "destructive", title: "Error de Ponderaciones", description: "No se pudieron cargar los esquemas de evaluación." });
     }
-  }, [toast]);
+  }, []);
 
 
   // Load non-sensitive data from local storage on initial mount
@@ -279,7 +286,8 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, [fetchSeguimientoEntries, fetchTeamTasks, fetchTeams, fetchWeightingSchemes, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Persist data to local storage whenever it changes, now with encryption
   useEffect(() => {
@@ -345,6 +353,9 @@ export function DashboardClient() {
     if (!file) {
       return;
     }
+     // Clear previous data before processing the new file
+    setAllStudents([]);
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
     setCurrentFile(file);
   }, []);
 
@@ -408,7 +419,8 @@ export function DashboardClient() {
         }
     };
     processFile();
-  }, [currentFile, toast, setAllStudents, setOfertaAcademica, setPlanType, setUploadHistory, setDataKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFile]);
 
     const handleMergeUpload = useCallback(async (file: File) => {
         try {
@@ -609,9 +621,9 @@ export function DashboardClient() {
     return student?.subjects || [];
   }
   
-  const getStudentChangesWrapper = async (studentId: string): Promise<Change[]> => {
+  const getStudentChangesWrapper = useCallback(async (studentId: string): Promise<Change[]> => {
      return studentHistory[studentId] || [];
-  }
+  }, [studentHistory]);
 
   const reportInfo = useMemo(() => {
     if (uploadHistory.length === 0) {
