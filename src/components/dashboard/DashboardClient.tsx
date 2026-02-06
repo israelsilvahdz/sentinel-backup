@@ -43,7 +43,7 @@ import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSumma
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges, getWeightingSchemes } from '@/lib/firebase-services';
+import { getBitacoraEntries, getContact, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges, getWeightingSchemes } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
 import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
@@ -66,6 +66,7 @@ interface DashboardContextType {
   setLatestComparison: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
   studentContacts: Record<string, StudentContact>;
   setStudentContacts: React.Dispatch<React.SetStateAction<Record<string, StudentContact>>>;
+  fetchStudentContact: (studentId: string) => Promise<StudentContact | null>;
   professorContacts: Record<string, ProfessorContact>;
   setProfessorContacts: React.Dispatch<React.SetStateAction<Record<string, ProfessorContact>>>;
   teams: Team[];
@@ -169,7 +170,7 @@ export function DashboardClient() {
           console.error("Failed to fetch teams:", error);
           toast({ variant: "destructive", title: "Error de Equipos", description: "No se pudieron cargar los equipos." });
       }
-  }, []);
+  }, [toast]);
   
   const fetchSeguimientoEntries = useCallback(async () => {
     try {
@@ -211,7 +212,7 @@ export function DashboardClient() {
         console.error("Failed to fetch seguimiento/bitacora entries:", error);
         toast({ variant: "destructive", title: "Error de Seguimiento", description: "No se pudieron cargar los registros." });
     }
-}, []);
+}, [toast]);
   
   const fetchTeamTasks = useCallback(async () => {
     try {
@@ -221,7 +222,7 @@ export function DashboardClient() {
         console.error("Failed to fetch team tasks:", error);
         toast({ variant: "destructive", title: "Error de Tareas", description: "No se pudieron cargar las tareas de equipo." });
     }
-  }, []);
+  }, [toast]);
 
   const fetchWeightingSchemes = useCallback(async () => {
     try {
@@ -231,15 +232,32 @@ export function DashboardClient() {
         console.error("Failed to fetch weighting schemes:", error);
         toast({ variant: "destructive", title: "Error de Ponderaciones", description: "No se pudieron cargar los esquemas de evaluación." });
     }
-  }, []);
+  }, [toast]);
+  
+  const fetchStudentContact = useCallback(async (studentId: string): Promise<StudentContact | null> => {
+    if (studentContacts[studentId]) {
+        return studentContacts[studentId];
+    }
+    try {
+        const contact = await getContact(studentId);
+        if (contact) {
+            setStudentContacts(prev => ({ ...prev, [studentId]: contact }));
+            return contact;
+        }
+        return null;
+    } catch (error) {
+        console.error("Failed to fetch contact:", error);
+        toast({ variant: "destructive", title: "Error de Contacto", description: "No se pudo cargar el contacto." });
+        return null;
+    }
+  }, [studentContacts, toast]);
 
 
   // Load non-sensitive data from local storage on initial mount
   useEffect(() => {
     async function loadInitialData() {
+        setIsLoading(true);
         try {
-          // Student data is no longer loaded from here. It will be loaded on file upload.
-
           const historyFromDb = await getAllStudentChanges();
           setStudentHistory(historyFromDb);
           
@@ -249,10 +267,6 @@ export function DashboardClient() {
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
 
-          // Contacts and other Firebase data will be fetched.
-          const studentContactsFromDb = await getContacts();
-          setStudentContacts(studentContactsFromDb);
-          
           let profContactsFromDb = await getProfessorContacts();
 
           const profMigrationDone = localStorage.getItem(LOCAL_STORAGE_KEYS.PROFESSOR_CONTACTS_MIGRATED);
@@ -281,6 +295,11 @@ export function DashboardClient() {
         } catch (error) {
             console.error("Error loading data from Local Storage or DB", error);
             Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+            toast({
+                variant: 'destructive',
+                title: 'Error de Carga',
+                description: 'No se pudieron cargar los datos iniciales. Intenta recargar la página.',
+            });
         } finally {
             setIsLoading(false);
         }
@@ -351,9 +370,10 @@ export function DashboardClient() {
   
   const handleFileUpload = useCallback((file: File | null) => {
     if (!file) {
+      setCurrentFile(null); // Clear file if deselected
       return;
     }
-     // Clear previous data before processing the new file
+    // Clear ALL previous data before processing the new file
     setAllStudents([]);
     localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
     setCurrentFile(file);
@@ -436,12 +456,11 @@ export function DashboardClient() {
                 for (const studentId in newStudentData) {
                     const newStudentInfo = newStudentData[studentId];
                     if (studentMap.has(studentId)) {
-                        // Student exists, merge subjects
                         const studentToUpdate = studentMap.get(studentId)!;
                         const subjectsMap = new Map((studentToUpdate.subjects || []).map(s => [s.id, s]));
 
                         (newStudentInfo.subjects || []).forEach(newSubject => {
-                            subjectsMap.set(newSubject.id, newSubject); // This adds new or overwrites existing subjects
+                            subjectsMap.set(newSubject.id, newSubject);
                         });
 
                         studentToUpdate.subjects = Array.from(subjectsMap.values());
@@ -450,7 +469,6 @@ export function DashboardClient() {
                             missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit, grade: s.grade, finalGrade: s.finalGrade,
                         }));
                     } else {
-                         // Student is new, add them
                         studentMap.set(studentId, {
                             ...newStudentInfo,
                             subjectSummaries: (newStudentInfo.subjects || []).map(s => ({
@@ -651,7 +669,7 @@ export function DashboardClient() {
   }, [uploadHistory, planType]);
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, latestComparison, setLatestComparison, studentContacts, setStudentContacts, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,

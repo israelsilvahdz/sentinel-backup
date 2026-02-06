@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -89,8 +88,9 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
 }
 
 function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { student: Student, changes: Change[], seguimiento: (SeguimientoEntry | BitacoraEntry)[], onSent: () => void }) {
-    const { studentContacts, toast, loadStudentSubjects, weightingSchemes } = useDashboardFilters();
+    const { studentContacts, toast, loadStudentSubjects, weightingSchemes, fetchStudentContact } = useDashboardFilters();
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+    const [isNotifying, setIsNotifying] = useState<'student' | 'parent' | false>(false);
 
     const { lastChangeDate, hasChanges } = useMemo(() => {
         if (!changes || changes.length === 0) return { lastChangeDate: null, hasChanges: false };
@@ -214,64 +214,74 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
     
     const handleSend = async (e: React.MouseEvent, recipient: 'student' | 'parent') => {
         e.stopPropagation();
-
-        const contact = studentContacts[student.id];
-        let phoneNumber: string | undefined;
-        let logTopic: string;
-
-        if (recipient === 'student') {
-            phoneNumber = contact?.studentPhone;
-            logTopic = 'Notificación WhatsApp (Alumno)';
-        } else {
-            phoneNumber = contact?.dadPhone || contact?.momPhone;
-            logTopic = 'Notificación WhatsApp (Padres)';
-        }
-
-        if (!phoneNumber) {
-            toast({ variant: "destructive", title: "Teléfono no encontrado", description: `No hay un número de ${recipient === 'student' ? 'alumno' : 'padres'} registrado.` });
-            return;
-        }
-
-        const message = generateMessage(recipient);
-        if (!message) {
-            toast({ title: "Sin nada que notificar", description: "No se generó ningún mensaje para este alumno."});
-            return;
-        }
-
-        const cleanNumber = phoneNumber.replace(/\D/g, '');
-        const finalPhoneNumber = `52${cleanNumber.slice(-10)}`;
-        const whatsappUrl = `https://wa.me/${finalPhoneNumber}?text=${encodeURIComponent(message)}`;
-        
-        window.open(whatsappUrl, '_blank');
-        
-        const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
-        const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
-        const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
-            studentId: student.id,
-            studentName: student.name,
-            attendedBy: 'Sistema Automático',
-            topic: logTopic,
-            notes: message,
-            absencesAtFollowUp: totalAbsences,
-            missedAssignmentsAtFollowUp: totalMissed,
-        };
+        setIsNotifying(recipient);
 
         try {
+            let contact = studentContacts[student.id];
+            if (!contact) {
+                contact = (await fetchStudentContact(student.id)) || undefined;
+            }
+
+            let phoneNumber: string | undefined;
+            let logTopic: string;
+
+            if (recipient === 'student') {
+                phoneNumber = contact?.studentPhone;
+                logTopic = 'Notificación WhatsApp (Alumno)';
+            } else {
+                phoneNumber = contact?.dadPhone || contact?.momPhone;
+                logTopic = 'Notificación WhatsApp (Padres)';
+            }
+
+            if (!phoneNumber) {
+                toast({ variant: "destructive", title: "Teléfono no encontrado", description: `No hay un número de ${recipient === 'student' ? 'alumno' : 'padres'} registrado.` });
+                return;
+            }
+
+            const message = generateMessage(recipient);
+            if (!message) {
+                toast({ title: "Sin nada que notificar", description: "No se generó ningún mensaje para este alumno."});
+                return;
+            }
+
+            const cleanNumber = phoneNumber.replace(/\D/g, '');
+            const finalPhoneNumber = `52${cleanNumber.slice(-10)}`;
+            const whatsappUrl = `https://wa.me/${finalPhoneNumber}?text=${encodeURIComponent(message)}`;
+            
+            window.open(whatsappUrl, '_blank');
+            
+            const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
+            const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
+            const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
+                studentId: student.id,
+                studentName: student.name,
+                attendedBy: 'Sistema Automático',
+                topic: logTopic,
+                notes: message,
+                absencesAtFollowUp: totalAbsences,
+                missedAssignmentsAtFollowUp: totalMissed,
+            };
+
             await addSeguimientoEntry(newEntry);
             onSent();
             toast({ title: "Notificación Registrada", description: `Se ha guardado el registro del envío.` });
-        } catch(err) {
-            console.error("Failed to log notification:", err);
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error al notificar", description: "No se pudo obtener la información de contacto." });
+        } finally {
+            setIsNotifying(false);
         }
     };
     
     const handleSendDetailedReport = async (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsGeneratingReport(true);
-        toast({ title: "Generando reporte detallado...", description: "Por favor, espera un momento." });
-
+        
         try {
-            const contact = studentContacts[student.id];
+            let contact = studentContacts[student.id];
+            if (!contact) {
+                contact = (await fetchStudentContact(student.id)) || undefined;
+            }
+            
             const parentPhone = contact?.dadPhone || contact?.momPhone;
             if (!parentPhone) {
                 throw new Error("No hay teléfono de padres para este alumno.");
@@ -353,16 +363,16 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => handleSend(e, 'student')}>
-                            {studentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => handleSend(e, 'student')} disabled={!!isNotifying}>
+                            {isNotifying === 'student' ? <Loader2 className="h-4 w-4 animate-spin"/> : (studentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent><p>{studentNotifiedForThisBatch ? 'Reenviar a alumno' : 'Enviar a alumno'}</p></TooltipContent>
                 </Tooltip>
                  <Tooltip>
                     <TooltipTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={(e) => handleSend(e, 'parent')}>
-                            {parentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+                         <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={(e) => handleSend(e, 'parent')} disabled={!!isNotifying}>
+                            {isNotifying === 'parent' ? <Loader2 className="h-4 w-4 animate-spin"/> : (parentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Users className="h-4 w-4" />)}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent><p>{parentNotifiedForThisBatch ? 'Reenviar a padres' : 'Notificar a padres'}</p></TooltipContent>

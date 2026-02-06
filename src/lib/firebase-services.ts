@@ -282,6 +282,25 @@ export const getContacts = async (): Promise<Record<string, StudentContact>> => 
     }
 };
 
+/**
+ * Obtiene el contacto de un solo alumno por su ID.
+ * @returns El objeto de contacto o null si no se encuentra.
+ */
+export const getContact = async (studentId: string): Promise<StudentContact | null> => {
+    try {
+        const docRef = doc(db, CONTACTS_COLLECTION, studentId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return docSnap.data() as StudentContact;
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error al obtener contacto para ${studentId}: `, error);
+        return null; // Return null on error to not break the flow
+    }
+};
+
+
 // --- Funciones para Contactos de Profesores ---
 
 /**

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -15,6 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { StudentContact } from '@/types/student';
 import { addOrUpdateContact } from '@/lib/firebase-services';
+import { Skeleton } from '../ui/skeleton';
 
 interface StudentContactProps {
     studentId: string;
@@ -67,8 +67,9 @@ function ContactDetail({ icon, label, value }: { icon: React.ReactNode, label: s
 }
 
 export function StudentContactInfo({ studentId }: StudentContactProps) {
-    const { studentContacts, setStudentContacts, allStudentsMap } = useDashboardFilters();
+    const { studentContacts, setStudentContacts, allStudentsMap, fetchStudentContact } = useDashboardFilters();
     const [isEditing, setIsEditing] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
     
     const contact = studentContacts[studentId];
@@ -82,6 +83,18 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
             momName: '', momPhone: '', momEmail: '',
         }
     });
+
+    useEffect(() => {
+        const loadContact = async () => {
+            if (!contact && !isEditing) { 
+                setIsLoading(true);
+                await fetchStudentContact(studentId);
+                setIsLoading(false);
+            }
+        };
+        loadContact();
+    }, [studentId, contact, isEditing, fetchStudentContact]);
+
 
     useEffect(() => {
         if (contact) {
@@ -125,6 +138,24 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
         }
     };
 
+    if (isLoading) {
+        return (
+            <div className="p-4 md:p-6">
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-8 w-48" />
+                        <Skeleton className="h-4 w-64 mt-2" />
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-6">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+    
     if (!student) {
         return <p>Alumno no encontrado.</p>;
     }
@@ -221,4 +252,3 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
         </div>
     );
 }
-
