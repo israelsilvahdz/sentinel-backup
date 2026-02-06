@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getActivityList } from '@/lib/ponderaciones';
 import { cn } from '@/lib/utils';
+import * as htmlToImage from 'html-to-image';
 
 
 interface StudentCardProps {
@@ -229,7 +230,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
                 phoneNumber = contact?.studentPhone;
                 logTopic = 'Notificación WhatsApp (Alumno)';
             } else {
-                phoneNumber = contact?.dadPhone || contact?.momPhone;
+                phoneNumber = contact?.momPhone || contact?.dadPhone;
                 logTopic = 'Notificación WhatsApp (Padres)';
             }
 
@@ -282,7 +283,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
                 contact = (await fetchStudentContact(student.id)) || undefined;
             }
             
-            const parentPhone = contact?.dadPhone || contact?.momPhone;
+            const parentPhone = contact?.momPhone || contact?.dadPhone;
             if (!parentPhone) {
                 throw new Error("No hay teléfono de padres para este alumno.");
             }
@@ -348,7 +349,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             onSent();
 
         } catch (error: any) {
-            toast({ variant: 'destructive', title: "Error al generar reporte", description: error.message });
+            toast({ variant: "destructive", title: "Error al generar reporte", description: error.message });
         } finally {
             setIsGeneratingReport(false);
         }
