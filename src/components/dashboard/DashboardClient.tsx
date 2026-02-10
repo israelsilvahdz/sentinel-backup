@@ -31,7 +31,7 @@ import { AcademicCommitteePanel } from './AcademicCommitteePanel';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
-import { ProjectionsPanel } from './ProjectionsPanel';
+import { SeguimientoPanel } from './SeguimientoPanel';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, Calendar, TimerOff } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
@@ -39,18 +39,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, BitacoraEntry, StudentContact, TeamTask, SeguimientoEntry, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, SeguimientoEntry, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
-import { getBitacoraEntries, getContact, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getAllStudentChanges, getWeightingSchemes } from '@/lib/firebase-services';
+import { getContact, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getWeightingSchemes } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
 import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'seguimiento-panel';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -60,8 +60,6 @@ interface DashboardContextType {
   allStudents: Student[];
   allStudentsMap: Map<string, Student>;
   setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
-  studentHistory: Record<string, Change[]>;
-  setStudentHistory: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
   latestComparison: Record<string, Change[]>;
   setLatestComparison: React.Dispatch<React.SetStateAction<Record<string, Change[]>>>;
   studentContacts: Record<string, StudentContact>;
@@ -71,7 +69,7 @@ interface DashboardContextType {
   setProfessorContacts: React.Dispatch<React.SetStateAction<Record<string, ProfessorContact>>>;
   teams: Team[];
   fetchTeams: () => Promise<void>;
-  seguimientoEntries: Record<string, (SeguimientoEntry | BitacoraEntry)[]>;
+  seguimientoEntries: Record<string, SeguimientoEntry[]>;
   fetchSeguimientoEntries: () => Promise<void>;
   teamTasks: TeamTask[];
   fetchTeamTasks: () => Promise<void>;
@@ -130,13 +128,12 @@ const LOCAL_STORAGE_KEYS = {
 export function DashboardClient() {
   const { toast } = useToast();
   const [allStudents, setAllStudents] = useState<Student[]>([]);
-  const [studentHistory, setStudentHistory] = useState<Record<string, Change[]>>({});
   const [latestComparison, setLatestComparison] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
   const [teams, setTeams] = useState<Team[]>([]);
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
-  const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, (SeguimientoEntry | BitacoraEntry)[]>>({});
+  const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, SeguimientoEntry[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
   const [weightingSchemes, setWeightingSchemes] = useState<WeightingScheme[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
@@ -170,8 +167,14 @@ export function DashboardClient() {
   }, [toast]);
   
   const fetchSeguimientoEntries = useCallback(async () => {
-      // This function is now stable and will only run once on mount.
-  }, []);
+    try {
+        const entries = await getSeguimientoEntries();
+        setSeguimientoEntries(entries);
+    } catch (error) {
+        console.error("Failed to fetch seguimiento entries:", error);
+        toast({ variant: "destructive", title: "Error de Seguimientos", description: "No se pudieron cargar los seguimientos." });
+    }
+  }, [toast]);
   
   const fetchTeamTasks = useCallback(async () => {
     try {
@@ -194,11 +197,9 @@ export function DashboardClient() {
   }, [toast]);
   
   const fetchStudentContact = useCallback(async (studentId: string): Promise<StudentContact | null> => {
-    // If contact is already in state, return it to avoid unnecessary fetches
     if (studentContacts[studentId]) {
         return studentContacts[studentId];
     }
-    // Otherwise, fetch from DB
     try {
         const contact = await getContact(studentId);
         if (contact) {
@@ -208,48 +209,28 @@ export function DashboardClient() {
         return null;
     } catch (error) {
         console.error("Failed to fetch contact:", error);
-        // Do not toast here to avoid spamming on background fetches.
-        // The UI will handle the loading/not found state.
         return null;
     }
   }, [studentContacts]);
 
 
-  // Load non-sensitive data from local storage on initial mount
   useEffect(() => {
     async function loadInitialData() {
         setIsLoading(true);
         try {
-          // Load all DB data only ONCE.
-          const [historyFromDb, profContactsFromDb, seguimientos, bitacora, tasks, fetchedTeams, schemes] = await Promise.all([
-            getAllStudentChanges(),
+          const [profContactsFromDb, seguimientos, tasks, fetchedTeams, schemes] = await Promise.all([
             getProfessorContacts(),
             getSeguimientoEntries(),
-            getBitacoraEntries(),
             getTeamTasks(),
             getTeams(),
             getWeightingSchemes()
           ]);
 
-          setStudentHistory(historyFromDb);
           setProfessorContacts(profContactsFromDb);
           setTeams(fetchedTeams);
           setWeightingSchemes(schemes);
           setTeamTasks(tasks);
-
-          const combined: Record<string, (SeguimientoEntry | BitacoraEntry)[]> = {};
-          for (const studentId in seguimientos) {
-              if (!combined[studentId]) combined[studentId] = [];
-              combined[studentId].push(...seguimientos[studentId]);
-          }
-          bitacora.forEach(entry => {
-              if (!combined[entry.studentId]) combined[entry.studentId] = [];
-              combined[entry.studentId].push({ ...entry, createdAt: entry.timestamp });
-          });
-          for (const studentId in combined) {
-              combined[studentId].sort((a, b) => (b.createdAt || b.timestamp).toMillis() - (a.createdAt || a.timestamp).toMillis());
-          }
-          setSeguimientoEntries(combined);
+          setSeguimientoEntries(seguimientos);
           
           const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
           if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
@@ -272,7 +253,6 @@ export function DashboardClient() {
     loadInitialData();
   }, [toast]);
 
-  // Persist data to local storage whenever it changes, now with encryption
   useEffect(() => {
     try {
         if(allStudents.length > 0 && dataKey) {
@@ -333,9 +313,8 @@ export function DashboardClient() {
   };
   
   const handleFileUpload = useCallback((file: File | null) => {
-    // This function will now always clear previous data.
     setAllStudents([]);
-    setStudentContacts({}); // Also clear contacts to avoid stale data
+    setStudentContacts({}); 
     localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
     setCurrentFile(file);
   }, []);
@@ -347,7 +326,6 @@ export function DashboardClient() {
         setIsProcessing(true);
         setProgress(10);
         try {
-            // No longer check for key in local storage. Always parse the new file.
             const newKey = await getHeaderKey(currentFile);
             setDataKey(newKey);
             setProgress(20);
@@ -413,7 +391,6 @@ export function DashboardClient() {
       Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
       
       setAllStudents([]);
-      setStudentHistory({});
       setUploadHistory([]);
       setCurrentFile(null);
       setPlanType('tetramestral');
@@ -544,8 +521,8 @@ export function DashboardClient() {
   }
   
   const getStudentChangesWrapper = useCallback(async (studentId: string): Promise<Change[]> => {
-     return studentHistory[studentId] || [];
-  }, [studentHistory]);
+     return latestComparison[studentId] || [];
+  }, [latestComparison]);
 
   const reportInfo = useMemo(() => {
     if (uploadHistory.length === 0) {
@@ -573,7 +550,7 @@ export function DashboardClient() {
   }, [uploadHistory, planType]);
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, studentHistory, setStudentHistory, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -606,6 +583,7 @@ export function DashboardClient() {
         case 'academic-committee': return <AcademicCommitteePanel />;
         case 'oferta-academica': return <OfertaAcademicaPanel />;
         case 'irregular-students': return <IrregularStudentsPanel />;
+        case 'seguimiento-panel': return <SeguimientoPanel />;
         default: return <Dashboard />;
     }
   }
@@ -639,6 +617,12 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')}>
                     <BarChart3 />
                     <span>Análisis de Cambios</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Seguimientos" isActive={activeView === 'seguimiento-panel'} onClick={() => handleSetActiveView('seguimiento-panel')}>
+                    <FileCheck2 />
+                    <span>Seguimientos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

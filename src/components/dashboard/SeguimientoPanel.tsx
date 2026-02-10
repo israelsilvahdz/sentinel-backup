@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useDashboardFilters } from './DashboardClient';
-import type { Student, SeguimientoEntry, BitacoraEntry, TeamTask, Subject } from '@/types/student';
+import type { Student, SeguimientoEntry, TeamTask, Subject } from '@/types/student';
 import { useToast } from '@/hooks/use-toast';
 import { addSeguimientoEntry, updateSeguimientoEntry, deleteSeguimientoEntry, addTeamTask, updateTeamTaskStatus } from '@/lib/firebase-services';
 import { StudentCard } from './StudentCard';
@@ -31,14 +31,13 @@ import { Switch } from '../ui/switch';
 import { Timestamp } from 'firebase/firestore';
 
 
-type RiskCategory = 'ne' | 'faltas' | 'both' | 'other' | 'reporte' | 'pendiente';
+type RiskCategory = 'ne' | 'faltas' | 'both' | 'other' | 'pendiente';
 type FilterTopic = 'all' | RiskCategory;
 
 const RISK_CATEGORY_TEXT: Record<RiskCategory, string> = {
     'ne': 'Riesgo por NE',
     'faltas': 'Riesgo por Faltas',
     'both': 'Riesgo por Faltas y NE',
-    'reporte': 'Reporte',
     'pendiente': 'Pendiente',
     'other': 'Con Seguimiento'
 };
@@ -233,17 +232,8 @@ export function SeguimientoPanel() {
             if (student) addStudent(student, 'pendiente');
         }
     });
-    
-    // 2. Add students with bitacora reports
-    Object.keys(seguimientoEntries).forEach(studentId => {
-        const hasReporte = seguimientoEntries[studentId].some(e => ('description' in e));
-        if(hasReporte) {
-            const student = studentSource.find(s => s.id === studentId);
-            if (student) addStudent(student, 'reporte');
-        }
-    });
 
-    // 3. Add students with risk
+    // 2. Add students with risk
     studentSource.forEach(student => {
       if (!student.subjectSummaries || student.subjectSummaries.length === 0) return;
       let highRiskNE = false;
@@ -257,7 +247,7 @@ export function SeguimientoPanel() {
       else if (highRiskFaltas) addStudent(student, 'faltas');
     });
 
-    // 4. Add students with any other interaction (seguimiento, completed tasks)
+    // 3. Add students with any other interaction (seguimiento, completed tasks)
     const allInteractionIds = new Set([
         ...Object.keys(seguimientoEntries),
         ...teamTasks.map(t => t.studentId)
@@ -276,7 +266,6 @@ export function SeguimientoPanel() {
     if (filterTopic !== 'all') {
         finalFilteredList = finalFilteredList.filter(item => {
             if (filterTopic === 'pendiente') return (teamTasks.some(t => t.studentId === item.student.id && t.status === 'pendiente'));
-            if (filterTopic === 'reporte') return item.riskCategory === 'reporte';
             return item.riskCategory === filterTopic;
         });
     }
@@ -303,16 +292,11 @@ export function SeguimientoPanel() {
     ne: { text: 'Riesgo por NE', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
     faltas: { text: 'Riesgo por Faltas', badgeClass: 'bg-yellow-100 text-yellow-800', borderClass: 'border-yellow-400' },
     both: { text: 'Riesgo por Faltas y NE', badgeClass: 'bg-orange-100 text-orange-800', borderClass: 'border-orange-500' },
-    reporte: { text: 'Reporte de Bitácora', badgeClass: 'bg-red-100 text-red-800', borderClass: 'border-red-500' },
     pendiente: { text: 'Pendiente', badgeClass: 'bg-blue-100 text-blue-800', borderClass: 'border-blue-500' },
     other: { text: 'Con Seguimiento', badgeClass: 'bg-gray-100 text-gray-800', borderClass: 'border-transparent' },
   };
 
-  const handleDelete = useCallback(async (id: string, isBitacora: boolean) => {
-    if (isBitacora) {
-        toast({ variant: 'destructive', title: "Acción no permitida", description: "Los reportes de bitácora no se pueden eliminar desde este panel." });
-        return;
-    }
+  const handleDelete = useCallback(async (id: string) => {
     try {
       await deleteSeguimientoEntry(id);
       toast({ title: "Registro eliminado", description: "El seguimiento ha sido borrado." });
@@ -360,7 +344,6 @@ export function SeguimientoPanel() {
                           <SelectContent>
                               <SelectItem value="all">Todos los Casos</SelectItem>
                               <SelectItem value="pendiente">Pendientes</SelectItem>
-                              <SelectItem value="reporte">Reportes de Bitácora</SelectItem>
                               <SelectItem value="faltas">Riesgo por Faltas</SelectItem>
                               <SelectItem value="ne">Riesgo por NE</SelectItem>
                               <SelectItem value="both">Riesgo por Faltas y NE</SelectItem>
@@ -427,7 +410,7 @@ export function SeguimientoPanel() {
                     const isTask = 'situation' in item;
                     return isTask 
                       ? <TaskCard key={item.id} task={item as TeamTask} student={student} onUpdate={fetchTeamTasks} />
-                      : <InteractionCard key={item.id} entry={item as SeguimientoEntry | BitacoraEntry} student={student} onUpdate={fetchSeguimientoEntries} />;
+                      : <InteractionCard key={item.id} entry={item as SeguimientoEntry} student={student} onUpdate={fetchSeguimientoEntries} />;
                   })}
                   <NewItemCard student={student} riskCategory={riskCategory} onUpdate={() => {fetchSeguimientoEntries(); fetchTeamTasks();}} />
                 </div>
@@ -438,7 +421,7 @@ export function SeguimientoPanel() {
               <Info className="mx-auto h-12 w-12 text-muted-foreground" />
               <CardTitle className="mt-4">Tablero Vacío</CardTitle>
               <CardDescription className="mt-2 max-w-md mx-auto">
-                No se encontraron alumnos con los criterios de riesgo o los filtros seleccionados. Puedes usar el buscador para añadir manualmente un alumno y registrar un seguimiento.
+                No se encontraron alumnos con los criterios de riesgo o los filtros seleccionados. Puedes usar el buscador para añadir manually un alumno y registrar un seguimiento.
               </CardDescription>
             </Card>
           )}
@@ -569,16 +552,11 @@ function TaskCard({ task, student, onUpdate }: { task: TeamTask, student: Studen
     )
 }
 
-function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry | BitacoraEntry, student: Student, onUpdate: () => void }) {
+function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry, student: Student, onUpdate: () => void }) {
     const { toast } = useToast();
     const [isEditOpen, setIsEditOpen] = useState(false);
-    const isBitacora = 'description' in entry;
 
     const handleDelete = async () => {
-        if (isBitacora) {
-            toast({ variant: 'destructive', title: "Acción no permitida", description: "Los reportes de bitácora no se pueden eliminar desde aquí." });
-            return;
-        }
         try {
             await deleteSeguimientoEntry(entry.id!);
             toast({ title: "Registro eliminado" });
@@ -588,8 +566,8 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
         }
     }
     
-    const cardTitle = isBitacora ? 'Reporte de Bitácora' : (entry.topic || 'Registro de Interacción');
-    const contentToShow = isBitacora ? (entry as BitacoraEntry).description : (entry as SeguimientoEntry).notes;
+    const cardTitle = entry.topic || 'Registro de Interacción';
+    const contentToShow = entry.notes;
     
     return (
         <Dialog>
@@ -597,20 +575,18 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                 <Card className="h-full flex flex-col group relative cursor-pointer hover:bg-muted/50 transition-colors">
                     <CardHeader className="p-4 flex-grow">
                         <CardTitle className="text-sm">{cardTitle}</CardTitle>
-                        <CardDescription>{format((entry.createdAt || entry.timestamp).toDate(), "d MMM, yyyy", { locale: es })}</CardDescription>
+                        <CardDescription>{format((entry.createdAt).toDate(), "d MMM, yyyy", { locale: es })}</CardDescription>
                         <div className="pt-2 text-xs text-muted-foreground line-clamp-3">
                             {contentToShow}
                         </div>
                     </CardHeader>
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {!isBitacora && (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Editar</p></TooltipContent>
-                            </Tooltip>
-                        )}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); }}><Edit className="h-4 w-4" /></Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Editar</p></TooltipContent>
+                        </Tooltip>
                         <AlertDialog>
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -635,24 +611,13 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                 <DialogHeader>
                     <DialogTitle>{cardTitle}</DialogTitle>
                     <DialogDescription>
-                        {student.name} | {format((entry.createdAt || entry.timestamp).toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
+                        {student.name} | {format((entry.createdAt).toDate(), "d 'de' LLLL, yyyy 'a las' HH:mm", { locale: es })}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
-                    {isBitacora ? (
-                        <div className="space-y-3 text-sm">
-                            <div><p className="font-semibold">Descripción:</p><p className="whitespace-pre-wrap text-muted-foreground">{contentToShow}</p></div>
-                            <div><p className="font-semibold">Acuerdos:</p><p className="whitespace-pre-wrap text-muted-foreground">{(entry as BitacoraEntry).agreements}</p></div>
-                             <div className="flex gap-4 pt-2">
-                                {(entry as BitacoraEntry).academicCommittee && <Badge variant="destructive">En Comité Académico</Badge>}
-                                {(entry as BitacoraEntry).parentsContacted && <Badge variant="outline" className="text-blue-600 border-blue-600"><Phone className="mr-1 h-3 w-3"/>Padres Contactados</Badge>}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-3 text-sm">
-                            <div><p className="font-semibold">Notas:</p><p className="whitespace-pre-wrap text-muted-foreground">{contentToShow}</p></div>
-                        </div>
-                    )}
+                    <div className="space-y-3 text-sm">
+                        <div><p className="font-semibold">Notas:</p><p className="whitespace-pre-wrap text-muted-foreground">{contentToShow}</p></div>
+                    </div>
 
                     <div className="flex items-center text-sm text-muted-foreground gap-4 border-t pt-4">
                         <div className="flex items-center gap-1"><FileWarning className="h-4 w-4" /> Faltas al momento: <span className="font-bold">{entry.absencesAtFollowUp ?? 0}</span></div>
@@ -661,12 +626,12 @@ function InteractionCard({ entry, student, onUpdate }: { entry: SeguimientoEntry
                 </div>
             </DialogContent>
             
-            {/* Dialog for Editing (only for non-bitacora) */}
-            {!isBitacora && entry.id && (
+            {/* Dialog for Editing */}
+            {entry.id && (
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                     <DialogContent>
                         <DialogHeader><DialogTitle>Editar Registro</DialogTitle></DialogHeader>
-                        <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry as SeguimientoEntry} onClose={() => setIsEditOpen(false)} />
+                        <SeguimientoForm student={student} riskCategory="other" onTaskAdded={onUpdate} existingEntry={entry} onClose={() => setIsEditOpen(false)} />
                     </DialogContent>
                 </Dialog>
             )}

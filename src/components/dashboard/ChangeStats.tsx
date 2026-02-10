@@ -13,7 +13,6 @@ import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { parseExcel } from '@/lib/excelParser';
 import { Progress } from '../ui/progress';
-import { addStudentChanges } from '@/lib/firebase-services';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -38,7 +37,7 @@ const legendFormatter = (value: string) => {
 }
 
 export function ChangeStats() {
-    const { allStudents, hasData: hasCurrentData, setStudentHistory, setActiveView, setContextualStudentIds, latestComparison, setLatestComparison, filterType, selectedValue } = useDashboardFilters();
+    const { allStudents, hasData: hasCurrentData, setActiveView, setContextualStudentIds, latestComparison, setLatestComparison, filterType, selectedValue } = useDashboardFilters();
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
@@ -114,34 +113,6 @@ export function ChangeStats() {
         
         const increaseChanges = allChangesToSave.filter(c => c.changeType === 'increase');
 
-        if (allChangesToSave.length > 0) {
-            try {
-                await addStudentChanges(allChangesToSave);
-                toast({
-                    title: 'Historial Guardado',
-                    description: `Se guardaron ${allChangesToSave.length} cambios en la base de datos.`,
-                });
-            } catch (error) {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Error de Base de Datos',
-                    description: 'No se pudieron guardar los cambios en el historial.',
-                });
-            }
-        }
-        
-        setStudentHistory(prevHistory => {
-            const mergedHistory = { ...prevHistory };
-            for (const studentId in deltaHistory) {
-                if (mergedHistory[studentId]) {
-                    mergedHistory[studentId] = [...deltaHistory[studentId], ...mergedHistory[studentId]];
-                } else {
-                    mergedHistory[studentId] = deltaHistory[studentId];
-                }
-            }
-            return mergedHistory;
-        });
-
         return { processed: Object.keys(currentStudents).length, changes: increaseChanges.length, deltaHistory };
     };
     
@@ -182,7 +153,7 @@ export function ChangeStats() {
                 
                 toast({
                     title: 'Éxito',
-                    description: `Se procesaron ${processed} alumnos y se detectaron ${changes} nuevos riesgos.`,
+                    description: `Se procesaron ${processed} alumnos y se detectaron ${changes} nuevos riesgos. Los resultados son temporales.`,
                 });
 
             } catch (error) {

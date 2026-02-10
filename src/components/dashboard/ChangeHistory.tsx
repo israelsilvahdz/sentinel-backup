@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo }from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Timeline, TimelineItem, TimelineConnector, TimelineHeader, TimelineIcon, TimelineTitle, TimelineBody } from '@/components/ui/timeline';
 import { useDashboardFilters } from './DashboardClient';
-import { type Change, type BitacoraEntry, type TeamTask, type SeguimientoEntry } from '@/types/student';
+import { type Change, type TeamTask, type SeguimientoEntry } from '@/types/student';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, BookOpenCheck, Calendar, FileText, FileWarning, UserCog, Users, ClipboardList, StickyNote } from 'lucide-react';
 import { format } from 'date-fns';
@@ -23,7 +23,6 @@ const ICONS: Record<string, React.ReactElement> = {
     leader: <UserCog />,
     tutor: <UserCog />,
     group: <Users />,
-    bitacora: <FileText />,
     task: <ClipboardList />,
     seguimiento: <StickyNote />,
 };
@@ -35,7 +34,6 @@ function formatFieldName(fieldName: string): string {
         'leader': 'Cambio de Líder',
         'tutor': 'Cambio de Tutor',
         'group': 'Cambio de Grupo',
-        'bitacora': 'Entrada en Bitácora',
         'task': 'Pendiente de Equipo Creado',
         'seguimiento': 'Registro de Seguimiento',
     };
@@ -44,11 +42,10 @@ function formatFieldName(fieldName: string): string {
 
 // Type guard para diferenciar los tipos de items del historial
 const isChange = (item: any): item is Change => 'fieldName' in item;
-const isBitacoraEntry = (item: any): item is BitacoraEntry => 'description' in item && 'agreements' in item;
 const isTeamTask = (item: any): item is TeamTask => 'situation' in item && 'assignedTo' in item;
 const isSeguimientoEntry = (item: any): item is SeguimientoEntry => 'topic' in item && !('description' in item);
 
-type HistoryItem = Change | BitacoraEntry | TeamTask | SeguimientoEntry;
+type HistoryItem = Change | TeamTask | SeguimientoEntry;
 
 
 export function ChangeHistory({ studentId }: ChangeHistoryProps) {
@@ -84,12 +81,10 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
       combinedHistory.sort((a, b) => {
           let dateA: Date;
           if (isChange(a)) dateA = new Date(a.date);
-          else if(isBitacoraEntry(a)) dateA = a.eventDate.toDate();
           else dateA = a.createdAt.toDate();
 
           let dateB: Date;
           if (isChange(b)) dateB = new Date(b.date);
-          else if(isBitacoraEntry(b)) dateB = b.eventDate.toDate();
           else dateB = b.createdAt.toDate();
 
           return dateB.getTime() - dateA.getTime();
@@ -160,38 +155,6 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
                       </div>
                     </TimelineBody>
                   </TimelineItem>
-                )
-              } else if (isBitacoraEntry(item)) {
-                return (
-                    <TimelineItem key={`bitacora-${item.id}`}>
-                        <TimelineConnector />
-                        <TimelineHeader>
-                            <TimelineIcon className="bg-red-500">
-                                {ICONS['bitacora']}
-                            </TimelineIcon>
-                            <TimelineTitle>{formatFieldName('bitacora')}</TimelineTitle>
-                        </TimelineHeader>
-                        <TimelineBody>
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                     <Badge variant={item.caseType === 'academica' ? 'secondary' : 'default'}>{item.caseType}</Badge>
-                                     {item.academicCommittee && <Badge variant="destructive">Comité Académico</Badge>}
-                                </div>
-                                <p className="text-sm"><span className="font-semibold">Descripción:</span> {item.description}</p>
-                                <p className="text-sm"><span className="font-semibold">Acuerdos:</span> {item.agreements}</p>
-                            </div>
-                             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                                <div className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    <span>Evento: {format(item.eventDate.toDate(), "d 'de' LLLL, yyyy", { locale: es })}</span>
-                                </div>
-                                 <div className="flex items-center gap-1">
-                                    <UserCog className="h-3 w-3" />
-                                    <span>Reportado por: {item.reportedBy}</span>
-                                </div>
-                            </div>
-                        </TimelineBody>
-                    </TimelineItem>
                 )
               } else if (isTeamTask(item)) {
                 return (
