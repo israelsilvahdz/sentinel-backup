@@ -473,25 +473,6 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
                 </div>
                 <div className="flex items-center gap-2">
                     <ChangeNotificationActions student={student} changes={changes} seguimiento={seguimiento} onSent={fetchSeguimientoEntries} />
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>EXPEDIENTE</Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                             <DialogHeader>
-                                <DialogTitle className="flex items-center text-2xl gap-3">
-                                    <FileText />
-                                    Expediente del Alumno
-                                </DialogTitle>
-                                <DialogDescription>
-                                  {student.name} ({student.id}) | Líder: {student.leader}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <ScrollArea className="pr-6 flex-1">
-                                <ChangeHistory studentId={student.id} />
-                            </ScrollArea>
-                        </DialogContent>
-                    </Dialog>
                     <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="w-9 p-0">
                             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
