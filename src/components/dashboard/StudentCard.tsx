@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogFooter, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { StudentSubjects } from './StudentSubjects';
@@ -91,7 +91,7 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
 function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { student: Student, changes: Change[], seguimiento: (SeguimientoEntry | BitacoraEntry)[], onSent: () => void }) {
     const { studentContacts, toast, loadStudentSubjects, weightingSchemes, fetchStudentContact } = useDashboardFilters();
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-    const [isNotifying, setIsNotifying] = useState<'student' | 'parent' | false>(false);
+    const [isNotifying, setIsNotifying] = useState< 'student' | 'parent' | false >(false);
 
     const { lastChangeDate, hasChanges } = useMemo(() => {
         if (!changes || changes.length === 0) return { lastChangeDate: null, hasChanges: false };
@@ -355,29 +355,29 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
         }
     };
     
-    if (!hasChanges) {
-        return null;
-    }
-
     return (
         <div className="flex items-center gap-1">
             <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => handleSend(e, 'student')} disabled={!!isNotifying}>
-                            {isNotifying === 'student' ? <Loader2 className="h-4 w-4 animate-spin"/> : (studentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>{studentNotifiedForThisBatch ? 'Reenviar a alumno' : 'Enviar a alumno'}</p></TooltipContent>
-                </Tooltip>
-                 <Tooltip>
-                    <TooltipTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={(e) => handleSend(e, 'parent')} disabled={!!isNotifying}>
-                            {isNotifying === 'parent' ? <Loader2 className="h-4 w-4 animate-spin"/> : (parentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Users className="h-4 w-4" />)}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>{parentNotifiedForThisBatch ? 'Reenviar a padres' : 'Notificar a padres'}</p></TooltipContent>
-                </Tooltip>
+                {hasChanges && (
+                    <>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => handleSend(e, 'student')} disabled={!!isNotifying}>
+                                    {isNotifying === 'student' ? <Loader2 className="h-4 w-4 animate-spin"/> : (studentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>{studentNotifiedForThisBatch ? 'Reenviar a alumno' : 'Enviar a alumno'}</p></TooltipContent>
+                        </Tooltip>
+                         <Tooltip>
+                            <TooltipTrigger asChild>
+                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={(e) => handleSend(e, 'parent')} disabled={!!isNotifying}>
+                                    {isNotifying === 'parent' ? <Loader2 className="h-4 w-4 animate-spin"/> : (parentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Users className="h-4 w-4" />)}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>{parentNotifiedForThisBatch ? 'Reenviar a padres' : 'Notificar a padres'}</p></TooltipContent>
+                        </Tooltip>
+                    </>
+                )}
                  <Tooltip>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSendDetailedReport} disabled={isGeneratingReport}>
