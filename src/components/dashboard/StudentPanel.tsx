@@ -623,7 +623,6 @@ export function StudentPanel() {
     allStudents,
     allStudentsMap,
     filteredStudents: initialFilteredStudents, 
-    studentHistory,
     latestComparison,
     contextualStudentIds,
     seguimientoEntries,
@@ -1078,9 +1077,7 @@ export function StudentPanel() {
                   Mostrando {filteredStudents.length} de {initialFilteredStudents.length} alumnos.
                 </div>
                 {filteredStudents.map(student => {
-                  const changesForCard = isContextualAnalysis
-                    ? latestComparison[student.id] || []
-                    : studentHistory[student.id] || [];
+                  const changesForCard = latestComparison[student.id] || [];
                   return (
                     <StudentCard 
                       key={student.id} 
