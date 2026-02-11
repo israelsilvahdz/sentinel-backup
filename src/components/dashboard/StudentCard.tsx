@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2 } from 'lucide-react';
-import { type Student, type SubjectSummary, type Team, type Change, type SeguimientoEntry, type BitacoraEntry, type Subject } from "@/types/student";
+import { type Student, type SubjectSummary, type Team, type Change, type Subject } from "@/types/student";
 import { getStudentOverallRisk, type RiskLevel, getRisk } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from '../ui/button';
@@ -16,7 +17,6 @@ import { ScrollArea } from '../ui/scroll-area';
 import { ChangeHistory } from './ChangeHistory';
 import { StudentSubjects } from './StudentSubjects';
 import { Checkbox } from '../ui/checkbox';
-import { addSeguimientoEntry } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getActivityList } from '@/lib/ponderaciones';
@@ -28,7 +28,6 @@ interface StudentCardProps {
   student: Student;
   teams: Team[];
   changes: Change[];
-  seguimiento: (SeguimientoEntry | BitacoraEntry)[];
   startOpen?: boolean;
   isDialog?: boolean;
   isSelected?: boolean;
@@ -88,52 +87,23 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
     );
 }
 
-function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { student: Student, changes: Change[], seguimiento: (SeguimientoEntry | BitacoraEntry)[], onSent: () => void }) {
-    const { studentContacts, toast, loadStudentSubjects, weightingSchemes, fetchStudentContact } = useDashboardFilters();
-    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-    const [isNotifying, setIsNotifying] = useState< 'student' | 'parent' | false >(false);
+export function StudentCard({ student, teams, changes, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
+  const [isOpen, setIsOpen] = useState(startOpen);
+  const { studentContacts, toast, loadStudentSubjects, weightingSchemes, fetchStudentContact } = useDashboardFilters();
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isNotifying, setIsNotifying] = useState<'student' | 'parent' | false>(false);
+  
+  const teamName = useMemo(() => {
+    if (!teams || teams.length === 0) return null;
+    const studentTeam = teams.find(team => 
+        Array.isArray(team.members) && team.members.some(member => member.id === student.id)
+    );
+    return studentTeam?.name;
+  }, [teams, student.id]);
 
-    const { lastChangeDate, hasChanges } = useMemo(() => {
-        if (!changes || changes.length === 0) return { lastChangeDate: null, hasChanges: false };
-        const sortedChanges = [...changes].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        const lastChangeDate = new Date(sortedChanges[0].date);
-        return { lastChangeDate, hasChanges: true };
-    }, [changes]);
+  const hasChanges = changes && changes.length > 0;
 
-    const lastStudentNotification = useMemo(() => {
-        return seguimiento
-            .filter((s): s is SeguimientoEntry => 'topic' in s && s.topic === 'Notificación WhatsApp (Alumno)')
-            .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())[0];
-    }, [seguimiento]);
-    
-    const lastParentNotification = useMemo(() => {
-        return seguimiento
-            .filter((s): s is SeguimientoEntry => 'topic' in s && s.topic === 'Notificación WhatsApp (Padres)')
-            .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())[0];
-    }, [seguimiento]);
-    
-    const lastDetailedReportNotification = useMemo(() => {
-        return seguimiento
-            .filter((s): s is SeguimientoEntry => 'topic' in s && s.topic === 'Reporte Detallado a Padres (WhatsApp)')
-            .sort((a, b) => b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime())[0];
-    }, [seguimiento]);
-
-    const studentNotifiedForThisBatch = useMemo(() => {
-        if (!lastStudentNotification || !lastChangeDate) return false;
-        return lastStudentNotification.createdAt.toDate() > lastChangeDate;
-    }, [lastStudentNotification, lastChangeDate]);
-    
-    const parentNotifiedForThisBatch = useMemo(() => {
-        if (!lastParentNotification || !lastChangeDate) return false;
-        return lastParentNotification.createdAt.toDate() > lastChangeDate;
-    }, [lastParentNotification, lastChangeDate]);
-    
-    const detailedReportSentForThisBatch = useMemo(() => {
-        if (!lastDetailedReportNotification || !lastChangeDate) return false;
-        return lastDetailedReportNotification.createdAt.toDate() > lastChangeDate;
-    }, [lastDetailedReportNotification, lastChangeDate]);
-
-    const generateMessage = (recipient: 'student' | 'parent'): string => {
+  const generateMessage = (recipient: 'student' | 'parent'): string => {
         const increaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
         const decreaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
 
@@ -167,7 +137,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             if (recipient === 'student') {
                  message += `Hola ${firstName}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas (NE) en las siguientes materias:\n\n`;
             } else {
-                 message += `Estimados padres de ${firstName}, les notificamos que ha habido un aumento en el riesgo académico de su hijo/a en las siguientes materias:\n\n`;
+                 message += `Estimados padres de ${student.name}, les notificamos que ha habido un aumento en el riesgo académico de su hijo/a en las siguientes materias:\n\n`;
             }
 
             for (const subjectName in increaseChangesBySubject) {
@@ -212,7 +182,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
 
         return message;
     }
-    
+
     const handleSend = async (e: React.MouseEvent, recipient: 'student' | 'parent') => {
         e.stopPropagation();
         setIsNotifying(recipient);
@@ -224,14 +194,11 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             }
 
             let phoneNumber: string | undefined;
-            let logTopic: string;
 
             if (recipient === 'student') {
                 phoneNumber = contact?.studentPhone;
-                logTopic = 'Notificación WhatsApp (Alumno)';
             } else {
                 phoneNumber = contact?.momPhone || contact?.dadPhone;
-                logTopic = 'Notificación WhatsApp (Padres)';
             }
 
             if (!phoneNumber) {
@@ -251,21 +218,7 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             
             window.open(whatsappUrl, '_blank');
             
-            const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
-            const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
-            const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
-                studentId: student.id,
-                studentName: student.name,
-                attendedBy: 'Sistema Automático',
-                topic: logTopic,
-                notes: message,
-                absencesAtFollowUp: totalAbsences,
-                missedAssignmentsAtFollowUp: totalMissed,
-            };
-
-            await addSeguimientoEntry(newEntry);
-            onSent();
-            toast({ title: "Notificación Registrada", description: `Se ha guardado el registro del envío.` });
+            toast({ title: "WhatsApp Abierto", description: `Se ha abierto WhatsApp con el mensaje para ${recipient === 'student' ? 'el alumno' : 'los padres'}.` });
         } catch (error) {
             toast({ variant: "destructive", title: "Error al notificar", description: "No se pudo obtener la información de contacto." });
         } finally {
@@ -333,75 +286,13 @@ function ChangeNotificationActions({ student, changes, seguimiento, onSent }: { 
             const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(reportMessage)}`;
 
             window.open(whatsappUrl, '_blank');
-
-            const totalAbsences = student.subjectSummaries?.reduce((acc, s) => acc + s.absences, 0) || 0;
-            const totalMissed = student.subjectSummaries?.reduce((acc, s) => acc + s.missedAssignments, 0) || 0;
-            const newEntry: Omit<SeguimientoEntry, 'id' | 'createdAt'> = {
-                studentId: student.id,
-                studentName: student.name,
-                attendedBy: 'Sistema Automático',
-                topic: 'Reporte Detallado a Padres (WhatsApp)',
-                notes: reportMessage,
-                absencesAtFollowUp: totalAbsences,
-                missedAssignmentsAtFollowUp: totalMissed,
-            };
-            await addSeguimientoEntry(newEntry);
-            onSent();
-
+            toast({ title: "WhatsApp Abierto", description: "Se ha abierto WhatsApp con el reporte detallado." });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Error al generar reporte", description: error.message });
         } finally {
             setIsGeneratingReport(false);
         }
     };
-    
-    return (
-        <div className="flex items-center gap-1">
-            <TooltipProvider>
-                {hasChanges && (
-                    <>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => handleSend(e, 'student')} disabled={!!isNotifying}>
-                                    {isNotifying === 'student' ? <Loader2 className="h-4 w-4 animate-spin"/> : (studentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>{studentNotifiedForThisBatch ? 'Reenviar a alumno' : 'Enviar a alumno'}</p></TooltipContent>
-                        </Tooltip>
-                         <Tooltip>
-                            <TooltipTrigger asChild>
-                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={(e) => handleSend(e, 'parent')} disabled={!!isNotifying}>
-                                    {isNotifying === 'parent' ? <Loader2 className="h-4 w-4 animate-spin"/> : (parentNotifiedForThisBatch ? <RefreshCw className="h-4 w-4" /> : <Users className="h-4 w-4" />)}
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>{parentNotifiedForThisBatch ? 'Reenviar a padres' : 'Notificar a padres'}</p></TooltipContent>
-                        </Tooltip>
-                    </>
-                )}
-                 <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSendDetailedReport} disabled={isGeneratingReport}>
-                           {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className={cn("h-4 w-4", detailedReportSentForThisBatch ? 'text-green-600' : 'text-red-600')} />}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Enviar reporte detallado a padres</p></TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        </div>
-    );
-}
-
-export function StudentCard({ student, teams, changes, seguimiento, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
-  const [isOpen, setIsOpen] = useState(startOpen);
-  const { fetchSeguimientoEntries } = useDashboardFilters();
-  
-  const teamName = useMemo(() => {
-    if (!teams || teams.length === 0) return null;
-    const studentTeam = teams.find(team => 
-        Array.isArray(team.members) && team.members.some(member => member.id === student.id)
-    );
-    return studentTeam?.name;
-  }, [teams, student.id]);
 
 
   const cardTitleContent = (
@@ -471,8 +362,37 @@ export function StudentCard({ student, teams, changes, seguimiento, startOpen = 
                         {cardDescriptionContent}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <ChangeNotificationActions student={student} changes={changes} seguimiento={seguimiento} onSent={fetchSeguimientoEntries} />
+                <div className="flex items-center gap-1">
+                    <TooltipProvider>
+                        {hasChanges && (
+                            <>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => handleSend(e, 'student')} disabled={!!isNotifying}>
+                                            {isNotifying === 'student' ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4" />}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Enviar a alumno</p></TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={(e) => handleSend(e, 'parent')} disabled={!!isNotifying}>
+                                            {isNotifying === 'parent' ? <Loader2 className="h-4 w-4 animate-spin"/> : <Users className="h-4 w-4" />}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Notificar a padres</p></TooltipContent>
+                                </Tooltip>
+                            </>
+                        )}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={handleSendDetailedReport} disabled={isGeneratingReport}>
+                                {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Enviar reporte detallado a padres</p></TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                     <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="sm" className="w-9 p-0">
                             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

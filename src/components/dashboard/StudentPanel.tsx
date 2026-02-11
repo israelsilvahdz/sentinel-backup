@@ -626,7 +626,6 @@ export function StudentPanel() {
     filteredStudents: initialFilteredStudents, 
     latestComparison,
     contextualStudentIds,
-    seguimientoEntries,
     studentContacts,
     setStudentContacts,
     teams,
@@ -1092,7 +1091,6 @@ export function StudentPanel() {
                       student={student} 
                       teams={teams}
                       changes={changesForCard}
-                      seguimiento={seguimientoEntries[student.id] as any || []}
                       startOpen={false} 
                       isSelected={selectedStudents.has(student.id)}
                       onSelectionChange={handleSelectionChange}
@@ -1121,5 +1119,3 @@ export function StudentPanel() {
     </div>
   );
 }
-
-    

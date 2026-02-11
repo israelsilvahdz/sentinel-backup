@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -31,26 +32,25 @@ import { AcademicCommitteePanel } from './AcademicCommitteePanel';
 import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
-import { SeguimientoPanel } from './SeguimientoPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileCheck2, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, Calendar, TimerOff } from 'lucide-react';
+import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, Calendar, TimerOff } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, SeguimientoEntry, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
+import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
-import { getContact, getContacts, getTeamTasks, getSeguimientoEntries, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getWeightingSchemes } from '@/lib/firebase-services';
+import { getContact, getContacts, getTeamTasks, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getWeightingSchemes } from '@/lib/firebase-services';
 import professorContactsData from '@/lib/professor-contacts.json';
 import { generateKeyFromData, xorCipher } from '@/lib/utils';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'seguimiento-panel';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -69,8 +69,6 @@ interface DashboardContextType {
   setProfessorContacts: React.Dispatch<React.SetStateAction<Record<string, ProfessorContact>>>;
   teams: Team[];
   fetchTeams: () => Promise<void>;
-  seguimientoEntries: Record<string, SeguimientoEntry[]>;
-  fetchSeguimientoEntries: () => Promise<void>;
   teamTasks: TeamTask[];
   fetchTeamTasks: () => Promise<void>;
   weightingSchemes: WeightingScheme[];
@@ -133,7 +131,6 @@ export function DashboardClient() {
   const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
   const [teams, setTeams] = useState<Team[]>([]);
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
-  const [seguimientoEntries, setSeguimientoEntries] = useState<Record<string, SeguimientoEntry[]>>({});
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
   const [weightingSchemes, setWeightingSchemes] = useState<WeightingScheme[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
@@ -162,19 +159,8 @@ export function DashboardClient() {
           setTeams(fetchedTeams);
       } catch (error) {
           console.error("Failed to fetch teams:", error);
-          toast({ variant: "destructive", title: "Error de Equipos", description: "No se pudieron cargar los equipos." });
       }
-  }, [toast]);
-  
-  const fetchSeguimientoEntries = useCallback(async () => {
-    try {
-        const entries = await getSeguimientoEntries();
-        setSeguimientoEntries(entries);
-    } catch (error) {
-        console.error("Failed to fetch seguimiento entries:", error);
-        toast({ variant: "destructive", title: "Error de Seguimientos", description: "No se pudieron cargar los seguimientos." });
-    }
-  }, [toast]);
+  }, []);
   
   const fetchTeamTasks = useCallback(async () => {
     try {
@@ -182,9 +168,8 @@ export function DashboardClient() {
         setTeamTasks(tasks);
     } catch (error) {
         console.error("Failed to fetch team tasks:", error);
-        toast({ variant: "destructive", title: "Error de Tareas", description: "No se pudieron cargar las tareas de equipo." });
     }
-  }, [toast]);
+  }, []);
 
   const fetchWeightingSchemes = useCallback(async () => {
     try {
@@ -192,14 +177,14 @@ export function DashboardClient() {
         setWeightingSchemes(schemes);
     } catch (error) {
         console.error("Failed to fetch weighting schemes:", error);
-        toast({ variant: "destructive", title: "Error de Ponderaciones", description: "No se pudieron cargar los esquemas de evaluación." });
     }
-  }, [toast]);
+  }, []);
   
   const fetchStudentContact = useCallback(async (studentId: string): Promise<StudentContact | null> => {
     if (studentContacts[studentId]) {
         return studentContacts[studentId];
     }
+    setIsLoading(true);
     try {
         const contact = await getContact(studentId);
         if (contact) {
@@ -210,6 +195,8 @@ export function DashboardClient() {
     } catch (error) {
         console.error("Failed to fetch contact:", error);
         return null;
+    } finally {
+        setIsLoading(false);
     }
   }, [studentContacts]);
 
@@ -218,9 +205,8 @@ export function DashboardClient() {
     async function loadInitialData() {
         setIsLoading(true);
         try {
-          const [profContactsFromDb, seguimientos, tasks, fetchedTeams, schemes] = await Promise.all([
+          const [profContactsFromDb, tasks, fetchedTeams, schemes] = await Promise.all([
             getProfessorContacts(),
-            getSeguimientoEntries(),
             getTeamTasks(),
             getTeams(),
             getWeightingSchemes()
@@ -230,7 +216,6 @@ export function DashboardClient() {
           setTeams(fetchedTeams);
           setWeightingSchemes(schemes);
           setTeamTasks(tasks);
-          setSeguimientoEntries(seguimientos);
           
           const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
           if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
@@ -550,7 +535,7 @@ export function DashboardClient() {
   }, [uploadHistory, planType]);
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, seguimientoEntries, fetchSeguimientoEntries, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -583,7 +568,6 @@ export function DashboardClient() {
         case 'academic-committee': return <AcademicCommitteePanel />;
         case 'oferta-academica': return <OfertaAcademicaPanel />;
         case 'irregular-students': return <IrregularStudentsPanel />;
-        case 'seguimiento-panel': return <SeguimientoPanel />;
         default: return <Dashboard />;
     }
   }
@@ -617,12 +601,6 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')}>
                     <BarChart3 />
                     <span>Análisis de Cambios</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Seguimientos" isActive={activeView === 'seguimiento-panel'} onClick={() => handleSetActiveView('seguimiento-panel')}>
-                    <FileCheck2 />
-                    <span>Seguimientos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
@@ -692,6 +670,7 @@ export function DashboardClient() {
         <SidebarInset>
             <header className="flex h-auto md:h-14 items-center justify-between gap-4 border-b bg-card px-4 lg:px-6 sticky top-0 z-30 flex-wrap py-2">
                  <div className="flex items-center gap-4 flex-1">
+                    <SidebarTrigger className="md:hidden" />
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
                     <div className="hidden md:flex">
                         <DashboardFilters />

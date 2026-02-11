@@ -6,9 +6,9 @@ import { useEffect, useState, useMemo }from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Timeline, TimelineItem, TimelineConnector, TimelineHeader, TimelineIcon, TimelineTitle, TimelineBody } from '@/components/ui/timeline';
 import { useDashboardFilters } from './DashboardClient';
-import { type Change, type TeamTask, type SeguimientoEntry } from '@/types/student';
+import { type Change, type TeamTask } from '@/types/student';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, BookOpenCheck, Calendar, FileText, FileWarning, UserCog, Users, ClipboardList, StickyNote } from 'lucide-react';
+import { AlertTriangle, BookOpenCheck, Calendar, FileText, FileWarning, UserCog, Users, ClipboardList } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '../ui/badge';
@@ -24,7 +24,6 @@ const ICONS: Record<string, React.ReactElement> = {
     tutor: <UserCog />,
     group: <Users />,
     task: <ClipboardList />,
-    seguimiento: <StickyNote />,
 };
 
 function formatFieldName(fieldName: string): string {
@@ -35,7 +34,6 @@ function formatFieldName(fieldName: string): string {
         'tutor': 'Cambio de Tutor',
         'group': 'Cambio de Grupo',
         'task': 'Pendiente de Equipo Creado',
-        'seguimiento': 'Registro de Seguimiento',
     };
     return map[fieldName] || fieldName;
 }
@@ -43,13 +41,12 @@ function formatFieldName(fieldName: string): string {
 // Type guard para diferenciar los tipos de items del historial
 const isChange = (item: any): item is Change => 'fieldName' in item;
 const isTeamTask = (item: any): item is TeamTask => 'situation' in item && 'assignedTo' in item;
-const isSeguimientoEntry = (item: any): item is SeguimientoEntry => 'topic' in item && !('description' in item);
 
-type HistoryItem = Change | TeamTask | SeguimientoEntry;
+type HistoryItem = Change | TeamTask;
 
 
 export function ChangeHistory({ studentId }: ChangeHistoryProps) {
-  const { getStudentChanges, seguimientoEntries, teamTasks, allStudents } = useDashboardFilters();
+  const { getStudentChanges, teamTasks, allStudents } = useDashboardFilters();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -73,10 +70,9 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
         change.fieldName === 'group'
       );
       
-      const studentInteractions = seguimientoEntries[studentId] || [];
       const studentTasks = teamTasks.filter(t => t.studentId === studentId);
       
-      const combinedHistory: HistoryItem[] = [...relevantChanges, ...studentInteractions, ...studentTasks];
+      const combinedHistory: HistoryItem[] = [...relevantChanges, ...studentTasks];
       
       combinedHistory.sort((a, b) => {
           let dateA: Date;
@@ -94,14 +90,14 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
       setIsLoading(false);
     }
     loadHistory();
-  }, [studentId, getStudentChanges, seguimientoEntries, teamTasks]);
+  }, [studentId, getStudentChanges, teamTasks]);
 
   if (isLoading) {
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Historial Unificado</CardTitle>
-                <CardDescription>Línea de tiempo de los eventos de riesgo, seguimientos y pendientes para este alumno.</CardDescription>
+                <CardDescription>Línea de tiempo de los eventos de riesgo, y pendientes para este alumno.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <Skeleton className="h-16 w-full" />
@@ -116,7 +112,7 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
     <Card>
       <CardHeader>
         <CardTitle>Historial Unificado</CardTitle>
-         <CardDescription>Línea de tiempo de los eventos de riesgo, seguimientos y pendientes para este alumno.</CardDescription>
+         <CardDescription>Línea de tiempo de los eventos de riesgo, y pendientes para este alumno.</CardDescription>
       </CardHeader>
       <CardContent>
         {history.length > 0 ? (
@@ -186,32 +182,6 @@ export function ChangeHistory({ studentId }: ChangeHistoryProps) {
                     </TimelineBody>
                   </TimelineItem>
                 );
-              } else if(isSeguimientoEntry(item)) {
-                  return (
-                    <TimelineItem key={`seguimiento-${item.id}`}>
-                        <TimelineConnector />
-                        <TimelineHeader>
-                          <TimelineIcon className="bg-green-500">{ICONS['seguimiento']}</TimelineIcon>
-                          <TimelineTitle>{formatFieldName('seguimiento')}</TimelineTitle>
-                        </TimelineHeader>
-                        <TimelineBody>
-                            <div className="space-y-2">
-                                <Badge variant="outline">{item.topic}</Badge>
-                                <p className="text-sm"><span className="font-semibold">Notas:</span> {item.notes}</p>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
-                                <div className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    <span>{format(item.createdAt.toDate(), "d 'de' LLLL, yyyy", { locale: es })}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <UserCog className="h-3 w-3" />
-                                    <span>Atendido por: {item.attendedBy}</span>
-                                </div>
-                            </div>
-                        </TimelineBody>
-                    </TimelineItem>
-                  )
               }
               return null;
             })}

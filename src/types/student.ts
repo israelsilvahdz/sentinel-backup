@@ -64,23 +64,6 @@ export interface UploadHistory {
   uploadedAt: string; // ISO String
 }
 
-export interface BitacoraEntry {
-  id?: string; // Asignado por Firestore
-  timestamp: any; // Firestore Timestamp of creation
-  eventDate: any; // Firestore Timestamp of event
-  studentId: string;
-  studentName: string;
-  reportedBy: string;
-  description: string;
-  agreements: string;
-  caseType: 'academica' | 'conductual';
-  academicCommittee: boolean;
-  parentsContacted: boolean;
-  absencesAtFollowUp?: number;
-  missedAssignmentsAtFollowUp?: number;
-  createdAt: any; // For compatibility with SeguimientoEntry
-}
-
 export interface TeamTask {
     id: string;
     createdAt: any; // Firestore Timestamp
@@ -95,18 +78,6 @@ export interface TeamTask {
     status: 'pendiente' | 'completado';
     assignedTo: 'leader' | 'tutor' | 'both';
     completionNotes?: string;
-}
-
-export interface SeguimientoEntry {
-  id: string;
-  createdAt: any; // Firestore Timestamp
-  studentId: string;
-  studentName: string;
-  attendedBy: string;
-  topic: string;
-  notes: string;
-  absencesAtFollowUp: number;
-  missedAssignmentsAtFollowUp: number;
 }
 
 export interface StudentContact {

@@ -17,16 +17,13 @@ import {
   where
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { BitacoraEntry, TeamTask, StudentContact, SeguimientoEntry, ProfessorContact, Team, Student, Change, WeightingScheme } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
-const BITACORA_COLLECTION = 'bitacora';
 const TEAM_TASKS_COLLECTION = 'teamTasks';
 const CONTACTS_COLLECTION = 'contacts';
 const PROFESSOR_CONTACTS_COLLECTION = 'professorContacts';
-const SEGUIMIENTOS_K_COLLECTION = 'seguimientosK';
-const SEGUIMIENTOS_PILOT_COLLECTION = 'seguimientosPilot';
 const TEAMS_COLLECTION = 'teams';
 const CHANGE_LOG_COLLECTION = 'studentChangeLog';
 const WEIGHTING_SCHEMES_COLLECTION = 'weightingSchemes';
@@ -80,73 +77,6 @@ export const getAllStudentChanges = async (): Promise<Record<string, Change[]>> 
     return {};
   }
 };
-
-
-/**
- * Añade una nueva entrada a la bitácora en Firestore.
- * @param entry - El objeto de la entrada de la bitácora sin el timestamp.
- */
-export const addBitacoraEntry = async (entry: Omit<BitacoraEntry, 'timestamp' | 'id'>): Promise<void> => {
-  try {
-    const { eventDate, ...rest } = entry;
-    const docData: any = {
-        ...rest,
-        eventDate: Timestamp.fromDate(eventDate as Date),
-        timestamp: Timestamp.now(),
-    };
-    
-    // Clean up undefined fields before sending to Firestore
-    Object.keys(docData).forEach(key => docData[key as keyof typeof docData] === undefined && delete docData[key as keyof typeof docData]);
-
-    await addDoc(collection(db, BITACORA_COLLECTION), docData);
-
-  } catch (error) {
-    console.error("Error al añadir documento a Firestore: ", error);
-    throw new Error("No se pudo guardar el registro en la base de datos.");
-  }
-};
-
-/**
- * Obtiene todas las entradas de la bitácora de Firestore, ordenadas por fecha descendente.
- * @returns Un array de entradas de la bitácora.
- */
-export const getBitacoraEntries = async (): Promise<BitacoraEntry[]> => {
-  try {
-    const bitacoraQuery = query(collection(db, BITACORA_COLLECTION), orderBy('eventDate', 'desc'));
-    const querySnapshot = await getDocs(bitacoraQuery);
-    
-    const entries: BitacoraEntry[] = [];
-    querySnapshot.forEach(doc => {
-        entries.push({
-            id: doc.id,
-            ...doc.data()
-        } as BitacoraEntry);
-    });
-    return entries;
-
-  } catch (error) {
-    console.error("Error al obtener documentos de Firestore: ", error);
-    if (error instanceof Error && error.message.includes("Failed to get document because the client is offline")) {
-        console.warn("Firestore está offline. Verifica la configuración y la conexión a internet.");
-    }
-    return [];
-  }
-};
-
-/**
- * Elimina una entrada de la bitácora por su ID.
- * @param id - El ID del documento de Firestore a eliminar.
- */
-export const deleteBitacoraEntry = async (id: string): Promise<void> => {
-  try {
-    const docRef = doc(db, BITACORA_COLLECTION, id);
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error("Error al eliminar documento de Firestore: ", error);
-    throw new Error("No se pudo eliminar el registro de la base de datos.");
-  }
-};
-
 
 // --- Funciones para Tareas de Equipo ---
 
@@ -355,101 +285,6 @@ export const getProfessorContacts = async (): Promise<Record<string, ProfessorCo
     }
 };
 
-// --- Funciones para Seguimientos Kanban ---
-
-export const addSeguimientoEntry = async (entry: Omit<SeguimientoEntry, 'id' | 'createdAt'>): Promise<void> => {
-  try {
-    await addDoc(collection(db, SEGUIMIENTOS_K_COLLECTION), {
-      ...entry,
-      createdAt: Timestamp.now(),
-    });
-  } catch (error) {
-    console.error("Error al añadir seguimiento: ", error);
-    throw new Error("No se pudo guardar el registro de seguimiento.");
-  }
-};
-
-export const getSeguimientoEntries = async (): Promise<Record<string, SeguimientoEntry[]>> => {
-  try {
-    const q = query(collection(db, SEGUIMIENTOS_K_COLLECTION), orderBy('createdAt', 'asc'));
-    const querySnapshot = await getDocs(q);
-    const entriesByStudent: Record<string, SeguimientoEntry[]> = {};
-    querySnapshot.forEach(doc => {
-      const entry = { id: doc.id, ...doc.data() } as SeguimientoEntry;
-      if (!entriesByStudent[entry.studentId]) {
-        entriesByStudent[entry.studentId] = [];
-      }
-      entriesByStudent[entry.studentId].push(entry);
-    });
-    return entriesByStudent;
-  } catch (error) {
-    console.error("Error al obtener seguimientos: ", error);
-    return {};
-  }
-};
-
-export const updateSeguimientoEntry = async (id: string, data: Partial<Omit<SeguimientoEntry, 'id' | 'createdAt'>>): Promise<void> => {
-  try {
-    const docRef = doc(db, SEGUIMIENTOS_K_COLLECTION, id);
-    await updateDoc(docRef, data);
-  } catch (error) {
-    console.error("Error al actualizar seguimiento: ", error);
-    throw new Error("No se pudo actualizar el registro de seguimiento.");
-  }
-};
-
-export const deleteSeguimientoEntry = async (id: string): Promise<void> => {
-  try {
-    const docRef = doc(db, SEGUIMIENTOS_K_COLLECTION, id);
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error("Error al eliminar seguimiento: ", error);
-    throw new Error("No se pudo eliminar el registro de seguimiento.");
-  }
-};
-
-
-// --- Funciones para Seguimientos (Piloto) ---
-export interface SeguimientoPilotEntry {
-  id?: string;
-  createdAt: any;
-  studentId: string;
-  studentName: string;
-  attendedBy: string;
-  topic: string;
-  notes?: string;
-  parentsContacted: boolean;
-  absencesAtFollowUp: number;
-  missedAssignmentsAtFollowUp: number;
-}
-
-export const addSeguimientoPilotEntry = async (entry: Omit<SeguimientoPilotEntry, 'id' | 'createdAt'>): Promise<void> => {
-  try {
-    await addDoc(collection(db, SEGUIMIENTOS_PILOT_COLLECTION), {
-      ...entry,
-      createdAt: Timestamp.now(),
-    });
-  } catch (error) {
-    console.error("Error al añadir seguimiento piloto: ", error);
-    throw new Error("No se pudo guardar el registro de seguimiento piloto.");
-  }
-};
-
-export const getSeguimientoPilotEntries = async (): Promise<SeguimientoPilotEntry[]> => {
-  try {
-    const q = query(collection(db, SEGUIMIENTOS_PILOT_COLLECTION), orderBy('createdAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    const entries: SeguimientoPilotEntry[] = [];
-    querySnapshot.forEach(doc => {
-      entries.push({ id: doc.id, ...doc.data() } as SeguimientoPilotEntry);
-    });
-    return entries;
-  } catch (error) {
-    console.error("Error al obtener seguimientos piloto: ", error);
-    return [];
-  }
-};
-
 // --- Teams Management Functions ---
 
 export const getTeams = async (): Promise<Team[]> => {
@@ -600,4 +435,3 @@ export const deleteWeightingScheme = async (schemeId: string): Promise<void> => 
         throw error;
     }
 };
-  
