@@ -23,6 +23,7 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { RiskCell, CopyButton } from './StudentCardShared';
 import * as htmlToImage from 'html-to-image';
 import { Badge } from '../ui/badge';
+import { ScrollArea } from '../ui/scroll-area';
 
 
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
@@ -119,17 +120,19 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
 
     return (
       <Tabs defaultValue="materias" className="w-full">
-        <div className="flex justify-between items-center px-6">
-            <TabsList>
-                <TabsTrigger value="materias">Materias</TabsTrigger>
-                <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
-                <TabsTrigger value="horario">Horario</TabsTrigger>
-                <TabsTrigger value="horario-profes">Horario Profesores</TabsTrigger>
-                <TabsTrigger value="contacto"><Phone className="mr-2 h-4 w-4"/>Contacto</TabsTrigger>
-            </TabsList>
+        <div className="flex justify-between items-center px-4 sm:px-6">
+            <ScrollArea className="w-full whitespace-nowrap pb-2">
+                <TabsList className="inline-flex h-auto p-1">
+                    <TabsTrigger value="materias">Materias</TabsTrigger>
+                    <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
+                    <TabsTrigger value="horario">Horario</TabsTrigger>
+                    <TabsTrigger value="horario-profes">Horario Profesores</TabsTrigger>
+                    <TabsTrigger value="contacto"><Phone className="mr-1 sm:mr-2 h-4 w-4"/>Contacto</TabsTrigger>
+                </TabsList>
+            </ScrollArea>
             <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
                 <DialogTrigger asChild>
-                    <Button variant="outline" size="sm"><Camera className="mr-2 h-4 w-4"/>Generar Reporte</Button>
+                    <Button variant="outline" size="sm" className="hidden sm:inline-flex ml-4"><Camera className="mr-2 h-4 w-4"/>Generar Reporte</Button>
                 </DialogTrigger>
                 <ReportImageDialog student={student} subjects={subjects}/>
             </Dialog>

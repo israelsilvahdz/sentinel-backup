@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -966,36 +967,39 @@ export function StudentPanel() {
                     )}
                 </div>
             </div>
-             <div className="flex items-center gap-2 flex-wrap">
+             <div className="flex items-center gap-2 flex-wrap justify-end">
                 <FileUpload 
                   onFileSelect={handleDirectoryUpload}
                   selectedFile={directoryFile}
                   isLoading={isProcessingDirectory}
-                  label="Cargar Directorio"
+                  label="Directorio"
                   icon={<Contact />}
                   variant="secondary"
+                  size="sm"
                 />
                  <FileUpload 
                   onFileSelect={handleAthletesUpload}
                   selectedFile={athletesFile}
                   isLoading={isProcessingAthletes}
-                  label="Cargar Atletas"
+                  label="Atletas"
                   icon={<Award />}
                   variant="secondary"
+                   size="sm"
                 />
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" disabled={athleteStudents.length === 0}>
-                            <Mail className="mr-2 h-4 w-4"/> Notificar Ausencia de Atletas
+                        <Button variant="outline" disabled={athleteStudents.length === 0} size="sm">
+                            <Mail className="md:mr-2 h-4 w-4"/> 
+                            <span className="hidden md:inline">Notificar Ausencia</span>
                         </Button>
                     </DialogTrigger>
                     <AthleteNotificationDialog students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
                 </Dialog>
                  <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline">
-                            <Printer className="mr-2 h-4 w-4" />
-                            Imprimir Lista
+                        <Button variant="outline" size="sm">
+                            <Printer className="md:mr-2 h-4 w-4" />
+                             <span className="hidden md:inline">Imprimir Lista</span>
                         </Button>
                     </DialogTrigger>
                     <PrintListDialog students={filteredStudents} contacts={studentContacts} />
@@ -1004,9 +1008,9 @@ export function StudentPanel() {
                 <TooltipProvider>
                     <Tooltip open={isCopied}>
                         <TooltipTrigger asChild>
-                        <Button variant="outline" onClick={handleCopyDirectory}>
-                            {isCopied ? <Check className="text-primary"/> : <ClipboardCopy />}
-                            Copiar Directorio
+                        <Button variant="outline" onClick={handleCopyDirectory} size="sm">
+                            {isCopied ? <Check className="text-primary h-4 w-4"/> : <ClipboardCopy className="md:mr-2 h-4 w-4" />}
+                             <span className="hidden md:inline">Copiar Directorio</span>
                         </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -1035,7 +1039,7 @@ export function StudentPanel() {
           </div>
           
            {filteredStudents.length > 0 && (
-            <div className="flex items-center justify-between bg-muted/50 p-3 rounded-lg">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/50 p-3 rounded-lg">
                 <div className="flex items-center gap-4">
                     <div className="flex items-center space-x-2">
                         <Checkbox 
@@ -1048,18 +1052,22 @@ export function StudentPanel() {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button 
+                        size="sm"
                         onClick={() => setIsMailerOpen(true)}
                         disabled={selectedStudents.size === 0}
                     >
-                        <Mail className="mr-2 h-4 w-4" />
-                        Enviar Correo ({selectedStudents.size})
+                        <Mail className="md:mr-2 h-4 w-4" />
+                        <span className="hidden md:inline">Enviar Correo</span>
+                         ({selectedStudents.size})
                     </Button>
                     <Button 
+                        size="sm"
                         onClick={handleDownloadZip}
                         disabled={selectedStudents.size === 0 || downloadProgress > 0}
                     >
-                        <Download className="mr-2 h-4 w-4" />
-                        Descargar Reportes ({selectedStudents.size})
+                        <Download className="md:mr-2 h-4 w-4" />
+                         <span className="hidden md:inline">Descargar Reportes</span>
+                         ({selectedStudents.size})
                     </Button>
                 </div>
             </div>
@@ -1113,3 +1121,5 @@ export function StudentPanel() {
     </div>
   );
 }
+
+    

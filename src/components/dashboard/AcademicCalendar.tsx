@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -15,6 +14,7 @@ import { Day, type DayProps } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '../ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 type CalendarType = 'tetra' | 'semestral';
@@ -59,6 +59,7 @@ export function AcademicCalendar() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [calendarType, setCalendarType] = useState<CalendarType>('tetra');
   const [isClient, setIsClient] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     setIsClient(true);
@@ -174,7 +175,7 @@ export function AcademicCalendar() {
               onSelect={setDate}
               className="rounded-md border"
               locale={es}
-              numberOfMonths={2}
+              numberOfMonths={isMobile ? 1 : 2}
               defaultMonth={defaultMonth}
               components={{ Day: DayWithTooltip }}
             />
@@ -197,7 +198,7 @@ export function AcademicCalendar() {
                             <ul className="space-y-3">
                             {eventsByDay.map((event, index) => (
                                 <li key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                                    <span className={`p-2 rounded-full ${CATEGORY_BG_TEXT_COLORS[event.category]}`}>
+                                    <span className={cn('p-2 rounded-full', CATEGORY_BG_TEXT_COLORS[event.category])}>
                                         {ICONS[event.category]}
                                     </span>
                                     <div>

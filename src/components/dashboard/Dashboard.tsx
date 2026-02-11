@@ -161,7 +161,7 @@ export function Dashboard() {
 
       {hasData && (
         <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
                 <KpiCard title="SD por Faltas" value={sdAbsencesCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('sd-absences')} />
                 <KpiCard title="SD por Tareas (NE)" value={sdAssignmentsCases.length} icon={UserX} color="red" onClick={() => handleCaseClick('sd-assignments')} />
                 <KpiCard title="Al Límite por Faltas" value={atLimitAbsencesCases.length} icon={AlertTriangle} color="red" onClick={() => handleCaseClick('at-limit-absences')} />
@@ -174,7 +174,7 @@ export function Dashboard() {
                 <CardHeader>
                     <CardTitle>Focos de Riesgo y Seguimiento</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                      <KpiCard title="Alumnos con NE en 'El mundo contemporáneo'" value={onlineRiskMundo.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('El mundo contemporáneo')} />
                      <KpiCard title="Alumnos con NE en 'Ciencias de la Vida'" value={onlineRiskVida.length} icon={BookX} color="yellow" onClick={() => handleSubjectRiskClick('Ciencias de la Vida')} />
                      <KpiCard title="Alumnos con Calificaciones Incompletas (SC)" value={incompleteGradeCases.length} icon={FileText} onClick={() => handleCaseClick('incompleteGrade')} />
