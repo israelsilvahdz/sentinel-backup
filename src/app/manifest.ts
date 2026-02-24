@@ -16,6 +16,12 @@ export default function manifest(): MetadataRoute.Manifest {
         src: 'https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png',
         sizes: '192x192',
         type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: 'https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png',
+        sizes: '192x192',
+        type: 'image/png',
         purpose: 'maskable',
       },
       {

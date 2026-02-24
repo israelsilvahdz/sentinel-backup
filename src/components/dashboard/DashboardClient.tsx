@@ -24,7 +24,6 @@ import { ChangeStats } from './ChangeStats';
 import { PonderacionesDashboard } from './PonderacionesDashboard';
 import { UnclassifiedSubjectsPanel } from './UnclassifiedSubjectsPanel';
 import { MapPlanner } from './MapPlanner';
-import { AcademicCalendar } from './AcademicCalendar';
 import { DashboardFilters } from './DashboardFilters';
 import { TeamsManagementPanel } from './TeamsManagementPanel';
 import { AcademicCommitteePanel } from './AcademicCommitteePanel';
@@ -48,7 +47,7 @@ import { xorCipher } from '@/lib/utils';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'academic-calendar' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -146,7 +145,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('academic-calendar');
+  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [contextualStudentIds, setContextualStudentIds] = useState<Set<string> | null>(null);
   
   const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
@@ -453,7 +452,7 @@ export function DashboardClient() {
                     studentIdsWithNewAbsences.add(studentId);
                 }
             });
-            return students.filter(s => studentIdsWithNewAbsences.has(s.id));
+            return students.filter(s => studentIdsWithNewAbsences.has(studentId));
         }
         if (caseType === 'newMissedAssignments') {
             const studentIdsWithNewNE = new Set<string>();
@@ -462,7 +461,7 @@ export function DashboardClient() {
                     studentIdsWithNewNE.add(studentId);
                 }
             });
-            return students.filter(s => studentIdsWithNewNE.has(s.id));
+            return students.filter(s => studentIdsWithNewNE.has(studentId));
         }
         if(caseType === 'lost') return findLostCases(students);
         if(caseType === 'extraordinary') return findExtraordinaryCases(students);
@@ -474,7 +473,7 @@ export function DashboardClient() {
             return findAtLimitAbsencesCases(students).filter(s => !sdIds.has(s.id));
         }
         if(caseType === 'at-limit-assignments') {
-            const sdIds = new Set(findSDAssignmentsCases(students).map(s => s.id));
+            const sdIds = new Set(findSDAbsencesCases(students).map(s => s.id));
             return findAtLimitAssignmentsCases(students).filter(s => !sdIds.has(s.id));
         }
 
@@ -560,7 +559,6 @@ export function DashboardClient() {
         case 'map-planner': return <MapPlanner />;
         case 'weighting-schemes': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
-        case 'academic-calendar': return <AcademicCalendar />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
         case 'teams-management': return <TeamsManagementPanel />;
         case 'academic-committee': return <AcademicCommitteePanel />;
@@ -583,12 +581,6 @@ export function DashboardClient() {
           <SidebarContent>
             <SidebarGroup>
               <SidebarMenu>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Calendario Académico" isActive={activeView === 'academic-calendar'} onClick={() => handleSetActiveView('academic-calendar')}>
-                    <CalendarDays />
-                    <span>Calendario Académico</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Progreso Estudiantil" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
                     <LayoutDashboard />
