@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: 'Student progress monitoring dashboard.',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Sentinel',
   },
   formatDetection: {
@@ -23,6 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -34,8 +35,10 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="font-body antialiased bg-background overflow-x-hidden">
+      <body className="font-body antialiased bg-background overflow-x-hidden selection:bg-primary/10">
         {children}
         <Toaster />
       </body>
