@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -33,7 +32,7 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, UploadCloud, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, Calendar, TimerOff } from 'lucide-react';
+import { Trash2, RefreshCw, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, Calendar, TimerOff } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -44,8 +43,7 @@ import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
 import { getContact, getContacts, getTeamTasks, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getWeightingSchemes } from '@/lib/firebase-services';
-import professorContactsData from '@/lib/professor-contacts.json';
-import { generateKeyFromData, xorCipher } from '@/lib/utils';
+import { xorCipher } from '@/lib/utils';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
@@ -579,7 +577,7 @@ export function DashboardClient() {
           <SidebarHeader>
              <div className="flex items-center gap-2 px-4 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
                 <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={26} height={26} className="h-6 w-auto" />
-                <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">TECMILENIO</span>
+                <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">SENTINEL</span>
              </div>
           </SidebarHeader>
           <SidebarContent>
@@ -668,44 +666,41 @@ export function DashboardClient() {
            <SidebarToggle />
         </Sidebar>
         <SidebarInset>
-            <header className="flex h-auto md:h-14 items-center justify-between gap-4 border-b bg-card px-4 lg:px-6 sticky top-0 z-30 flex-wrap py-2">
-                 <div className="flex items-center gap-4 flex-1">
-                    <SidebarTrigger className="md:hidden" />
-                    <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={180} height={40} className="h-8 w-auto" />
+            <header className="flex h-14 items-center justify-between gap-4 border-b bg-card px-4 lg:px-6 sticky top-0 z-30 py-2">
+                 <div className="flex items-center gap-2 md:gap-4 flex-1 overflow-hidden">
+                    <SidebarTrigger className="flex shrink-0" />
+                    <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={120} height={30} className="h-6 md:h-8 w-auto hidden xs:block" />
                     <div className="hidden md:flex">
                         <DashboardFilters />
                     </div>
                  </div>
-                 <div className="flex items-center gap-2 flex-wrap">
+                 <div className="flex items-center gap-1 md:gap-2">
                     {allStudents.length > 0 && reportInfo?.date && (
-                        <div className="flex items-center gap-3 text-sm font-medium text-muted-foreground p-2 rounded-md bg-muted/50">
-                            <div className="flex items-center gap-1.5">
-                                <Calendar size={14} />
-                                <span>Reporte del {reportInfo.date}</span>
-                            </div>
-                            <Badge variant="secondary">{reportInfo.plan}</Badge>
+                        <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-muted-foreground p-1.5 rounded-md bg-muted/50">
+                            <Calendar size={12} />
+                            <span>{reportInfo.date}</span>
+                            <Badge variant="secondary" className="text-[10px] px-1">{reportInfo.plan[0]}</Badge>
                         </div>
                     )}
-                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" />
-                     <Button variant="ghost" size="icon" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar página">
+                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" className="h-8 min-w-0 px-2" label="" icon={<FileClock className="h-4 w-4" />} />
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar">
                         <RefreshCw className="h-4 w-4" />
-                        <span className="sr-only">Recargar</span>
                      </Button>
-                     <Button variant="ghost" size="icon" onClick={handleDeleteAllData} disabled={isLoading || isProcessing} title="Borrar todos los datos">
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleDeleteAllData} disabled={isLoading || isProcessing} title="Borrar Datos">
                         <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Borrar Datos</span>
                     </Button>
                 </div>
-                <div className="md:hidden w-full pt-2">
-                    <DashboardFilters />
-                </div>
             </header>
+            
+            <div className="md:hidden w-full px-4 pt-3 border-b bg-card pb-3">
+                <DashboardFilters />
+            </div>
 
             {(isProcessing || isLoading) && progress > 0 && <Progress value={progress} className="w-full h-1" />}
             
-            <div className="flex-1">
+            <main className="flex-1 overflow-y-auto">
               {renderActiveView()}
-            </div>
+            </main>
 
         </SidebarInset>
       </SidebarProvider>

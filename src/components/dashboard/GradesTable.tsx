@@ -23,7 +23,6 @@ export function GradesTable({ subjects }: GradesTableProps) {
         const allActivityKeys = new Set<string>();
         subjects.forEach(subject => {
             Object.keys(subject.activities).forEach(key => {
-                 // Solo añade la clave de actividad si tiene un valor (no es null, undefined, o string vacío)
                 if (ACTIVITY_REGEX.test(key) && subject.activities[key] !== null && subject.activities[key] !== undefined && String(subject.activities[key]).trim() !== '') {
                     allActivityKeys.add(key);
                 }
@@ -39,7 +38,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
         const tableRows = subjects.map(subject => {
             const rowData: Record<string, string | number> = {
                 subjectName: subject.name,
-                ponderado: (subject.grade || 0).toFixed(2), // Usar la calificación del reporte
+                ponderado: (subject.grade || 0).toFixed(2),
             };
             sortedHeaders.forEach(header => {
                 rowData[header] = subject.activities[header] ?? '';
@@ -56,26 +55,25 @@ export function GradesTable({ subjects }: GradesTableProps) {
     }
 
     return (
-        <div className="p-1">
-            <Table>
+        <div className="w-full overflow-x-auto">
+            <Table className="min-w-[600px]">
                 <TableHeader>
                     <TableRow>
-                        <TableHead className="min-w-[200px] font-semibold">Materia</TableHead>
+                        <TableHead className="min-w-[180px] font-semibold sticky left-0 bg-background z-10">Materia</TableHead>
                         {headers.map(header => (
-                            <TableHead key={header} className="text-center">{header}</TableHead>
+                            <TableHead key={header} className="text-center px-2">{header}</TableHead>
                         ))}
-                        <TableHead className="text-right font-bold">Ponderado</TableHead>
+                        <TableHead className="text-right font-bold pr-4">Pond.</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {rows.map((row, index) => (
                         <TableRow key={index} className={cn(index % 2 === 0 ? 'bg-muted/30' : '')}>
-                            <TableCell className="font-medium">{row.subjectName}</TableCell>
+                            <TableCell className="font-medium sticky left-0 bg-inherit z-10">{row.subjectName}</TableCell>
                             {headers.map(header => (
-                                <TableCell key={header} className="text-center font-mono">
+                                <TableCell key={header} className="text-center font-mono text-xs px-2">
                                     {String(row[header]).toUpperCase() === 'SC' ? (
-                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                                            <Clock className="h-3 w-3 mr-1"/>
+                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-1 py-0 text-[10px]">
                                             SC
                                         </Badge>
                                     ) : (
@@ -83,7 +81,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
                                     )}
                                 </TableCell>
                             ))}
-                            <TableCell className="text-right font-mono font-bold text-primary">{row.ponderado}</TableCell>
+                            <TableCell className="text-right font-mono font-bold text-primary pr-4">{row.ponderado}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
