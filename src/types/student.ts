@@ -1,5 +1,4 @@
 
-
 export interface Subject {
   id: string; // CRN
   key: string; // Clave de materia
@@ -56,12 +55,6 @@ export interface Change {
   oldValue: any;
   newValue: any;
   changeType: 'increase' | 'decrease';
-}
-
-export interface UploadHistory {
-  id: string;
-  fileName: string;
-  uploadedAt: string; // ISO String
 }
 
 export interface TeamTask {

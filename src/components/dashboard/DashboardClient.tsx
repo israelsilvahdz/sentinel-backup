@@ -31,17 +31,16 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, CalendarClock, LayoutDashboard, Users, BookMarked, BookCopy, HelpCircle, ChevronLeft, Map as MapIcon, FileClock, BarChart3, CalendarDays, Home, FileText, Contact, ClipboardList, Shield, Gavel, BookOpen, Calendar, TimerOff } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Home, FileText, Contact, Shield, BookOpen, Calendar } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 
-import type { Student, Change, Subject, UploadHistory, StudentData, SubjectSummary, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
+import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
-import { getContact, getContacts, getTeamTasks, getProfessorContacts, bulkAddOrUpdateProfessorContacts, getTeams, bulkAddOrUpdateTeams, getWeightingSchemes } from '@/lib/firebase-services';
+import { getContact, getTeamTasks, getProfessorContacts, getTeams, getWeightingSchemes } from '@/lib/firebase-services';
 import { xorCipher } from '@/lib/utils';
 
 
@@ -70,7 +69,6 @@ interface DashboardContextType {
   fetchTeamTasks: () => Promise<void>;
   weightingSchemes: WeightingScheme[];
   fetchWeightingSchemes: () => Promise<void>;
-  setUploadHistory: React.Dispatch<React.SetStateAction<UploadHistory[]>>;
   isLoading: boolean;
   hasData: boolean;
   leaders: string[];
@@ -113,10 +111,9 @@ export function useDashboardFilters() {
 
 const LOCAL_STORAGE_KEYS = {
     STUDENTS: 'academic_sentinel_students',
-    UPLOADS: 'academic_sentinel_uploads',
     PLAN_TYPE: 'academic_sentinel_plan_type',
-    PROFESSOR_CONTACTS_MIGRATED: 'academic_sentinel_prof_contacts_migrated',
     OFERTA_ACADEMICA: 'academic_sentinel_oferta_academica',
+    CURRENT_FILE_NAME: 'academic_sentinel_current_file_name',
 };
 
 
@@ -127,11 +124,11 @@ export function DashboardClient() {
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [professorContacts, setProfessorContacts] = useState<Record<string, ProfessorContact>>({});
   const [teams, setTeams] = useState<Team[]>([]);
-  const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [teamTasks, setTeamTasks] = useState<TeamTask[]>([]);
   const [weightingSchemes, setWeightingSchemes] = useState<WeightingScheme[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
   const [ofertaAcademica, setOfertaAcademica] = useState<OfertaAcademicaItem[]>([]);
+  const [currentFileName, setCurrentFileName] = useState<string | null>(null);
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [dataKey, setDataKey] = useState<string | null>(null);
@@ -214,11 +211,11 @@ export function DashboardClient() {
           setWeightingSchemes(schemes);
           setTeamTasks(tasks);
           
-          const storedUploads = localStorage.getItem(LOCAL_STORAGE_KEYS.UPLOADS);
-          if (storedUploads) setUploadHistory(JSON.parse(storedUploads));
-          
           const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
           if (storedPlanType) setPlanType(storedPlanType as PlanType);
+
+          const storedFileName = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME);
+          if (storedFileName) setCurrentFileName(storedFileName);
 
         } catch (error) {
             console.error("Error loading data from Local Storage or DB", error);
@@ -241,14 +238,14 @@ export function DashboardClient() {
             const encryptedStudents = xorCipher(JSON.stringify(allStudents), dataKey);
             localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENTS, encryptedStudents);
         }
-        if(uploadHistory.length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEYS.UPLOADS, JSON.stringify(uploadHistory));
-        }
         if (ofertaAcademica.length > 0 && dataKey) {
             const encryptedOferta = xorCipher(JSON.stringify(ofertaAcademica), dataKey);
             localStorage.setItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA, encryptedOferta);
         }
         localStorage.setItem(LOCAL_STORAGE_KEYS.PLAN_TYPE, planType);
+        if (currentFileName) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME, currentFileName);
+        }
 
     } catch(error) {
         console.error("Error saving data to Local Storage", error);
@@ -258,7 +255,7 @@ export function DashboardClient() {
           description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
         });
     }
-  }, [allStudents, uploadHistory, planType, ofertaAcademica, dataKey, toast]);
+  }, [allStudents, planType, ofertaAcademica, dataKey, toast, currentFileName]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -330,6 +327,7 @@ export function DashboardClient() {
             }));
             
             setAllStudents(processedStudents);
+            setCurrentFileName(currentFile.name);
             
             setOfertaAcademica([]); 
             localStorage.removeItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
@@ -350,8 +348,6 @@ export function DashboardClient() {
                 title: 'Éxito',
                 description: `Se procesaron ${processedStudents.length} alumnos del reporte.`,
             });
-            
-            setUploadHistory(prev => [{ id: Date.now().toString(), fileName: currentFile.name, uploadedAt: new Date().toISOString() }, ...prev].slice(0, 10));
 
         } catch (error) {
            toast({ variant: 'destructive', title: 'Error al procesar', description: `Hubo un problema al procesar el archivo. Revisa la consola.`});
@@ -373,7 +369,7 @@ export function DashboardClient() {
       Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
       
       setAllStudents([]);
-      setUploadHistory([]);
+      setCurrentFileName(null);
       setCurrentFile(null);
       setPlanType('tetramestral');
       setOfertaAcademica([]);
@@ -507,13 +503,11 @@ export function DashboardClient() {
   }, [latestComparison]);
 
   const reportInfo = useMemo(() => {
-    if (uploadHistory.length === 0) {
+    if (!currentFileName) {
         return null;
     }
-    const latestUpload = uploadHistory[0];
-    const fileName = latestUpload.fileName;
 
-    const dateMatch = fileName.match(/(\d{2})\.(\d{2})\.(\d{4}|\d{2})/);
+    const dateMatch = currentFileName.match(/(\d{2})\.(\d{2})\.(\d{4}|\d{2})/);
     let displayDate: string | null = null;
     if (dateMatch) {
         const day = dateMatch[1];
@@ -529,10 +523,10 @@ export function DashboardClient() {
         date: displayDate,
         plan: planType === 'tetramestral' ? 'Tetramestral' : 'Semestral'
     };
-  }, [uploadHistory, planType]);
+  }, [currentFileName, planType]);
 
   const contextValue: DashboardContextType = {
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, setUploadHistory, weightingSchemes, fetchWeightingSchemes,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, weightingSchemes, fetchWeightingSchemes,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
     leaders, tutors, subjects, professors, groups, groupsForSubject,
@@ -636,23 +630,6 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
-            </SidebarGroup>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <h3 className="text-sm font-semibold text-muted-foreground px-2 mb-2 flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-                <CalendarClock size={16} /> Historial de Cargas
-              </h3>
-              {uploadHistory.length > 0 ? (
-                <ul className="space-y-1 px-2 text-sm group-data-[collapsible=icon]:hidden">
-                  {uploadHistory.map(upload => (
-                    <li key={upload.id} className="text-muted-foreground truncate" title={upload.fileName}>
-                      {upload.fileName}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="px-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">No hay cargas recientes.</p>
-              )}
             </SidebarGroup>
           </SidebarContent>
            <SidebarToggle />
