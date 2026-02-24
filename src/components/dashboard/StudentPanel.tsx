@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
@@ -30,6 +29,7 @@ import { cn } from '@/lib/utils';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { StudentReportImage } from './StudentReportImage';
+import { StudentGradesReportImage } from './StudentGradesReportImage';
 import { ScrollArea } from '../ui/scroll-area';
 import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { Progress } from '../ui/progress';
@@ -818,7 +818,9 @@ export function StudentPanel() {
         setDownloadStatus(`Iniciando descarga en ${studentChunks.length} partes...`);
         setDownloadProgress(0);
 
-        const generateImage = async (student: Student): Promise<Blob | null> => {
+        const { createRoot } = await import('react-dom/client');
+
+        const generateImages = async (student: Student): Promise<{ report: Blob | null, grades: Blob | null }> => {
             const subjects = await loadStudentSubjects(student.id);
             const subjectSummaries = subjects.map(s => ({
                 id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
@@ -826,39 +828,40 @@ export function StudentPanel() {
                 grade: s.grade, finalGrade: s.finalGrade, group: s.group,
             }));
 
-            const node = document.createElement('div');
-            node.style.position = 'fixed';
-            node.style.top = '-9999px';
-            node.style.left = '0px';
-            document.body.appendChild(node);
-            
-            const { createRoot } = await import('react-dom/client');
-            const root = createRoot(node);
-            const ref = React.createRef<HTMLDivElement>();
-            
-            const ReportComponent = React.forwardRef<HTMLDivElement>((props, fwdRef) => <StudentReportImage ref={fwdRef} student={student} subjects={subjectSummaries} />);
-            ReportComponent.displayName = 'ReportComponent';
-            
-            return new Promise((resolve) => {
-                root.render(<ReportComponent ref={ref} />);
+            const renderToBlob = async (Component: any): Promise<Blob | null> => {
+                const node = document.createElement('div');
+                node.style.position = 'fixed';
+                node.style.top = '-9999px';
+                node.style.left = '0px';
+                document.body.appendChild(node);
+                const root = createRoot(node);
+                const ref = React.createRef<HTMLDivElement>();
                 
-                setTimeout(async () => {
-                    if (ref.current) {
-                        try {
-                            const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5 });
-                            resolve(blob);
-                        } catch (err) {
-                            console.error(`Failed to generate image for student ${student.name}`, err);
+                return new Promise((resolve) => {
+                    root.render(<Component ref={ref} />);
+                    setTimeout(async () => {
+                        if (ref.current) {
+                            try {
+                                const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5 });
+                                resolve(blob);
+                            } catch (err) {
+                                console.error(`Failed to generate image`, err);
+                                resolve(null);
+                            } finally {
+                                root.unmount();
+                                document.body.removeChild(node);
+                            }
+                        } else {
                             resolve(null);
-                        } finally {
-                            root.unmount();
-                            document.body.removeChild(node);
                         }
-                    } else {
-                        resolve(null);
-                    }
-                }, 500); 
-            });
+                    }, 600); 
+                });
+            };
+
+            const reportBlob = await renderToBlob(React.forwardRef<HTMLDivElement>((props, ref) => <StudentReportImage ref={ref} student={student} subjects={subjectSummaries} />));
+            const gradesBlob = await renderToBlob(React.forwardRef<HTMLDivElement>((props, ref) => <StudentGradesReportImage ref={ref} student={student} subjects={subjects} />));
+
+            return { report: reportBlob, grades: gradesBlob };
         };
 
         let totalCompleted = 0;
@@ -871,10 +874,14 @@ export function StudentPanel() {
             for (const studentId of chunk) {
                 const student = allStudentsMap.get(studentId);
                 if (student) {
-                    const blob = await generateImage(student);
-                    if (blob) {
-                        const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                        zip.file(`${sanitizedName}_reporte.png`, blob);
+                    const { report, grades } = await generateImages(student);
+                    const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                    
+                    if (report) {
+                        zip.file(`${sanitizedName}_resumen.png`, report);
+                    }
+                    if (grades) {
+                        zip.file(`${sanitizedName}_calificaciones.png`, grades);
                     }
                 }
                 totalCompleted++;
@@ -885,7 +892,7 @@ export function StudentPanel() {
             const zipContent = await zip.generateAsync({ type: "blob" });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(zipContent);
-            link.download = `reportes_parte_${i + 1}_de_${studentChunks.length}.zip`;
+            link.download = `reportes_completos_parte_${i + 1}_de_${studentChunks.length}.zip`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
