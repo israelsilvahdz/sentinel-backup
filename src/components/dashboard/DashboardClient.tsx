@@ -10,7 +10,6 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarGroup,
-  SidebarSeparator,
   SidebarProvider,
   SidebarMenu,
   SidebarMenuItem,
@@ -31,7 +30,7 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Home, FileText, Contact, Shield, BookOpen, Calendar } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -667,9 +666,9 @@ export function DashboardClient() {
 
             {(isProcessing || isLoading) && progress > 0 && <Progress value={progress} className="w-full h-1" />}
             
-            <main className="flex-1 overflow-y-auto">
+            <div className="flex-1">
               {renderActiveView()}
-            </main>
+            </div>
 
         </SidebarInset>
       </SidebarProvider>

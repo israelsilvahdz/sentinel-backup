@@ -60,18 +60,12 @@
     -webkit-tap-highlight-color: transparent;
   }
   
-  body {
-    @apply bg-background text-foreground font-body;
-    overscroll-behavior-y: none;
-    position: fixed;
-    width: 100%;
+  html, body {
     height: 100%;
-    overflow: hidden;
   }
 
-  main {
-    height: 100%;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    overscroll-behavior-y: none;
   }
 }
