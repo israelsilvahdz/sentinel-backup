@@ -1,5 +1,4 @@
 
-
 import * as XLSX from 'xlsx';
 import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team } from '@/types/student';
 import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams } from './firebase-services';
@@ -27,7 +26,7 @@ function findColumnIndex(headerMap: Record<string, number>, headers: string[], p
     // Fallback to partial match, but stricter (starts with)
     for (const name of possibleNames) {
         const normalized = normalizeHeader(name);
-        const partialIndex = headers.findIndex(h => h.startsWith(normalized)); // Use startsWith instead of includes
+        const partialIndex = headers.findIndex(h => h.startsWith(normalized)); 
         if (partialIndex !== -1) {
             return partialIndex;
         }
@@ -59,6 +58,8 @@ const COLUMNS = {
   FINAL_GRADE_REASON: 'Motivo cf',
   START_TIME: 'INICIO',
   END_TIME: 'FIN',
+  EXAMEN_INTERMEDIO: ['EXAMEN INTERMEDIO', 'INTERMEDIO', 'EXAMEN PARCIAL', 'PARCIAL', 'E.I.', 'CALIFICACION PARCIAL'],
+  EXAMEN_FINAL: ['EXAMEN FINAL', 'FINAL', 'E.F.', 'CALIFICACION FINAL']
 };
 
 const ACTIVITY_REGEX = /^A\d+$/;
@@ -69,7 +70,7 @@ const SUBJECT_NAME_NORMALIZATION_MAP: Record<string, string> = {
     'math iii: regularity and repetition': 'Matemáticas III: regularidad y repetición',
     'matematicas i': 'Matemáticas I: lenguaje de la ciencia',
     'math i': 'Matemáticas I: lenguaje de la ciencia',
-    'matemáticas i: lenguaje de la ciencia': 'Matemáticas I: lenguaje de la ciencia', // Ensure exact match
+    'matemáticas i: lenguaje de la ciencia': 'Matemáticas I: lenguaje de la ciencia', 
     'math ii: pensamiento matemático': 'Matemáticas II: pensamiento matemático',
     'math ii: mathematical thinking': 'Matemáticas II: pensamiento matemático',
     'lengua adicional al español i': 'Optativa de lengua adicional al español I',
@@ -127,7 +128,6 @@ function normalizeSubjectName(name: string): string {
         return SUBJECT_NAME_NORMALIZATION_MAP[cleanedName];
     }
     
-    // Fallback for "Habilidades" with slight variations
     if (cleanedName.startsWith('habilidades y valores v')) {
         return 'Habilidades y valores V: lenguaje';
     }
@@ -163,7 +163,7 @@ export async function getHeaderKey(file: File): Promise<string> {
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, {
             header: 1, 
             defval: '',
-            range: 0 // Only read the first row
+            range: 0 
         });
 
         if (jsonData.length < 1) {
@@ -171,7 +171,7 @@ export async function getHeaderKey(file: File): Promise<string> {
         }
         
         const headers: string[] = jsonData[0].map((h: any) => String(h).trim());
-        const headerString = headers.join('|'); // Use a separator to be safe
+        const headerString = headers.join('|'); 
         const key = generateKeyFromData(headerString);
         resolve(key);
 
@@ -258,7 +258,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             const normalizedSubjectName = normalizeSubjectName(rawSubjectName);
 
             if (normalizedSubjectName === 'IGNORE') {
-                continue; // Saltar materias extracurriculares
+                continue; 
             }
 
             const studentId = getColumnValue([COLUMNS.STUDENT_ID]);
@@ -282,6 +282,13 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                 }
             }
             
+            // Capture specific exams if they exist in dedicated columns
+            const intermedioIdx = getColumnIdx(COLUMNS.EXAMEN_INTERMEDIO);
+            if (intermedioIdx !== undefined) activities['EXAMEN_INTERMEDIO'] = row[intermedioIdx];
+
+            const finalIdx = getColumnIdx(COLUMNS.EXAMEN_FINAL);
+            if (finalIdx !== undefined) activities['EXAMEN_FINAL'] = row[finalIdx];
+            
             const scheduleDays: string[] = [];
             const daySynonyms: Record<string, string[]> = {
                 'LUN': ['LUN', 'LUNES'],
@@ -302,7 +309,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             const subject: Subject = {
                 id: getColumnValue([COLUMNS.SUBJECT_CRN]),
                 key: getColumnValue([COLUMNS.SUBJECT_KEY]),
-                name: normalizedSubjectName, // Usar el nombre normalizado
+                name: normalizedSubjectName, 
                 group: getColumnValue([COLUMNS.SUBJECT_GROUP]),
                 professorName: getColumnValue([COLUMNS.PROFESSOR_NAME]),
                 statusDescription: getColumnValue([COLUMNS.SUBJECT_STATUS_DESCRIPTION]),
@@ -425,13 +432,11 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                         momPhone: getValue(DIRECTORY_COLUMNS_SYNONYMS.MOM_PHONE),
                         momEmail: getValue(DIRECTORY_COLUMNS_SYNONYMS.MOM_EMAIL),
                         sedena: getValue(DIRECTORY_COLUMNS_SYNONYMS.SEDENA),
-                        // --- campos que no se guardan pero se parsean por retrocompatibilidad ---
                         group: '', 
                         mentoringId: ''
                     };
                 }
                 
-                // Guardar en Firebase en lugar de devolver
                 await bulkAddOrUpdateContacts(contacts);
                 resolve(contacts);
 
@@ -688,4 +693,3 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
         reader.readAsArrayBuffer(file);
     });
 }
-    

@@ -23,13 +23,21 @@ export function GradesTable({ subjects }: GradesTableProps) {
         const allActivityKeys = new Set<string>();
         subjects.forEach(subject => {
             Object.keys(subject.activities).forEach(key => {
-                if (ACTIVITY_REGEX.test(key) && subject.activities[key] !== null && subject.activities[key] !== undefined && String(subject.activities[key]).trim() !== '') {
+                const isSpecial = key === 'EXAMEN_INTERMEDIO' || key === 'EXAMEN_FINAL';
+                const isActivity = ACTIVITY_REGEX.test(key);
+                
+                if ((isActivity || isSpecial) && subject.activities[key] !== null && subject.activities[key] !== undefined && String(subject.activities[key]).trim() !== '') {
                     allActivityKeys.add(key);
                 }
             });
         });
 
         const sortedHeaders = Array.from(allActivityKeys).sort((a, b) => {
+            if (a === 'EXAMEN_INTERMEDIO') return -1;
+            if (b === 'EXAMEN_INTERMEDIO') return 1;
+            if (a === 'EXAMEN_FINAL') return 1;
+            if (b === 'EXAMEN_FINAL') return -1;
+            
             const numA = parseInt(a.substring(1), 10);
             const numB = parseInt(b.substring(1), 10);
             return numA - numB;
@@ -54,6 +62,12 @@ export function GradesTable({ subjects }: GradesTableProps) {
         return <p className="p-4 text-center text-muted-foreground">No hay datos de calificaciones para mostrar.</p>
     }
 
+    const formatHeader = (header: string) => {
+        if (header === 'EXAMEN_INTERMEDIO') return 'Interm.';
+        if (header === 'EXAMEN_FINAL') return 'Final';
+        return header;
+    }
+
     return (
         <div className="w-full overflow-x-auto">
             <Table className="min-w-[600px]">
@@ -61,7 +75,7 @@ export function GradesTable({ subjects }: GradesTableProps) {
                     <TableRow>
                         <TableHead className="min-w-[180px] font-semibold sticky left-0 bg-background z-10">Materia</TableHead>
                         {headers.map(header => (
-                            <TableHead key={header} className="text-center px-2">{header}</TableHead>
+                            <TableHead key={header} className="text-center px-2">{formatHeader(header)}</TableHead>
                         ))}
                         <TableHead className="text-right font-bold pr-4">Pond.</TableHead>
                     </TableRow>
