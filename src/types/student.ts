@@ -141,6 +141,12 @@ export interface WeightingScheme {
 export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low';
 export type TaskStatus = 'todo' | 'in-progress' | 'done';
 
+export interface WorkTaskComment {
+  id: string;
+  text: string;
+  createdAt: any;
+}
+
 export interface WorkTeam {
   id: string;
   name: string;
@@ -158,12 +164,5 @@ export interface WorkTask {
   linkedStudents: { id: string; name: string }[];
   dueDate?: any; // Firestore Timestamp
   createdAt: any;
-  assignedBy?: string;
-}
-
-export interface DailyRoute {
-  id: string;
-  teamId: string;
-  date: string; // YYYY-MM-DD
-  taskIds: string[]; // List of task IDs in order
+  comments?: WorkTaskComment[];
 }

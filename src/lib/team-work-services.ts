@@ -1,3 +1,4 @@
+
 import { 
   getFirestore, 
   collection, 
@@ -9,10 +10,11 @@ import {
   doc,
   deleteDoc,
   updateDoc,
-  limit
+  limit,
+  arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { WorkTeam, WorkTask } from '@/types/student';
+import type { WorkTeam, WorkTask, WorkTaskComment } from '@/types/student';
 
 const db = getFirestore(getFirebaseApp());
 const TEAMS_WORK_COLLECTION = 'workTeams';
@@ -45,8 +47,6 @@ export const createWorkTeam = async (name: string, accessCode: string): Promise<
 // --- Gestión de Tareas ---
 
 export const getWorkTasks = async (teamId: string): Promise<WorkTask[]> => {
-  // Eliminamos el orderBy de aquí para evitar que Firebase pida un índice compuesto (que causa error)
-  // El ordenamiento lo haremos en el cliente (TeamWorkPanel.tsx)
   const q = query(
     collection(db, TASKS_WORK_COLLECTION), 
     where('teamId', '==', teamId)
@@ -58,13 +58,26 @@ export const getWorkTasks = async (teamId: string): Promise<WorkTask[]> => {
 export const addWorkTask = async (task: Omit<WorkTask, 'id' | 'createdAt'>): Promise<void> => {
   await addDoc(collection(db, TASKS_WORK_COLLECTION), {
     ...task,
-    createdAt: Timestamp.now()
+    createdAt: Timestamp.now(),
+    comments: []
   });
 };
 
 export const updateWorkTask = async (id: string, updates: Partial<WorkTask>): Promise<void> => {
   const docRef = doc(db, TASKS_WORK_COLLECTION, id);
   await updateDoc(docRef, updates);
+};
+
+export const addWorkTaskComment = async (taskId: string, text: string): Promise<void> => {
+  const docRef = doc(db, TASKS_WORK_COLLECTION, taskId);
+  const newComment: WorkTaskComment = {
+    id: Math.random().toString(36).substring(7),
+    text,
+    createdAt: Timestamp.now()
+  };
+  await updateDoc(docRef, {
+    comments: arrayUnion(newComment)
+  });
 };
 
 export const deleteWorkTask = async (id: string): Promise<void> => {
