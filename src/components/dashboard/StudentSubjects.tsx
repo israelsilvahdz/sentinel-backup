@@ -1,12 +1,10 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Minus, Plus, Phone, Camera, Download, User as UserIcon } from 'lucide-react';
-import { type Student, type Subject, type SubjectSummary } from "@/types/student";
+import { Minus, Plus, Phone, Camera, User as UserIcon } from 'lucide-react';
+import { type Student, type Subject } from "@/types/student";
 import { getActivityList } from '@/lib/ponderaciones';
 import { isWithoutRight } from '@/lib/dataProcessor';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,18 +15,18 @@ import { StudentProfessorsSchedule } from './StudentProfessorsSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { ActivityBreakdown } from './ActivityBreakdown';
 import { GradesTable } from './GradesTable';
-import { Dialog, DialogContent, DialogFooter, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { RiskCell, CopyButton } from './StudentCardShared';
 import * as htmlToImage from 'html-to-image';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     
     const subjectSummaries = subjects?.map(s => ({
@@ -43,11 +41,10 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
             const timeoutId = setTimeout(async () => {
                 if (reportRef.current) {
                     try {
-                        const dataUrl = await htmlToImage.toPng(reportRef.current!, { 
+                        await htmlToImage.toPng(reportRef.current!, { 
                             pixelRatio: 2,
                             fetchRequestInit: { mode: 'no-cors' }
                         });
-                        setImageUrl(dataUrl);
                     } catch (error) {
                        console.error("Error generating image:", error);
                     } finally {
@@ -57,7 +54,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
             }, 100);
             return () => clearTimeout(timeoutId);
         }
-    }, [reportRef, subjects]);
+    }, [subjects]);
 
 
     return (
@@ -68,7 +65,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
                     Esta es una previsualización del reporte del alumno. Puedes tomar una captura de pantalla.
                 </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-4 overflow-x-auto">
                 <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
             </div>
         </DialogContent>
@@ -120,43 +117,43 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
 
     return (
       <Tabs defaultValue="materias" className="w-full">
-        <div className="flex justify-between items-center px-4 sm:px-6">
-            <ScrollArea className="w-full whitespace-nowrap pb-2">
-                <TabsList className="inline-flex h-auto p-1">
-                    <TabsTrigger value="materias">Materias</TabsTrigger>
-                    <TabsTrigger value="calificaciones">Calificaciones</TabsTrigger>
-                    <TabsTrigger value="horario">Horario</TabsTrigger>
-                    <TabsTrigger value="horario-profes">Horario Profesores</TabsTrigger>
-                    <TabsTrigger value="contacto"><Phone className="mr-1 sm:mr-2 h-4 w-4"/>Contacto</TabsTrigger>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-2 sm:px-6 gap-2">
+            <ScrollArea className="w-full sm:w-auto whitespace-nowrap pb-2 sm:pb-0">
+                <TabsList className="inline-flex h-9 p-1">
+                    <TabsTrigger value="materias" className="text-xs sm:text-sm">Materias</TabsTrigger>
+                    <TabsTrigger value="calificaciones" className="text-xs sm:text-sm">Calificaciones</TabsTrigger>
+                    <TabsTrigger value="horario" className="text-xs sm:text-sm">Horario</TabsTrigger>
+                    <TabsTrigger value="horario-profes" className="text-xs sm:text-sm">Profesores</TabsTrigger>
+                    <TabsTrigger value="contacto" className="text-xs sm:text-sm"><Phone className="mr-1 h-3 w-3 sm:h-4 sm:w-4"/>Contacto</TabsTrigger>
                 </TabsList>
             </ScrollArea>
             <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
                 <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="hidden sm:inline-flex ml-4"><Camera className="mr-2 h-4 w-4"/>Generar Reporte</Button>
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto"><Camera className="mr-2 h-4 w-4"/>Reporte Visual</Button>
                 </DialogTrigger>
                 <ReportImageDialog student={student} subjects={subjects}/>
             </Dialog>
         </div>
-        <TabsContent value="materias">
-          <div className="overflow-x-auto">
+        
+        <TabsContent value="materias" className="mt-4">
+          <div className="overflow-x-auto border-t">
               <Table>
                   <TableHeader>
-                      <TableRow>
-                      <TableHead className="w-8"></TableHead>
-                      <TableHead>Materia</TableHead>
-                      <TableHead>
-                          <div className="flex items-center gap-2">
-                              Profesor
-                              <CopyButton 
-                                textToCopy={subjects.map(s => s.professorName).filter(Boolean).join('\n')} 
-                                tooltipText='Copiar todos los profesores'
-                              />
-                          </div>
-                      </TableHead>
-                      <TableHead className="text-center">Faltas</TableHead>
-                      <TableHead className="text-center">Tareas (NE)</TableHead>
-                      <TableHead className="text-right">Calif. Reporte</TableHead>
-                      <TableHead className="text-right">Calif. Calculada</TableHead>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-8 px-2 sm:px-4"></TableHead>
+                        <TableHead className="px-2 sm:px-4 text-xs sm:text-sm">Materia</TableHead>
+                        <TableHead className="hidden md:table-cell px-4 text-xs sm:text-sm">
+                            <div className="flex items-center gap-2">
+                                Profesor
+                                <CopyButton 
+                                    textToCopy={subjects.map(s => s.professorName).filter(Boolean).join('\n')} 
+                                    tooltipText='Copiar todos'
+                                />
+                            </div>
+                        </TableHead>
+                        <TableHead className="text-center px-1 sm:px-4 text-xs sm:text-sm">Faltas</TableHead>
+                        <TableHead className="text-center px-1 sm:px-4 text-xs sm:text-sm">Tareas</TableHead>
+                        <TableHead className="text-right px-2 sm:px-4 text-xs sm:text-sm whitespace-nowrap">Calif. Calc.</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -180,22 +177,39 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                     
                     return (
                     <React.Fragment key={subject.id}>
-                      <TableRow className="cursor-pointer" onClick={() => handleToggleSubject(subject.id)}>
-                          <TableCell>
+                      <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => handleToggleSubject(subject.id)}>
+                          <TableCell className="px-2 sm:px-4">
                               <div className="flex items-center justify-center">
-                                  {openSubject === subject.id ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                                  {openSubject === subject.id ? <Minus className="h-3 w-3 sm:h-4 sm:w-4" /> : <Plus className="h-3 w-3 sm:h-4 sm:w-4" />}
                               </div>
                           </TableCell>
-                          <TableCell className="font-medium">
-                              {subject.name}
-                              <span className="text-muted-foreground text-xs block">Grupo: {subject.group}</span>
+                          <TableCell className="font-medium px-2 sm:px-4 py-3">
+                              <div className="text-xs sm:text-sm leading-tight">{subject.name}</div>
+                              <div className="text-[10px] text-muted-foreground mt-0.5">Gpo: {subject.group}</div>
+                              
+                              {/* Visible only on mobile below subject name */}
+                              <div className="md:hidden mt-1 flex items-center gap-1">
+                                {subject.professorName ? (
+                                    <Button
+                                        variant="link"
+                                        className="p-0 h-auto text-[10px] text-primary/70 hover:text-primary justify-start"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleProfessorClick(subject.professorName!);
+                                        }}
+                                    >
+                                        <UserIcon className="h-2.5 w-2.5 mr-1" />
+                                        {subject.professorName.split(' ').slice(0, 2).join(' ')}...
+                                    </Button>
+                                ) : <span className="text-[10px] text-muted-foreground">N/A</span>}
+                              </div>
                           </TableCell>
-                         <TableCell className="text-muted-foreground">
+                         <TableCell className="hidden md:table-cell text-muted-foreground px-4">
                             {subject.professorName ? (
                                 <div className="flex items-center gap-1">
                                 <Button
                                     variant="link"
-                                    className="p-0 h-auto text-muted-foreground hover:text-primary justify-start"
+                                    className="p-0 h-auto text-xs text-muted-foreground hover:text-primary justify-start"
                                     onClick={(e) => {
                                     e.stopPropagation();
                                     handleProfessorClick(subject.professorName!);
@@ -203,45 +217,40 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                                 >
                                     {subject.professorName}
                                 </Button>
-                                <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre del profesor' />
+                                <CopyButton textToCopy={subject.professorName} tooltipText='Copiar nombre' />
                                 </div>
                             ) : (
                                 <span>N/A</span>
                             )}
                          </TableCell>
-                          <TableCell className="text-center">
-                              <div className='inline-block'>
+                          <TableCell className="text-center px-1 sm:px-4">
+                              <div className='inline-block scale-90 sm:scale-100'>
                                   <RiskCell value={subject.absences} limit={subject.absenceLimit} />
                               </div>
                           </TableCell>
-                          <TableCell className="text-center">
-                              <div className='inline-block'>
+                          <TableCell className="text-center px-1 sm:px-4">
+                              <div className='inline-block scale-90 sm:scale-100'>
                                   <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
                               </div>
                           </TableCell>
-                          <TableCell className="text-right font-mono">
-                              {typeof subject.grade === 'number' && !isNaN(subject.grade) ? subject.grade.toFixed(2) : '0.00'}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-bold text-primary">
+                          <TableCell className="text-right font-mono font-bold text-primary px-2 sm:px-4 text-xs sm:text-sm">
                                 {isWithoutRight(subject) ? (
-                                <Badge variant="destructive">SD</Badge>
+                                <Badge variant="destructive" className="h-5 px-1 sm:px-2">SD</Badge>
                                 ) : activityList.length > 0 && maxPossiblePoints > 0 ? (
                                 <TooltipProvider>
                                     <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <span>{`${totalEarnedPoints.toFixed(
-                                        2
-                                        )} / ${maxPossiblePoints.toFixed(2)}`}</span>
+                                        <span className="cursor-help">{`${totalEarnedPoints.toFixed(1)}/${maxPossiblePoints.toFixed(0)}`}</span>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p>
+                                        <p className="text-xs">
                                         Puntos acumulados / Puntos posibles hasta ahora
                                         </p>
                                     </TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
                                 ) : (
-                                <Badge variant="secondary">N/D</Badge>
+                                <Badge variant="secondary" className="h-5 px-1 sm:px-2 text-[10px]">N/D</Badge>
                                 )}
                           </TableCell>
                       </TableRow>
@@ -258,7 +267,8 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
               </Table>
           </div>
         </TabsContent>
-         <TabsContent value="calificaciones">
+        
+        <TabsContent value="calificaciones">
           <div className="overflow-x-auto">
             <GradesTable subjects={subjects} />
           </div>
@@ -275,5 +285,3 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
       </Tabs>
     );
 }
-
-    
