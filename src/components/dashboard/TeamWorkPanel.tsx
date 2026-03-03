@@ -115,25 +115,8 @@ export function TeamWorkPanel() {
     setIsLoading(true);
     try {
       const data = await getWorkTasks(teamId);
-      
-      // Auto-Route logic: Tasks due today that are "todo" should move to "in-progress"
-      const now = new Date();
-      const updates = data.filter(t => 
-        t.status === 'todo' && 
-        t.dueDate && 
-        isToday(t.dueDate.toDate())
-      );
-
-      if (updates.length > 0) {
-        for (const t of updates) {
-          await updateWorkTask(t.id, { status: 'in-progress', order: 0 });
-        }
-        // Refresh after auto-updates
-        const refreshedData = await getWorkTasks(teamId);
-        setTasks(refreshedData);
-      } else {
-        setTasks(data);
-      }
+      // No longer auto-updating status to keep tasks in both lists if due today
+      setTasks(data);
     } catch (error) {
       console.error(error);
       toast({ variant: 'destructive', title: 'Error al cargar tareas' });
@@ -196,11 +179,9 @@ export function TeamWorkPanel() {
     }
     setIsLoading(true);
     try {
-      // FIX: Parse date as local midnight instead of UTC midnight to avoid "one day off" bug
       let parsedDueDate = null;
       if (taskForm.dueDate) {
         const [year, month, day] = taskForm.dueDate.split('-').map(Number);
-        // month - 1 because JS Date months are 0-indexed
         parsedDueDate = Timestamp.fromDate(new Date(year, month - 1, day));
       }
 
@@ -268,15 +249,15 @@ export function TeamWorkPanel() {
   };
 
   const handleMoveInRoute = async (taskId: string, direction: 'up' | 'down') => {
-    const routeTasks = tasks.filter(t => t.status === 'in-progress').sort((a, b) => (a.order || 0) - (b.order || 0));
-    const idx = routeTasks.findIndex(t => t.id === taskId);
+    const sortedRoute = routeTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const idx = sortedRoute.findIndex(t => t.id === taskId);
     if (idx === -1) return;
 
     const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= routeTasks.length) return;
+    if (newIdx < 0 || newIdx >= sortedRoute.length) return;
 
-    const targetTask = routeTasks[newIdx];
-    const currentOrder = routeTasks[idx].order || 0;
+    const targetTask = sortedRoute[newIdx];
+    const currentOrder = sortedRoute[idx].order || 0;
     const targetOrder = targetTask.order || 0;
 
     try {
@@ -311,6 +292,7 @@ export function TeamWorkPanel() {
     });
   };
 
+  // PENDING: Tasks with status 'todo' (always visible here as requested)
   const pendingTasks = useMemo(() => {
     return tasks
       .filter(t => t.status === 'todo')
@@ -322,9 +304,13 @@ export function TeamWorkPanel() {
       });
   }, [tasks, priorityFilter]);
 
+  // ROUTE: Tasks manually 'in-progress' OR 'todo' with dueDate === today
   const routeTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'in-progress')
+      .filter(t => 
+        t.status === 'in-progress' || 
+        (t.status === 'todo' && t.dueDate && isToday(t.dueDate.toDate()))
+      )
       .sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [tasks]);
 
@@ -486,7 +472,7 @@ export function TeamWorkPanel() {
                 {routeTasks.length > 0 ? routeTasks.map((task, index) => (
                   <div key={task.id} className="relative">
                     <div className="absolute -left-[25px] top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm" />
-                    <Card className="hover:shadow-md transition-all border-l-4 overflow-hidden" style={{ borderLeftColor: `var(--color-${task.priority})` }}>
+                    <Card className="hover:shadow-md transition-all border-l-4 overflow-hidden" style={{ borderLeftColor: PRIORITY_MAP[task.priority].color.split(' ')[0].replace('bg-', '') }}>
                       <div className="p-4 flex items-center justify-between gap-4">
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2">
@@ -514,9 +500,11 @@ export function TeamWorkPanel() {
                               <ArrowDown className="h-3 w-3" />
                             </Button>
                           </div>
-                          <Button size="sm" variant="outline" className="h-8" onClick={() => handleStatusChange(task.id, 'todo')}>
-                            <Clock className="h-3.5 w-3.5 mr-1" /> Posponer
-                          </Button>
+                          {task.status === 'in-progress' && (
+                            <Button size="sm" variant="outline" className="h-8" onClick={() => handleStatusChange(task.id, 'todo')}>
+                              <Clock className="h-3.5 w-3.5 mr-1" /> Posponer
+                            </Button>
+                          )}
                           <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleStatusChange(task.id, 'done')}>
                             <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Finalizar
                           </Button>
@@ -655,6 +643,7 @@ function TaskCard({
 }) {
   const priorityInfo = PRIORITY_MAP[task.priority];
   const statusInfo = STATUS_MAP[task.status];
+  const isDueToday = task.dueDate && isToday(task.dueDate.toDate());
 
   return (
     <Card className={cn(
@@ -662,7 +651,8 @@ function TaskCard({
       task.status === 'done' ? 'opacity-60' : 'opacity-100',
       task.priority === 'urgent' ? 'border-l-red-600' : 
       task.priority === 'high' ? 'border-l-orange-500' :
-      task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500'
+      task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500',
+      isDueToday && task.status === 'todo' && "ring-2 ring-primary/20"
     )}>
       <div 
         className="p-4 cursor-pointer hover:bg-muted/5 flex items-center justify-between"
@@ -692,11 +682,11 @@ function TaskCard({
               {task.dueDate && (
                 <span className={cn(
                   "text-[10px] font-semibold flex items-center gap-1",
-                  isToday(task.dueDate.toDate()) ? "text-primary animate-pulse" : "text-muted-foreground"
+                  isDueToday ? "text-primary font-bold" : "text-muted-foreground"
                 )}>
                   <Calendar className="h-3 w-3" />
                   {format((task.dueDate as any).toDate(), 'dd MMM', { locale: es })}
-                  {isToday(task.dueDate.toDate()) && " (Hoy)"}
+                  {isDueToday && " (Hoy)"}
                 </span>
               )}
             </div>
