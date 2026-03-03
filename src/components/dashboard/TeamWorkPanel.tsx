@@ -41,7 +41,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
   AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles,
-  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical, UserCog
+  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical, UserCog, ListFilter
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format, isToday } from 'date-fns';
@@ -86,6 +86,7 @@ export function TeamWorkPanel() {
 
   // Filters
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('todo');
 
   // Task Form State
   const [taskForm, setTaskForm] = useState<{
@@ -255,9 +256,12 @@ export function TeamWorkPanel() {
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     try {
-      const updates: Partial<WorkTask> = { status: newStatus };
+      const updates: any = { status: newStatus };
       if (newStatus === 'done') {
         updates.completedAt = Timestamp.now();
+      } else {
+        // Clear completion data if reopened
+        updates.completedAt = null;
       }
       await updateWorkTask(taskId, updates);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
@@ -372,14 +376,14 @@ export function TeamWorkPanel() {
 
   const pendingTabTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status !== 'done')
+      .filter(t => (statusFilter === 'all' || t.status === statusFilter))
       .filter(t => (priorityFilter === 'all' || t.priority === priorityFilter))
       .sort((a, b) => {
         const priorityDiff = PRIORITY_MAP[b.priority].weight - PRIORITY_MAP[a.priority].weight;
         if (priorityDiff !== 0) return priorityDiff;
         return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
       });
-  }, [tasks, priorityFilter]);
+  }, [tasks, priorityFilter, statusFilter]);
 
   const completedTodayTasks = useMemo(() => {
     return tasks
@@ -486,8 +490,8 @@ export function TeamWorkPanel() {
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-muted/50 rounded-xl">
           <TabsTrigger value="pending" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
-            <Clock className="h-4 w-4" /> Pendientes
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{pendingTabTasks.length}</Badge>
+            <Clock className="h-4 w-4" /> Centro de Pendientes
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{tasks.filter(t => t.status !== 'done').length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="route" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
             <PlayCircle className="h-4 w-4" /> Ruta de Hoy
@@ -497,21 +501,34 @@ export function TeamWorkPanel() {
 
         <TabsContent value="pending" className="space-y-6 pt-6">
           <div className="flex items-center justify-between gap-4 flex-wrap bg-card border p-4 rounded-xl shadow-sm">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">Prioridad:</span>
+                <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
+                  <SelectTrigger className="w-[130px] h-9"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="low">Baja</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
-                <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Prioridad" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="urgent">Urgente</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="medium">Media</SelectItem>
-                  <SelectItem value="low">Baja</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <ListFilter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Estado:</span>
+                <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+                  <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="todo">Pendientes</SelectItem>
+                    <SelectItem value="in-progress">En Ruta</SelectItem>
+                    <SelectItem value="done">Completados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <Button onClick={() => setIsTaskDialogOpen(true)} className="shadow-sm">
               <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Pendiente
@@ -536,8 +553,8 @@ export function TeamWorkPanel() {
             )) : (
               <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed">
                 <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-bold">Sin pendientes</h3>
-                <p className="text-muted-foreground">Todo está al día o completado.</p>
+                <h3 className="text-lg font-bold">Sin resultados</h3>
+                <p className="text-muted-foreground">No hay tareas que coincidan con los filtros seleccionados.</p>
               </div>
             )}
           </div>
@@ -626,7 +643,7 @@ export function TeamWorkPanel() {
                 </h2>
                 <div className="grid grid-cols-1 gap-3">
                   {completedTodayTasks.map(task => (
-                    <Card key={task.id} className="bg-green-50/50 opacity-80 border-green-100">
+                    <Card key={task.id} className="bg-green-50/50 border-green-100">
                       <div className="p-3 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -746,11 +763,11 @@ function TaskCard({
   return (
     <Card className={cn(
       "hover:shadow-md transition-all duration-200 border-l-[6px] overflow-hidden", 
-      task.status === 'done' ? 'opacity-60' : 'opacity-100',
+      task.status === 'done' ? 'opacity-60 bg-muted/10' : 'opacity-100',
       task.priority === 'urgent' ? 'border-l-red-600' : 
       task.priority === 'high' ? 'border-l-orange-500' :
       task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500',
-      isDueToday && task.status === 'todo' && "ring-2 ring-primary/20"
+      isDueToday && task.status !== 'done' && "ring-2 ring-primary/20"
     )}>
       <div 
         className="p-4 cursor-pointer hover:bg-muted/5 flex items-center justify-between"
@@ -780,11 +797,11 @@ function TaskCard({
               {task.dueDate && (
                 <span className={cn(
                   "text-[10px] font-semibold flex items-center gap-1",
-                  isDueToday ? "text-primary font-bold" : "text-muted-foreground"
+                  isDueToday && task.status !== 'done' ? "text-primary font-bold" : "text-muted-foreground"
                 )}>
                   <Calendar className="h-3 w-3" />
                   {format((task.dueDate as any).toDate(), 'dd MMM', { locale: es })}
-                  {isDueToday && " (Hoy)"}
+                  {isDueToday && task.status !== 'done' && " (Hoy)"}
                 </span>
               )}
             </div>
@@ -847,6 +864,11 @@ function TaskCard({
                 {task.status === 'in-progress' && (
                   <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo'); }}>
                     <Clock className="mr-2 h-4 w-4" /> Regresar a Pendientes
+                  </Button>
+                )}
+                {task.status === 'done' && (
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo'); }}>
+                    <History className="mr-2 h-4 w-4" /> Reabrir Tarea
                   </Button>
                 )}
                 <AlertDialog>
