@@ -84,7 +84,7 @@ export function TeamWorkPanel() {
   // Drag and Drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
-  // Filters - Default values requested: all Priority and all States
+  // Filters
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
 
@@ -105,7 +105,6 @@ export function TeamWorkPanel() {
 
   const { toast } = useToast();
 
-  // Combine leaders and tutors for signatory options
   const signatoryOptions = useMemo(() => {
     const combined = [...new Set([...leaders, ...tutors])];
     return combined.sort((a, b) => a.localeCompare(b));
@@ -260,8 +259,8 @@ export function TeamWorkPanel() {
       if (newStatus === 'done') {
         updates.completedAt = Timestamp.now();
       } else {
-        // Clear completion data if reopened
         updates.completedAt = null;
+        updates.completionNotes = null;
       }
       await updateWorkTask(taskId, updates);
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
@@ -371,7 +370,11 @@ export function TeamWorkPanel() {
 
   const pendingTabTasks = useMemo(() => {
     return tasks
-      .filter(t => (statusFilter === 'all' || t.status === statusFilter))
+      .filter(t => {
+        // "All" filter excludes completed tasks as per user request
+        if (statusFilter === 'all') return t.status !== 'done';
+        return t.status === statusFilter;
+      })
       .filter(t => (priorityFilter === 'all' || t.priority === priorityFilter))
       .sort((a, b) => {
         const priorityDiff = PRIORITY_MAP[b.priority].weight - PRIORITY_MAP[a.priority].weight;
@@ -517,10 +520,10 @@ export function TeamWorkPanel() {
                 <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
                   <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="todo">Pendientes</SelectItem>
-                    <SelectItem value="in-progress">En Ruta</SelectItem>
-                    <SelectItem value="done">Completados</SelectItem>
+                    <SelectItem value="all">Activos (Sin completados)</SelectItem>
+                    <SelectItem value="todo">Solo Pendientes</SelectItem>
+                    <SelectItem value="in-progress">Solo En Ruta</SelectItem>
+                    <SelectItem value="done">Solo Completados</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -549,7 +552,7 @@ export function TeamWorkPanel() {
               <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed">
                 <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-bold">Sin resultados</h3>
-                <p className="text-muted-foreground">No hay tareas que coincidan con los filtros seleccionados.</p>
+                <p className="text-muted-foreground">No hay tareas activas que coincidan con los filtros.</p>
               </div>
             )}
           </div>
@@ -580,7 +583,7 @@ export function TeamWorkPanel() {
                   >
                     <div className="absolute -left-[25px] top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm z-10" />
                     <Card className={cn(
-                      "hover:shadow-md transition-all border-l-4 overflow-hidden group cursor-grab active:cursor-grabbing select-none",
+                      "hover:shadow-md transition-all border-l-4 overflow-hidden group cursor-grab active:cursor-grabbing select-none bg-background",
                       draggedTaskId === task.id ? "opacity-40 grayscale" : "opacity-100"
                     )} style={{ borderLeftColor: PRIORITY_MAP[task.priority].color.split(' ')[0].replace('bg-', '') }}>
                       <div className="p-4 flex items-center justify-between gap-4">
@@ -649,7 +652,7 @@ export function TeamWorkPanel() {
                             </p>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => handleStatusChange(task.id, 'in-progress')}>
+                        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => handleStatusChange(task.id, 'todo')}>
                           <History className="h-3 w-3 mr-1" /> Reabrir
                         </Button>
                       </div>
@@ -757,7 +760,7 @@ function TaskCard({
 
   return (
     <Card className={cn(
-      "hover:shadow-md transition-all duration-200 border-l-[6px] overflow-hidden", 
+      "hover:shadow-md transition-all duration-200 border-l-[6px] overflow-hidden bg-background", 
       task.status === 'done' ? 'opacity-60 bg-muted/10' : 'opacity-100',
       task.priority === 'urgent' ? 'border-l-red-600' : 
       task.priority === 'high' ? 'border-l-orange-500' :
