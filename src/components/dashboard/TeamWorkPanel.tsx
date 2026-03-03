@@ -254,6 +254,18 @@ export function TeamWorkPanel() {
     setIsTaskDialogOpen(true);
   };
 
+  const handleAddDerivedTask = (parentTask: WorkTask) => {
+    setEditingTask(null);
+    setTaskForm({
+      title: `Seguimiento: ${parentTask.title}`,
+      description: '',
+      priority: parentTask.priority,
+      linkedStudents: parentTask.linkedStudents,
+      dueDate: ''
+    });
+    setIsTaskDialogOpen(true);
+  };
+
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     try {
       const updates: any = { status: newStatus };
@@ -372,7 +384,6 @@ export function TeamWorkPanel() {
   const pendingTabTasks = useMemo(() => {
     return tasks
       .filter(t => {
-        // "All" filter excludes completed tasks as per user request
         if (statusFilter === 'all') return t.status !== 'done';
         return t.status === statusFilter;
       })
@@ -540,6 +551,7 @@ export function TeamWorkPanel() {
                 key={task.id} 
                 task={task} 
                 onEdit={handleEditTask} 
+                onAddDerivedTask={handleAddDerivedTask}
                 onStatusChange={handleStatusChange} 
                 onToggleExpand={toggleExpand}
                 isExpanded={expandedTasks.has(task.id)}
@@ -741,11 +753,12 @@ export function TeamWorkPanel() {
 }
 
 function TaskCard({ 
-  task, onEdit, onStatusChange, onToggleExpand, isExpanded, 
+  task, onEdit, onAddDerivedTask, onStatusChange, onToggleExpand, isExpanded, 
   newComment, onCommentChange, onAddComment, onDelete, currentAuthor
 }: { 
   task: WorkTask, 
   onEdit: (t: WorkTask) => void, 
+  onAddDerivedTask: (t: WorkTask) => void,
   onStatusChange: (id: string, s: TaskStatus) => void,
   onToggleExpand: (id: string) => void,
   isExpanded: boolean,
@@ -878,7 +891,7 @@ function TaskCard({
                 </div>
               )}
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-wrap gap-2 pt-2">
                 {task.status === 'todo' && (
                   <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'in-progress'); }}>
                     <PlayCircle className="mr-2 h-4 w-4" /> Iniciar Ruta Diaria
@@ -894,6 +907,9 @@ function TaskCard({
                     <History className="mr-2 h-4 w-4" /> Reabrir Tarea
                   </Button>
                 )}
+                <Button size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/5" onClick={(e) => { e.stopPropagation(); onAddDerivedTask(task); }}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Nueva Tarea Vinculada
+                </Button>
               </div>
             </div>
 
