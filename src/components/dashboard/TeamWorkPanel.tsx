@@ -270,7 +270,6 @@ export function TeamWorkPanel() {
   }, [tasks]);
 
   const updateOrdersOptimistically = (newSortedTasks: WorkTask[]) => {
-    // 1. Update local state immediately for smooth UI
     const updatedTasks = tasks.map(t => {
       const foundIdx = newSortedTasks.findIndex(st => st.id === t.id);
       if (foundIdx !== -1) return { ...t, order: foundIdx };
@@ -278,11 +277,10 @@ export function TeamWorkPanel() {
     });
     setTasks(updatedTasks);
 
-    // 2. Sync with Firestore in background
     const ordersToUpdate = newSortedTasks.map((t, i) => ({ id: t.id, order: i }));
     bulkUpdateTaskOrders(ordersToUpdate).catch(() => {
       toast({ variant: 'destructive', title: 'Error al sincronizar orden' });
-      loadTasks(currentTeam!.id); // Rollback on error
+      loadTasks(currentTeam!.id); 
     });
   }
 
@@ -301,13 +299,11 @@ export function TeamWorkPanel() {
     updateOrdersOptimistically(result);
   };
 
-  // Drag and Drop Handlers
   const onDragStart = (e: React.DragEvent, id: string) => {
     setDraggedTaskId(id);
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
     
-    // Create drag ghost image or just set a class
     setTimeout(() => {
       const el = document.getElementById(`route-card-${id}`);
       if (el) el.classList.add('opacity-40', 'grayscale');
@@ -644,7 +640,6 @@ export function TeamWorkPanel() {
         </TabsContent>
       </Tabs>
 
-      {/* Task Creation/Edition Dialog */}
       <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { setIsTaskDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
@@ -874,7 +869,7 @@ function TaskCard({
                     <div key={c.id} className="bg-muted/30 p-3 rounded-lg border text-xs">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-bold text-primary flex items-center gap-1">
-                          <User Cog className="h-3 w-3" /> {c.author}
+                          <UserCog className="h-3 w-3" /> {c.author}
                         </span>
                         <span className="text-[10px] text-muted-foreground">
                           {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
