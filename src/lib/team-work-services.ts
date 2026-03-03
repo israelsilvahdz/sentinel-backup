@@ -1,4 +1,3 @@
-
 import { 
   getFirestore, 
   collection, 
@@ -11,7 +10,8 @@ import {
   deleteDoc,
   updateDoc,
   limit,
-  arrayUnion
+  arrayUnion,
+  writeBatch
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
 import type { WorkTeam, WorkTask, WorkTaskComment } from '@/types/student';
@@ -68,11 +68,12 @@ export const updateWorkTask = async (id: string, updates: Partial<WorkTask>): Pr
   await updateDoc(docRef, updates);
 };
 
-export const addWorkTaskComment = async (taskId: string, text: string): Promise<void> => {
+export const addWorkTaskComment = async (taskId: string, text: string, author: string): Promise<void> => {
   const docRef = doc(db, TASKS_WORK_COLLECTION, taskId);
   const newComment: WorkTaskComment = {
     id: Math.random().toString(36).substring(7),
     text,
+    author,
     createdAt: Timestamp.now()
   };
   await updateDoc(docRef, {
@@ -84,3 +85,12 @@ export const deleteWorkTask = async (id: string): Promise<void> => {
   const docRef = doc(db, TASKS_WORK_COLLECTION, id);
   await deleteDoc(docRef);
 };
+
+export const bulkUpdateTaskOrders = async (tasks: { id: string, order: number }[]): Promise<void> => {
+  const batch = writeBatch(db);
+  tasks.forEach(task => {
+    const docRef = doc(db, TASKS_WORK_COLLECTION, task.id);
+    batch.update(docRef, { order: task.order });
+  });
+  await batch.commit();
+}

@@ -1,4 +1,3 @@
-
 export interface Subject {
   id: string; // CRN
   key: string; // Clave de materia
@@ -144,6 +143,7 @@ export type TaskStatus = 'todo' | 'in-progress' | 'done';
 export interface WorkTaskComment {
   id: string;
   text: string;
+  author: string; // Quién hizo el comentario
   createdAt: any;
 }
 

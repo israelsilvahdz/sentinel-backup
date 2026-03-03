@@ -10,7 +10,8 @@ import {
   addWorkTask, 
   updateWorkTask, 
   deleteWorkTask,
-  addWorkTaskComment
+  addWorkTaskComment,
+  bulkUpdateTaskOrders
 } from '@/lib/team-work-services';
 import type { WorkTeam, WorkTask, TaskPriority, TaskStatus, WorkTaskComment } from '@/types/student';
 import { 
@@ -40,7 +41,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
   AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles,
-  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical
+  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical, UserCog
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format, isToday } from 'date-fns';
@@ -65,6 +66,7 @@ const STATUS_MAP: Record<TaskStatus, { label: string, icon: React.ReactNode, col
 
 export function TeamWorkPanel() {
   const [currentTeam, setCurrentWorkTeam] = useState<WorkTeam | null>(null);
+  const [currentUser, setCurrentUser] = useState<string>('');
   const [tasks, setTasks] = useState<WorkTask[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [authCode, setAuthCode] = useState('');
@@ -102,17 +104,25 @@ export function TeamWorkPanel() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const saved = sessionStorage.getItem('current_work_team');
-    if (saved) {
+    const savedTeam = sessionStorage.getItem('current_work_team');
+    if (savedTeam) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(savedTeam);
         setCurrentWorkTeam(parsed);
         loadTasks(parsed.id);
       } catch (e) {
         sessionStorage.removeItem('current_work_team');
       }
     }
+    
+    const savedUser = sessionStorage.getItem('current_work_user');
+    if (savedUser) setCurrentUser(savedUser);
   }, []);
+
+  const handleUserChange = (val: string) => {
+    setCurrentUser(val);
+    sessionStorage.setItem('current_work_user', val);
+  };
 
   const loadTasks = async (teamId: string) => {
     setIsLoading(true);
@@ -250,7 +260,6 @@ export function TeamWorkPanel() {
     }
   };
 
-  // Improved reordering logic for Route
   const routeTasks = useMemo(() => {
     return tasks
       .filter(t => 
@@ -260,7 +269,24 @@ export function TeamWorkPanel() {
       .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
   }, [tasks]);
 
-  const handleMoveInRoute = async (taskId: string, direction: 'up' | 'down') => {
+  const updateOrdersOptimistically = (newSortedTasks: WorkTask[]) => {
+    // 1. Update local state immediately for smooth UI
+    const updatedTasks = tasks.map(t => {
+      const foundIdx = newSortedTasks.findIndex(st => st.id === t.id);
+      if (foundIdx !== -1) return { ...t, order: foundIdx };
+      return t;
+    });
+    setTasks(updatedTasks);
+
+    // 2. Sync with Firestore in background
+    const ordersToUpdate = newSortedTasks.map((t, i) => ({ id: t.id, order: i }));
+    bulkUpdateTaskOrders(ordersToUpdate).catch(() => {
+      toast({ variant: 'destructive', title: 'Error al sincronizar orden' });
+      loadTasks(currentTeam!.id); // Rollback on error
+    });
+  }
+
+  const handleMoveInRoute = (taskId: string, direction: 'up' | 'down') => {
     const currentList = [...routeTasks];
     const idx = currentList.findIndex(t => t.id === taskId);
     if (idx === -1) return;
@@ -268,19 +294,11 @@ export function TeamWorkPanel() {
     const newIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (newIdx < 0 || newIdx >= currentList.length) return;
 
-    // Swap elements in local array
     const result = Array.from(currentList);
     const [removed] = result.splice(idx, 1);
     result.splice(newIdx, 0, removed);
 
-    // Persist new orders
-    try {
-      const updates = result.map((task, index) => updateWorkTask(task.id, { order: index }));
-      await Promise.all(updates);
-      loadTasks(currentTeam!.id);
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error al reordenar' });
-    }
+    updateOrdersOptimistically(result);
   };
 
   // Drag and Drop Handlers
@@ -288,6 +306,12 @@ export function TeamWorkPanel() {
     setDraggedTaskId(id);
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
+    
+    // Create drag ghost image or just set a class
+    setTimeout(() => {
+      const el = document.getElementById(`route-card-${id}`);
+      if (el) el.classList.add('opacity-40', 'grayscale');
+    }, 0);
   };
 
   const onDragOver = (e: React.DragEvent) => {
@@ -298,6 +322,8 @@ export function TeamWorkPanel() {
   const onDrop = async (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
     const sourceId = e.dataTransfer.getData('text/plain');
+    setDraggedTaskId(null);
+    
     if (sourceId === targetId) return;
 
     const currentList = [...routeTasks];
@@ -310,23 +336,20 @@ export function TeamWorkPanel() {
     const [removed] = result.splice(sourceIdx, 1);
     result.splice(targetIdx, 0, removed);
 
-    try {
-      const updates = result.map((task, index) => updateWorkTask(task.id, { order: index }));
-      await Promise.all(updates);
-      loadTasks(currentTeam!.id);
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error al reordenar' });
-    } finally {
-      setDraggedTaskId(null);
-    }
+    updateOrdersOptimistically(result);
   };
 
   const handleAddComment = async (taskId: string) => {
     const text = newCommentText[taskId];
     if (!text?.trim()) return;
+    
+    if (!currentUser) {
+      toast({ variant: 'destructive', title: 'Identificación necesaria', description: 'Por favor selecciona quién firma en la parte superior.' });
+      return;
+    }
 
     try {
-      await addWorkTaskComment(taskId, text);
+      await addWorkTaskComment(taskId, text, currentUser);
       setNewCommentText(prev => ({ ...prev, [taskId]: '' }));
       loadTasks(currentTeam!.id);
       toast({ title: 'Comentario añadido' });
@@ -418,22 +441,38 @@ export function TeamWorkPanel() {
 
   return (
     <div className="p-4 md:p-8 space-y-8 pb-20">
-      <header className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria / Equipo
+      <header className="flex items-center justify-between flex-wrap gap-4 bg-primary/5 p-6 rounded-2xl border border-primary/10">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria
           </h1>
-          <div className="text-sm text-muted-foreground flex items-center mt-1">
-            <span className="mr-1">Código de Equipo:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Equipo:</span>
             <Badge variant="outline" className="text-foreground border-primary font-bold">{currentTeam.name}</Badge>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => {
+        
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-background p-3 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-2">
+            <UserCog className="h-5 w-5 text-primary" />
+            <Label className="text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">Firmar como:</Label>
+          </div>
+          <Select value={currentUser} onValueChange={handleUserChange}>
+            <SelectTrigger className="w-[180px] h-9 border-none bg-muted/50 focus:ring-0">
+              <SelectValue placeholder="¿Quién eres?" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Líder">Líder de Generación</SelectItem>
+              <SelectItem value="Tutor">Tutor / Coordinador</SelectItem>
+              <SelectItem value="Secretaria">Asistente / Sec.</SelectItem>
+              <SelectItem value="Otro">Otro Responsable</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" className="text-xs h-8 text-muted-foreground hover:text-destructive" onClick={() => {
             sessionStorage.removeItem('current_work_team');
             setCurrentWorkTeam(null);
           }}>
-            Cerrar Sesión
+            Salir
           </Button>
         </div>
       </header>
@@ -486,6 +525,7 @@ export function TeamWorkPanel() {
                 onCommentChange={(text) => setNewCommentText({...newCommentText, [task.id]: text})}
                 onAddComment={() => handleAddComment(task.id)}
                 onDelete={() => deleteWorkTask(task.id).then(() => loadTasks(currentTeam.id))}
+                currentAuthor={currentUser}
               />
             )) : (
               <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed">
@@ -500,47 +540,48 @@ export function TeamWorkPanel() {
         <TabsContent value="route" className="pt-6">
           <div className="max-w-3xl mx-auto space-y-8">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between px-2">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   <PlayCircle className="h-5 w-5 text-primary" /> Procedimiento del Día
                 </h2>
-                <span className="text-sm text-muted-foreground font-medium">
+                <span className="text-sm text-muted-foreground font-medium bg-muted/50 px-3 py-1 rounded-full">
                   {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
                 </span>
               </div>
               
-              <div className="relative space-y-4 pl-4 border-l-2 border-dashed border-muted-foreground/30">
+              <div className="relative space-y-4 pl-4 border-l-2 border-dashed border-muted-foreground/30 ml-2">
                 {routeTasks.length > 0 ? routeTasks.map((task, index) => (
                   <div 
                     key={task.id} 
+                    id={`route-card-${task.id}`}
                     className="relative"
                     draggable
                     onDragStart={(e) => onDragStart(e, task.id)}
                     onDragOver={onDragOver}
                     onDrop={(e) => onDrop(e, task.id)}
                   >
-                    <div className="absolute -left-[25px] top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm" />
+                    <div className="absolute -left-[25px] top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm z-10" />
                     <Card className={cn(
-                      "hover:shadow-md transition-all border-l-4 overflow-hidden group cursor-grab active:cursor-grabbing",
-                      draggedTaskId === task.id ? "opacity-40" : "opacity-100"
+                      "hover:shadow-md transition-all border-l-4 overflow-hidden group cursor-grab active:cursor-grabbing select-none",
+                      draggedTaskId === task.id ? "opacity-40 grayscale" : "opacity-100"
                     )} style={{ borderLeftColor: PRIORITY_MAP[task.priority].color.split(' ')[0].replace('bg-', '') }}>
                       <div className="p-4 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-1">
-                          <GripVertical className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Badge className={cn("text-[10px] h-5", PRIORITY_MAP[task.priority].color)}>
+                        <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                          <GripVertical className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+                          <div className="space-y-1 overflow-hidden">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <Badge className={cn("text-[10px] h-5 shrink-0", PRIORITY_MAP[task.priority].color)}>
                                 {PRIORITY_MAP[task.priority].label}
                               </Badge>
-                              <h3 className="font-bold">{task.title}</h3>
+                              <h3 className="font-bold truncate">{task.title}</h3>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                               <Clock className="h-3 w-3" />
-                               <span>Estado actual: {STATUS_MAP[task.status].label}</span>
+                               <Clock className="h-3 w-3 shrink-0" />
+                               <span>{STATUS_MAP[task.status].label}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           <div className="flex flex-col gap-1 mr-2">
                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMoveInRoute(task.id, 'up')} disabled={index === 0}>
                               <ArrowUp className="h-3 w-3" />
@@ -549,14 +590,16 @@ export function TeamWorkPanel() {
                               <ArrowDown className="h-3 w-3" />
                             </Button>
                           </div>
-                          {task.status === 'in-progress' && (
-                            <Button size="sm" variant="outline" className="h-8" onClick={() => handleStatusChange(task.id, 'todo')}>
-                              <Clock className="h-3.5 w-3.5 mr-1" /> Posponer
+                          <div className="flex gap-2">
+                            {task.status === 'in-progress' && (
+                              <Button size="sm" variant="outline" className="h-9 px-3" onClick={() => handleStatusChange(task.id, 'todo')}>
+                                <Clock className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Posponer</span>
+                              </Button>
+                            )}
+                            <Button size="sm" className="h-9 px-3 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleStatusChange(task.id, 'done')}>
+                              <CheckCircle2 className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Finalizar</span>
                             </Button>
-                          )}
-                          <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleStatusChange(task.id, 'done')}>
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Finalizar
-                          </Button>
+                          </div>
                         </div>
                       </div>
                     </Card>
@@ -678,7 +721,7 @@ export function TeamWorkPanel() {
 
 function TaskCard({ 
   task, onEdit, onStatusChange, onToggleExpand, isExpanded, 
-  newComment, onCommentChange, onAddComment, onDelete 
+  newComment, onCommentChange, onAddComment, onDelete, currentAuthor
 }: { 
   task: WorkTask, 
   onEdit: (t: WorkTask) => void, 
@@ -688,7 +731,8 @@ function TaskCard({
   newComment: string,
   onCommentChange: (val: string) => void,
   onAddComment: () => void,
-  onDelete: () => void
+  onDelete: () => void,
+  currentAuthor: string
 }) {
   const priorityInfo = PRIORITY_MAP[task.priority];
   const statusInfo = STATUS_MAP[task.status];
@@ -820,35 +864,45 @@ function TaskCard({
               </div>
             </div>
 
-            <div className="space-y-4 border-l pl-6 hidden md:block">
+            <div className="space-y-4 border-l pl-6">
               <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold flex items-center gap-2">
-                <MessageSquare className="h-3 w-3" /> Comentarios / Bitácora
+                <MessageSquare className="h-3 w-3" /> Bitácora / Comentarios
               </Label>
-              <ScrollArea className="h-[200px] pr-4">
+              <ScrollArea className="h-[250px] pr-4">
                 <div className="space-y-3">
                   {task.comments && task.comments.length > 0 ? task.comments.map(c => (
                     <div key={c.id} className="bg-muted/30 p-3 rounded-lg border text-xs">
-                      <p className="text-foreground/90">{c.text}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1 text-right">
-                        {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
-                      </p>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-primary flex items-center gap-1">
+                          <User Cog className="h-3 w-3" /> {c.author}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
+                        </span>
+                      </div>
+                      <p className="text-foreground/90 whitespace-pre-wrap">{c.text}</p>
                     </div>
                   )) : (
                     <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios aún.</p>
                   )}
                 </div>
               </ScrollArea>
-              <div className="flex gap-2">
-                <Input 
-                  value={newComment} 
-                  onChange={e => onCommentChange(e.target.value)}
-                  placeholder="Añadir nota..."
-                  className="h-8 text-xs"
-                  onKeyDown={e => { if(e.key === 'Enter') onAddComment(); }}
-                />
-                <Button size="icon" className="h-8 w-8 shrink-0" onClick={onAddComment}>
-                  <Send className="h-3 w-3" />
-                </Button>
+              
+              <div className="space-y-2 pt-2">
+                <div className="flex gap-2">
+                  <Textarea 
+                    value={newComment} 
+                    onChange={e => onCommentChange(e.target.value)}
+                    placeholder={currentAuthor ? `Comentar como ${currentAuthor}...` : "Escribe una nota..."}
+                    className="min-h-[60px] text-xs resize-none"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={onAddComment} disabled={!newComment.trim() || !currentAuthor}>
+                    <Send className="h-3.5 w-3.5 mr-2" /> Enviar
+                  </Button>
+                </div>
+                {!currentAuthor && <p className="text-[10px] text-destructive text-right font-semibold">Selecciona responsable arriba ↑</p>}
               </div>
             </div>
           </div>
