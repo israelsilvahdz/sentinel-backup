@@ -164,5 +164,7 @@ export interface WorkTask {
   linkedStudents: { id: string; name: string }[];
   dueDate?: any; // Firestore Timestamp
   createdAt: any;
+  completedAt?: any; // Firestore Timestamp
   comments?: WorkTaskComment[];
+  order?: number; // Para el orden en la ruta diaria
 }

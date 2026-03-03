@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDashboardFilters } from './DashboardClient';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -30,15 +30,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
   AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles,
-  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User
+  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Timestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
+import { Separator } from '../ui/separator';
 
 const PRIORITY_MAP: Record<TaskPriority, { label: string, color: string, weight: number }> = {
   urgent: { label: 'Urgente', color: 'bg-red-600 text-white', weight: 4 },
@@ -59,6 +60,9 @@ export function TeamWorkPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [authCode, setAuthCode] = useState('');
   
+  // View Control
+  const [activeTab, setActiveTab] = useState<'pending' | 'route'>('pending');
+  
   // Dialog States
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<WorkTask | null>(null);
@@ -66,7 +70,6 @@ export function TeamWorkPanel() {
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
   
   // Filters
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
 
   // Task Form State
@@ -103,7 +106,25 @@ export function TeamWorkPanel() {
     setIsLoading(true);
     try {
       const data = await getWorkTasks(teamId);
-      setTasks(data);
+      
+      // Auto-Route logic: Tasks due today that are "todo" should move to "in-progress"
+      const now = new Date();
+      const updates = data.filter(t => 
+        t.status === 'todo' && 
+        t.dueDate && 
+        isToday(t.dueDate.toDate())
+      );
+
+      if (updates.length > 0) {
+        for (const t of updates) {
+          await updateWorkTask(t.id, { status: 'in-progress', order: 0 });
+        }
+        // Refresh after auto-updates
+        const refreshedData = await getWorkTasks(teamId);
+        setTasks(refreshedData);
+      } else {
+        setTasks(data);
+      }
     } catch (error) {
       console.error(error);
       toast({ variant: 'destructive', title: 'Error al cargar tareas' });
@@ -124,7 +145,7 @@ export function TeamWorkPanel() {
         setCurrentWorkTeam(team);
         sessionStorage.setItem('current_work_team', JSON.stringify(team));
         loadTasks(team.id);
-        toast({ title: `Bienvenido al equipo ${team.name}` });
+        toast({ title: `Acceso concedido al equipo ${team.name}` });
       } else {
         toast({ variant: 'destructive', title: 'Código no encontrado' });
       }
@@ -144,13 +165,13 @@ export function TeamWorkPanel() {
     try {
       const existing = await findWorkTeamByName(authCode);
       if (existing) {
-        toast({ variant: 'destructive', title: 'Código ocupado' });
+        toast({ variant: 'destructive', title: 'Código ya registrado' });
       } else {
         const newTeam = await createWorkTeam(authCode, authCode);
         setCurrentWorkTeam(newTeam);
         sessionStorage.setItem('current_work_team', JSON.stringify(newTeam));
         loadTasks(newTeam.id);
-        toast({ title: 'Equipo creado con éxito' });
+        toast({ title: 'Equipo registrado con éxito' });
       }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -182,6 +203,7 @@ export function TeamWorkPanel() {
         await addWorkTask({
           ...taskData,
           status: 'todo',
+          order: 999
         });
         toast({ title: 'Tarea creada con éxito' });
       }
@@ -216,10 +238,36 @@ export function TeamWorkPanel() {
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     try {
-      await updateWorkTask(taskId, { status: newStatus });
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+      const updates: Partial<WorkTask> = { status: newStatus };
+      if (newStatus === 'done') {
+        updates.completedAt = Timestamp.now();
+      }
+      await updateWorkTask(taskId, updates);
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+      toast({ title: `Estado actualizado: ${STATUS_MAP[newStatus].label}` });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error al actualizar estado' });
+    }
+  };
+
+  const handleMoveInRoute = async (taskId: string, direction: 'up' | 'down') => {
+    const routeTasks = tasks.filter(t => t.status === 'in-progress').sort((a, b) => (a.order || 0) - (b.order || 0));
+    const idx = routeTasks.findIndex(t => t.id === taskId);
+    if (idx === -1) return;
+
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= routeTasks.length) return;
+
+    const targetTask = routeTasks[newIdx];
+    const currentOrder = routeTasks[idx].order || 0;
+    const targetOrder = targetTask.order || 0;
+
+    try {
+      await updateWorkTask(taskId, { order: targetOrder });
+      await updateWorkTask(targetTask.id, { order: currentOrder });
+      loadTasks(currentTeam!.id);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error al reordenar' });
     }
   };
 
@@ -246,18 +294,28 @@ export function TeamWorkPanel() {
     });
   };
 
-  const filteredAndSortedTasks = useMemo(() => {
+  const pendingTasks = useMemo(() => {
     return tasks
-      .filter(t => (statusFilter === 'all' || t.status === statusFilter))
+      .filter(t => t.status === 'todo')
       .filter(t => (priorityFilter === 'all' || t.priority === priorityFilter))
       .sort((a, b) => {
         const priorityDiff = PRIORITY_MAP[b.priority].weight - PRIORITY_MAP[a.priority].weight;
         if (priorityDiff !== 0) return priorityDiff;
-        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
-        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
-        return dateB - dateA;
+        return (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0);
       });
-  }, [tasks, statusFilter, priorityFilter]);
+  }, [tasks, priorityFilter]);
+
+  const routeTasks = useMemo(() => {
+    return tasks
+      .filter(t => t.status === 'in-progress')
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [tasks]);
+
+  const completedTodayTasks = useMemo(() => {
+    return tasks
+      .filter(t => t.status === 'done' && t.completedAt && isToday(t.completedAt.toDate()))
+      .sort((a, b) => (b.completedAt?.toDate?.()?.getTime() || 0) - (a.completedAt?.toDate?.()?.getTime() || 0));
+  }, [tasks]);
 
   if (!currentTeam) {
     return (
@@ -322,86 +380,11 @@ export function TeamWorkPanel() {
             <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria / Equipo
           </h1>
           <div className="text-sm text-muted-foreground flex items-center mt-1">
-            <span className="mr-1">Código:</span>
-            <Badge variant="outline" className="text-foreground border-primary">{currentTeam.name}</Badge>
+            <span className="mr-1">Código de Equipo:</span>
+            <Badge variant="outline" className="text-foreground border-primary font-bold">{currentTeam.name}</Badge>
           </div>
         </div>
         <div className="flex gap-2">
-          <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { setIsTaskDialogOpen(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button className="shadow-md">
-                <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Pendiente
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-xl">
-              <DialogHeader>
-                <DialogTitle>{editingTask ? 'Editar Pendiente' : 'Añadir Nueva Tarea'}</DialogTitle>
-                <DialogDescription>Describe el pendiente y vincula a los alumnos si es necesario.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Título del Pendiente</Label>
-                  <Input 
-                    value={taskForm.title} 
-                    onChange={e => setTaskForm({...taskForm, title: e.target.value})} 
-                    placeholder="Ej. Entrevista con padres de familia"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Prioridad</Label>
-                    <Select value={taskForm.priority} onValueChange={(v: any) => setTaskForm({...taskForm, priority: v})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="urgent">Urgente</SelectItem>
-                        <SelectItem value="high">Alta</SelectItem>
-                        <SelectItem value="medium">Media</SelectItem>
-                        <SelectItem value="low">Baja</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Fecha límite</Label>
-                    <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm({...taskForm, dueDate: e.target.value})} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Vincular Alumnos (Opcional)</Label>
-                  <StudentSearchPopover onStudentSelect={(s) => {
-                    if (!taskForm.linkedStudents.find(ls => ls.id === s.id)) {
-                      setTaskForm({...taskForm, linkedStudents: [...taskForm.linkedStudents, s]});
-                    }
-                  }} />
-                  {taskForm.linkedStudents.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2 p-2 bg-muted/30 rounded-md">
-                      {taskForm.linkedStudents.map(ls => (
-                        <Badge key={ls.id} variant="secondary" className="gap-1 pr-1">
-                          {ls.name}
-                          <button onClick={() => setTaskForm({...taskForm, linkedStudents: taskForm.linkedStudents.filter(s => s.id !== ls.id)})} className="hover:text-destructive p-0.5"><Trash2 className="h-3 w-3" /></button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Descripción / Acuerdos</Label>
-                  <Textarea 
-                    value={taskForm.description} 
-                    onChange={e => setTaskForm({...taskForm, description: e.target.value})} 
-                    placeholder="Detalles adicionales..."
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsTaskDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSaveTask} disabled={isLoading}>
-                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
-                  {editingTask ? 'Actualizar' : 'Guardar'} Tarea
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
           <Button variant="outline" size="sm" onClick={() => {
             sessionStorage.removeItem('current_work_team');
             setCurrentWorkTeam(null);
@@ -411,204 +394,410 @@ export function TeamWorkPanel() {
         </div>
       </header>
 
-      <div className="flex items-center gap-4 flex-wrap bg-card border p-4 rounded-xl shadow-sm">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Filtros:</span>
-        </div>
-        <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
-          <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            <SelectItem value="todo">Solo Pendientes</SelectItem>
-            <SelectItem value="in-progress">En Ruta Diaria</SelectItem>
-            <SelectItem value="done">Completados</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
-          <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Prioridad" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las prioridades</SelectItem>
-            <SelectItem value="urgent">Urgente</SelectItem>
-            <SelectItem value="high">Alta</SelectItem>
-            <SelectItem value="medium">Media</SelectItem>
-            <SelectItem value="low">Baja</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="ml-auto text-xs text-muted-foreground font-medium">
-          {filteredAndSortedTasks.length} tareas encontradas
-        </div>
-      </div>
+      <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-muted/50 rounded-xl">
+          <TabsTrigger value="pending" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
+            <Clock className="h-4 w-4" /> Pendientes
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{pendingTasks.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="route" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
+            <PlayCircle className="h-4 w-4" /> Ruta de Hoy
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{routeTasks.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 gap-4">
-        {isLoading && tasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Cargando tablero...</p>
-          </div>
-        ) : filteredAndSortedTasks.length > 0 ? (
-          filteredAndSortedTasks.map(task => {
-            const isExpanded = expandedTasks.has(task.id);
-            const statusInfo = STATUS_MAP[task.status];
-            const priorityInfo = PRIORITY_MAP[task.priority];
-
-            return (
-              <Card key={task.id} className={cn(
-                "hover:shadow-md transition-all duration-200 border-l-[6px] overflow-hidden", 
-                task.status === 'done' ? 'opacity-60' : 'opacity-100',
-                task.priority === 'urgent' ? 'border-l-red-600' : 
-                task.priority === 'high' ? 'border-l-orange-500' :
-                task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500'
-              )}>
-                <div 
-                  className="p-4 cursor-pointer hover:bg-muted/5 flex items-center justify-between"
-                  onClick={() => toggleExpand(task.id)}
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <Checkbox 
-                      id={`check-${task.id}`}
-                      checked={task.status === 'done'} 
-                      onCheckedChange={(checked) => handleStatusChange(task.id, checked ? 'done' : 'todo')} 
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div className="space-y-1">
-                      <h3 className={cn(
-                        "text-lg font-bold leading-none", 
-                        task.status === 'done' && 'line-through text-muted-foreground'
-                      )}>
-                        {task.title}
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge className={cn("text-[10px] px-1.5 h-5", priorityInfo.color)}>
-                          {priorityInfo.label}
-                        </Badge>
-                        <span className={cn("text-[10px] font-semibold flex items-center gap-1", statusInfo.color)}>
-                          {statusInfo.icon} {statusInfo.label}
-                        </span>
-                        {task.dueDate && (
-                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format((task.dueDate as any).toDate(), 'dd MMM', { locale: es })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {task.linkedStudents.length > 0 && (
-                      <div className="hidden sm:flex -space-x-2 mr-4">
-                        {task.linkedStudents.slice(0, 3).map(s => (
-                          <div key={s.id} className="h-7 w-7 rounded-full bg-primary/10 border-2 border-background flex items-center justify-center text-[10px] font-bold text-primary" title={s.name}>
-                            {s.name.substring(0, 1)}
-                          </div>
-                        ))}
-                        {task.linkedStudents.length > 3 && (
-                          <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                            +{task.linkedStudents.length - 3}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}>
-                      <Edit3 className="h-4 w-4" />
-                    </Button>
-                    {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <CardContent className="p-4 pt-0 space-y-6 animate-in slide-in-from-top-2 duration-200">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed">
-                      <div className="md:col-span-2 space-y-4">
-                        <div className="space-y-2">
-                          <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Descripción y Acuerdos</Label>
-                          <div className="text-sm bg-muted/20 p-4 rounded-xl border border-dashed text-foreground/80 whitespace-pre-wrap min-h-[80px]">
-                            {task.description || "Sin descripción adicional."}
-                          </div>
-                        </div>
-
-                        {task.linkedStudents.length > 0 && (
-                          <div className="space-y-2">
-                            <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Alumnos Vinculados</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {task.linkedStudents.map(ls => (
-                                <Badge key={ls.id} variant="secondary" className="bg-primary/5 text-primary border-primary/10 hover:bg-primary/10 transition-colors py-1 pl-2 pr-1 gap-2">
-                                  <User className="h-3 w-3" />
-                                  {ls.name} <span className="opacity-60 font-mono text-[10px]">({ls.id})</span>
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex gap-2 pt-2">
-                          {task.status === 'todo' && (
-                            <Button size="sm" onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'in-progress'); }}>
-                              <PlayCircle className="mr-2 h-4 w-4" /> Iniciar Ruta Diaria
-                            </Button>
-                          )}
-                          {task.status === 'in-progress' && (
-                            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handleStatusChange(task.id, 'todo'); }}>
-                              <Clock className="mr-2 h-4 w-4" /> Regresar a Pendientes
-                            </Button>
-                          )}
-                          <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); deleteWorkTask(task.id).then(() => loadTasks(currentTeam.id)); }}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar Permanente
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 border-l pl-6 hidden md:block">
-                        <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold flex items-center gap-2">
-                          <MessageSquare className="h-3 w-3" /> Comentarios / Bitácora
-                        </Label>
-                        <ScrollArea className="h-[200px] pr-4">
-                          <div className="space-y-3">
-                            {task.comments && task.comments.length > 0 ? task.comments.map(c => (
-                              <div key={c.id} className="bg-muted/30 p-3 rounded-lg border text-xs">
-                                <p className="text-foreground/90">{c.text}</p>
-                                <p className="text-[10px] text-muted-foreground mt-1 text-right">
-                                  {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
-                                </p>
-                              </div>
-                            )) : (
-                              <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios aún.</p>
-                            )}
-                          </div>
-                        </ScrollArea>
-                        <div className="flex gap-2">
-                          <Input 
-                            value={newCommentText[task.id] || ''} 
-                            onChange={e => setNewCommentText({...newCommentText, [task.id]: e.target.value})}
-                            placeholder="Añadir nota..."
-                            className="h-8 text-xs"
-                            onKeyDown={e => { if(e.key === 'Enter') handleAddComment(task.id); }}
-                          />
-                          <Button size="icon" className="h-8 w-8 shrink-0" onClick={() => handleAddComment(task.id)}>
-                            <Send className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })
-        ) : (
-          <div className="text-center py-24 bg-card rounded-2xl border-2 border-dashed shadow-inner">
-            <div className="bg-muted/50 p-4 rounded-full w-fit mx-auto mb-4">
-              <AlertCircle className="h-12 w-12 text-muted-foreground" />
+        <TabsContent value="pending" className="space-y-6 pt-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap bg-card border p-4 rounded-xl shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-semibold">Prioridad:</span>
+              </div>
+              <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
+                <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="urgent">Urgente</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="medium">Media</SelectItem>
+                  <SelectItem value="low">Baja</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <h3 className="text-xl font-bold">Sin tareas que mostrar</h3>
-            <p className="text-muted-foreground mt-2 max-w-xs mx-auto">Ajusta tus filtros o añade un nuevo pendiente para el equipo.</p>
-            <Button variant="outline" className="mt-6" onClick={() => { setStatusFilter('all'); setPriorityFilter('all'); }}>
-              Ver todos los pendientes
+            <Button onClick={() => setIsTaskDialogOpen(true)} className="shadow-sm">
+              <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Pendiente
             </Button>
           </div>
-        )}
-      </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {pendingTasks.length > 0 ? pendingTasks.map(task => (
+              <TaskCard 
+                key={task.id} 
+                task={task} 
+                onEdit={handleEditTask} 
+                onStatusChange={handleStatusChange} 
+                onToggleExpand={toggleExpand}
+                isExpanded={expandedTasks.has(task.id)}
+                newComment={newCommentText[task.id] || ''}
+                onCommentChange={(text) => setNewCommentText({...newCommentText, [task.id]: text})}
+                onAddComment={() => handleAddComment(task.id)}
+                onDelete={() => deleteWorkTask(task.id).then(() => loadTasks(currentTeam.id))}
+              />
+            )) : (
+              <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed">
+                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-bold">Sin pendientes</h3>
+                <p className="text-muted-foreground">Todo está al día o en ruta de trabajo.</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="route" className="pt-6">
+          <div className="max-w-3xl mx-auto space-y-8">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <PlayCircle className="h-5 w-5 text-primary" /> Procedimiento del Día
+                </h2>
+                <span className="text-sm text-muted-foreground font-medium">
+                  {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
+                </span>
+              </div>
+              
+              <div className="relative space-y-4 pl-4 border-l-2 border-dashed border-muted-foreground/30">
+                {routeTasks.length > 0 ? routeTasks.map((task, index) => (
+                  <div key={task.id} className="relative">
+                    <div className="absolute -left-[25px] top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm" />
+                    <Card className="hover:shadow-md transition-all border-l-4 overflow-hidden" style={{ borderLeftColor: `var(--color-${task.priority})` }}>
+                      <div className="p-4 flex items-center justify-between gap-4">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge className={cn("text-[10px] h-5", PRIORITY_MAP[task.priority].color)}>
+                              {PRIORITY_MAP[task.priority].label}
+                            </Badge>
+                            <h3 className="font-bold">{task.title}</h3>
+                          </div>
+                          {task.linkedStudents.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {task.linkedStudents.map(s => (
+                                <span key={s.id} className="text-[10px] text-muted-foreground flex items-center gap-1 bg-muted px-1.5 rounded">
+                                  <User className="h-2.5 w-2.5" /> {s.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="flex flex-col gap-1 mr-2">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMoveInRoute(task.id, 'up')} disabled={index === 0}>
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMoveInRoute(task.id, 'down')} disabled={index === routeTasks.length - 1}>
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <Button size="sm" variant="outline" className="h-8" onClick={() => handleStatusChange(task.id, 'todo')}>
+                            <Clock className="h-3.5 w-3.5 mr-1" /> Posponer
+                          </Button>
+                          <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleStatusChange(task.id, 'done')}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Finalizar
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                )) : (
+                  <div className="p-12 text-center bg-muted/20 rounded-xl border-2 border-dashed">
+                    <p className="text-muted-foreground italic">No hay tareas asignadas para la ruta de hoy.</p>
+                    <Button variant="link" onClick={() => setActiveTab('pending')}>Añadir desde pendientes</Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {completedTodayTasks.length > 0 && (
+              <div className="space-y-4 pt-8 border-t">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-green-600">
+                  <CheckCircle2 className="h-5 w-5" /> Completado Hoy
+                </h2>
+                <div className="grid grid-cols-1 gap-3">
+                  {completedTodayTasks.map(task => (
+                    <Card key={task.id} className="bg-green-50/50 opacity-80 border-green-100">
+                      <div className="p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          <div>
+                            <h3 className="font-semibold text-sm line-through text-muted-foreground">{task.title}</h3>
+                            <p className="text-[10px] text-muted-foreground">
+                              Finalizado a las {format(task.completedAt.toDate(), "HH:mm")}
+                            </p>
+                          </div>
+                        </div>
+                        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => handleStatusChange(task.id, 'in-progress')}>
+                          <History className="h-3 w-3 mr-1" /> Reabrir
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Task Creation/Edition Dialog */}
+      <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { setIsTaskDialogOpen(open); if (!open) resetForm(); }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{editingTask ? 'Editar Pendiente' : 'Añadir Nueva Tarea'}</DialogTitle>
+            <DialogDescription>Describe el pendiente y vincula a los alumnos si es necesario.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Título del Pendiente</Label>
+              <Input 
+                value={taskForm.title} 
+                onChange={e => setTaskForm({...taskForm, title: e.target.value})} 
+                placeholder="Ej. Entrevista con padres de familia"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Prioridad</Label>
+                <Select value={taskForm.priority} onValueChange={(v: any) => setTaskForm({...taskForm, priority: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="urgent">Urgente</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="low">Baja</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha límite</Label>
+                <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm({...taskForm, dueDate: e.target.value})} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Vincular Alumnos (Opcional)</Label>
+              <StudentSearchPopover onStudentSelect={(s) => {
+                if (!taskForm.linkedStudents.find(ls => ls.id === s.id)) {
+                  setTaskForm({...taskForm, linkedStudents: [...taskForm.linkedStudents, s]});
+                }
+              }} />
+              {taskForm.linkedStudents.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 p-2 bg-muted/30 rounded-md">
+                  {taskForm.linkedStudents.map(ls => (
+                    <Badge key={ls.id} variant="secondary" className="gap-1 pr-1">
+                      {ls.name}
+                      <button onClick={() => setTaskForm({...taskForm, linkedStudents: taskForm.linkedStudents.filter(s => s.id !== ls.id)})} className="hover:text-destructive p-0.5"><Trash2 className="h-3 w-3" /></button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Descripción / Acuerdos</Label>
+              <Textarea 
+                value={taskForm.description} 
+                onChange={e => setTaskForm({...taskForm, description: e.target.value})} 
+                placeholder="Detalles adicionales..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsTaskDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveTask} disabled={isLoading}>
+              {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
+              {editingTask ? 'Actualizar' : 'Guardar'} Tarea
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function TaskCard({ 
+  task, onEdit, onStatusChange, onToggleExpand, isExpanded, 
+  newComment, onCommentChange, onAddComment, onDelete 
+}: { 
+  task: WorkTask, 
+  onEdit: (t: WorkTask) => void, 
+  onStatusChange: (id: string, s: TaskStatus) => void,
+  onToggleExpand: (id: string) => void,
+  isExpanded: boolean,
+  newComment: string,
+  onCommentChange: (val: string) => void,
+  onAddComment: () => void,
+  onDelete: () => void
+}) {
+  const priorityInfo = PRIORITY_MAP[task.priority];
+  const statusInfo = STATUS_MAP[task.status];
+
+  return (
+    <Card className={cn(
+      "hover:shadow-md transition-all duration-200 border-l-[6px] overflow-hidden", 
+      task.status === 'done' ? 'opacity-60' : 'opacity-100',
+      task.priority === 'urgent' ? 'border-l-red-600' : 
+      task.priority === 'high' ? 'border-l-orange-500' :
+      task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500'
+    )}>
+      <div 
+        className="p-4 cursor-pointer hover:bg-muted/5 flex items-center justify-between"
+        onClick={() => onToggleExpand(task.id)}
+      >
+        <div className="flex items-center gap-4 flex-1">
+          <Checkbox 
+            id={`check-${task.id}`}
+            checked={task.status === 'done'} 
+            onCheckedChange={(checked) => onStatusChange(task.id, checked ? 'done' : 'todo')} 
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="space-y-1">
+            <h3 className={cn(
+              "text-lg font-bold leading-none", 
+              task.status === 'done' && 'line-through text-muted-foreground'
+            )}>
+              {task.title}
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              <Badge className={cn("text-[10px] px-1.5 h-5", priorityInfo.color)}>
+                {priorityInfo.label}
+              </Badge>
+              <span className={cn("text-[10px] font-semibold flex items-center gap-1", statusInfo.color)}>
+                {statusInfo.icon} {statusInfo.label}
+              </span>
+              {task.dueDate && (
+                <span className={cn(
+                  "text-[10px] font-semibold flex items-center gap-1",
+                  isToday(task.dueDate.toDate()) ? "text-primary animate-pulse" : "text-muted-foreground"
+                )}>
+                  <Calendar className="h-3 w-3" />
+                  {format((task.dueDate as any).toDate(), 'dd MMM', { locale: es })}
+                  {isToday(task.dueDate.toDate()) && " (Hoy)"}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {task.linkedStudents.length > 0 && (
+            <div className="hidden sm:flex -space-x-2 mr-4">
+              {task.linkedStudents.slice(0, 3).map(s => (
+                <div key={s.id} className="h-7 w-7 rounded-full bg-primary/10 border-2 border-background flex items-center justify-center text-[10px] font-bold text-primary" title={s.name}>
+                  {s.name.substring(0, 1)}
+                </div>
+              ))}
+              {task.linkedStudents.length > 3 && (
+                <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                  +{task.linkedStudents.length - 3}
+                </div>
+              )}
+            </div>
+          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(task); }}>
+            <Edit3 className="h-4 w-4" />
+          </Button>
+          {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+        </div>
+      </div>
+
+      {isExpanded && (
+        <CardContent className="p-4 pt-0 space-y-6 animate-in slide-in-from-top-2 duration-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed">
+            <div className="md:col-span-2 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Descripción y Acuerdos</Label>
+                <div className="text-sm bg-muted/20 p-4 rounded-xl border border-dashed text-foreground/80 whitespace-pre-wrap min-h-[80px]">
+                  {task.description || "Sin descripción adicional."}
+                </div>
+              </div>
+
+              {task.linkedStudents.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Alumnos Vinculados</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {task.linkedStudents.map(ls => (
+                      <Badge key={ls.id} variant="secondary" className="bg-primary/5 text-primary border-primary/10 hover:bg-primary/10 transition-colors py-1 pl-2 pr-1 gap-2">
+                        <User className="h-3 w-3" />
+                        {ls.name} <span className="opacity-60 font-mono text-[10px]">({ls.id})</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                {task.status === 'todo' && (
+                  <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'in-progress'); }}>
+                    <PlayCircle className="mr-2 h-4 w-4" /> Iniciar Ruta Diaria
+                  </Button>
+                )}
+                {task.status === 'in-progress' && (
+                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo'); }}>
+                    <Clock className="mr-2 h-4 w-4" /> Regresar a Pendientes
+                  </Button>
+                )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10">
+                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
+                      <AlertDialogDescription>Esta acción es permanente y no se puede deshacer.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+
+            <div className="space-y-4 border-l pl-6 hidden md:block">
+              <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold flex items-center gap-2">
+                <MessageSquare className="h-3 w-3" /> Comentarios / Bitácora
+              </Label>
+              <ScrollArea className="h-[200px] pr-4">
+                <div className="space-y-3">
+                  {task.comments && task.comments.length > 0 ? task.comments.map(c => (
+                    <div key={c.id} className="bg-muted/30 p-3 rounded-lg border text-xs">
+                      <p className="text-foreground/90">{c.text}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 text-right">
+                        {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
+                      </p>
+                    </div>
+                  )) : (
+                    <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios aún.</p>
+                  )}
+                </div>
+              </ScrollArea>
+              <div className="flex gap-2">
+                <Input 
+                  value={newComment} 
+                  onChange={e => onCommentChange(e.target.value)}
+                  placeholder="Añadir nota..."
+                  className="h-8 text-xs"
+                  onKeyDown={e => { if(e.key === 'Enter') onAddComment(); }}
+                />
+                <Button size="icon" className="h-8 w-8 shrink-0" onClick={onAddComment}>
+                  <Send className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      )}
+    </Card>
   );
 }
