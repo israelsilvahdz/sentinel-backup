@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -30,7 +31,7 @@ import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { TeamWorkPanel } from './TeamWorkPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -145,6 +146,9 @@ export function DashboardClient() {
   const [activeView, setActiveView] = useState<ActiveView>('dashboard');
   const [contextualStudentIds, setContextualStudentIds] = useState<Set<string> | null>(null);
   
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
   const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
   const fetchTeams = useCallback(async () => {
@@ -196,6 +200,13 @@ export function DashboardClient() {
 
 
   useEffect(() => {
+    // PWA Install Logic
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
     async function loadInitialData() {
         setIsLoading(true);
         try {
@@ -252,6 +263,10 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -402,6 +417,15 @@ export function DashboardClient() {
        toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron borrar los datos.' });
     } finally {
       setTimeout(() => { setIsProcessing(false); setProgress(0); }, 500);
+    }
+  };
+
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
     }
   };
   
@@ -597,6 +621,14 @@ export function DashboardClient() {
           <SidebarContent>
             <SidebarGroup>
               <SidebarMenu>
+                {deferredPrompt && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton tooltip="Descargar App en Celular" onClick={handleInstallPWA} className="bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-b mb-2">
+                      <Smartphone className="animate-bounce" />
+                      <span className="font-bold">Instalar en Celular</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Progreso Estudiantil" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
                     <LayoutDashboard />

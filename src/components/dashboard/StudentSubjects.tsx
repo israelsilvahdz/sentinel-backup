@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Minus, Plus, Phone, Camera, User as UserIcon } from 'lucide-react';
+import { Minus, Plus, Phone, Camera, User as UserIcon, Download } from 'lucide-react';
 import { type Student, type Subject } from "@/types/student";
 import { getActivityList } from '@/lib/ponderaciones';
 import { isWithoutRight } from '@/lib/dataProcessor';
@@ -15,7 +16,7 @@ import { StudentProfessorsSchedule } from './StudentProfessorsSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { ActivityBreakdown } from './ActivityBreakdown';
 import { GradesTable } from './GradesTable';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { RiskCell, CopyButton } from './StudentCardShared';
@@ -27,47 +28,49 @@ import { cn } from '@/lib/utils';
 
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
     
     const subjectSummaries = subjects?.map(s => ({
         id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
         missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
         grade: s.grade, finalGrade: s.finalGrade, group: s.group,
     }));
-    
-    useEffect(() => {
-        if (!reportRef.current) {
-            setIsLoading(true);
-            const timeoutId = setTimeout(async () => {
-                if (reportRef.current) {
-                    try {
-                        await htmlToImage.toPng(reportRef.current!, { 
-                            pixelRatio: 2,
-                            fetchRequestInit: { mode: 'no-cors' }
-                        });
-                    } catch (error) {
-                       console.error("Error generating image:", error);
-                    } finally {
-                        setIsLoading(false);
-                    }
-                }
-            }, 100);
-            return () => clearTimeout(timeoutId);
-        }
-    }, [subjects]);
 
+    const handleDownload = async () => {
+        if (!reportRef.current) return;
+        setIsGenerating(true);
+        try {
+            const dataUrl = await htmlToImage.toPng(reportRef.current, { pixelRatio: 2 });
+            const link = document.createElement('a');
+            link.download = `Reporte_${student.name.replace(/\s+/g, '_')}_${student.id}.png`;
+            link.href = dataUrl;
+            link.click();
+        } catch (error) {
+            console.error("Error downloading image:", error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     return (
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl sm:max-w-4xl">
             <DialogHeader>
                 <DialogTitle>Reporte Rápido del Alumno</DialogTitle>
                 <DialogDescription>
-                    Esta es una previsualización del reporte del alumno. Puedes tomar una captura de pantalla.
+                    Previsualización del reporte visual. Puedes guardarlo en tu dispositivo o tomar captura.
                 </DialogDescription>
             </DialogHeader>
-            <div className="py-4 overflow-x-auto">
-                <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
+            <div className="py-4 overflow-x-auto bg-muted/20 rounded-md">
+                <div className="min-w-[800px] flex justify-center p-4">
+                    <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
+                </div>
             </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+                <Button onClick={handleDownload} disabled={isGenerating} className="w-full sm:w-auto">
+                    {isGenerating ? <Skeleton className="h-4 w-4 rounded-full mr-2" /> : <Download className="mr-2 h-4 w-4" />}
+                    Descargar Imagen
+                </Button>
+            </DialogFooter>
         </DialogContent>
     );
 }

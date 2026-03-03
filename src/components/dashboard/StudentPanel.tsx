@@ -175,15 +175,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
         const recipients = recipientsWithEmail.map(t => t.email).join(',');
         const subject = `Notificación de Ausencia por ${reason}`;
         
-        const mailtoBody = `Estimados profesores,
-
-Les notifico que los siguientes alumnos se ausentarán por motivo de "${reason}" ${dateText}.
-
-Alumnos: ${studentsListText}.
-
-${notes ? `Notas adicionales: ${notes}\n\n` : ''}Si desean una tabla más detallada con matrículas y grupos, pueden reemplazar la lista de alumnos pegando la tabla que se ha copiado al portapapeles.
-
-Saludos cordiales,`;
+        const mailtoBody = `Estimados profesores,\n\nLes notifico que los siguientes alumnos se ausentarán por motivo de "${reason}" ${dateText}.\n\nAlumnos: ${studentsListText}.\n\n${notes ? `Notas adicionales: ${notes}\n\n` : ''}Si desean una tabla más detallada con matrículas y grupos, pueden reemplazar la lista de alumnos pegando la tabla que se ha copiado al portapapeles.\n\nSaludos cordiales,`;
 
         return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody, recipientsWithoutEmail };
     };
@@ -526,6 +518,8 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
         
         const ReportComponent = () => {
             const innerRef = useRef<HTMLDivElement>(null);
+            const [isExporting, setIsExporting] = useState(false);
+
             const handleCopy = () => {
                 if (innerRef.current) {
                     htmlToImage.toPng(innerRef.current, { pixelRatio: 2 })
@@ -542,12 +536,35 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
                 }
             };
 
+            const handleDownload = async () => {
+                if (innerRef.current) {
+                    setIsExporting(true);
+                    try {
+                        const dataUrl = await htmlToImage.toPng(innerRef.current, { pixelRatio: 2 });
+                        const link = document.createElement('a');
+                        link.download = `Reporte_${student.name.replace(/\s+/g, '_')}.png`;
+                        link.href = dataUrl;
+                        link.click();
+                        toast({ title: "Reporte Descargado", description: "La imagen se ha guardado en tu dispositivo." });
+                    } catch (err) {
+                        toast({ variant: "destructive", title: "Error", description: "No se pudo descargar la imagen." });
+                    } finally {
+                        setIsExporting(false);
+                    }
+                }
+            };
+
             return (
                 <div>
-                     <div ref={innerRef}>
-                        <StudentReportImage student={student} subjects={subjectSummaries} />
+                     <div className="overflow-x-auto bg-muted/20 p-2 rounded-md">
+                        <div ref={innerRef} className="min-w-[800px]">
+                            <StudentReportImage student={student} subjects={subjectSummaries} />
+                        </div>
                     </div>
-                    <DialogFooter className="mt-4">
+                    <DialogFooter className="mt-4 gap-2">
+                        <Button variant="outline" onClick={handleDownload} disabled={isExporting}>
+                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Descargar
+                        </Button>
                         <Button onClick={handleCopy}>
                             <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Imagen
                         </Button>
@@ -557,10 +574,10 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
         }
 
         setDialogContent(
-            <DialogContent>
+            <DialogContent className="max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Reporte de {student.name}</DialogTitle>
-                    <DialogDescription>Copia la imagen y pégala en tu cliente de correo.</DialogDescription>
+                    <DialogDescription>Copia la imagen o descárgala para enviarla por correo o mensaje.</DialogDescription>
                 </DialogHeader>
                 <ReportComponent />
             </DialogContent>
@@ -583,8 +600,11 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
                     <ScrollArea className="h-[60vh] -mx-6 px-6">
                         <div className="py-4 space-y-2">
                             {students.map(student => (
-                                <div key={student.id} className="flex items-center justify-between gap-2">
-                                    <p className="font-medium text-sm">{student.name}</p>
+                                <div key={student.id} className="flex items-center justify-between gap-2 p-2 hover:bg-muted/50 rounded-md transition-colors">
+                                    <div className="flex flex-col">
+                                        <p className="font-medium text-sm">{student.name}</p>
+                                        <p className="text-xs text-muted-foreground">{student.id}</p>
+                                    </div>
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -596,7 +616,7 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
                                         ) : (
                                             <Eye className="mr-2 h-4 w-4" />
                                         )}
-                                        Generar Reporte
+                                        Ver Reporte
                                     </Button>
                                 </div>
                             ))}
@@ -807,100 +827,88 @@ export function StudentPanel() {
     const handleDownloadZip = async () => {
         if (selectedStudents.size === 0) return;
         
-        const CHUNK_SIZE = 50;
-        const studentChunks = [];
         const studentArray = Array.from(selectedStudents);
-
-        for (let i = 0; i < studentArray.length; i += CHUNK_SIZE) {
-            studentChunks.push(studentArray.slice(i, i + CHUNK_SIZE));
-        }
-
-        setDownloadStatus(`Iniciando descarga en ${studentChunks.length} partes...`);
+        setDownloadStatus(`Iniciando generación de ${studentArray.length} reportes...`);
         setDownloadProgress(0);
 
         const { createRoot } = await import('react-dom/client');
+        const zip = new JSZip();
 
-        const generateImages = async (student: Student): Promise<{ report: Blob | null, grades: Blob | null }> => {
-            const subjects = await loadStudentSubjects(student.id);
-            const subjectSummaries = subjects.map(s => ({
-                id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-                missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-                grade: s.grade, finalGrade: s.finalGrade, group: s.group,
-            }));
-
-            const renderToBlob = async (Component: any): Promise<Blob | null> => {
-                const node = document.createElement('div');
-                node.style.position = 'fixed';
-                node.style.top = '-9999px';
-                node.style.left = '0px';
-                document.body.appendChild(node);
-                const root = createRoot(node);
-                const ref = React.createRef<HTMLDivElement>();
-                
-                return new Promise((resolve) => {
-                    root.render(<Component ref={ref} />);
-                    setTimeout(async () => {
-                        if (ref.current) {
-                            try {
-                                const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5 });
-                                resolve(blob);
-                            } catch (err) {
-                                console.error(`Failed to generate image`, err);
-                                resolve(null);
-                            } finally {
-                                root.unmount();
+        const renderToBlob = async (Component: any): Promise<Blob | null> => {
+            const node = document.createElement('div');
+            node.style.position = 'fixed';
+            node.style.top = '-9999px';
+            node.style.left = '0px';
+            node.style.width = '800px'; // Set fixed width for consistency
+            document.body.appendChild(node);
+            const root = createRoot(node);
+            const ref = React.createRef<HTMLDivElement>();
+            
+            return new Promise((resolve) => {
+                root.render(<Component ref={ref} />);
+                // Smaller delay but sequential to avoid CPU spikes
+                setTimeout(async () => {
+                    if (ref.current) {
+                        try {
+                            const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5 });
+                            resolve(blob);
+                        } catch (err) {
+                            console.error(`Failed to generate image`, err);
+                            resolve(null);
+                        } finally {
+                            root.unmount();
+                            if (document.body.contains(node)) {
                                 document.body.removeChild(node);
                             }
-                        } else {
-                            resolve(null);
                         }
-                    }, 600); 
-                });
-            };
-
-            const reportBlob = await renderToBlob(React.forwardRef<HTMLDivElement>((props, ref) => <StudentReportImage ref={ref} student={student} subjects={subjectSummaries} />));
-            const gradesBlob = await renderToBlob(React.forwardRef<HTMLDivElement>((props, ref) => <StudentGradesReportImage ref={ref} student={student} subjects={subjects} />));
-
-            return { report: reportBlob, grades: gradesBlob };
+                    } else {
+                        resolve(null);
+                    }
+                }, 800); 
+            });
         };
 
         let totalCompleted = 0;
         
-        for (let i = 0; i < studentChunks.length; i++) {
-            const chunk = studentChunks[i];
-            const zip = new JSZip();
-            setDownloadStatus(`Generando reportes para el lote ${i + 1} de ${studentChunks.length}...`);
+        // Process sequentially to be mobile-friendly (less memory pressure)
+        for (const studentId of studentArray) {
+            const student = allStudentsMap.get(studentId);
+            if (student) {
+                setDownloadStatus(`Procesando: ${student.name} (${totalCompleted + 1}/${studentArray.length})`);
+                
+                const subjects = await loadStudentSubjects(student.id);
+                const subjectSummaries = subjects.map(s => ({
+                    id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+                    missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+                    grade: s.grade, finalGrade: s.finalGrade, group: s.group,
+                }));
 
-            for (const studentId of chunk) {
-                const student = allStudentsMap.get(studentId);
-                if (student) {
-                    const { report, grades } = await generateImages(student);
-                    const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                    
-                    if (report) {
-                        zip.file(`${sanitizedName}_resumen.png`, report);
-                    }
-                    if (grades) {
-                        zip.file(`${sanitizedName}_calificaciones.png`, grades);
-                    }
+                const reportBlob = await renderToBlob(React.forwardRef<HTMLDivElement>((props, ref) => <StudentReportImage ref={ref} student={student} subjects={subjectSummaries} />));
+                
+                const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                if (reportBlob) {
+                    zip.file(`${sanitizedName}_reporte.png`, reportBlob);
                 }
-                totalCompleted++;
-                setDownloadProgress((totalCompleted / studentArray.length) * 100);
             }
-
-            setDownloadStatus(`Comprimiendo lote ${i + 1}...`);
-            const zipContent = await zip.generateAsync({ type: "blob" });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(zipContent);
-            link.download = `reportes_completos_parte_${i + 1}_de_${studentChunks.length}.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            totalCompleted++;
+            setDownloadProgress((totalCompleted / studentArray.length) * 100);
+            
+            // Short rest for mobile browsers to breathe
+            await new Promise(r => setTimeout(root, 100));
         }
 
+        setDownloadStatus(`Comprimiendo archivo...`);
+        const zipContent = await zip.generateAsync({ type: "blob" });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipContent);
+        link.download = `Reportes_Sentinel_${format(new Date(), 'yyyyMMdd_HHmm')}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
         toast({
-            title: "Descarga Completa",
-            description: `Se han descargado los reportes en ${studentChunks.length} archivo(s) ZIP.`,
+            title: "Descarga Exitosa",
+            description: `Se han generado ${totalCompleted} reportes correctamente.`,
         });
 
         setDownloadStatus('');
@@ -1045,7 +1053,7 @@ export function StudentPanel() {
           </div>
           
            {filteredStudents.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/50 p-3 rounded-lg">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/50 p-3 rounded-lg border">
                 <div className="flex items-center gap-4">
                     <div className="flex items-center space-x-2">
                         <Checkbox 
@@ -1053,17 +1061,18 @@ export function StudentPanel() {
                             checked={selectedStudents.size === filteredStudents.length && filteredStudents.length > 0}
                             onCheckedChange={(checked) => handleSelectAll(!!checked)}
                         />
-                        <Label htmlFor="select-all">Seleccionar Todos ({selectedStudents.size})</Label>
+                        <Label htmlFor="select-all" className="font-bold">Seleccionar Todos ({selectedStudents.size})</Label>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button 
                         size="sm"
+                        variant="secondary"
                         onClick={() => setIsMailerOpen(true)}
                         disabled={selectedStudents.size === 0}
                     >
-                        <Mail className="md:mr-2 h-4 w-4" />
-                        <span className="hidden md:inline">Enviar Correo</span>
+                        <Eye className="mr-2 h-4 w-4" />
+                        <span className="hidden md:inline">Ver Reportes</span>
                          ({selectedStudents.size})
                     </Button>
                     <Button 
@@ -1071,18 +1080,24 @@ export function StudentPanel() {
                         onClick={handleDownloadZip}
                         disabled={selectedStudents.size === 0 || downloadProgress > 0}
                     >
-                        <Download className="md:mr-2 h-4 w-4" />
-                         <span className="hidden md:inline">Descargar Reportes</span>
+                        {downloadProgress > 0 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="md:mr-2 h-4 w-4" />}
+                         <span className="hidden md:inline">Descargar ZIP</span>
                          ({selectedStudents.size})
                     </Button>
                 </div>
             </div>
            )}
            {downloadProgress > 0 && (
-                <div className="space-y-2">
-                    <Progress value={downloadProgress} className="w-full" />
-                    <p className="text-sm text-muted-foreground">{downloadStatus}</p>
-                </div>
+                <Card className="p-4 border-primary/20 bg-primary/5">
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <p className="text-sm font-bold text-primary">{downloadStatus}</p>
+                            <span className="text-xs font-mono">{Math.round(downloadProgress)}%</span>
+                        </div>
+                        <Progress value={downloadProgress} className="h-2" />
+                        <p className="text-[10px] text-muted-foreground italic">No cierres esta ventana mientras se procesan los reportes.</p>
+                    </div>
+                </Card>
            )}
 
           {filteredStudents.length > 0 ? (
