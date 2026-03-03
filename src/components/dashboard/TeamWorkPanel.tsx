@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
-  AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, UserPlus, LogIn
+  AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format } from 'date-fns';
@@ -53,7 +53,6 @@ export function TeamWorkPanel() {
   const [currentTeam, setCurrentWorkTeam] = useState<WorkTeam | null>(null);
   const [tasks, setTasks] = useState<WorkTask[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [authName, setAuthName] = useState('');
   const [authCode, setAuthCode] = useState('');
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   
@@ -104,24 +103,21 @@ export function TeamWorkPanel() {
   };
 
   const handleLogin = async () => {
-    if (!authName || !authCode) {
-      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'Por favor ingresa nombre y código.' });
+    if (!authCode) {
+      toast({ variant: 'destructive', title: 'Código vacío', description: 'Por favor ingresa tu código de equipo.' });
       return;
     }
     setIsLoading(true);
     try {
-      const team = await findWorkTeamByName(authName);
+      // Buscamos un equipo cuyo NOMBRE sea el código (simplificación máxima)
+      const team = await findWorkTeamByName(authCode);
       if (team) {
-        if (team.accessCode === authCode) {
-          setCurrentWorkTeam(team);
-          sessionStorage.setItem('current_work_team', JSON.stringify(team));
-          loadTasks(team.id);
-          toast({ title: `Bienvenido al equipo ${team.name}` });
-        } else {
-          toast({ variant: 'destructive', title: 'Código incorrecto' });
-        }
+        setCurrentWorkTeam(team);
+        sessionStorage.setItem('current_work_team', JSON.stringify(team));
+        loadTasks(team.id);
+        toast({ title: `Bienvenido al equipo ${team.name}` });
       } else {
-        toast({ variant: 'destructive', title: 'Equipo no encontrado', description: 'Asegúrate de que el nombre sea correcto o cámbiate a la pestaña de registro.' });
+        toast({ variant: 'destructive', title: 'Código no encontrado', description: 'Si el equipo es nuevo, cámbiate a la pestaña "Registrar".' });
       }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -131,17 +127,18 @@ export function TeamWorkPanel() {
   };
 
   const handleRegisterTeam = async () => {
-    if (!authName || !authCode) {
-      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'Define un nombre y un código para el equipo.' });
+    if (!authCode) {
+      toast({ variant: 'destructive', title: 'Código vacío', description: 'Define un código para tu nuevo equipo.' });
       return;
     }
     setIsLoading(true);
     try {
-      const existing = await findWorkTeamByName(authName);
+      const existing = await findWorkTeamByName(authCode);
       if (existing) {
-        toast({ variant: 'destructive', title: 'Nombre ocupado', description: 'Ese nombre de equipo ya existe. Usa otro o cámbiate a la pestaña de entrada.' });
+        toast({ variant: 'destructive', title: 'Código ocupado', description: 'Este código ya está en uso. Elige otro o entra con el actual.' });
       } else {
-        const newTeam = await createWorkTeam(authName, authCode);
+        // Usamos el mismo código como nombre y clave para simplificar
+        const newTeam = await createWorkTeam(authCode, authCode);
         setCurrentWorkTeam(newTeam);
         sessionStorage.setItem('current_work_team', JSON.stringify(newTeam));
         loadTasks(newTeam.id);
@@ -212,13 +209,13 @@ export function TeamWorkPanel() {
   if (!currentTeam) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-100px)] p-4">
-        <Card className="w-full max-w-md shadow-xl">
+        <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
           <CardHeader className="text-center pb-2">
             <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-4">
               <ShieldCheck className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle>Ruta Diaria / Equipo</CardTitle>
-            <CardDescription>Accede a tus pendientes compartidos o configura un nuevo equipo.</CardDescription>
+            <CardTitle className="text-2xl">Ruta de Equipo</CardTitle>
+            <CardDescription>Introduce el código de dos dígitos o letras para acceder.</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login" className="w-full">
@@ -227,36 +224,35 @@ export function TeamWorkPanel() {
                   <LogIn className="h-4 w-4" /> Entrar
                 </TabsTrigger>
                 <TabsTrigger value="create" className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4" /> Registrar
+                  <Sparkles className="h-4 w-4" /> Registrar
                 </TabsTrigger>
               </TabsList>
               
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nombre del Equipo</Label>
-                  <Input value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Ej. Líderes Prepa" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Código de Acceso</Label>
-                  <Input type="password" value={authCode} onChange={e => setAuthCode(e.target.value)} placeholder="Introduce la clave..." />
+                <div className="space-y-2 text-center">
+                  <Label className="text-lg">Código del Equipo</Label>
+                  <Input 
+                    value={authCode} 
+                    onChange={e => setAuthCode(e.target.value)} 
+                    placeholder="Ej. 12" 
+                    className="text-center text-3xl font-bold tracking-[0.5em] h-16"
+                    maxLength={10}
+                  />
                 </div>
               </div>
 
               <TabsContent value="login" className="pt-4">
-                <Button className="w-full" onClick={handleLogin} disabled={isLoading}>
-                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : <LogIn className="mr-2 h-4 w-4" />}
-                  Acceder al Equipo
+                <Button className="w-full h-12 text-lg" onClick={handleLogin} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : <LogIn className="mr-2 h-5 w-5" />}
+                  Cargar Tareas
                 </Button>
               </TabsContent>
 
               <TabsContent value="create" className="pt-4">
-                <Button variant="secondary" className="w-full" onClick={handleRegisterTeam} disabled={isLoading}>
-                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                  Crear Nuevo Equipo
+                <Button variant="secondary" className="w-full h-12 text-lg" onClick={handleRegisterTeam} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : <PlusCircle className="mr-2 h-5 w-5" />}
+                  Crear Equipo
                 </Button>
-                <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                  El código servirá para que tus compañeros puedan unirse al equipo.
-                </p>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -272,8 +268,8 @@ export function TeamWorkPanel() {
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria / Equipo
           </h1>
-          <div className="text-sm text-muted-foreground flex items-center">
-            Equipo: <Badge variant="outline" className="text-foreground border-primary ml-1">{currentTeam.name}</Badge>
+          <div className="text-sm text-muted-foreground flex items-center mt-1">
+            Código: <Badge variant="outline" className="text-foreground border-primary ml-1">{currentTeam.name}</Badge>
           </div>
         </div>
         <div className="flex gap-2">
@@ -356,7 +352,7 @@ export function TeamWorkPanel() {
             sessionStorage.removeItem('current_work_team');
             setCurrentWorkTeam(null);
           }}>
-            Cambiar Equipo
+            Cambiar Código
           </Button>
         </div>
       </header>
@@ -386,7 +382,7 @@ export function TeamWorkPanel() {
           </SelectContent>
         </Select>
         <div className="ml-auto text-xs text-muted-foreground font-medium">
-          {filteredAndSortedTasks.length} tareas en pantalla
+          {filteredAndSortedTasks.length} tareas
         </div>
       </div>
 
@@ -460,7 +456,7 @@ export function TeamWorkPanel() {
                 )}
               </CardContent>
               <CardFooter className="p-3 pt-0 border-t border-muted/50 flex justify-between items-center text-[10px] text-muted-foreground font-mono">
-                <span>ID: {task.id.substring(0,8)} | Creado: {format((task.createdAt as any).toDate(), "dd/MM/yy HH:mm")}</span>
+                <span>Creado: {format((task.createdAt as any).toDate(), "dd/MM/yy HH:mm")}</span>
                 <div className="flex gap-2">
                   {task.status !== 'done' && (
                     <Button 
