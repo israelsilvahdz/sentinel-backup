@@ -84,9 +84,9 @@ export function TeamWorkPanel() {
   // Drag and Drop state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
-  // Filters
+  // Filters - Default values requested: all Priority and all States
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('todo');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
 
   // Task Form State
   const [taskForm, setTaskForm] = useState<{
@@ -314,11 +314,6 @@ export function TeamWorkPanel() {
     setDraggedTaskId(id);
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
-    
-    setTimeout(() => {
-      const el = document.getElementById(`route-card-${id}`);
-      if (el) el.classList.add('opacity-40', 'grayscale');
-    }, 0);
   };
 
   const onDragOver = (e: React.DragEvent) => {
