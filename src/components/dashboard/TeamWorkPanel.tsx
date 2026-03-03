@@ -115,7 +115,6 @@ export function TeamWorkPanel() {
     setIsLoading(true);
     try {
       const data = await getWorkTasks(teamId);
-      // No longer auto-updating status to keep tasks in both lists if due today
       setTasks(data);
     } catch (error) {
       console.error(error);
@@ -249,7 +248,7 @@ export function TeamWorkPanel() {
   };
 
   const handleMoveInRoute = async (taskId: string, direction: 'up' | 'down') => {
-    const sortedRoute = routeTasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    const sortedRoute = [...routeTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
     const idx = sortedRoute.findIndex(t => t.id === taskId);
     if (idx === -1) return;
 
@@ -292,10 +291,10 @@ export function TeamWorkPanel() {
     });
   };
 
-  // PENDING: Tasks with status 'todo' (always visible here as requested)
-  const pendingTasks = useMemo(() => {
+  // MASTER LIST: Show all tasks that are NOT done
+  const pendingTabTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'todo')
+      .filter(t => t.status !== 'done')
       .filter(t => (priorityFilter === 'all' || t.priority === priorityFilter))
       .sort((a, b) => {
         const priorityDiff = PRIORITY_MAP[b.priority].weight - PRIORITY_MAP[a.priority].weight;
@@ -304,7 +303,7 @@ export function TeamWorkPanel() {
       });
   }, [tasks, priorityFilter]);
 
-  // ROUTE: Tasks manually 'in-progress' OR 'todo' with dueDate === today
+  // ROUTE VIEWER: Show only tasks in progress OR tasks due today
   const routeTasks = useMemo(() => {
     return tasks
       .filter(t => 
@@ -401,7 +400,7 @@ export function TeamWorkPanel() {
         <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-muted/50 rounded-xl">
           <TabsTrigger value="pending" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
             <Clock className="h-4 w-4" /> Pendientes
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{pendingTasks.length}</Badge>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{pendingTabTasks.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="route" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
             <PlayCircle className="h-4 w-4" /> Ruta de Hoy
@@ -433,7 +432,7 @@ export function TeamWorkPanel() {
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {pendingTasks.length > 0 ? pendingTasks.map(task => (
+            {pendingTabTasks.length > 0 ? pendingTabTasks.map(task => (
               <TaskCard 
                 key={task.id} 
                 task={task} 
@@ -450,7 +449,7 @@ export function TeamWorkPanel() {
               <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed">
                 <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-bold">Sin pendientes</h3>
-                <p className="text-muted-foreground">Todo está al día o en ruta de trabajo.</p>
+                <p className="text-muted-foreground">Todo está al día o completado.</p>
               </div>
             )}
           </div>
@@ -481,15 +480,10 @@ export function TeamWorkPanel() {
                             </Badge>
                             <h3 className="font-bold">{task.title}</h3>
                           </div>
-                          {task.linkedStudents.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {task.linkedStudents.map(s => (
-                                <span key={s.id} className="text-[10px] text-muted-foreground flex items-center gap-1 bg-muted px-1.5 rounded">
-                                  <User className="h-2.5 w-2.5" /> {s.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                             <Clock className="h-3 w-3" />
+                             <span>Estado actual: {STATUS_MAP[task.status].label}</span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-1">
                           <div className="flex flex-col gap-1 mr-2">
