@@ -40,7 +40,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
   AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles,
-  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History
+  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format, isToday } from 'date-fns';
@@ -78,6 +78,9 @@ export function TeamWorkPanel() {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
   
+  // Drag and Drop state
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+
   // Filters
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
 
@@ -247,24 +250,74 @@ export function TeamWorkPanel() {
     }
   };
 
+  // Improved reordering logic for Route
+  const routeTasks = useMemo(() => {
+    return tasks
+      .filter(t => 
+        t.status === 'in-progress' || 
+        (t.status === 'todo' && t.dueDate && isToday(t.dueDate.toDate()))
+      )
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.createdAt?.toMillis?.() || 0) - (b.createdAt?.toMillis?.() || 0));
+  }, [tasks]);
+
   const handleMoveInRoute = async (taskId: string, direction: 'up' | 'down') => {
-    const sortedRoute = [...routeTasks].sort((a, b) => (a.order || 0) - (b.order || 0));
-    const idx = sortedRoute.findIndex(t => t.id === taskId);
+    const currentList = [...routeTasks];
+    const idx = currentList.findIndex(t => t.id === taskId);
     if (idx === -1) return;
 
     const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= sortedRoute.length) return;
+    if (newIdx < 0 || newIdx >= currentList.length) return;
 
-    const targetTask = sortedRoute[newIdx];
-    const currentOrder = sortedRoute[idx].order || 0;
-    const targetOrder = targetTask.order || 0;
+    // Swap elements in local array
+    const result = Array.from(currentList);
+    const [removed] = result.splice(idx, 1);
+    result.splice(newIdx, 0, removed);
 
+    // Persist new orders
     try {
-      await updateWorkTask(taskId, { order: targetOrder });
-      await updateWorkTask(targetTask.id, { order: currentOrder });
+      const updates = result.map((task, index) => updateWorkTask(task.id, { order: index }));
+      await Promise.all(updates);
       loadTasks(currentTeam!.id);
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error al reordenar' });
+    }
+  };
+
+  // Drag and Drop Handlers
+  const onDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedTaskId(id);
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const onDrop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain');
+    if (sourceId === targetId) return;
+
+    const currentList = [...routeTasks];
+    const sourceIdx = currentList.findIndex(t => t.id === sourceId);
+    const targetIdx = currentList.findIndex(t => t.id === targetId);
+
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    const result = Array.from(currentList);
+    const [removed] = result.splice(sourceIdx, 1);
+    result.splice(targetIdx, 0, removed);
+
+    try {
+      const updates = result.map((task, index) => updateWorkTask(task.id, { order: index }));
+      await Promise.all(updates);
+      loadTasks(currentTeam!.id);
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error al reordenar' });
+    } finally {
+      setDraggedTaskId(null);
     }
   };
 
@@ -291,7 +344,6 @@ export function TeamWorkPanel() {
     });
   };
 
-  // MASTER LIST: Show all tasks that are NOT done
   const pendingTabTasks = useMemo(() => {
     return tasks
       .filter(t => t.status !== 'done')
@@ -299,24 +351,14 @@ export function TeamWorkPanel() {
       .sort((a, b) => {
         const priorityDiff = PRIORITY_MAP[b.priority].weight - PRIORITY_MAP[a.priority].weight;
         if (priorityDiff !== 0) return priorityDiff;
-        return (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0);
+        return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
       });
   }, [tasks, priorityFilter]);
-
-  // ROUTE VIEWER: Show only tasks in progress OR tasks due today
-  const routeTasks = useMemo(() => {
-    return tasks
-      .filter(t => 
-        t.status === 'in-progress' || 
-        (t.status === 'todo' && t.dueDate && isToday(t.dueDate.toDate()))
-      )
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
-  }, [tasks]);
 
   const completedTodayTasks = useMemo(() => {
     return tasks
       .filter(t => t.status === 'done' && t.completedAt && isToday(t.completedAt.toDate()))
-      .sort((a, b) => (b.completedAt?.toDate?.()?.getTime() || 0) - (a.completedAt?.toDate?.()?.getTime() || 0));
+      .sort((a, b) => (b.completedAt?.toMillis?.() || 0) - (a.completedAt?.toMillis?.() || 0));
   }, [tasks]);
 
   if (!currentTeam) {
@@ -469,20 +511,33 @@ export function TeamWorkPanel() {
               
               <div className="relative space-y-4 pl-4 border-l-2 border-dashed border-muted-foreground/30">
                 {routeTasks.length > 0 ? routeTasks.map((task, index) => (
-                  <div key={task.id} className="relative">
+                  <div 
+                    key={task.id} 
+                    className="relative"
+                    draggable
+                    onDragStart={(e) => onDragStart(e, task.id)}
+                    onDragOver={onDragOver}
+                    onDrop={(e) => onDrop(e, task.id)}
+                  >
                     <div className="absolute -left-[25px] top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm" />
-                    <Card className="hover:shadow-md transition-all border-l-4 overflow-hidden" style={{ borderLeftColor: PRIORITY_MAP[task.priority].color.split(' ')[0].replace('bg-', '') }}>
+                    <Card className={cn(
+                      "hover:shadow-md transition-all border-l-4 overflow-hidden group cursor-grab active:cursor-grabbing",
+                      draggedTaskId === task.id ? "opacity-40" : "opacity-100"
+                    )} style={{ borderLeftColor: PRIORITY_MAP[task.priority].color.split(' ')[0].replace('bg-', '') }}>
                       <div className="p-4 flex items-center justify-between gap-4">
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Badge className={cn("text-[10px] h-5", PRIORITY_MAP[task.priority].color)}>
-                              {PRIORITY_MAP[task.priority].label}
-                            </Badge>
-                            <h3 className="font-bold">{task.title}</h3>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                             <Clock className="h-3 w-3" />
-                             <span>Estado actual: {STATUS_MAP[task.status].label}</span>
+                        <div className="flex items-center gap-3 flex-1">
+                          <GripVertical className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge className={cn("text-[10px] h-5", PRIORITY_MAP[task.priority].color)}>
+                                {PRIORITY_MAP[task.priority].label}
+                              </Badge>
+                              <h3 className="font-bold">{task.title}</h3>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                               <Clock className="h-3 w-3" />
+                               <span>Estado actual: {STATUS_MAP[task.status].label}</span>
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
