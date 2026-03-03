@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -821,9 +822,33 @@ function TaskCard({
               )}
             </div>
           )}
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(task); }}>
-            <Edit3 className="h-4 w-4" />
-          </Button>
+          
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(task)}>
+              <Edit3 className="h-4 w-4" />
+            </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar pendiente permanentemente?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción no se puede deshacer y el pendiente se borrará de la base de datos de inmediato.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Eliminar para siempre</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          
           {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
         </div>
       </div>
@@ -869,23 +894,6 @@ function TaskCard({
                     <History className="mr-2 h-4 w-4" /> Reabrir Tarea
                   </Button>
                 )}
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10">
-                      <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
-                      <AlertDialogDescription>Esta acción es permanente y no se puede deshacer.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Eliminar</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
               </div>
             </div>
 
