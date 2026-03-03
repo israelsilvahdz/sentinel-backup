@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -10,11 +9,9 @@ import {
   getWorkTasks, 
   addWorkTask, 
   updateWorkTask, 
-  deleteWorkTask,
-  getDailyRoute,
-  saveDailyRoute
+  deleteWorkTask
 } from '@/lib/team-work-services';
-import type { WorkTeam, WorkTask, DailyRoute, TaskPriority, TaskStatus, Student } from '@/types/student';
+import type { WorkTeam, WorkTask, TaskPriority, TaskStatus } from '@/types/student';
 import { 
   Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter 
 } from '@/components/ui/card';
@@ -29,14 +26,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
-  Loader2, PlusCircle, Trash2, ClipboardList, Route, ShieldCheck, 
-  AlertCircle, ChevronRight, UserPlus, Filter, ArrowUpDown, Calendar,
-  CheckCircle2, Clock, PlayCircle
+  Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
+  AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Timestamp } from 'firebase/firestore';
 
 const PRIORITY_MAP: Record<TaskPriority, { label: string, color: string, weight: number }> = {
   urgent: { label: 'Urgente', color: 'bg-red-600 text-white', weight: 4 },
@@ -57,9 +54,7 @@ export function TeamWorkPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [authName, setAuthName] = useState('');
   const [authCode, setAuthCode] = useState('');
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(true);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'route'>('all');
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
@@ -71,24 +66,27 @@ export function TeamWorkPanel() {
     description: string, 
     priority: TaskPriority, 
     linkedStudents: { id: string, name: string }[],
-    dueDate?: string
+    dueDate: string
   }>({
     title: '',
     description: '',
     priority: 'medium',
-    linkedStudents: []
+    linkedStudents: [],
+    dueDate: ''
   });
 
   const { toast } = useToast();
 
-  // Load from session
   useEffect(() => {
     const saved = sessionStorage.getItem('current_work_team');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      setCurrentWorkTeam(parsed);
-      setIsAuthDialogOpen(false);
-      loadTasks(parsed.id);
+      try {
+        const parsed = JSON.parse(saved);
+        setCurrentWorkTeam(parsed);
+        loadTasks(parsed.id);
+      } catch (e) {
+        sessionStorage.removeItem('current_work_team');
+      }
     }
   }, []);
 
@@ -105,7 +103,10 @@ export function TeamWorkPanel() {
   };
 
   const handleLogin = async () => {
-    if (!authName || !authCode) return;
+    if (!authName || !authCode) {
+      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'Por favor ingresa nombre y código.' });
+      return;
+    }
     setIsLoading(true);
     try {
       const team = await findWorkTeamByName(authName);
@@ -113,18 +114,15 @@ export function TeamWorkPanel() {
         if (team.accessCode === authCode) {
           setCurrentWorkTeam(team);
           sessionStorage.setItem('current_work_team', JSON.stringify(team));
-          setIsAuthDialogOpen(false);
           loadTasks(team.id);
         } else {
-          toast({ variant: 'destructive', title: 'Código de acceso incorrecto' });
+          toast({ variant: 'destructive', title: 'Código incorrecto' });
         }
       } else {
-        // Option to create
-        if (window.confirm(`El equipo "${authName}" no existe. ¿Quieres crearlo con este código?`)) {
+        if (window.confirm(`¿Crear el equipo "${authName}" con este código?`)) {
           const newTeam = await createWorkTeam(authName, authCode);
           setCurrentWorkTeam(newTeam);
           sessionStorage.setItem('current_work_team', JSON.stringify(newTeam));
-          setIsAuthDialogOpen(false);
           loadTasks(newTeam.id);
         }
       }
@@ -136,7 +134,11 @@ export function TeamWorkPanel() {
   };
 
   const handleCreateTask = async () => {
-    if (!newTask.title || !currentTeam) return;
+    if (!newTask.title || !currentTeam) {
+      toast({ variant: 'destructive', title: 'El título es obligatorio' });
+      return;
+    }
+    setIsLoading(true);
     try {
       await addWorkTask({
         teamId: currentTeam.id,
@@ -147,12 +149,15 @@ export function TeamWorkPanel() {
         linkedStudents: newTask.linkedStudents,
         dueDate: newTask.dueDate ? Timestamp.fromDate(new Date(newTask.dueDate)) : null
       });
-      toast({ title: 'Tarea creada' });
+      toast({ title: 'Tarea creada con éxito' });
       setIsTaskDialogOpen(false);
-      setNewTask({ title: '', description: '', priority: 'medium', linkedStudents: [] });
-      loadTasks(currentTeam.id);
+      setNewTask({ title: '', description: '', priority: 'medium', linkedStudents: [], dueDate: '' });
+      await loadTasks(currentTeam.id);
     } catch (error) {
+      console.error(error);
       toast({ variant: 'destructive', title: 'Error al guardar tarea' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -161,18 +166,18 @@ export function TeamWorkPanel() {
       await updateWorkTask(taskId, { status: newStatus });
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error' });
+      toast({ variant: 'destructive', title: 'Error al actualizar estado' });
     }
   };
 
   const handleDeleteTask = async (id: string) => {
-    if (!window.confirm('¿Eliminar esta tarea?')) return;
+    if (!window.confirm('¿Eliminar esta tarea permanentemente?')) return;
     try {
       await deleteWorkTask(id);
       setTasks(prev => prev.filter(t => t.id !== id));
       toast({ title: 'Tarea eliminada' });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Error' });
+      toast({ variant: 'destructive', title: 'Error al eliminar' });
     }
   };
 
@@ -185,27 +190,29 @@ export function TeamWorkPanel() {
 
   if (!currentTeam) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-100px)]">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="text-primary" /> Acceso a Equipo
-            </CardTitle>
-            <CardDescription>Escribe el nombre de tu equipo y código de acceso.</CardDescription>
+      <div className="flex items-center justify-center min-h-[calc(100vh-100px)] p-4">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="text-center">
+            <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-4">
+              <ShieldCheck className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle>Acceso a Equipo de Trabajo</CardTitle>
+            <CardDescription>Configura un equipo para centralizar tus pendientes compartidos.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Nombre del Equipo</Label>
-              <Input value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Ej. Equipo Liderazgo" />
+              <Input value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Ej. Líderes Prepa" />
             </div>
             <div className="space-y-2">
               <Label>Código de Acceso</Label>
-              <Input type="password" value={authCode} onChange={e => setAuthCode(e.target.value)} placeholder="****" />
+              <Input type="password" value={authCode} onChange={e => setAuthCode(e.target.value)} placeholder="Introduce la clave..." />
             </div>
           </CardContent>
           <CardFooter>
             <Button className="w-full" onClick={handleLogin} disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin" /> : 'Entrar / Crear'}
+              {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
+              Entrar o Crear Equipo
             </Button>
           </CardFooter>
         </Card>
@@ -214,92 +221,108 @@ export function TeamWorkPanel() {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-8">
+    <div className="p-4 md:p-8 space-y-8 pb-20">
       <header className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ClipboardList className="h-8 w-8 text-primary" /> Gestión de Pendientes
+            <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria / Equipo
           </h1>
           <p className="text-muted-foreground">
-            Equipo: <span className="font-bold text-foreground">{currentTeam.name}</span> | Acciones y seguimiento diario.
+            Equipo: <Badge variant="outline" className="text-foreground border-primary ml-1">{currentTeam.name}</Badge>
           </p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="shadow-md">
                 <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Pendiente
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-xl">
               <DialogHeader>
-                <DialogTitle>Añadir Pendiente</DialogTitle>
-                <DialogDescription>Describe la tarea y vincula a los alumnos involucrados.</DialogDescription>
+                <DialogTitle>Añadir Nueva Tarea</DialogTitle>
+                <DialogDescription>Describe el pendiente y vincula a los alumnos si es necesario.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>Título de la Tarea</Label>
-                  <Input value={newTask.title} onChange={e => setNewTask({...newTask, title: e.target.value})} />
+                  <Label>Título del Pendiente</Label>
+                  <Input 
+                    value={newTask.title} 
+                    onChange={e => setNewTask({...newTask, title: e.target.value})} 
+                    placeholder="Ej. Entrevista con padres de familia"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Prioridad</Label>
+                    <Select value={newTask.priority} onValueChange={(v: any) => setNewTask({...newTask, priority: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
+                        <SelectItem value="medium">Media</SelectItem>
+                        <SelectItem value="low">Baja</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fecha límite</Label>
+                    <Input type="date" value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Prioridad</Label>
-                  <Select value={newTask.priority} onValueChange={(v: any) => setNewTask({...newTask, priority: v})}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="urgent">Urgente</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="medium">Media</SelectItem>
-                      <SelectItem value="low">Baja</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Vincular Alumnos</Label>
+                  <Label>Vincular Alumnos (Opcional)</Label>
                   <StudentSearchPopover onStudentSelect={(s) => {
                     if (!newTask.linkedStudents.find(ls => ls.id === s.id)) {
                       setNewTask({...newTask, linkedStudents: [...newTask.linkedStudents, s]});
                     }
                   }} />
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {newTask.linkedStudents.map(s => (
-                      <Badge key={s.id} variant="secondary" className="gap-1">
-                        {s.name}
-                        <button onClick={() => setNewTask({...newTask, linkedStudents: newTask.linkedStudents.filter(ls => ls.id !== s.id)})} className="hover:text-destructive"><Trash2 className="h-3 w-3" /></button>
-                      </Badge>
-                    ))}
-                  </div>
+                  {newTask.linkedStudents.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2 p-2 bg-muted/30 rounded-md">
+                      {newTask.linkedStudents.map(s => (
+                        <Badge key={s.id} variant="secondary" className="gap-1 pr-1">
+                          {s.name}
+                          <button onClick={() => setNewTask({...newTask, linkedStudents: newTask.linkedStudents.filter(ls => ls.id !== s.id)})} className="hover:text-destructive p-0.5"><Trash2 className="h-3 w-3" /></button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Fecha límite (Opcional)</Label>
-                  <Input type="date" value={newTask.dueDate} onChange={e => setNewTask({...newTask, dueDate: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Descripción / Notas</Label>
-                  <Textarea value={newTask.description} onChange={e => setNewTask({...newTask, description: e.target.value})} />
+                  <Label>Descripción / Acuerdos</Label>
+                  <Textarea 
+                    value={newTask.description} 
+                    onChange={e => setNewTask({...newTask, description: e.target.value})} 
+                    placeholder="Detalles adicionales..."
+                    rows={3}
+                  />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setIsTaskDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleCreateTask}>Crear Pendiente</Button>
+                <Button onClick={handleCreateTask} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
+                  Guardar Tarea
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" onClick={() => {
+          <Button variant="outline" size="sm" onClick={() => {
             sessionStorage.removeItem('current_work_team');
             setCurrentWorkTeam(null);
           }}>
-            Salir del Equipo
+            Cambiar Equipo
           </Button>
         </div>
       </header>
 
-      <div className="flex items-center gap-4 flex-wrap bg-muted/30 p-4 rounded-lg">
+      <div className="flex items-center gap-4 flex-wrap bg-card border p-4 rounded-xl shadow-sm">
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Filtros:</span>
+          <span className="text-sm font-semibold">Filtros rápidos:</span>
         </div>
         <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+          <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="todo">Pendientes</SelectItem>
@@ -308,7 +331,7 @@ export function TeamWorkPanel() {
           </SelectContent>
         </Select>
         <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
-          <SelectTrigger className="w-[150px]"><SelectValue placeholder="Prioridad" /></SelectTrigger>
+          <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Prioridad" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las prioridades</SelectItem>
             <SelectItem value="urgent">Urgente</SelectItem>
@@ -317,70 +340,91 @@ export function TeamWorkPanel() {
             <SelectItem value="low">Baja</SelectItem>
           </SelectContent>
         </Select>
-        <div className="ml-auto text-sm text-muted-foreground">
-          {filteredAndSortedTasks.length} tareas encontradas.
+        <div className="ml-auto text-xs text-muted-foreground font-medium">
+          {filteredAndSortedTasks.length} tareas en pantalla
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
-        {filteredAndSortedTasks.length > 0 ? (
+        {isLoading && tasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Cargando tablero...</p>
+          </div>
+        ) : filteredAndSortedTasks.length > 0 ? (
           filteredAndSortedTasks.map(task => (
-            <Card key={task.id} className={cn("hover:shadow-md transition-shadow", task.status === 'done' && 'opacity-60')}>
+            <Card key={task.id} className={cn(
+              "hover:shadow-lg transition-all duration-200 border-l-4", 
+              task.status === 'done' ? 'opacity-60 grayscale' : 'opacity-100',
+              task.priority === 'urgent' ? 'border-l-red-600' : 
+              task.priority === 'high' ? 'border-l-orange-500' :
+              task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500'
+            )}>
               <CardHeader className="p-4 pb-2">
                 <div className="flex justify-between items-start">
                   <div className="flex items-start gap-3">
                     <Checkbox 
+                      id={`check-${task.id}`}
                       checked={task.status === 'done'} 
                       onCheckedChange={(checked) => handleStatusChange(task.id, checked ? 'done' : 'todo')} 
+                      className="mt-1"
                     />
                     <div>
-                      <CardTitle className={cn("text-lg", task.status === 'done' && 'line-through')}>
+                      <label htmlFor={`check-${task.id}`} className={cn(
+                        "text-lg font-bold cursor-pointer block leading-tight", 
+                        task.status === 'done' && 'line-through text-muted-foreground'
+                      )}>
                         {task.title}
-                      </CardTitle>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        <Badge className={PRIORITY_MAP[task.priority].color}>
+                      </label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge className={cn("text-[10px] px-1.5 h-5", PRIORITY_MAP[task.priority].color)}>
                           {PRIORITY_MAP[task.priority].label}
                         </Badge>
-                        <Badge variant="outline" className="gap-1">
+                        <Badge variant="outline" className="text-[10px] px-1.5 h-5 gap-1 bg-background">
                           {STATUS_MAP[task.status].icon}
                           {STATUS_MAP[task.status].label}
                         </Badge>
                         {task.dueDate && (
-                          <Badge variant="secondary" className="gap-1">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 h-5 gap-1">
                             <Calendar className="h-3 w-3" />
-                            {format(task.dueDate.toDate(), 'dd/MM/yy')}
+                            {format((task.dueDate as any).toDate(), 'dd MMM', { locale: es })}
                           </Badge>
                         )}
                       </div>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteTask(task.id)}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteTask(task.id)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-3">
                 {task.description && (
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/20 p-2 rounded">
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/20 p-3 rounded-lg border border-dashed">
                     {task.description}
                   </p>
                 )}
                 {task.linkedStudents.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {task.linkedStudents.map(s => (
-                      <Badge key={s.id} variant="secondary" className="bg-primary/5 text-primary border-primary/20">
-                        {s.name} ({s.id})
+                      <Badge key={s.id} variant="secondary" className="bg-primary/5 text-primary border-primary/10 text-[11px]">
+                        {s.name} <span className="ml-1 opacity-60 font-mono">({s.id})</span>
                       </Badge>
                     ))}
                   </div>
                 )}
               </CardContent>
-              <CardFooter className="p-4 pt-0 border-t border-muted/50 flex justify-between items-center text-[10px] text-muted-foreground">
-                <span>Creado: {format(task.createdAt.toDate(), "d 'de' LLLL 'a las' HH:mm", { locale: es })}</span>
+              <CardFooter className="p-3 pt-0 border-t border-muted/50 flex justify-between items-center text-[10px] text-muted-foreground font-mono">
+                <span>ID: {task.id.substring(0,8)} | Creado: {format((task.createdAt as any).toDate(), "dd/MM/yy HH:mm")}</span>
                 <div className="flex gap-2">
                   {task.status !== 'done' && (
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => handleStatusChange(task.id, task.status === 'todo' ? 'in-progress' : 'todo')}>
-                      {task.status === 'todo' ? 'Comenzar' : 'Detener'}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-[10px] hover:bg-primary/10 hover:text-primary" 
+                      onClick={() => handleStatusChange(task.id, task.status === 'todo' ? 'in-progress' : 'todo')}
+                    >
+                      {task.status === 'todo' ? 'Iniciar hoy' : 'Pausar'}
                     </Button>
                   )}
                 </div>
@@ -388,10 +432,15 @@ export function TeamWorkPanel() {
             </Card>
           ))
         ) : (
-          <div className="text-center py-20 bg-muted/10 rounded-lg border-2 border-dashed">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium">No hay tareas pendientes</h3>
-            <p className="text-muted-foreground">¡Todo en orden! Crea una nueva tarea para comenzar.</p>
+          <div className="text-center py-24 bg-card rounded-2xl border-2 border-dashed shadow-inner">
+            <div className="bg-muted/50 p-4 rounded-full w-fit mx-auto mb-4">
+              <AlertCircle className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-bold">Sin tareas que mostrar</h3>
+            <p className="text-muted-foreground mt-2 max-w-xs mx-auto">Ajusta tus filtros o añade un nuevo pendiente para el equipo.</p>
+            <Button variant="outline" className="mt-6" onClick={() => { setStatusFilter('all'); setPriorityFilter('all'); }}>
+              Limpiar filtros
+            </Button>
           </div>
         )}
       </div>
