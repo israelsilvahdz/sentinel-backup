@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -197,13 +196,21 @@ export function TeamWorkPanel() {
     }
     setIsLoading(true);
     try {
+      // FIX: Parse date as local midnight instead of UTC midnight to avoid "one day off" bug
+      let parsedDueDate = null;
+      if (taskForm.dueDate) {
+        const [year, month, day] = taskForm.dueDate.split('-').map(Number);
+        // month - 1 because JS Date months are 0-indexed
+        parsedDueDate = Timestamp.fromDate(new Date(year, month - 1, day));
+      }
+
       const taskData = {
         teamId: currentTeam.id,
         title: taskForm.title,
         description: taskForm.description,
         priority: taskForm.priority,
         linkedStudents: taskForm.linkedStudents,
-        dueDate: taskForm.dueDate ? Timestamp.fromDate(new Date(taskForm.dueDate)) : null
+        dueDate: parsedDueDate
       };
 
       if (editingTask) {

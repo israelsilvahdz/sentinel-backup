@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Search, User } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { ScrollArea } from '../ui/scroll-area';
@@ -59,34 +59,36 @@ export function StudentSearchPopover({ onStudentSelect }: { onStudentSelect: (st
             value={searchValue} 
             onValueChange={setSearchValue} 
           />
-          {searchValue.trim().length >= 2 && filteredStudents.length === 0 && (
-            <CommandEmpty>No se encontraron resultados para "{searchValue}".</CommandEmpty>
-          )}
-          {searchValue.trim().length < 2 && (
-            <div className="py-6 text-center text-sm text-muted-foreground">Escribe al menos 2 letras para buscar...</div>
-          )}
-          <CommandGroup>
-            <ScrollArea className={filteredStudents.length > 0 ? "h-64" : "h-0"}>
-              {filteredStudents.map((student) => (
-                <CommandItem
-                  key={student.id}
-                  value={student.id}
-                  onSelect={() => {
-                    onStudentSelect({ id: student.id, name: student.name });
-                    setOpen(false);
-                    setSearchValue("");
-                  }}
-                  className="cursor-pointer"
-                >
-                  <User className="mr-2 h-4 w-4" />
-                  <div className="flex flex-col">
-                    <span className="font-medium">{student.name}</span>
-                    <span className="text-xs text-muted-foreground">{student.id}</span>
-                  </div>
-                </CommandItem>
-              ))}
-            </ScrollArea>
-          </CommandGroup>
+          <CommandList>
+            {searchValue.trim().length >= 2 && filteredStudents.length === 0 && (
+              <CommandEmpty>No se encontraron resultados para "{searchValue}".</CommandEmpty>
+            )}
+            {searchValue.trim().length < 2 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">Escribe al menos 2 letras para buscar...</div>
+            )}
+            <CommandGroup>
+              <ScrollArea className={filteredStudents.length > 0 ? "h-64" : "h-0"}>
+                {filteredStudents.map((student) => (
+                  <CommandItem
+                    key={student.id}
+                    value={student.id}
+                    onSelect={() => {
+                      onStudentSelect({ id: student.id, name: student.name });
+                      setOpen(false);
+                      setSearchValue("");
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{student.name}</span>
+                      <span className="text-xs text-muted-foreground">{student.id}</span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </ScrollArea>
+            </CommandGroup>
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
