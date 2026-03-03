@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -442,63 +440,65 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
               </AlertDialog>
            </div>
            
-            <div className="grid grid-cols-6 gap-px bg-border rounded-lg border overflow-hidden">
-                {/* Time column */}
-                <div className="p-3 bg-card flex flex-col space-y-2">
-                  <h3 className="font-bold text-center text-primary invisible">Hora</h3>
-                </div>
-                 {DAYS.map(day => (
-                    <div key={day} className="p-3 bg-card flex flex-col items-center">
-                        <div className="flex items-center justify-between w-full">
-                            <h3 className="font-bold text-center text-primary flex-1">{DAY_MAP[day]}</h3>
-                            <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyTeachersForDay(day)}>
-                                    <Copy className="h-4 w-4" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Copiar profesores del {DAY_MAP[day]}</p>
-                            </TooltipContent>
-                            </Tooltip>
-                        </div>
+            <div className="overflow-x-auto">
+                <div className="grid grid-cols-6 gap-px bg-border rounded-lg border overflow-hidden min-w-[600px]">
+                    {/* Time column */}
+                    <div className="p-3 bg-card flex flex-col space-y-2">
+                      <h3 className="font-bold text-center text-primary invisible">Hora</h3>
                     </div>
-                ))}
-
-                {TIME_SLOTS.map((slot, slotIndex) => (
-                    <React.Fragment key={slot.start}>
-                        {/* Time slot label */}
-                        <div className="p-3 bg-card border-t border-border flex items-center justify-center">
-                             <Badge variant="outline" className="font-mono text-xs">
-                                <Clock className="h-3 w-3 mr-1.5" />
-                                {slot.start}
-                            </Badge>
+                     {DAYS.map(day => (
+                        <div key={day} className="p-3 bg-card flex flex-col items-center">
+                            <div className="flex items-center justify-between w-full">
+                                <h3 className="font-bold text-center text-primary flex-1">{DAY_MAP[day]}</h3>
+                                <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyTeachersForDay(day)}>
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Copiar profesores del {DAY_MAP[day]}</p>
+                                </TooltipContent>
+                                </Tooltip>
+                            </div>
                         </div>
-                        {DAYS.map(day => {
-                            const subject = scheduleByDayAndSlot[day][slotIndex];
-                            return (
-                                <div key={`${day}-${slot.start}`} className="p-2 bg-card border-t border-border min-h-[90px] flex flex-col justify-center">
-                                    {subject ? (
-                                        <div className="p-2 bg-card rounded-md h-full flex flex-col justify-center">
-                                            <div>
-                                                <p className="font-semibold text-xs leading-tight">{subject.name}</p>
-                                                {subject.professorName ? (
-                                                    <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-primary justify-start" onClick={() => handleProfessorClick(subject.professorName!)}>
-                                                        <UserIcon className="h-3 w-3 mr-1" />
-                                                        {subject.professorName}
-                                                    </Button>
-                                                ) : <p className="text-xs text-muted-foreground">N/A</p>}
-                                                <p className="text-xs text-muted-foreground">Grupo: {subject.group}</p>
+                    ))}
+
+                    {TIME_SLOTS.map((slot, slotIndex) => (
+                        <React.Fragment key={slot.start}>
+                            {/* Time slot label */}
+                            <div className="p-3 bg-card border-t border-border flex items-center justify-center">
+                                 <Badge variant="outline" className="font-mono text-xs">
+                                    <Clock className="h-3 w-3 mr-1.5" />
+                                    {slot.start}
+                                </Badge>
+                            </div>
+                            {DAYS.map(day => {
+                                const subject = scheduleByDayAndSlot[day][slotIndex];
+                                return (
+                                    <div key={`${day}-${slot.start}`} className="p-2 bg-card border-t border-border min-h-[90px] flex flex-col justify-center">
+                                        {subject ? (
+                                            <div className="p-2 bg-card rounded-md h-full flex flex-col justify-center">
+                                                <div>
+                                                    <p className="font-semibold text-xs leading-tight">{subject.name}</p>
+                                                    {subject.professorName ? (
+                                                        <Button variant="link" className="p-0 h-auto text-xs text-muted-foreground hover:text-primary justify-start" onClick={() => handleProfessorClick(subject.professorName!)}>
+                                                            <UserIcon className="h-3 w-3 mr-1" />
+                                                            {subject.professorName}
+                                                        </Button>
+                                                    ) : <p className="text-xs text-muted-foreground">N/A</p>}
+                                                    <p className="text-xs text-muted-foreground">Grupo: {subject.group}</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="min-h-[74px] rounded-md"></div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </React.Fragment>
-                ))}
+                                        ) : (
+                                            <div className="min-h-[74px] rounded-md"></div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </React.Fragment>
+                    ))}
+                </div>
             </div>
       </div>
     </TooltipProvider>

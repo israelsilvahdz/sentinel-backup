@@ -137,7 +137,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
         
         <TabsContent value="materias" className="mt-4">
           <div className="overflow-x-auto border-t">
-              <Table>
+              <Table className="min-w-[500px] md:min-w-full">
                   <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-8 px-2 sm:px-4"></TableHead>

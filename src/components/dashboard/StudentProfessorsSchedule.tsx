@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -156,40 +154,42 @@ export function StudentProfessorsSchedule({ studentSubjects, studentName }: { st
             </div>
         </div>
 
-        <div className="grid grid-cols-6 gap-px bg-border rounded-lg border overflow-hidden">
-            {/* Header */}
-            <div className="p-2 bg-card"></div>
-            {DAYS.map(day => (
-                <div key={day} className="p-2 bg-card text-center font-bold text-primary text-sm">{DAY_MAP[day]}</div>
-            ))}
-            
-            {/* Body */}
-            {ALL_TIME_SLOTS.map(slot => (
-                <React.Fragment key={slot.start}>
-                    <div className="p-2 bg-card border-t border-border flex items-center justify-center">
-                        <Badge variant="outline" className="font-mono text-xs">
-                            <Clock className="h-3 w-3 mr-1.5" />
-                            {slot.start}
-                        </Badge>
-                    </div>
-                    {DAYS.map(day => {
-                        const classesInSlot = scheduleByDayAndSlot[`${day}-${slot.start}`] || [];
-                        const uniqueClasses = Array.from(new Map(classesInSlot.map(c => [`${c.professorName}-${c.name}-${c.group}`, c])).values());
+        <div className="overflow-x-auto">
+            <div className="grid grid-cols-6 gap-px bg-border rounded-lg border overflow-hidden min-w-[600px]">
+                {/* Header */}
+                <div className="p-2 bg-card"></div>
+                {DAYS.map(day => (
+                    <div key={day} className="p-2 bg-card text-center font-bold text-primary text-sm">{DAY_MAP[day]}</div>
+                ))}
+                
+                {/* Body */}
+                {ALL_TIME_SLOTS.map(slot => (
+                    <React.Fragment key={slot.start}>
+                        <div className="p-2 bg-card border-t border-border flex items-center justify-center">
+                            <Badge variant="outline" className="font-mono text-xs">
+                                <Clock className="h-3 w-3 mr-1.5" />
+                                {slot.start}
+                            </Badge>
+                        </div>
+                        {DAYS.map(day => {
+                            const classesInSlot = scheduleByDayAndSlot[`${day}-${slot.start}`] || [];
+                            const uniqueClasses = Array.from(new Map(classesInSlot.map(c => [`${c.professorName}-${c.name}-${c.group}`, c])).values());
 
-                        return (
-                            <div key={`${day}-${slot.start}`} className="p-1.5 bg-card border-t border-border min-h-[70px]">
-                                {uniqueClasses.map(subject => (
-                                    <div key={`${subject.id}-${subject.group}`} className="bg-blue-50 border border-blue-200 rounded-md p-1.5 text-xs shadow-sm mb-1">
-                                        <p className="font-semibold leading-tight truncate text-blue-800">{subject.professorName}</p>
-                                        <p className="text-muted-foreground truncate">{subject.name}</p>
-                                        <p className="text-muted-foreground font-medium">Gpo: {subject.group}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        );
-                    })}
-                </React.Fragment>
-            ))}
+                            return (
+                                <div key={`${day}-${slot.start}`} className="p-1.5 bg-card border-t border-border min-h-[70px]">
+                                    {uniqueClasses.map(subject => (
+                                        <div key={`${subject.id}-${subject.group}`} className="bg-blue-50 border border-blue-200 rounded-md p-1.5 text-xs shadow-sm mb-1">
+                                            <p className="font-semibold leading-tight truncate text-blue-800">{subject.professorName}</p>
+                                            <p className="text-muted-foreground truncate">{subject.name}</p>
+                                            <p className="text-muted-foreground font-medium">Gpo: {subject.group}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })}
+                    </React.Fragment>
+                ))}
+            </div>
         </div>
     </div>
   );
