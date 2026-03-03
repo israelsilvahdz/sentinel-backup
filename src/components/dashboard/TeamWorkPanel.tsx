@@ -272,9 +272,9 @@ export function TeamWorkPanel() {
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria / Equipo
           </h1>
-          <p className="text-muted-foreground">
+          <div className="text-sm text-muted-foreground flex items-center">
             Equipo: <Badge variant="outline" className="text-foreground border-primary ml-1">{currentTeam.name}</Badge>
-          </p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
