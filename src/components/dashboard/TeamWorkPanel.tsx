@@ -242,7 +242,7 @@ export function TeamWorkPanel() {
   };
 
   const resetForm = () => {
-    setTaskForm({ title: '', description: '', priority: 'medium', linkedStudents: [], dueDate: '' });
+    setTaskForm({ title: '', description: '', priority: 'medium', linkedStudents: [], dueDate: '', parentId: undefined, parentTitle: '' });
     setEditingTask(null);
   };
 
@@ -561,7 +561,7 @@ export function TeamWorkPanel() {
               <TaskCard 
                 key={task.id} 
                 task={task} 
-                allTasks={tasks} // Pasamos todas las tareas para buscar sub-tareas
+                allTasks={tasks} 
                 onEdit={handleEditTask} 
                 onAddDerivedTask={handleAddDerivedTask}
                 onStatusChange={handleStatusChange} 
@@ -948,7 +948,7 @@ function TaskCard({
                     <History className="h-3 w-3" /> Seguimientos del Caso ({subTasks.length})
                   </Label>
                   <Button 
-                    size="xs" 
+                    size="sm" 
                     variant="link" 
                     className="h-auto p-0 text-primary font-bold text-xs" 
                     onClick={(e) => { e.stopPropagation(); onAddDerivedTask(task); }}
@@ -960,7 +960,7 @@ function TaskCard({
                 {subTasks.length > 0 ? (
                   <div className="space-y-2">
                     {subTasks.map(st => (
-                      <div key={st.id} className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border border-dashed text-xs">
+                      <div key={st.id} className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border border-dashed text-xs group/subtask">
                         <div className="flex items-center gap-3">
                           <Checkbox 
                             checked={st.status === 'done'} 
@@ -970,9 +970,33 @@ function TaskCard({
                             {st.title}
                           </span>
                         </div>
-                        <Badge variant="outline" className={cn("text-[9px] h-4", PRIORITY_MAP[st.priority].color)}>
-                          {PRIORITY_MAP[st.priority].label}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={cn("text-[9px] h-4", PRIORITY_MAP[st.priority].color)}>
+                            {PRIORITY_MAP[st.priority].label}
+                          </Badge>
+                          <div className="flex items-center gap-1 opacity-0 group-hover/subtask:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onEdit(st); }}>
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => e.stopPropagation()}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar seguimiento?</AlertDialogTitle>
+                                  <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteWorkTask(st.id).then(() => onToggleExpand(task.id))} className="bg-destructive">Eliminar</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
