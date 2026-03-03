@@ -5,6 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Normaliza una cadena de texto eliminando acentos y convirtiéndola a minúsculas
+ * para facilitar búsquedas y comparaciones.
+ */
+export function normalizeString(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Eliminar acentos
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' '); // Normalizar espacios múltiples
+}
+
 export function generateKeyFromData(data: string): string {
     // Simple non-crypto hash.
     let hash = 0;

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -114,6 +113,7 @@ const LOCAL_STORAGE_KEYS = {
     PLAN_TYPE: 'academic_sentinel_plan_type',
     OFERTA_ACADEMICA: 'academic_sentinel_oferta_academica',
     CURRENT_FILE_NAME: 'academic_sentinel_current_file_name',
+    DATA_KEY: 'academic_sentinel_data_key'
 };
 
 
@@ -217,9 +217,31 @@ export function DashboardClient() {
           const storedFileName = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME);
           if (storedFileName) setCurrentFileName(storedFileName);
 
+          const storedKey = localStorage.getItem(LOCAL_STORAGE_KEYS.DATA_KEY);
+          if (storedKey) {
+              setDataKey(storedKey);
+              const storedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
+              if (storedStudents) {
+                  try {
+                      const decrypted = xorCipher(storedStudents, storedKey);
+                      setAllStudents(JSON.parse(decrypted));
+                  } catch (e) {
+                      console.error("Fallo al desencriptar alumnos:", e);
+                  }
+              }
+              const storedOferta = localStorage.getItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA);
+              if (storedOferta) {
+                  try {
+                      const decrypted = xorCipher(storedOferta, storedKey);
+                      setOfertaAcademica(JSON.parse(decrypted));
+                  } catch (e) {
+                      console.error("Fallo al desencriptar oferta:", e);
+                  }
+              }
+          }
+
         } catch (error) {
             console.error("Error loading data from Local Storage or DB", error);
-            Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
             toast({
                 variant: 'destructive',
                 title: 'Error de Carga',
@@ -230,7 +252,8 @@ export function DashboardClient() {
         }
     }
     loadInitialData();
-  }, [toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     try {
@@ -242,6 +265,9 @@ export function DashboardClient() {
             const encryptedOferta = xorCipher(JSON.stringify(ofertaAcademica), dataKey);
             localStorage.setItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA, encryptedOferta);
         }
+        if (dataKey) {
+            localStorage.setItem(LOCAL_STORAGE_KEYS.DATA_KEY, dataKey);
+        }
         localStorage.setItem(LOCAL_STORAGE_KEYS.PLAN_TYPE, planType);
         if (currentFileName) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME, currentFileName);
@@ -249,13 +275,8 @@ export function DashboardClient() {
 
     } catch(error) {
         console.error("Error saving data to Local Storage", error);
-        toast({
-          variant: 'destructive',
-          title: 'Error de guardado',
-          description: 'No se pudo guardar la información en el navegador. Es posible que el almacenamiento esté lleno.',
-        });
     }
-  }, [allStudents, planType, ofertaAcademica, dataKey, toast, currentFileName]);
+  }, [allStudents, planType, ofertaAcademica, dataKey, currentFileName]);
 
 
   const handleSetFilterType = (type: FilterType) => {
