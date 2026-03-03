@@ -65,6 +65,7 @@ const STATUS_MAP: Record<TaskStatus, { label: string, icon: React.ReactNode, col
 };
 
 export function TeamWorkPanel() {
+  const { leaders, tutors } = useDashboardFilters();
   const [currentTeam, setCurrentWorkTeam] = useState<WorkTeam | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [tasks, setTasks] = useState<WorkTask[]>([]);
@@ -102,6 +103,12 @@ export function TeamWorkPanel() {
   });
 
   const { toast } = useToast();
+
+  // Combine leaders and tutors for signatory options
+  const signatoryOptions = useMemo(() => {
+    const combined = [...new Set([...leaders, ...tutors])];
+    return combined.sort((a, b) => a.localeCompare(b));
+  }, [leaders, tutors]);
 
   useEffect(() => {
     const savedTeam = sessionStorage.getItem('current_work_team');
@@ -454,14 +461,17 @@ export function TeamWorkPanel() {
             <Label className="text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">Firmar como:</Label>
           </div>
           <Select value={currentUser} onValueChange={handleUserChange}>
-            <SelectTrigger className="w-[180px] h-9 border-none bg-muted/50 focus:ring-0">
+            <SelectTrigger className="w-[220px] h-9 border-none bg-muted/50 focus:ring-0">
               <SelectValue placeholder="¿Quién eres?" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Líder">Líder de Generación</SelectItem>
-              <SelectItem value="Tutor">Tutor / Coordinador</SelectItem>
-              <SelectItem value="Secretaria">Asistente / Sec.</SelectItem>
-              <SelectItem value="Otro">Otro Responsable</SelectItem>
+              <ScrollArea className="max-h-[300px]">
+                {signatoryOptions.map(option => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+                <SelectItem value="Secretaria">Asistente / Sec.</SelectItem>
+                <SelectItem value="Otro">Otro Responsable</SelectItem>
+              </ScrollArea>
             </SelectContent>
           </Select>
           <Button variant="ghost" size="sm" className="text-xs h-8 text-muted-foreground hover:text-destructive" onClick={() => {
