@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -42,7 +41,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
   AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles,
-  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical, UserCog, ListFilter
+  ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical, UserCog, ListFilter,
+  Link2
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format, isToday } from 'date-fns';
@@ -95,7 +95,9 @@ export function TeamWorkPanel() {
     description: string, 
     priority: TaskPriority, 
     linkedStudents: { id: string, name: string }[],
-    dueDate: string
+    dueDate: string,
+    parentId?: string,
+    parentTitle?: string
   }>({
     title: '',
     description: '',
@@ -211,7 +213,9 @@ export function TeamWorkPanel() {
         description: taskForm.description,
         priority: taskForm.priority,
         linkedStudents: taskForm.linkedStudents,
-        dueDate: parsedDueDate
+        dueDate: parsedDueDate,
+        parentId: taskForm.parentId || null,
+        parentTitle: taskForm.parentTitle || null
       };
 
       if (editingTask) {
@@ -249,7 +253,9 @@ export function TeamWorkPanel() {
       description: task.description,
       priority: task.priority,
       linkedStudents: task.linkedStudents,
-      dueDate: task.dueDate ? format(task.dueDate.toDate(), 'yyyy-MM-dd') : ''
+      dueDate: task.dueDate ? format(task.dueDate.toDate(), 'yyyy-MM-dd') : '',
+      parentId: task.parentId,
+      parentTitle: task.parentTitle
     });
     setIsTaskDialogOpen(true);
   };
@@ -261,7 +267,9 @@ export function TeamWorkPanel() {
       description: '',
       priority: parentTask.priority,
       linkedStudents: parentTask.linkedStudents,
-      dueDate: ''
+      dueDate: '',
+      parentId: parentTask.id,
+      parentTitle: parentTask.title
     });
     setIsTaskDialogOpen(true);
   };
@@ -384,7 +392,10 @@ export function TeamWorkPanel() {
   const pendingTabTasks = useMemo(() => {
     return tasks
       .filter(t => {
-        if (statusFilter === 'all') return t.status !== 'done';
+        // En la pestaña pendientes principal, ocultamos las sub-tareas para que aparezcan solo dentro de sus padres
+        // A MENOS que se esté filtrando por algo específico o sea una búsqueda
+        if (statusFilter === 'all' && !t.parentId) return t.status !== 'done';
+        if (statusFilter === 'all' && t.parentId) return false;
         return t.status === statusFilter;
       })
       .filter(t => (priorityFilter === 'all' || t.priority === priorityFilter))
@@ -501,7 +512,7 @@ export function TeamWorkPanel() {
         <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-muted/50 rounded-xl">
           <TabsTrigger value="pending" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
             <Clock className="h-4 w-4" /> Centro de Pendientes
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{tasks.filter(t => t.status !== 'done').length}</Badge>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{tasks.filter(t => t.status !== 'done' && !t.parentId).length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="route" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
             <PlayCircle className="h-4 w-4" /> Ruta de Hoy
@@ -550,6 +561,7 @@ export function TeamWorkPanel() {
               <TaskCard 
                 key={task.id} 
                 task={task} 
+                allTasks={tasks} // Pasamos todas las tareas para buscar sub-tareas
                 onEdit={handleEditTask} 
                 onAddDerivedTask={handleAddDerivedTask}
                 onStatusChange={handleStatusChange} 
@@ -612,6 +624,11 @@ export function TeamWorkPanel() {
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                <Clock className="h-3 w-3 shrink-0" />
                                <span>{STATUS_MAP[task.status].label}</span>
+                               {task.parentTitle && (
+                                 <span className="flex items-center gap-1 text-blue-600 font-semibold truncate ml-2">
+                                   <Link2 className="h-3 w-3" /> De: {task.parentTitle}
+                                 </span>
+                               )}
                             </div>
                           </div>
                         </div>
@@ -681,8 +698,10 @@ export function TeamWorkPanel() {
       <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { setIsTaskDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>{editingTask ? 'Editar Pendiente' : 'Añadir Nueva Tarea'}</DialogTitle>
-            <DialogDescription>Describe el pendiente y vincula a los alumnos si es necesario.</DialogDescription>
+            <DialogTitle>{editingTask ? 'Editar Pendiente' : (taskForm.parentId ? 'Añadir Seguimiento' : 'Añadir Nueva Tarea')}</DialogTitle>
+            <DialogDescription>
+              {taskForm.parentTitle ? `Vinculado al caso: ${taskForm.parentTitle}` : "Describe el pendiente y vincula a los alumnos si es necesario."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -753,10 +772,11 @@ export function TeamWorkPanel() {
 }
 
 function TaskCard({ 
-  task, onEdit, onAddDerivedTask, onStatusChange, onToggleExpand, isExpanded, 
+  task, allTasks, onEdit, onAddDerivedTask, onStatusChange, onToggleExpand, isExpanded, 
   newComment, onCommentChange, onAddComment, onDelete, currentAuthor
 }: { 
   task: WorkTask, 
+  allTasks: WorkTask[],
   onEdit: (t: WorkTask) => void, 
   onAddDerivedTask: (t: WorkTask) => void,
   onStatusChange: (id: string, s: TaskStatus) => void,
@@ -772,6 +792,12 @@ function TaskCard({
   const statusInfo = STATUS_MAP[task.status];
   const isDueToday = task.dueDate && isToday(task.dueDate.toDate());
 
+  // Buscar tareas que tengan este id como parentId
+  const subTasks = useMemo(() => 
+    allTasks.filter(t => t.parentId === task.id),
+    [allTasks, task.id]
+  );
+
   return (
     <Card className={cn(
       "hover:shadow-md transition-all duration-200 border-l-[6px] overflow-hidden bg-background", 
@@ -779,7 +805,8 @@ function TaskCard({
       task.priority === 'urgent' ? 'border-l-red-600' : 
       task.priority === 'high' ? 'border-l-orange-500' :
       task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500',
-      isDueToday && task.status !== 'done' && "ring-2 ring-primary/20"
+      isDueToday && task.status !== 'done' && "ring-2 ring-primary/20",
+      task.parentId && "ml-8 bg-muted/5 scale-95 border-dashed" // Estilo visual para sub-tareas
     )}>
       <div 
         className="p-4 cursor-pointer hover:bg-muted/5 flex items-center justify-between"
@@ -815,6 +842,11 @@ function TaskCard({
                   {format((task.dueDate as any).toDate(), 'dd MMM', { locale: es })}
                   {isDueToday && task.status !== 'done' && " (Hoy)"}
                 </span>
+              )}
+              {task.parentTitle && (
+                <Badge variant="outline" className="text-[10px] h-5 border-blue-200 text-blue-700 bg-blue-50">
+                  <Link2 className="h-3 w-3 mr-1" /> De: {task.parentTitle}
+                </Badge>
               )}
             </div>
           </div>
@@ -869,7 +901,7 @@ function TaskCard({
       {isExpanded && (
         <CardContent className="p-4 pt-0 space-y-6 animate-in slide-in-from-top-2 duration-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed">
-            <div className="md:col-span-2 space-y-4">
+            <div className="md:col-span-2 space-y-6">
               <div className="space-y-2">
                 <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Descripción y Acuerdos</Label>
                 <div className="text-sm bg-muted/20 p-4 rounded-xl border border-dashed text-foreground/80 whitespace-pre-wrap min-h-[80px]">
@@ -907,15 +939,54 @@ function TaskCard({
                     <History className="mr-2 h-4 w-4" /> Reabrir Tarea
                   </Button>
                 )}
-                <Button size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/5" onClick={(e) => { e.stopPropagation(); onAddDerivedTask(task); }}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Nueva Tarea Vinculada
-                </Button>
+              </div>
+
+              {/* Sección de Sub-tareas (Seguimientos vinculados) */}
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold flex items-center gap-2">
+                    <History className="h-3 w-3" /> Seguimientos del Caso ({subTasks.length})
+                  </Label>
+                  <Button 
+                    size="xs" 
+                    variant="link" 
+                    className="h-auto p-0 text-primary font-bold text-xs" 
+                    onClick={(e) => { e.stopPropagation(); onAddDerivedTask(task); }}
+                  >
+                    <PlusCircle className="h-3 w-3 mr-1" /> Añadir Seguimiento
+                  </Button>
+                </div>
+                
+                {subTasks.length > 0 ? (
+                  <div className="space-y-2">
+                    {subTasks.map(st => (
+                      <div key={st.id} className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border border-dashed text-xs">
+                        <div className="flex items-center gap-3">
+                          <Checkbox 
+                            checked={st.status === 'done'} 
+                            onCheckedChange={(checked) => onStatusChange(st.id, checked ? 'done' : 'todo')}
+                          />
+                          <span className={cn(st.status === 'done' && "line-through text-muted-foreground")}>
+                            {st.title}
+                          </span>
+                        </div>
+                        <Badge variant="outline" className={cn("text-[9px] h-4", PRIORITY_MAP[st.priority].color)}>
+                          {PRIORITY_MAP[st.priority].label}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic bg-muted/10 p-3 rounded-lg border border-dashed text-center">
+                    No hay tareas de seguimiento vinculadas.
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="space-y-4 border-l pl-6">
               <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold flex items-center gap-2">
-                <MessageSquare className="h-3 w-3" /> Bitácora / Comentarios
+                <MessageSquare className="h-3 w-3" /> Bitácora de Comentarios
               </Label>
               <ScrollArea className="h-[250px] pr-4">
                 <div className="space-y-3">

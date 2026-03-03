@@ -157,6 +157,8 @@ export interface WorkTeam {
 export interface WorkTask {
   id: string;
   teamId: string;
+  parentId?: string; // Tarea de la que depende (Seguimiento)
+  parentTitle?: string; // Título de la tarea padre para referencia rápida
   title: string;
   description: string;
   priority: TaskPriority;
