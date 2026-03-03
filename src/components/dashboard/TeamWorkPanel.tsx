@@ -27,13 +27,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
-  AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle
+  AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, UserPlus, LogIn
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Timestamp } from 'firebase/firestore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const PRIORITY_MAP: Record<TaskPriority, { label: string, color: string, weight: number }> = {
   urgent: { label: 'Urgente', color: 'bg-red-600 text-white', weight: 4 },
@@ -115,16 +116,36 @@ export function TeamWorkPanel() {
           setCurrentWorkTeam(team);
           sessionStorage.setItem('current_work_team', JSON.stringify(team));
           loadTasks(team.id);
+          toast({ title: `Bienvenido al equipo ${team.name}` });
         } else {
           toast({ variant: 'destructive', title: 'Código incorrecto' });
         }
       } else {
-        if (window.confirm(`¿Crear el equipo "${authName}" con este código?`)) {
-          const newTeam = await createWorkTeam(authName, authCode);
-          setCurrentWorkTeam(newTeam);
-          sessionStorage.setItem('current_work_team', JSON.stringify(newTeam));
-          loadTasks(newTeam.id);
-        }
+        toast({ variant: 'destructive', title: 'Equipo no encontrado', description: 'Asegúrate de que el nombre sea correcto o cámbiate a la pestaña de registro.' });
+      }
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegisterTeam = async () => {
+    if (!authName || !authCode) {
+      toast({ variant: 'destructive', title: 'Campos incompletos', description: 'Define un nombre y un código para el equipo.' });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const existing = await findWorkTeamByName(authName);
+      if (existing) {
+        toast({ variant: 'destructive', title: 'Nombre ocupado', description: 'Ese nombre de equipo ya existe. Usa otro o cámbiate a la pestaña de entrada.' });
+      } else {
+        const newTeam = await createWorkTeam(authName, authCode);
+        setCurrentWorkTeam(newTeam);
+        sessionStorage.setItem('current_work_team', JSON.stringify(newTeam));
+        loadTasks(newTeam.id);
+        toast({ title: 'Equipo creado con éxito' });
       }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -192,29 +213,53 @@ export function TeamWorkPanel() {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-100px)] p-4">
         <Card className="w-full max-w-md shadow-xl">
-          <CardHeader className="text-center">
+          <CardHeader className="text-center pb-2">
             <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-4">
               <ShieldCheck className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle>Acceso a Equipo de Trabajo</CardTitle>
-            <CardDescription>Configura un equipo para centralizar tus pendientes compartidos.</CardDescription>
+            <CardTitle>Ruta Diaria / Equipo</CardTitle>
+            <CardDescription>Accede a tus pendientes compartidos o configura un nuevo equipo.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre del Equipo</Label>
-              <Input value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Ej. Líderes Prepa" />
-            </div>
-            <div className="space-y-2">
-              <Label>Código de Acceso</Label>
-              <Input type="password" value={authCode} onChange={e => setAuthCode(e.target.value)} placeholder="Introduce la clave..." />
-            </div>
+          <CardContent>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="login" className="flex items-center gap-2">
+                  <LogIn className="h-4 w-4" /> Entrar
+                </TabsTrigger>
+                <TabsTrigger value="create" className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" /> Registrar
+                </TabsTrigger>
+              </TabsList>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nombre del Equipo</Label>
+                  <Input value={authName} onChange={e => setAuthName(e.target.value)} placeholder="Ej. Líderes Prepa" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Código de Acceso</Label>
+                  <Input type="password" value={authCode} onChange={e => setAuthCode(e.target.value)} placeholder="Introduce la clave..." />
+                </div>
+              </div>
+
+              <TabsContent value="login" className="pt-4">
+                <Button className="w-full" onClick={handleLogin} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : <LogIn className="mr-2 h-4 w-4" />}
+                  Acceder al Equipo
+                </Button>
+              </TabsContent>
+
+              <TabsContent value="create" className="pt-4">
+                <Button variant="secondary" className="w-full" onClick={handleRegisterTeam} disabled={isLoading}>
+                  {isLoading ? <Loader2 className="animate-spin mr-2" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                  Crear Nuevo Equipo
+                </Button>
+                <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                  El código servirá para que tus compañeros puedan unirse al equipo.
+                </p>
+              </TabsContent>
+            </Tabs>
           </CardContent>
-          <CardFooter>
-            <Button className="w-full" onClick={handleLogin} disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
-              Entrar o Crear Equipo
-            </Button>
-          </CardFooter>
         </Card>
       </div>
     );
