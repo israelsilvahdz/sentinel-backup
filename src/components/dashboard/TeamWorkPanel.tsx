@@ -96,6 +96,7 @@ export function TeamWorkPanel() {
       const data = await getWorkTasks(teamId);
       setTasks(data);
     } catch (error) {
+      console.error(error);
       toast({ variant: 'destructive', title: 'Error al cargar tareas' });
     } finally {
       setIsLoading(false);
@@ -109,7 +110,6 @@ export function TeamWorkPanel() {
     }
     setIsLoading(true);
     try {
-      // Buscamos un equipo cuyo NOMBRE sea el código (simplificación máxima)
       const team = await findWorkTeamByName(authCode);
       if (team) {
         setCurrentWorkTeam(team);
@@ -137,7 +137,6 @@ export function TeamWorkPanel() {
       if (existing) {
         toast({ variant: 'destructive', title: 'Código ocupado', description: 'Este código ya está en uso. Elige otro o entra con el actual.' });
       } else {
-        // Usamos el mismo código como nombre y clave para simplificar
         const newTeam = await createWorkTeam(authCode, authCode);
         setCurrentWorkTeam(newTeam);
         sessionStorage.setItem('current_work_team', JSON.stringify(newTeam));
@@ -203,7 +202,16 @@ export function TeamWorkPanel() {
     return tasks
       .filter(t => (statusFilter === 'all' || t.status === statusFilter))
       .filter(t => (priorityFilter === 'all' || t.priority === priorityFilter))
-      .sort((a, b) => PRIORITY_MAP[b.priority].weight - PRIORITY_MAP[a.priority].weight);
+      .sort((a, b) => {
+        // Primero por peso de prioridad
+        const priorityDiff = PRIORITY_MAP[b.priority].weight - PRIORITY_MAP[a.priority].weight;
+        if (priorityDiff !== 0) return priorityDiff;
+        
+        // Segundo por fecha de creación (más reciente arriba)
+        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+        return dateB - dateA;
+      });
   }, [tasks, statusFilter, priorityFilter]);
 
   if (!currentTeam) {
@@ -215,7 +223,7 @@ export function TeamWorkPanel() {
               <ShieldCheck className="h-8 w-8 text-primary" />
             </div>
             <CardTitle className="text-2xl">Ruta de Equipo</CardTitle>
-            <CardDescription>Introduce el código de dos dígitos o letras para acceder.</CardDescription>
+            <CardDescription>Introduce el código de equipo para acceder.</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login" className="w-full">
@@ -269,7 +277,8 @@ export function TeamWorkPanel() {
             <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria / Equipo
           </h1>
           <div className="text-sm text-muted-foreground flex items-center mt-1">
-            Código: <Badge variant="outline" className="text-foreground border-primary ml-1">{currentTeam.name}</Badge>
+            <span className="mr-1">Código:</span>
+            <Badge variant="outline" className="text-foreground border-primary">{currentTeam.name}</Badge>
           </div>
         </div>
         <div className="flex gap-2">
@@ -456,7 +465,7 @@ export function TeamWorkPanel() {
                 )}
               </CardContent>
               <CardFooter className="p-3 pt-0 border-t border-muted/50 flex justify-between items-center text-[10px] text-muted-foreground font-mono">
-                <span>Creado: {format((task.createdAt as any).toDate(), "dd/MM/yy HH:mm")}</span>
+                <span>Creado: {task.createdAt && format((task.createdAt as any).toDate(), "dd/MM/yy HH:mm")}</span>
                 <div className="flex gap-2">
                   {task.status !== 'done' && (
                     <Button 

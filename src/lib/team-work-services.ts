@@ -5,7 +5,6 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy, 
   Timestamp,
   doc,
   deleteDoc,
@@ -39,16 +38,18 @@ export const createWorkTeam = async (name: string, accessCode: string): Promise<
     createdAt: Timestamp.now()
   });
   
-  return { id: docRef.id, name, accessCode, createdAt: new Date() } as any;
+  const createdTeam = { id: docRef.id, name, accessCode, createdAt: new Date() };
+  return createdTeam as any;
 };
 
 // --- Gestión de Tareas ---
 
 export const getWorkTasks = async (teamId: string): Promise<WorkTask[]> => {
+  // Eliminamos el orderBy de aquí para evitar que Firebase pida un índice compuesto (que causa error)
+  // El ordenamiento lo haremos en el cliente (TeamWorkPanel.tsx)
   const q = query(
     collection(db, TASKS_WORK_COLLECTION), 
-    where('teamId', '==', teamId),
-    orderBy('createdAt', 'desc')
+    where('teamId', '==', teamId)
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkTask));
