@@ -135,3 +135,35 @@ export interface WeightingScheme {
   }[];
   subjectNames: string[];
 }
+
+// --- NUEVOS TIPOS PARA TRABAJO EN EQUIPO ---
+
+export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low';
+export type TaskStatus = 'todo' | 'in-progress' | 'done';
+
+export interface WorkTeam {
+  id: string;
+  name: string;
+  accessCode: string;
+  createdAt: any;
+}
+
+export interface WorkTask {
+  id: string;
+  teamId: string;
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  linkedStudents: { id: string; name: string }[];
+  dueDate?: any; // Firestore Timestamp
+  createdAt: any;
+  assignedBy?: string;
+}
+
+export interface DailyRoute {
+  id: string;
+  teamId: string;
+  date: string; // YYYY-MM-DD
+  taskIds: string[]; // List of task IDs in order
+}
