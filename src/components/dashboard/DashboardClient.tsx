@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -32,7 +33,7 @@ import { TeamWorkPanel } from './TeamWorkPanel';
 import { ContinuidadPanel } from './ContinuidadPanel';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -651,106 +652,123 @@ export function DashboardClient() {
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <SidebarProvider defaultOpen={false}>
-        <Sidebar>
-          <SidebarHeader>
-             <div className="flex items-center gap-2 px-4 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
-                <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={26} height={26} className="h-6 w-auto" />
-                <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">SENTINEL</span>
+      <SidebarProvider defaultOpen={true}>
+        <Sidebar className="border-none bg-primary shadow-2xl">
+          <SidebarHeader className="bg-primary/50 backdrop-blur-md">
+             <div className="flex items-center gap-3 px-6 py-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
+                <div className="bg-white/20 p-2 rounded-xl border border-white/10 shadow-inner">
+                  <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={28} height={28} className="h-7 w-auto brightness-0 invert" />
+                </div>
+                <span className="font-black text-xl tracking-[0.15em] text-white group-data-[collapsible=icon]:hidden">SENTINEL</span>
              </div>
           </SidebarHeader>
-          <SidebarContent>
-            <SidebarGroup>
-              <SidebarMenu>
+          <SidebarContent className="px-3 bg-primary/20 backdrop-blur-sm">
+            <SidebarGroup className="mt-4">
+              <SidebarMenu className="gap-2">
                 {deferredPrompt && (
                   <SidebarMenuItem>
-                    <SidebarMenuButton tooltip="Descargar App en Celular" onClick={handleInstallPWA} className="bg-primary/10 text-primary hover:bg-primary/20 transition-colors border-b mb-2">
-                      <Smartphone className="animate-bounce" />
-                      <span className="font-bold">Instalar en Celular</span>
+                    <SidebarMenuButton tooltip="Descargar App" onClick={handleInstallPWA} className="bg-white/10 text-white hover:bg-white/20 transition-all rounded-xl h-12 border border-white/5 mb-4 group-data-[collapsible=icon]:mb-2">
+                      <Smartphone className="animate-pulse" />
+                      <span className="font-bold">Instalar App</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
+                
+                <div className="px-3 mb-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden">Exploración</p>
+                </div>
+
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')}>
+                  <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <Home />
-                    <span>Inicio</span>
+                    <span className="font-bold tracking-tight">Inicio</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Progreso Estudiantil" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
+                  <SidebarMenuButton tooltip="Resumen Académico" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <LayoutDashboard />
-                    <span>Resumen Académico</span>
+                    <span className="font-bold tracking-tight">Resumen Académico</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')}>
+                  <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <BarChart3 />
-                    <span>Análisis de Cambios</span>
+                    <span className="font-bold tracking-tight">Análisis de Cambios</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+
+                <div className="px-3 mb-2 mt-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden">Operación</p>
+                </div>
+
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Ruta Diaria / Equipo" isActive={activeView === 'team-work'} onClick={() => handleSetActiveView('team-work')}>
+                  <SidebarMenuButton tooltip="Ruta Diaria / Equipo" isActive={activeView === 'team-work'} onClick={() => handleSetActiveView('team-work')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <ClipboardList />
-                    <span>Ruta Diaria / Equipo</span>
+                    <span className="font-bold tracking-tight">Ruta Diaria / Equipo</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Continuidad Vocacional" isActive={activeView === 'continuidad'} onClick={() => handleSetActiveView('continuidad')}>
+                  <SidebarMenuButton tooltip="Continuidad Vocacional" isActive={activeView === 'continuidad'} onClick={() => handleSetActiveView('continuidad')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <TrendingUp />
-                    <span>Continuidad</span>
+                    <span className="font-bold tracking-tight">Continuidad</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')}>
+                  <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <Users />
-                    <span>Panel de Alumnos</span>
+                    <span className="font-bold tracking-tight">Panel de Alumnos</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+
+                <div className="px-3 mb-2 mt-6">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden">Planeación y Gestión</p>
+                </div>
+
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')}>
+                   <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <Contact />
-                    <span>Horarios de Profesores</span>
+                    <span className="font-bold tracking-tight">Horarios de Profesores</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Planificador de Horarios" isActive={activeView === 'oferta-academica'} onClick={() => handleSetActiveView('oferta-academica')}>
+                   <SidebarMenuButton tooltip="Planificador de Horarios" isActive={activeView === 'oferta-academica'} onClick={() => handleSetActiveView('oferta-academica')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <BookOpen />
-                    <span>Planificador de Horarios</span>
+                    <span className="font-bold tracking-tight">Planificador de Horarios</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Equipos Deportivos/Cult" isActive={activeView === 'teams-management'} onClick={() => handleSetActiveView('teams-management')}>
+                   <SidebarMenuButton tooltip="Equipos Dep/Cult" isActive={activeView === 'teams-management'} onClick={() => handleSetActiveView('teams-management')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <Shield />
-                    <span>Equipos Dep/Cult</span>
+                    <span className="font-bold tracking-tight">Equipos Dep/Cult</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Planificador por Mapa" isActive={activeView === 'map-planner'} onClick={() => handleSetActiveView('map-planner')}>
+                   <SidebarMenuButton tooltip="Planificador por Mapa" isActive={activeView === 'map-planner'} onClick={() => handleSetActiveView('map-planner')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <MapIcon />
-                    <span>Planificador por Mapa</span>
+                    <span className="font-bold tracking-tight">Planificador por Mapa</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Gestor de Ponderaciones" isActive={activeView === 'weighting-schemes'} onClick={() => handleSetActiveView('weighting-schemes')}>
+                   <SidebarMenuButton tooltip="Gestor de Ponderaciones" isActive={activeView === 'weighting-schemes'} onClick={() => handleSetActiveView('weighting-schemes')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <BookCopy />
-                    <span>Gestor de Ponderaciones</span>
+                    <span className="font-bold tracking-tight">Gestor de Ponderaciones</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')}>
+                   <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl">
                     <HelpCircle />
-                    <span>Materias sin Clasificar</span>
+                    <span className="font-bold tracking-tight">Materias sin Clasificar</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
-           <SidebarToggle />
+           <SidebarToggle className="bg-white text-primary border-primary shadow-xl scale-125" />
         </Sidebar>
         <SidebarInset>
-            <header className="flex h-14 items-center justify-between gap-4 border-b bg-card px-4 lg:px-6 sticky top-0 z-30 py-2">
+            <header className="flex h-14 items-center justify-between gap-4 border-b bg-white/80 backdrop-blur-md px-4 lg:px-6 sticky top-0 z-30 py-2">
                  <div className="flex items-center gap-2 md:gap-4 flex-1 overflow-hidden">
-                    <SidebarTrigger className="flex shrink-0" />
+                    <SidebarTrigger className="flex shrink-0 text-primary" />
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={120} height={30} className="h-6 md:h-8 w-auto hidden xs:block" />
                     <div className="hidden md:flex">
                         {activeView !== 'welcome' && <DashboardFilters />}
@@ -758,17 +776,17 @@ export function DashboardClient() {
                  </div>
                  <div className="flex items-center gap-1 md:gap-2">
                     {allStudents.length > 0 && reportInfo?.date && (
-                        <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-muted-foreground p-1.5 rounded-md bg-muted/50">
-                            <Calendar size={12} />
+                        <div className="hidden sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary p-2 rounded-xl bg-primary/5 border border-primary/10">
+                            <Calendar size={12} className="text-primary" />
                             <span>{reportInfo.date}</span>
-                            <Badge variant="secondary" className="text-[10px] px-1">{reportInfo.plan[0]}</Badge>
+                            <Badge variant="secondary" className="text-[10px] px-1.5 h-4 bg-primary text-white border-none">{reportInfo.plan[0]}</Badge>
                         </div>
                     )}
-                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" className="h-8 min-w-0 px-2" label="" icon={<FileClock className="h-4 w-4" />} />
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar">
+                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" className="h-9 rounded-xl border-primary/20 text-primary font-bold hover:bg-primary/5" label="" icon={<FileClock className="h-4 w-4" />} />
+                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 text-primary" onClick={() => window.location.reload()} disabled={isLoading || isProcessing} title="Recargar">
                         <RefreshCw className="h-4 w-4" />
                      </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleDeleteAllData} disabled={isLoading || isProcessing} title="Borrar Datos">
+                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-destructive/5 text-destructive" onClick={handleDeleteAllData} disabled={isLoading || isProcessing} title="Borrar Datos">
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </div>
@@ -780,7 +798,7 @@ export function DashboardClient() {
 
             {(isProcessing || isLoading) && progress > 0 && <Progress value={progress} className="w-full h-1" />}
             
-            <div className="flex-1 bg-slate-50/50">
+            <div className="flex-1 bg-[#F8FAFC]">
               {renderActiveView()}
             </div>
 
