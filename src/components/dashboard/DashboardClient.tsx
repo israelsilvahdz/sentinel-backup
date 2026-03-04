@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -31,8 +30,9 @@ import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { TeamWorkPanel } from './TeamWorkPanel';
 import { ContinuidadPanel } from './ContinuidadPanel';
+import { WelcomeDashboard } from './WelcomeDashboard';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -47,7 +47,7 @@ import { xorCipher } from '@/lib/utils';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'team-work' | 'continuidad';
+export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'team-work' | 'continuidad';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -152,7 +152,7 @@ export function DashboardClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
   const [subjectRiskFilter, setSubjectRiskFilter] = useState<SubjectRiskFilter | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [activeView, setActiveView] = useState<ActiveView>('welcome');
   const [contextualStudentIds, setContextualStudentIds] = useState<Set<string> | null>(null);
   
   // PWA Install State
@@ -631,6 +631,7 @@ export function DashboardClient() {
 
   const renderActiveView = () => {
     switch (activeView) {
+        case 'welcome': return <WelcomeDashboard />;
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'change-stats': return <ChangeStats />;
@@ -644,7 +645,7 @@ export function DashboardClient() {
         case 'irregular-students': return <IrregularStudentsPanel />;
         case 'team-work': return <TeamWorkPanel />;
         case 'continuidad': return <ContinuidadPanel />;
-        default: return <Dashboard />;
+        default: return <WelcomeDashboard />;
     }
   }
 
@@ -670,9 +671,15 @@ export function DashboardClient() {
                   </SidebarMenuItem>
                 )}
                 <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')}>
+                    <Home />
+                    <span>Inicio</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Progreso Estudiantil" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')}>
                     <LayoutDashboard />
-                    <span>Progreso Estudiantil</span>
+                    <span>Resumen Académico</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
@@ -746,7 +753,7 @@ export function DashboardClient() {
                     <SidebarTrigger className="flex shrink-0" />
                     <Image src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" alt="Tecmilenio Logo" width={120} height={30} className="h-6 md:h-8 w-auto hidden xs:block" />
                     <div className="hidden md:flex">
-                        <DashboardFilters />
+                        {activeView !== 'welcome' && <DashboardFilters />}
                     </div>
                  </div>
                  <div className="flex items-center gap-1 md:gap-2">
@@ -768,12 +775,12 @@ export function DashboardClient() {
             </header>
             
             <div className="md:hidden w-full px-4 pt-3 border-b bg-card pb-3">
-                <DashboardFilters />
+                {activeView !== 'welcome' && <DashboardFilters />}
             </div>
 
             {(isProcessing || isLoading) && progress > 0 && <Progress value={progress} className="w-full h-1" />}
             
-            <div className="flex-1">
+            <div className="flex-1 bg-slate-50/50">
               {renderActiveView()}
             </div>
 
