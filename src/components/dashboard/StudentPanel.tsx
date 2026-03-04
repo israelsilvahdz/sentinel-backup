@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye, Zap, Filter, ListChecks } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
@@ -232,7 +232,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
 
 
     return (
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-3xl rounded-3xl">
             <DialogHeader>
                 <DialogTitle>Notificar Ausencia de Atletas</DialogTitle>
                 <DialogDescription>
@@ -244,10 +244,10 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                      <div className="w-full space-y-2">
                         <Label htmlFor="sport-select" className="font-semibold">1. Selecciona el Deporte</Label>
                         <Select value={selectedSport} onValueChange={setSelectedSport}>
-                            <SelectTrigger id="sport-select">
+                            <SelectTrigger id="sport-select" className="rounded-xl">
                                 <SelectValue placeholder="Seleccionar deporte..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="rounded-xl">
                                 <SelectItem value="all">Todos los deportes</SelectItem>
                                 {sportList.map(sport => <SelectItem key={sport} value={sport}>{sport}</SelectItem>)}
                             </SelectContent>
@@ -259,7 +259,7 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                             </div>
                         )}
                         <p className="text-sm text-muted-foreground pt-2">
-                            <span className="font-bold">{filteredAthletes.length}</span> alumno(s) seleccionado(s).
+                            <span className="font-bold text-primary">{filteredAthletes.length}</span> alumno(s) seleccionado(s).
                         </p>
                     </div>
                     <Label className="font-semibold pt-4">2. Selecciona el rango de fechas</Label>
@@ -269,10 +269,10 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                         onSelect={setDateRange}
                         locale={es}
                         classNames={{
-                            day_selected: "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:bg-destructive/90",
-                            day_range_start: "day-range-start",
-                            day_range_end: "day-range-end",
-                            day_range_middle: "bg-destructive/20 text-accent-foreground",
+                            day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90",
+                            day_range_start: "day-range-start rounded-l-xl",
+                            day_range_end: "day-range-end rounded-r-xl",
+                            day_range_middle: "bg-primary/10 text-primary",
                         }}
                     />
                 </div>
@@ -286,30 +286,30 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
                     </div>
                     <div>
                         <Label htmlFor="notes">4. Notas Adicionales (Opcional)</Label>
-                        <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. El torneo es en la ciudad de..." />
+                        <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. El torneo es en la ciudad de..." className="rounded-xl" />
                     </div>
                     <div>
                         <Label className="font-semibold">5. Profesores a Notificar</Label>
-                        <Card className="mt-2 p-3 bg-muted/50 max-h-48 overflow-y-auto">
+                        <Card className="mt-2 p-3 bg-muted/30 border-none rounded-xl max-h-48 overflow-y-auto">
                             {teachers.length > 0 ? (
-                                <ul className="text-sm list-disc list-inside">
+                                <ul className="text-sm list-disc list-inside space-y-1">
                                     {teachers.map(t => (
-                                        <li key={t.name}>{t.name} {!t.email && <span className="text-destructive text-xs font-semibold">(Sin correo)</span>}</li>
+                                        <li key={t.name} className="text-muted-foreground"><span className="text-foreground font-medium">{t.name}</span> {!t.email && <span className="text-destructive text-[10px] font-black uppercase">(Sin correo)</span>}</li>
                                     ))}
                                 </ul>
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center">Selecciona un deporte y fecha para ver los profesores.</p>
+                                <p className="text-xs text-muted-foreground text-center py-4 italic">Selecciona un deporte y fecha para ver los profesores.</p>
                             )}
                         </Card>
                     </div>
-                    <DialogFooter className="pt-4">
-                         <Button variant="outline" onClick={handleCopyToClipboard}>
+                    <DialogFooter className="pt-4 gap-2">
+                         <Button variant="outline" onClick={handleCopyToClipboard} className="rounded-xl font-bold">
                             <ClipboardCopy className="mr-2 h-4 w-4" />
                             Copiar Tabla
                         </Button>
-                        <Button onClick={handleOpenMail}>
+                        <Button onClick={handleOpenMail} className="rounded-xl font-bold">
                            <Mail className="mr-2 h-4 w-4" />
-                           Abrir Borrador de Correo
+                           Abrir Correo
                         </Button>
                     </DialogFooter>
                 </div>
@@ -436,7 +436,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
 
 
     return (
-        <DialogContent>
+        <DialogContent className="rounded-3xl">
             <DialogHeader>
                 <DialogTitle>Imprimir Lista de Alumnos</DialogTitle>
                 <DialogDescription>
@@ -474,7 +474,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                 </div>
             </div>
             <div className="flex justify-end">
-                <Button onClick={handlePrint}>
+                <Button onClick={handlePrint} className="rounded-xl font-bold px-6">
                     <Printer className="mr-2 h-4 w-4" />
                     Generar e Imprimir
                 </Button>
@@ -562,10 +562,10 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
                         </div>
                     </div>
                     <DialogFooter className="mt-4 gap-2">
-                        <Button variant="outline" onClick={handleDownload} disabled={isExporting}>
+                        <Button variant="outline" onClick={handleDownload} disabled={isExporting} className="rounded-xl font-bold">
                             {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Descargar
                         </Button>
-                        <Button onClick={handleCopy}>
+                        <Button onClick={handleCopy} className="rounded-xl font-bold">
                             <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Imagen
                         </Button>
                     </DialogFooter>
@@ -574,7 +574,7 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
         }
 
         setDialogContent(
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-4xl rounded-3xl">
                 <DialogHeader>
                     <DialogTitle>Reporte de {student.name}</DialogTitle>
                     <DialogDescription>Copia la imagen o descárgala para enviarla por correo o mensaje.</DialogDescription>
@@ -590,40 +590,41 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
     return (
         <>
             <Dialog open={open && !isReportOpen} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md rounded-3xl">
                     <DialogHeader>
-                        <DialogTitle>Generar Reportes Individuales</DialogTitle>
-                        <DialogDescription>
-                            Selecciona un alumno para generar su reporte visual.
+                        <DialogTitle className="text-xl font-black">Generar Reportes</DialogTitle>
+                        <DialogDescription className="text-xs uppercase tracking-widest font-bold opacity-60">
+                            Previsualización individual
                         </DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="h-[60vh] -mx-6 px-6">
                         <div className="py-4 space-y-2">
                             {students.map(student => (
-                                <div key={student.id} className="flex items-center justify-between gap-2 p-2 hover:bg-muted/50 rounded-md transition-colors">
-                                    <div className="flex flex-col">
-                                        <p className="font-medium text-sm">{student.name}</p>
-                                        <p className="text-xs text-muted-foreground">{student.id}</p>
+                                <div key={student.id} className="flex items-center justify-between gap-4 p-3 hover:bg-muted/30 rounded-xl transition-all border border-transparent hover:border-muted">
+                                    <div className="flex flex-col overflow-hidden">
+                                        <p className="font-bold text-sm truncate">{student.name}</p>
+                                        <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter">Matrícula: {student.id}</p>
                                     </div>
                                     <Button
                                         size="sm"
                                         variant="outline"
+                                        className="rounded-lg h-8 text-xs font-bold shrink-0"
                                         onClick={() => handleGenerateAndCopy(student)}
                                         disabled={isGenerating && selectedStudent?.id === student.id}
                                     >
                                         {isGenerating && selectedStudent?.id === student.id ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
                                         ) : (
-                                            <Eye className="mr-2 h-4 w-4" />
+                                            <Eye className="mr-2 h-3 w-3" />
                                         )}
-                                        Ver Reporte
+                                        Ver
                                     </Button>
                                 </div>
                             ))}
                         </div>
                     </ScrollArea>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                        <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-xl font-bold">Cerrar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -687,7 +688,7 @@ export function StudentPanel() {
       if (contacts) {
         setStudentContacts(prev => ({ ...prev, ...contacts }));
         toast({
-          title: "Directorio Guardado en la Nube",
+          title: "Directorio Guardado",
           description: `Se procesaron y guardaron ${Object.keys(contacts).length} contactos en la base de datos.`,
         });
       } else {
@@ -839,14 +840,13 @@ export function StudentPanel() {
             node.style.position = 'fixed';
             node.style.top = '-9999px';
             node.style.left = '0px';
-            node.style.width = '800px'; // Set fixed width for consistency
+            node.style.width = '800px'; 
             document.body.appendChild(node);
             const root = createRoot(node);
             const ref = React.createRef<HTMLDivElement>();
             
             return new Promise((resolve) => {
                 root.render(<Component ref={ref} />);
-                // Smaller delay but sequential to avoid CPU spikes
                 setTimeout(async () => {
                     if (ref.current) {
                         try {
@@ -870,7 +870,6 @@ export function StudentPanel() {
 
         let totalCompleted = 0;
         
-        // Process sequentially to be mobile-friendly (less memory pressure)
         for (const studentId of studentArray) {
             const student = allStudentsMap.get(studentId);
             if (student) {
@@ -893,8 +892,7 @@ export function StudentPanel() {
             totalCompleted++;
             setDownloadProgress((totalCompleted / studentArray.length) * 100);
             
-            // Short rest for mobile browsers to breathe
-            await new Promise(r => setTimeout(root, 100));
+            await new Promise(r => setTimeout(r, 100));
         }
 
         setDownloadStatus(`Comprimiendo archivo...`);
@@ -947,13 +945,13 @@ export function StudentPanel() {
 
   const getPanelTitle = () => {
     if (caseType && caseTypeMap[caseType]) {
-        return <p className="text-muted-foreground">Mostrando: {caseTypeMap[caseType]}</p>;
+        return <span className="font-bold text-primary">{caseTypeMap[caseType]}</span>;
     }
     if (subjectRiskFilter) {
         const riskTypeText = subjectRiskFilter.riskType === 'absences' ? 'Faltas' : 'Tareas (NE)';
-        return <p className="text-muted-foreground">Mostrando: Alumnos en riesgo por <span className="font-semibold text-primary">{riskTypeText}</span> en <span className="font-semibold text-primary">{subjectRiskFilter.subjectName}</span></p>;
+        return <span>Alumnos en riesgo por <span className="font-bold text-primary">{riskTypeText}</span> en <span className="font-bold text-primary">{subjectRiskFilter.subjectName}</span></span>;
     }
-    return <p className="text-muted-foreground">Explora y monitorea los casos individuales de cada alumno.</p>;
+    return <span>Explora y monitorea los casos individuales de cada alumno.</span>;
   };
 
   const handleClearFilter = () => {
@@ -962,58 +960,58 @@ export function StudentPanel() {
   };
   
   const hasActiveFilter = !!caseType || !!subjectRiskFilter;
-  const isContextualAnalysis = !!contextualStudentIds && contextualStudentIds.size > 0;
 
 
   return (
-    <div className="space-y-8 p-4 md:p-8 pt-6">
-       <header className="mb-8">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Panel de Alumnos</h1>
-                <div className="flex items-center gap-2 mt-2">
+    <div className="p-6 md:p-10 space-y-10 max-w-7xl mx-auto animate-in fade-in duration-700">
+       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/5 to-emerald-900/5 p-6 md:p-8 border border-primary/10 shadow-sm">
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 bg-white/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-2 border">
+                  <Zap className="h-3 w-3 text-primary" /> Gestión de Casos 2026
+                </div>
+                <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+                  <Users className="h-8 w-8 text-primary" /> Panel de Alumnos
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                     {getPanelTitle()}
                     {hasActiveFilter && (
-                        <Button variant="ghost" size="sm" onClick={handleClearFilter}>
-                        <X className="mr-2 h-4 w-4"/>
-                        Limpiar filtro
+                        <Button variant="ghost" size="sm" onClick={handleClearFilter} className="h-6 px-2 text-xs font-bold text-destructive hover:bg-destructive/5 rounded-full">
+                          <X className="mr-1 h-3 w-3"/> Limpiar filtro
                         </Button>
                     )}
-                </div>
+                </p>
             </div>
-             <div className="flex items-center gap-2 flex-wrap justify-end">
-                <FileUpload 
-                  onFileSelect={handleDirectoryUpload}
-                  selectedFile={directoryFile}
-                  isLoading={isProcessingDirectory}
-                  label="Directorio"
-                  icon={<Contact />}
-                  variant="secondary"
-                  size="sm"
-                />
-                 <FileUpload 
-                  onFileSelect={handleAthletesUpload}
-                  selectedFile={athletesFile}
-                  isLoading={isProcessingAthletes}
-                  label="Atletas"
-                  icon={<Award />}
-                  variant="secondary"
-                   size="sm"
-                />
+             <div className="flex items-center gap-2 flex-wrap bg-white/80 backdrop-blur-md p-2 rounded-2xl border shadow-sm">
+                <div className="flex items-center gap-1.5 border-r pr-2 mr-1">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <FileUpload onFileSelect={handleDirectoryUpload} selectedFile={directoryFile} isLoading={isProcessingDirectory} variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 text-primary" label="" icon={<Contact className="h-5 w-5" />} />
+                            </TooltipTrigger>
+                            <TooltipContent><p className="font-bold">Cargar Directorio</p></TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <FileUpload onFileSelect={handleAthletesUpload} selectedFile={athletesFile} isLoading={isProcessingAthletes} variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 text-primary" label="" icon={<Award className="h-5 w-5" />} />
+                            </TooltipTrigger>
+                            <TooltipContent><p className="font-bold">Cargar Atletas</p></TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+                
                 <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" disabled={athleteStudents.length === 0} size="sm">
-                            <Mail className="md:mr-2 h-4 w-4"/> 
-                            <span className="hidden md:inline">Notificar Ausencia</span>
+                        <Button variant="ghost" disabled={athleteStudents.length === 0} size="sm" className="h-9 rounded-xl font-bold text-xs gap-2">
+                            <Mail className="h-4 w-4 text-primary"/> Notificar Ausencia
                         </Button>
                     </DialogTrigger>
                     <AthleteNotificationDialog students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
                 </Dialog>
                  <Dialog>
                     <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                            <Printer className="md:mr-2 h-4 w-4" />
-                             <span className="hidden md:inline">Imprimir Lista</span>
+                        <Button variant="ghost" size="sm" className="h-9 rounded-xl font-bold text-xs gap-2">
+                            <Printer className="h-4 w-4 text-primary" /> Imprimir Lista
                         </Button>
                     </DialogTrigger>
                     <PrintListDialog students={filteredStudents} contacts={studentContacts} />
@@ -1022,120 +1020,122 @@ export function StudentPanel() {
                 <TooltipProvider>
                     <Tooltip open={isCopied}>
                         <TooltipTrigger asChild>
-                        <Button variant="outline" onClick={handleCopyDirectory} size="sm">
-                            {isCopied ? <Check className="text-primary h-4 w-4"/> : <ClipboardCopy className="md:mr-2 h-4 w-4" />}
-                             <span className="hidden md:inline">Copiar Directorio</span>
+                        <Button variant="ghost" onClick={handleCopyDirectory} size="sm" className="h-9 rounded-xl font-bold text-xs gap-2">
+                            {isCopied ? <Check className="text-primary h-4 w-4"/> : <ClipboardCopy className="h-4 w-4 text-primary" />}
+                             Copiar Directorio
                         </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>{isCopied ? '¡Directorio Copiado!' : 'Copiar contactos de los alumnos filtrados'}</p>
+                            <p className="font-bold">{isCopied ? '¡Copiado!' : 'Exportar a portapapeles'}</p>
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
                 )}
             </div>
         </div>
+        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
       </header>
 
       {hasData && (
-        <>
-          <div className="flex gap-4 items-center mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                    type="text"
-                    placeholder="Buscar alumno por nombre, matrícula o teléfono..."
-                    className="pl-10 w-full"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+        <section className="space-y-6">
+          <div className="relative group/search max-w-2xl mx-auto">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/40 group-focus-within/search:text-primary transition-colors">
+                <Search className="h-5 w-5" />
+            </div>
+            <Input
+                type="text"
+                placeholder="Busca por nombre, matrícula o teléfono..."
+                className="pl-12 h-14 w-full bg-white border-none shadow-xl shadow-primary/5 rounded-2xl text-lg font-medium transition-all focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/40"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
           
            {filteredStudents.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/50 p-3 rounded-lg border">
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center space-x-2">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 backdrop-blur-sm p-4 rounded-3xl border border-primary/5 shadow-sm sticky top-20 z-20">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center space-x-3 bg-white px-4 py-2 rounded-2xl border shadow-sm">
                         <Checkbox 
                             id="select-all" 
                             checked={selectedStudents.size === filteredStudents.length && filteredStudents.length > 0}
                             onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                            className="h-5 w-5 rounded-md border-primary/20"
                         />
-                        <Label htmlFor="select-all" className="font-bold">Seleccionar Todos ({selectedStudents.size})</Label>
+                        <Label htmlFor="select-all" className="font-black text-sm uppercase tracking-tighter opacity-70 cursor-pointer">Seleccionar Todos ({selectedStudents.size})</Label>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <Button 
                         size="sm"
                         variant="secondary"
+                        className="rounded-xl h-10 px-5 font-bold shadow-md"
                         onClick={() => setIsMailerOpen(true)}
                         disabled={selectedStudents.size === 0}
                     >
                         <Eye className="mr-2 h-4 w-4" />
-                        <span className="hidden md:inline">Ver Reportes</span>
-                         ({selectedStudents.size})
+                        Ver Reportes ({selectedStudents.size})
                     </Button>
                     <Button 
                         size="sm"
+                        className="rounded-xl h-10 px-6 font-black shadow-lg shadow-primary/20"
                         onClick={handleDownloadZip}
                         disabled={selectedStudents.size === 0 || downloadProgress > 0}
                     >
                         {downloadProgress > 0 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="md:mr-2 h-4 w-4" />}
-                         <span className="hidden md:inline">Descargar ZIP</span>
-                         ({selectedStudents.size})
+                         Descargar ZIP ({selectedStudents.size})
                     </Button>
                 </div>
             </div>
            )}
+
            {downloadProgress > 0 && (
-                <Card className="p-4 border-primary/20 bg-primary/5">
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <p className="text-sm font-bold text-primary">{downloadStatus}</p>
-                            <span className="text-xs font-mono">{Math.round(downloadProgress)}%</span>
+                <Card className="p-6 border-none bg-primary/5 rounded-3xl animate-in zoom-in-95 duration-300">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end">
+                            <div>
+                                <p className="text-lg font-black text-primary tracking-tight">{downloadStatus}</p>
+                                <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mt-1">Generando imágenes de alta resolución...</p>
+                            </div>
+                            <span className="text-2xl font-black tabular-nums text-primary">{Math.round(downloadProgress)}%</span>
                         </div>
-                        <Progress value={downloadProgress} className="h-2" />
-                        <p className="text-[10px] text-muted-foreground italic">No cierres esta ventana mientras se procesan los reportes.</p>
+                        <Progress value={downloadProgress} className="h-3 bg-white/50 rounded-full" />
+                        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground italic opacity-60">
+                            <AlertTriangle className="h-3 w-3" /> No cierres esta ventana durante el proceso.
+                        </div>
                     </div>
                 </Card>
            )}
 
           {filteredStudents.length > 0 ? (
             <div className="space-y-4">
-                <div className="text-sm text-muted-foreground font-medium">
-                  Mostrando {filteredStudents.length} de {initialFilteredStudents.length} alumnos.
+                <div className="flex items-center gap-2 px-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
+                  <ListChecks className="h-3 w-3" /> Resultados: {filteredStudents.length} de {initialFilteredStudents.length} alumnos
                 </div>
-                {filteredStudents.map(student => {
-                  const changesForCard = latestComparison[student.id] || [];
-                  return (
-                    <StudentCard 
-                      key={student.id} 
-                      student={student} 
-                      teams={teams}
-                      changes={changesForCard}
-                      startOpen={false} 
-                      isSelected={selectedStudents.has(student.id)}
-                      onSelectionChange={handleSelectionChange}
-                    />
-                  );
-                })}
+                <div className="grid grid-cols-1 gap-4">
+                    {filteredStudents.map(student => {
+                      const changesForCard = latestComparison[student.id] || [];
+                      return (
+                        <StudentCard 
+                          key={student.id} 
+                          student={student} 
+                          teams={teams}
+                          changes={changesForCard}
+                          startOpen={false} 
+                          isSelected={selectedStudents.has(student.id)}
+                          onSelectionChange={handleSelectionChange}
+                        />
+                      );
+                    })}
+                </div>
             </div>
           ) : (
-            <Card className="text-center p-12">
-                <CardHeader>
-                    <div className="mx-auto bg-secondary p-3 rounded-full w-fit">
-                        <Users className="h-8 w-8 text-primary" />
-                    </div>
-                    <CardTitle>No se encontraron alumnos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">
-                      No se encontraron alumnos con los filtros o término de búsqueda seleccionados.
-                    </p>
-                </CardContent>
-            </Card>
+            <div className="text-center py-32 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10">
+                <Users className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
+                <h3 className="text-xl font-bold opacity-60">Sin coincidencias</h3>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">No hay alumnos que coincidan con tu búsqueda o los filtros actuales.</p>
+            </div>
           )}
-        </>
+        </section>
       )}
       <MailerDialog open={isMailerOpen} onOpenChange={setIsMailerOpen} students={studentsForMailer} loadStudentSubjects={loadStudentSubjects} />
     </div>

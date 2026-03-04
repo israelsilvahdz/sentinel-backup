@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2, User as UserIcon, Calendar, CheckCircle2 } from 'lucide-react';
 import { type Student, type SubjectSummary, type Team, type Change, type Subject } from "@/types/student";
 import { getStudentOverallRisk, type RiskLevel, getRisk } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -37,19 +36,21 @@ interface StudentCardProps {
 function OverallRiskBadge({ student, subjects }: { student: Student, subjects: (SubjectSummary[]) }) {
     const { overallRisk } = getStudentOverallRisk(student, subjects);
 
-    if (overallRisk === 'low') return null;
+    if (overallRisk === 'low') {
+        return <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-100 text-[10px] font-black uppercase tracking-tighter h-5">Estable</Badge>;
+    }
     
     const config: Record<string, { text: string; className: string; }> = {
-        medium: { text: 'En Observación', className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-        high: { text: 'Crítico', className: 'bg-orange-100 text-orange-800 border-orange-300' },
-        at_limit: { text: 'Al Límite', className: 'bg-red-200 text-red-900 border-red-400' },
-        sd: { text: 'SD', className: 'bg-red-500 text-white border-red-700' },
+        medium: { text: 'En Observación', className: 'bg-yellow-50 text-yellow-700 border-yellow-100' },
+        high: { text: 'Crítico', className: 'bg-orange-50 text-orange-700 border-orange-100' },
+        at_limit: { text: 'Al Límite', className: 'bg-red-50 text-red-700 border-red-100' },
+        sd: { text: 'Sin Derecho', className: 'bg-red-600 text-white border-none' },
     };
 
     const riskConfig = config[overallRisk];
     if (!riskConfig) return null;
 
-    return <Badge variant="outline" className={`ml-2 ${riskConfig.className}`}>{riskConfig.text}</Badge>;
+    return <Badge variant="outline" className={cn("ml-2 text-[10px] font-black uppercase tracking-tighter h-5", riskConfig.className)}>{riskConfig.text}</Badge>;
 }
 
 function MatriculaCopy({ studentId }: { studentId: string }) {
@@ -72,15 +73,15 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
         <TooltipProvider>
             <Tooltip open={isCopied}>
                 <TooltipTrigger asChild>
-                    <span onClick={handleCopy} className="group/copy-id inline-flex items-center gap-1 cursor-pointer rounded-md p-1 -m-1 hover:bg-muted/50 transition-colors">
+                    <span onClick={handleCopy} className="group/copy-id inline-flex items-center gap-1 cursor-pointer rounded-md px-1 py-0.5 bg-muted/30 hover:bg-muted transition-colors font-mono font-bold text-xs text-muted-foreground uppercase tracking-tighter">
                         {studentId}
-                        <span className="opacity-0 group-hover/copy-id:opacity-50 transition-opacity">
-                            {isCopied ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                        <span className="opacity-0 group-hover/copy-id:opacity-100 transition-opacity">
+                            {isCopied ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-2.5 w-2.5" />}
                         </span>
                     </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <span>¡Copiado!</span>
+                    <p className="font-bold text-xs">¡Copiado!</p>
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
@@ -102,6 +103,11 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
   }, [teams, student.id]);
 
   const hasChanges = changes && changes.length > 0;
+
+  const initials = useMemo(() => {
+    const parts = student.name.split(',').reverse().join(' ').trim().split(' ').filter(Boolean);
+    return (parts[0]?.charAt(0) || '') + (parts[1]?.charAt(0) || '');
+  }, [student.name]);
 
   const generateMessage = (recipient: 'student' | 'parent'): string => {
         const increaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
@@ -295,44 +301,23 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
     };
 
 
-  const cardTitleContent = (
-    <div className="flex items-center">
-      {student.name}
-      {teamName && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="ml-2">
-                <Award className="h-5 w-5 text-blue-600" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Equipo: {teamName}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-      {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
-    </div>
-  );
-
-  const cardDescriptionContent = (
-    <div className="text-sm text-muted-foreground">
-        Matrícula: <MatriculaCopy studentId={student.id} /> | Líder: {student.leader}
-    </div>
-  )
-
   if (isDialog) {
-    // Render content directly without collapsible for Dialog view
     return (
       <Card className="h-full flex flex-col border-none shadow-none">
-        <CardHeader>
-            <div className="flex justify-between items-start">
+        <CardHeader className="pb-2">
+            <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary to-emerald-900 flex items-center justify-center text-white font-black text-lg shadow-inner shrink-0">
+                    {initials}
+                </div>
                 <div>
-                    <CardTitle className="flex items-center text-lg">
-                      {cardTitleContent}
+                    <CardTitle className="text-xl font-black flex items-center gap-2 tracking-tight">
+                      {student.name}
+                      {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
                     </CardTitle>
-                    {cardDescriptionContent}
+                    <CardDescription className="flex items-center gap-2 mt-0.5">
+                        <MatriculaCopy studentId={student.id} />
+                        <span className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-widest">• Líder: {student.leader}</span>
+                    </CardDescription>
                 </div>
             </div>
         </CardHeader>
@@ -344,66 +329,103 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
   }
 
   return (
-    <Card className={isSelected ? 'ring-2 ring-primary' : ''}>
+    <Card className={cn(
+        "transition-all duration-300 border-none shadow-sm hover:shadow-md group/student",
+        isSelected ? 'ring-2 ring-primary' : '',
+        isOpen && 'shadow-lg ring-1 ring-primary/5'
+    )}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
-            <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
+        <div 
+            className="p-4 cursor-pointer flex items-center justify-between" 
+            onClick={() => setIsOpen(!isOpen)}
+        >
+            <div className="flex items-center gap-5 flex-1 min-w-0">
+                <div className="flex items-center gap-3 shrink-0">
                     <Checkbox
                         checked={isSelected}
                         onCheckedChange={(checked) => onSelectionChange(student.id, !!checked)}
                         onClick={(e) => e.stopPropagation()}
-                        className="mt-1"
+                        className="h-5 w-5 rounded-md border-primary/20 data-[state=checked]:bg-primary"
                     />
-                    <div>
-                        <CardTitle className="flex items-center text-lg">
-                        {cardTitleContent}
-                        </CardTitle>
-                        {cardDescriptionContent}
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-primary font-black text-sm uppercase group-hover/student:from-primary group-hover/student:to-emerald-900 group-hover/student:text-white transition-all duration-500 shadow-inner">
+                        {initials}
                     </div>
                 </div>
-                <div className="flex items-center gap-1">
+                
+                <div className="overflow-hidden space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={cn(
+                            "text-base font-bold tracking-tight truncate max-w-[200px] sm:max-w-md",
+                            isOpen && "text-primary"
+                        )}>
+                            {student.name}
+                        </h3>
+                        {teamName && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Award className="h-4 w-4 text-blue-600 shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="rounded-lg font-bold">Equipo: {teamName}</TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                        {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <MatriculaCopy studentId={student.id} />
+                        <span className="text-[10px] font-black uppercase text-muted-foreground/50 tracking-widest hidden sm:inline">Líder: {student.leader}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 opacity-0 group-hover/student:opacity-100 transition-opacity">
                     <TooltipProvider>
                         {hasChanges && (
                             <>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => handleSend(e, 'student')} disabled={!!isNotifying}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-emerald-50 text-emerald-600" onClick={(e) => handleSend(e, 'student')} disabled={!!isNotifying}>
                                             {isNotifying === 'student' ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4" />}
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent><p>Enviar a alumno</p></TooltipContent>
+                                    <TooltipContent className="rounded-lg font-bold">Notificar Alumno</TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600" onClick={(e) => handleSend(e, 'parent')} disabled={!!isNotifying}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-blue-50 text-blue-600" onClick={(e) => handleSend(e, 'parent')} disabled={!!isNotifying}>
                                             {isNotifying === 'parent' ? <Loader2 className="h-4 w-4 animate-spin"/> : <Users className="h-4 w-4" />}
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent><p>Notificar a padres</p></TooltipContent>
+                                    <TooltipContent className="rounded-lg font-bold">Notificar Padres</TooltipContent>
                                 </Tooltip>
                             </>
                         )}
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={handleSendDetailedReport} disabled={isGeneratingReport}>
-                                {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-red-50 text-red-600" onClick={handleSendDetailedReport} disabled={isGeneratingReport}>
+                                    {isGeneratingReport ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Enviar reporte detallado a padres</p></TooltipContent>
+                            <TooltipContent className="rounded-lg font-bold">Enviar Reporte Detallado</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
-                    <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="w-9 p-0">
-                            {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            <span className="sr-only">Toggle</span>
-                        </Button>
-                    </CollapsibleTrigger>
+                </div>
+                
+                <div className={cn(
+                    "p-1 rounded-full transition-colors",
+                    isOpen ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                )}>
+                    {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </div>
             </div>
-        </CardHeader>
+        </div>
+        
         <CollapsibleContent>
-          <StudentSubjects student={student} isOpen={isOpen} />
+          <div className="border-t border-muted/50 bg-muted/5 p-2 sm:p-4 rounded-b-3xl">
+            <StudentSubjects student={student} isOpen={isOpen} />
+          </div>
         </CollapsibleContent>
       </Collapsible>
     </Card>
