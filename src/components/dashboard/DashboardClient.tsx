@@ -655,11 +655,11 @@ export function DashboardClient() {
       <SidebarProvider defaultOpen={true}>
         <Sidebar className="border-none bg-primary shadow-2xl">
           <SidebarHeader className="bg-primary/50 backdrop-blur-md">
-             <div className="flex items-center gap-3 px-6 py-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 transition-all">
-                <div className="bg-white/20 p-2 rounded-xl border border-white/10 shadow-inner group-data-[collapsible=icon]:p-1.5 transition-all">
-                  <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={28} height={28} className="h-7 w-auto brightness-0 invert group-data-[collapsible=icon]:h-6" />
+             <div className="flex items-center gap-3 px-6 py-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:group-hover:justify-start group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:group-hover:px-6 transition-all duration-300">
+                <div className="bg-white/20 p-2 rounded-xl border border-white/10 shadow-inner group-data-[collapsible=icon]:p-1.5 group-data-[collapsible=icon]:group-hover:p-2 transition-all">
+                  <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="School Logo" width={28} height={28} className="h-7 w-auto brightness-0 invert group-data-[collapsible=icon]:h-6 group-data-[collapsible=icon]:group-hover:h-7" />
                 </div>
-                <span className="font-black text-xl tracking-[0.15em] text-white group-data-[collapsible=icon]:hidden whitespace-nowrap">SENTINEL</span>
+                <span className="font-black text-xl tracking-[0.15em] text-white group-data-[collapsible=icon]:hidden group-data-[collapsible=icon]:group-hover:inline whitespace-nowrap">SENTINEL</span>
              </div>
           </SidebarHeader>
           <SidebarContent className="px-3 bg-primary/20 backdrop-blur-sm">
@@ -675,7 +675,7 @@ export function DashboardClient() {
                 )}
                 
                 <div className="px-3 mb-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden">Exploración</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden group-data-[collapsible=icon]:group-hover:block">Exploración</p>
                 </div>
 
                 <SidebarMenuItem>
@@ -698,7 +698,7 @@ export function DashboardClient() {
                 </SidebarMenuItem>
 
                 <div className="px-3 mb-2 mt-6">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden">Operación</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden group-data-[collapsible=icon]:group-hover:block">Operación</p>
                 </div>
 
                 <SidebarMenuItem>
@@ -721,7 +721,7 @@ export function DashboardClient() {
                 </SidebarMenuItem>
 
                 <div className="px-3 mb-2 mt-6">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden">Planeación y Gestión</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden group-data-[collapsible=icon]:group-hover:block">Planeación y Gestión</p>
                 </div>
 
                 <SidebarMenuItem>
@@ -763,7 +763,7 @@ export function DashboardClient() {
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
-           <SidebarToggle className="bg-white text-primary border-primary shadow-xl z-50 right-[-14px]" />
+           <SidebarToggle className="bg-white text-primary border-primary shadow-xl z-50" />
         </Sidebar>
         <SidebarInset>
             <header className="flex h-14 items-center justify-between gap-4 border-b bg-white/80 backdrop-blur-md px-4 lg:px-6 sticky top-0 z-30 py-2">
