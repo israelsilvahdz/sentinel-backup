@@ -11,7 +11,8 @@ import {
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
-  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered
+  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
+  School, Building2, Landmark
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -112,12 +113,17 @@ export function ContinuidadPanel() {
       list = list.filter(s => {
         const local = localStatuses[s.id];
         const voc = local?.vocationalDiagnosis;
+        const topUni = voc?.universityRanking?.split(/[;,]/)[0]?.trim().toUpperCase() || '';
+
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'indeciso': return !s.isInscribed && local?.isIndeciso;
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
           case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
+          case 'pri-tecmilenio': return !s.isInscribed && topUni.includes('TECMILENIO');
+          case 'pri-uanl': return !s.isInscribed && topUni.includes('UANL');
+          case 'pri-tec': return !s.isInscribed && topUni.includes('TEC') && !topUni.includes('MILENIO');
           default: return true;
         }
       });
@@ -129,23 +135,30 @@ export function ContinuidadPanel() {
   const stats = useMemo(() => {
     const total = students.length || 1;
     const inscribed = students.filter(s => s.isInscribed).length;
-    const highInterest = students.filter(s => s.interestLevel?.toLowerCase().includes('alto')).length;
     const talentRisk = students.filter(s => !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
     
-    // Stats based on joined Firestore data - Exclude inscribed students
     let indecisosCount = 0;
     let sosCount = 0;
     let tallerCount = 0;
+    let priTecmi = 0;
+    let priUanl = 0;
+    let priTec = 0;
 
     students.forEach(s => {
-      if (s.isInscribed) return; // Ignore inscribed for these counts
+      if (s.isInscribed) return;
 
       const local = localStatuses[s.id];
       if (local?.isIndeciso) indecisosCount++;
-      if (local?.vocationalDiagnosis) {
-        if (local.vocationalDiagnosis.urgencyLevel >= 8) sosCount++;
-        // Count only those who require workshop AND haven't attended yet
-        if (local.vocationalDiagnosis.requiresWorkshop && !local.workshopAttended) tallerCount++;
+      
+      const voc = local?.vocationalDiagnosis;
+      if (voc) {
+        if (voc.urgencyLevel >= 8) sosCount++;
+        if (voc.requiresWorkshop && !local.workshopAttended) tallerCount++;
+        
+        const topUni = voc.universityRanking?.split(/[;,]/)[0]?.trim().toUpperCase() || '';
+        if (topUni.includes('TECMILENIO')) priTecmi++;
+        else if (topUni.includes('UANL')) priUanl++;
+        else if (topUni.includes('TEC') && !topUni.includes('MILENIO')) priTec++;
       }
     });
     
@@ -163,7 +176,7 @@ export function ContinuidadPanel() {
       };
     }).sort((a,b) => b.total - a.total);
 
-    return { total, inscribed, highInterest, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount };
+    return { total, inscribed, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, priTecmi, priUanl, priTec };
   }, [students, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
@@ -227,11 +240,44 @@ export function ContinuidadPanel() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard title="Total Alumnos" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
-        <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="blue" onClick={() => handleKpiClick('inscribed')} />
-        <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
+        <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="green" onClick={() => handleKpiClick('inscribed')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
+        <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
         <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
         <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" onClick={() => handleKpiClick('risk')} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-primary/5 border-primary/20 cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => handleKpiClick('pri-tecmilenio')}>
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-bold uppercase text-primary flex items-center gap-2">
+              <Trophy className="h-4 w-4" /> Prioridad Tecmilenio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold text-primary">{stats.priTecmi} <span className="text-sm font-normal text-muted-foreground">alumnos</span></div>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-50 border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleKpiClick('pri-uanl')}>
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-bold uppercase text-blue-700 flex items-center gap-2">
+              <Landmark className="h-4 w-4" /> Prioridad UANL
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold text-blue-700">{stats.priUanl} <span className="text-sm font-normal text-muted-foreground">alumnos</span></div>
+          </CardContent>
+        </Card>
+        <Card className="bg-orange-50 border-orange-200 cursor-pointer hover:bg-orange-100 transition-colors" onClick={() => handleKpiClick('pri-tec')}>
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-bold uppercase text-orange-700 flex items-center gap-2">
+              <School className="h-4 w-4" /> Prioridad TEC
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl font-bold text-orange-700">{stats.priTec} <span className="text-sm font-normal text-muted-foreground">alumnos</span></div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -345,19 +391,21 @@ function ContinuityCard({
 }) {
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
-  // If inscribed, SOS and Indeciso are cleared
+  
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
-  const isSecondOption = vocational?.isSecondOption;
   const isWorkshopRequired = vocational?.requiresWorkshop && !student.isInscribed;
   const isWorkshopAttended = localStatus?.workshopAttended;
 
-  const tecmilenioRank = useMemo(() => {
-    if (!vocational?.universityRanking) return null;
-    const rankingArray = vocational.universityRanking.split(';').filter(Boolean).map(u => u.trim().toUpperCase());
-    const rank = rankingArray.indexOf('TECMILENIO') + 1;
-    return rank > 0 ? rank : null;
+  const universityRankingArray = useMemo(() => {
+    if (!vocational?.universityRanking) return [];
+    return vocational.universityRanking.split(/[;,]/).filter(Boolean).map(u => u.trim());
   }, [vocational]);
+
+  const tecmilenioRank = useMemo(() => {
+    const idx = universityRankingArray.findIndex(u => u.toUpperCase().includes('TECMILENIO'));
+    return idx !== -1 ? idx + 1 : null;
+  }, [universityRankingArray]);
 
   const [commentText, setCommentText] = useState('');
   const { leaders, tutors } = useDashboardFilters();
@@ -374,44 +422,67 @@ function ContinuityCard({
       (isHighValueRisk || isSOS) && "ring-2 ring-red-500/50",
       isIndeciso && "border-l-purple-500 bg-purple-50/5"
     )}>
-      <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/5" onClick={onToggle}>
-        <div className="flex items-center gap-4 flex-1">
-          <div className={cn(
-            "h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm",
-            student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40"
-          )}>
-            {student.isInscribed ? <GraduationCap className="h-5 w-5" /> : student.id.substring(0, 2)}
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base">
-              {student.name}
-              {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
-              {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
-              {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
-              {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
-              {!student.isInscribed && tecmilenioRank !== null && (
-                <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(
-                  tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50"
-                )}>
-                  {tecmilenioRank === 1 ? <Trophy className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
-                  Opción {tecmilenioRank}
-                </Badge>
-              )}
-              {isWorkshopRequired && !isWorkshopAttended && <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Pend. Taller</Badge>}
-              {isWorkshopAttended && <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50"><CheckCircle2 className="h-3 w-3 mr-1" />Taller Tomado</Badge>}
-            </h3>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
-              <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
-              <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
-              <span className="font-mono">{student.id}</span>
-              <span className="font-bold">Promedio: {student.average}</span>
+      <div className="p-4 flex flex-col cursor-pointer hover:bg-muted/5" onClick={onToggle}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4 flex-1">
+            <div className={cn(
+              "h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm",
+              student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40"
+            )}>
+              {student.isInscribed ? <GraduationCap className="h-5 w-5" /> : student.id.substring(0, 2)}
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base">
+                {student.name}
+                {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
+                {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
+                {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
+                {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
+                {!student.isInscribed && tecmilenioRank !== null && (
+                  <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(
+                    tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50"
+                  )}>
+                    {tecmilenioRank === 1 ? <Trophy className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
+                    Opción {tecmilenioRank}
+                  </Badge>
+                )}
+              </h3>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
+                <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
+                <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
+                <span className="font-mono">{student.id}</span>
+                <span className="font-bold">Promedio: {student.average}</span>
+              </div>
             </div>
           </div>
+          <div className="flex items-center gap-4">
+            <Badge variant="outline" className="hidden lg:inline-flex">{student.status}</Badge>
+            {isExpanded ? <ChevronUp /> : <ChevronDown />}
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="hidden lg:inline-flex">{student.status}</Badge>
-          {isExpanded ? <ChevronUp /> : <ChevronDown />}
-        </div>
+
+        {/* Banner Summary Info */}
+        {!student.isInscribed && (vocational?.interestedCareers || vocational?.universityRanking) && (
+          <div className="mt-2 pl-14 flex flex-col gap-1 border-t border-dashed pt-2">
+            {vocational?.interestedCareers && (
+              <div className="text-[10px] text-primary font-bold flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3" />
+                <span className="uppercase text-[9px] text-muted-foreground font-semibold">Carreras:</span> {vocational.interestedCareers}
+              </div>
+            )}
+            {universityRankingArray.length > 0 && (
+              <div className="text-[10px] text-foreground font-medium flex items-center gap-1.5">
+                <ListOrdered className="h-3 w-3 text-muted-foreground" />
+                <span className="uppercase text-[9px] text-muted-foreground font-semibold">Top 3:</span> 
+                {universityRankingArray.slice(0, 3).map((uni, i) => (
+                  <span key={i} className={cn(uni.toUpperCase().includes('TECMILENIO') ? "text-primary font-bold" : "")}>
+                    {i + 1}. {uni}{i < Math.min(universityRankingArray.length, 3) - 1 ? ", " : ""}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {isExpanded && (
@@ -464,7 +535,13 @@ function ContinuityCard({
                   )}>{student.interestLevel || 'No definido'}</Badge>
                 </div>
                 <p className="text-sm"><strong>Programa:</strong> {student.programOfInterest || 'Pendiente'}</p>
-                <p className="text-sm"><strong>Compite con:</strong> {student.competitorUniversity || 'N/A'}</p>
+                <div className="text-sm">
+                  <strong>Compite con:</strong> 
+                  <span className={cn(
+                    "ml-1 font-bold",
+                    (student.competitorUniversity?.toUpperCase().includes('TEC') || student.competitorUniversity?.toUpperCase().includes('UANL')) ? "text-destructive" : "text-foreground"
+                  )}>{student.competitorUniversity || 'N/A'}</span>
+                </div>
               </div>
             </div>
 
@@ -502,9 +579,9 @@ function ContinuityCard({
                     <div>
                       <p className="text-xs font-bold text-muted-foreground uppercase">Obstáculo Principal</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="bg-white border">
-                          {vocational.mainObstacle.includes('Económico') ? <Target className="h-3 w-3 mr-1 text-red-500" /> : <Lightbulb className="h-3 w-3 mr-1 text-yellow-500" />}
-                          {vocational.mainObstacle || 'Ninguno'}
+                        <Badge variant="secondary" className="bg-white border text-left h-auto py-1">
+                          {vocational.mainObstacle.includes('Económico') ? <Landmark className="h-3 w-3 mr-1 text-red-500 shrink-0" /> : <Lightbulb className="h-3 w-3 mr-1 text-yellow-500 shrink-0" />}
+                          <span className="whitespace-normal leading-tight">{vocational.mainObstacle || 'Ninguno'}</span>
                         </Badge>
                       </div>
                     </div>
@@ -517,18 +594,20 @@ function ContinuityCard({
                       <ListOrdered className="h-4 w-4 text-muted-foreground" />
                       <p className="text-xs font-bold text-muted-foreground uppercase">Ranking de Universidades</p>
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {vocational.universityRanking.split(';').filter(Boolean).map((uni, idx) => (
+                    <div className="flex flex-wrap gap-1.5">
+                      {universityRankingArray.length > 0 ? universityRankingArray.map((uni, idx) => (
                         <div key={idx} className="flex items-center">
                           <Badge variant="outline" className={cn(
-                            "text-[10px] py-0 px-1.5",
-                            uni.trim().toUpperCase() === 'TECMILENIO' ? "bg-primary text-white border-primary" : "bg-white"
+                            "text-[10px] py-0 px-1.5 h-6",
+                            uni.toUpperCase().includes('TECMILENIO') ? "bg-primary text-white border-primary" : "bg-white"
                           )}>
-                            {idx + 1}. {uni.trim()}
+                            {idx + 1}. {uni}
                           </Badge>
-                          {idx < vocational.universityRanking.split(';').filter(Boolean).length - 1 && <span className="text-muted-foreground mx-0.5">→</span>}
+                          {idx < universityRankingArray.length - 1 && <span className="text-muted-foreground mx-0.5">→</span>}
                         </div>
-                      ))}
+                      )) : (
+                        <p className="text-xs text-muted-foreground italic">No se declaró un ranking.</p>
+                      )}
                     </div>
                     {tecmilenioRank && tecmilenioRank > 1 && !student.isInscribed && (
                       <div className="bg-orange-100 text-orange-800 p-2 rounded-lg text-[10px] font-bold flex items-center gap-2 mt-2">
@@ -543,7 +622,7 @@ function ContinuityCard({
                   <CardContent className="p-4 space-y-3">
                     <div>
                       <p className="text-xs font-bold text-muted-foreground uppercase">Carreras de Interés</p>
-                      <p className="text-xs font-semibold mt-1">{vocational.interestedCareers || 'No especificadas'}</p>
+                      <p className="text-xs font-semibold mt-1 leading-relaxed">{vocational.interestedCareers || 'No especificadas'}</p>
                     </div>
                     {vocational.requiresWorkshop && !student.isInscribed && (
                       <div className={cn(
@@ -648,7 +727,8 @@ function KpiCard({
     red: "text-red-600 bg-red-50 border-red-100",
     blue: "text-blue-600 bg-blue-50 border-blue-100",
     yellow: "text-yellow-600 bg-yellow-50 border-yellow-100",
-    purple: "text-purple-600 bg-purple-50 border-purple-100",
+    purple: "text-purple-600 bg-purple-50 border-purple-200",
+    green: "text-green-600 bg-green-50 border-green-100",
     default: "text-primary bg-primary/5 border-primary/10"
   };
   const colorClass = color ? (colors[color as keyof typeof colors] || colors.default) : colors.default;

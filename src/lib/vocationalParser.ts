@@ -33,9 +33,10 @@ export async function parseVocationalExcel(file: File): Promise<VocationalUpload
             const id = String(row['Matrícula'] || '').trim();
             if (!id) return;
 
+            // Ranking handling - support both semicolon and comma
             const ranking = String(row[QUESTIONS.RANKING] || '');
-            const firstUni = ranking.split(';')[0]?.trim().toUpperCase() || '';
-            const isSecondOption = firstUni !== '' && firstUni !== 'TECMILENIO';
+            const firstUni = ranking.split(/[;,]/)[0]?.trim().toUpperCase() || '';
+            const isSecondOption = firstUni !== '' && !firstUni.includes('TECMILENIO');
 
             diagnoses[id] = {
               certaintyLevel: row[QUESTIONS.CERTAINTY] || '',
@@ -59,10 +60,7 @@ export async function parseVocationalExcel(file: File): Promise<VocationalUpload
             const id = String(row['Matrícula'] || '').trim();
             if (!id) return;
 
-            // Rule: If they are in this tab, they are candidates for indecision
-            // but if they have only one career, they are no longer indecisive.
             const careersStr = String(row['Carreras'] || '').trim();
-            // Split by common separators: comma, slash, semicolon, " y ", " o "
             const careerItems = careersStr.split(/[,\/;]|\sy\s|\so\s/).map(i => i.trim()).filter(Boolean);
             
             if (careerItems.length > 1) {
@@ -70,7 +68,6 @@ export async function parseVocationalExcel(file: File): Promise<VocationalUpload
             }
 
             if (diagnoses[id]) {
-              // Taller is often marked as TRUE or 1
               diagnoses[id].requiresWorkshop = String(row['Taller']).toUpperCase() === 'TRUE' || String(row['Taller']) === '1';
             }
           });
