@@ -492,18 +492,37 @@ export const getAllContinuityStatuses = async (): Promise<Record<string, Continu
   }
 };
 
-export const bulkUpdateVocationalDiagnosis = async (diagnoses: Record<string, VocationalDiagnosis>): Promise<void> => {
+export const bulkUpdateContinuityVocational = async (
+  diagnoses: Record<string, VocationalDiagnosis>, 
+  indecisosIds: Set<string>
+): Promise<void> => {
   try {
     const batch = writeBatch(db);
+    
+    // Process all diagnoses
     Object.entries(diagnoses).forEach(([studentId, diagnosis]) => {
       const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
-      batch.set(docRef, { 
+      const updateData: any = { 
         vocationalDiagnosis: {
           ...diagnosis,
           lastUpdated: Timestamp.now()
         }
-      }, { merge: true });
+      };
+      
+      // If student is also in the indecisos set, mark them as such
+      if (indecisosIds.has(studentId)) {
+        updateData.isIndeciso = true;
+      } else {
+        // If they are in the survey but NOT in the indecisos tab, 
+        // they might have decided, so we could optionally clear their indecisive status
+        // but user says "los que tienen solo una ya no son indecisos" 
+        // which implies we should only mark TRUE if > 1 career.
+        updateData.isIndeciso = false;
+      }
+
+      batch.set(docRef, updateData, { merge: true });
     });
+
     await batch.commit();
   } catch (error) {
     console.error("Error bulk updating vocational diagnoses:", error);

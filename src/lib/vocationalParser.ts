@@ -10,7 +10,12 @@ const QUESTIONS = {
   DETALLES: "Detalles"
 };
 
-export async function parseVocationalExcel(file: File): Promise<Record<string, VocationalDiagnosis> | null> {
+export interface VocationalUploadResult {
+  diagnoses: Record<string, VocationalDiagnosis>;
+  indecisosIds: Set<string>;
+}
+
+export async function parseVocationalExcel(file: File): Promise<VocationalUploadResult | null> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -18,6 +23,7 @@ export async function parseVocationalExcel(file: File): Promise<Record<string, V
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'array' });
         const diagnoses: Record<string, VocationalDiagnosis> = {};
+        const indecisosIds = new Set<string>();
 
         // 1. Process "Respuestas" tab
         const respWs = workbook.Sheets['Respuestas'];
@@ -51,6 +57,18 @@ export async function parseVocationalExcel(file: File): Promise<Record<string, V
           const json: any[] = XLSX.utils.sheet_to_json(indecisosWs, { defval: '' });
           json.forEach(row => {
             const id = String(row['Matrícula'] || '').trim();
+            if (!id) return;
+
+            // Rule: If they are in this tab, they are candidates for indecision
+            // but if they have only one career, they are no longer indecisive.
+            const careersStr = String(row['Carreras'] || '').trim();
+            // Split by common separators: comma, slash, semicolon, " y ", " o "
+            const careerItems = careersStr.split(/[,\/;]|\sy\s|\so\s/).map(i => i.trim()).filter(Boolean);
+            
+            if (careerItems.length > 1) {
+              indecisosIds.add(id);
+            }
+
             if (diagnoses[id]) {
               // Taller is often marked as TRUE or 1
               diagnoses[id].requiresWorkshop = String(row['Taller']).toUpperCase() === 'TRUE' || String(row['Taller']) === '1';
@@ -58,7 +76,7 @@ export async function parseVocationalExcel(file: File): Promise<Record<string, V
           });
         }
 
-        resolve(diagnoses);
+        resolve({ diagnoses, indecisosIds });
       } catch (err) {
         reject(err);
       }

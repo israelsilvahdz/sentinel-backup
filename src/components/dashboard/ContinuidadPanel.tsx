@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -12,7 +11,7 @@ import {
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
-  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon
+  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -25,7 +24,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, addContinuityComment, bulkUpdateVocationalDiagnosis } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, addContinuityComment, bulkUpdateContinuityVocational } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
@@ -47,6 +46,9 @@ export function ContinuidadPanel() {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedCycle, setSelectedCycle] = useState('all');
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+  
+  const [activeTab, setActiveTab] = useState('stats');
+  const [selectedKpi, setSelectedKpi] = useState<string | null>(null);
 
   useEffect(() => {
     const loadLocalStatuses = async () => {
@@ -77,9 +79,9 @@ export function ContinuidadPanel() {
     if (!file) return;
     setIsProcessingVoc(true);
     try {
-      const diagnoses = await parseVocationalExcel(file);
-      if (diagnoses) {
-        await bulkUpdateVocationalDiagnosis(diagnoses);
+      const result = await parseVocationalExcel(file);
+      if (result) {
+        await bulkUpdateContinuityVocational(result.diagnoses, result.indecisosIds);
         const updated = await getAllContinuityStatuses();
         setLocalStatuses(updated);
         toast({ title: "Encuesta Vocacional Procesada", description: "El Diagnóstico Vocacional ha sido guardado permanentemente." });
@@ -95,7 +97,7 @@ export function ContinuidadPanel() {
   const statuses = useMemo(() => [...new Set(students.map(s => s.status).filter(Boolean))].sort(), [students]);
 
   const filteredStudents = useMemo(() => {
-    return students.filter(s => {
+    let list = students.filter(s => {
       const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.includes(searchTerm);
       const matchesAdvisor = selectedAdvisor === 'all' || s.advisor === selectedAdvisor;
       const matchesStatus = selectedStatus === 'all' || s.status === selectedStatus;
@@ -105,7 +107,24 @@ export function ContinuidadPanel() {
 
       return matchesSearch && matchesAdvisor && matchesStatus && matchesCycle && matchesGlobalLeader;
     });
-  }, [students, searchTerm, selectedAdvisor, selectedStatus, selectedCycle, filterType, selectedValue]);
+
+    if (selectedKpi) {
+      list = list.filter(s => {
+        const local = localStatuses[s.id];
+        const voc = local?.vocationalDiagnosis;
+        switch(selectedKpi) {
+          case 'inscribed': return s.isInscribed;
+          case 'indeciso': return local?.isIndeciso;
+          case 'sos': return voc && voc.urgencyLevel >= 8;
+          case 'taller': return voc?.requiresWorkshop;
+          case 'risk': return s.average >= 90 && s.status.toLowerCase().includes('descartado');
+          default: return true;
+        }
+      });
+    }
+
+    return list;
+  }, [students, searchTerm, selectedAdvisor, selectedStatus, selectedCycle, filterType, selectedValue, selectedKpi, localStatuses]);
 
   const stats = useMemo(() => {
     const total = students.length || 1;
@@ -158,6 +177,11 @@ export function ContinuidadPanel() {
     setLocalStatuses(updated);
   };
 
+  const handleKpiClick = (kpi: string) => {
+    setSelectedKpi(kpi);
+    setActiveTab('list');
+  };
+
   if (students.length === 0) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[calc(100vh-100px)] space-y-6">
@@ -187,15 +211,15 @@ export function ContinuidadPanel() {
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <KpiCard title="Total Alumnos" value={stats.total} icon={Users} />
-        <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="blue" />
-        <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="yellow" />
-        <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" />
-        <KpiCard title="Taller Voc." value={stats.tallerCount} icon={CapIcon} color="blue" />
-        <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" />
+        <KpiCard title="Total Alumnos" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
+        <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="blue" onClick={() => handleKpiClick('inscribed')} />
+        <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
+        <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
+        <KpiCard title="Taller Voc." value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
+        <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" onClick={() => handleKpiClick('risk')} />
       </div>
 
-      <Tabs defaultValue="stats" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="stats"><BarChart3 className="mr-2 h-4 w-4" /> Analíticos</TabsTrigger>
           <TabsTrigger value="list"><Filter className="mr-2 h-4 w-4" /> Base Operativa</TabsTrigger>
@@ -265,6 +289,12 @@ export function ContinuidadPanel() {
                 <SelectItem value="Agosto 26">Agosto 26</SelectItem>
               </SelectContent>
             </Select>
+            
+            {selectedKpi && (
+              <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="text-destructive h-10">
+                <X className="mr-2 h-4 w-4" /> Limpiar Filtro KPI
+              </Button>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -524,17 +554,28 @@ function ContinuityCard({
   );
 }
 
-function KpiCard({ title, value, icon: Icon, color }: { title: string, value: number | string, icon: any, color?: string }) {
+function KpiCard({ 
+  title, value, icon: Icon, color, onClick 
+}: { 
+  title: string, value: number | string, icon: any, color?: string, onClick?: () => void 
+}) {
   const colors = {
     red: "text-red-600 bg-red-50 border-red-100",
     blue: "text-blue-600 bg-blue-50 border-blue-100",
     yellow: "text-yellow-600 bg-yellow-50 border-yellow-100",
+    purple: "text-purple-600 bg-purple-50 border-purple-100",
     default: "text-primary bg-primary/5 border-primary/10"
   };
-  const colorClass = color ? colors[color as keyof typeof colors] : colors.default;
+  const colorClass = color ? (colors[color as keyof typeof colors] || colors.default) : colors.default;
 
   return (
-    <Card className="shadow-sm">
+    <Card 
+      className={cn(
+        "shadow-sm transition-all", 
+        onClick && "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95"
+      )}
+      onClick={onClick}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <div className={cn("p-2 rounded-lg", colorClass)}>
