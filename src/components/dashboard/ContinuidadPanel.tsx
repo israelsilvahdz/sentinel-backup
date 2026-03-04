@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -32,9 +33,12 @@ import { Textarea } from '../ui/textarea';
 
 export function ContinuidadPanel() {
   const { toast } = useToast();
-  const { selectedValue, filterType } = useDashboardFilters();
-  const [students, setStudents] = useState<ContinuityStudent[]>([]);
-  const [catalog, setCatalog] = useState<ContinuityCatalog | null>(null);
+  const { 
+    selectedValue, filterType, 
+    continuityStudents: students, setContinuityStudents: setStudents, 
+    continuityCatalog: catalog, setContinuityCatalog: setCatalog 
+  } = useDashboardFilters();
+  
   const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessingVoc, setIsProcessingVoc] = useState(false);
@@ -109,6 +113,20 @@ export function ContinuidadPanel() {
     const highInterest = students.filter(s => s.interestLevel?.toLowerCase().includes('alto')).length;
     const talentRisk = students.filter(s => s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
     
+    // Stats based on joined Firestore data
+    let indecisosCount = 0;
+    let sosCount = 0;
+    let tallerCount = 0;
+
+    students.forEach(s => {
+      const local = localStatuses[s.id];
+      if (local?.isIndeciso) indecisosCount++;
+      if (local?.vocationalDiagnosis) {
+        if (local.vocationalDiagnosis.urgencyLevel >= 8) sosCount++;
+        if (local.vocationalDiagnosis.requiresWorkshop) tallerCount++;
+      }
+    });
+    
     const statusDistribution = statuses.map(st => ({
       name: st,
       value: students.filter(s => s.status === st).length
@@ -123,8 +141,8 @@ export function ContinuidadPanel() {
       };
     }).sort((a,b) => b.total - a.total);
 
-    return { total, inscribed, highInterest, talentRisk, statusDistribution, advisorProgress };
-  }, [students, advisors, statuses]);
+    return { total, inscribed, highInterest, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount };
+  }, [students, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
     await updateContinuityIndeciso(studentId, isIndeciso);
@@ -168,11 +186,13 @@ export function ContinuidadPanel() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard title="Total Alumnos" value={stats.total} icon={Users} />
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="blue" />
-        <KpiCard title="Interés Alto" value={stats.highInterest} icon={Award} color="yellow" />
-        <KpiCard title="Fuga de Talento" value={stats.talentRisk} icon={AlertCircle} color="red" />
+        <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="yellow" />
+        <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" />
+        <KpiCard title="Taller Voc." value={stats.tallerCount} icon={CapIcon} color="blue" />
+        <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" />
       </div>
 
       <Tabs defaultValue="stats" className="w-full">

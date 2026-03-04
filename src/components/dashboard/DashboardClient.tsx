@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -36,7 +37,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
 
-import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme } from '@/types/student';
+import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme, ContinuityStudent, ContinuityCatalog } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
@@ -96,6 +97,10 @@ interface DashboardContextType {
   planType: PlanType;
   ofertaAcademica: OfertaAcademicaItem[];
   setOfertaAcademica: React.Dispatch<React.SetStateAction<OfertaAcademicaItem[]>>;
+  continuityStudents: ContinuityStudent[];
+  setContinuityStudents: React.Dispatch<React.SetStateAction<ContinuityStudent[]>>;
+  continuityCatalog: ContinuityCatalog | null;
+  setContinuityCatalog: React.Dispatch<React.SetStateAction<ContinuityCatalog | null>>;
   toast: (options: any) => void;
 }
 
@@ -114,7 +119,9 @@ const LOCAL_STORAGE_KEYS = {
     PLAN_TYPE: 'academic_sentinel_plan_type',
     OFERTA_ACADEMICA: 'academic_sentinel_oferta_academica',
     CURRENT_FILE_NAME: 'academic_sentinel_current_file_name',
-    DATA_KEY: 'academic_sentinel_data_key'
+    DATA_KEY: 'academic_sentinel_data_key',
+    CONTINUITY_STUDENTS: 'academic_sentinel_continuity_students',
+    CONTINUITY_CATALOG: 'academic_sentinel_continuity_catalog'
 };
 
 
@@ -129,6 +136,8 @@ export function DashboardClient() {
   const [weightingSchemes, setWeightingSchemes] = useState<WeightingScheme[]>([]);
   const [planType, setPlanType] = useState<PlanType>('tetramestral');
   const [ofertaAcademica, setOfertaAcademica] = useState<OfertaAcademicaItem[]>([]);
+  const [continuityStudents, setContinuityStudents] = useState<ContinuityStudent[]>([]);
+  const [continuityCatalog, setContinuityCatalog] = useState<ContinuityCatalog | null>(null);
   const [currentFileName, setCurrentFileName] = useState<string | null>(null);
   
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -249,6 +258,24 @@ export function DashboardClient() {
                       console.error("Fallo al desencriptar oferta:", e);
                   }
               }
+              const storedContinuity = localStorage.getItem(LOCAL_STORAGE_KEYS.CONTINUITY_STUDENTS);
+              if (storedContinuity) {
+                  try {
+                      const decrypted = xorCipher(storedContinuity, storedKey);
+                      setContinuityStudents(JSON.parse(decrypted));
+                  } catch (e) {
+                      console.error("Fallo al desencriptar continuidad:", e);
+                  }
+              }
+              const storedCatalog = localStorage.getItem(LOCAL_STORAGE_KEYS.CONTINUITY_CATALOG);
+              if (storedCatalog) {
+                  try {
+                      const decrypted = xorCipher(storedCatalog, storedKey);
+                      setContinuityCatalog(JSON.parse(decrypted));
+                  } catch (e) {
+                      console.error("Fallo al desencriptar catálogo:", e);
+                  }
+              }
           }
 
         } catch (error) {
@@ -280,6 +307,14 @@ export function DashboardClient() {
             const encryptedOferta = xorCipher(JSON.stringify(ofertaAcademica), dataKey);
             localStorage.setItem(LOCAL_STORAGE_KEYS.OFERTA_ACADEMICA, encryptedOferta);
         }
+        if (continuityStudents.length > 0 && dataKey) {
+            const encryptedContinuity = xorCipher(JSON.stringify(continuityStudents), dataKey);
+            localStorage.setItem(LOCAL_STORAGE_KEYS.CONTINUITY_STUDENTS, encryptedContinuity);
+        }
+        if (continuityCatalog && dataKey) {
+            const encryptedCatalog = xorCipher(JSON.stringify(continuityCatalog), dataKey);
+            localStorage.setItem(LOCAL_STORAGE_KEYS.CONTINUITY_CATALOG, encryptedCatalog);
+        }
         if (dataKey) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.DATA_KEY, dataKey);
         }
@@ -291,7 +326,7 @@ export function DashboardClient() {
     } catch(error) {
         console.error("Error saving data to Local Storage", error);
     }
-  }, [allStudents, planType, ofertaAcademica, dataKey, currentFileName]);
+  }, [allStudents, planType, ofertaAcademica, dataKey, currentFileName, continuityStudents, continuityCatalog]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -305,7 +340,7 @@ export function DashboardClient() {
 
   const handleSetActiveView = (view: ActiveView) => {
     setActiveView(view);
-    if (view !== 'students') {
+    if (view !== 'students' && view !== 'continuidad') {
       setCaseType(null);
       setSubjectRiskFilter(null);
       setGroupId(null);
@@ -409,6 +444,8 @@ export function DashboardClient() {
       setCurrentFile(null);
       setPlanType('tetramestral');
       setOfertaAcademica([]);
+      setContinuityStudents([]);
+      setContinuityCatalog(null);
       setDataKey(null);
 
       toast({ title: 'Datos Locales Eliminados', description: 'Los datos guardados en el navegador han sido borrados. Los datos en la nube permanecen.' });
@@ -587,6 +624,8 @@ export function DashboardClient() {
     activeView, setActiveView: handleSetActiveView,
     planType,
     ofertaAcademica, setOfertaAcademica,
+    continuityStudents, setContinuityStudents,
+    continuityCatalog, setContinuityCatalog,
     toast,
   };
 
