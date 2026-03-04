@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import type { ContinuityStudent, ContinuityCatalog } from '@/types/student';
 
 function normalizeHeader(header: string): string {
-  return header.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+  return header.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
 export async function parseContinuidadExcel(file: File): Promise<{ students: ContinuityStudent[], catalog: ContinuityCatalog } | null> {
@@ -28,25 +28,32 @@ export async function parseContinuidadExcel(file: File): Promise<{ students: Con
           const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
           
           json.forEach(row => {
-            const id = String(row['Matrícula'] || '').trim();
+            // Flexible header search for base sheet
+            const getVal = (search: string) => {
+              const normSearch = normalizeHeader(search);
+              const key = Object.keys(row).find(k => normalizeHeader(k).includes(normSearch));
+              return key ? row[key] : '';
+            };
+
+            const id = String(getVal('Matrícula') || '').trim();
             if (!id) return;
 
             studentMap.set(id, {
               id,
-              name: row['Nombre'] || '',
-              leader: row['Líder'] || '',
-              advisor: row['Asesor'] || '',
-              status: row['Estatus'] || '',
-              isInscribed: String(row['Inscrito']) === '1',
-              priority: parseInt(row['Prioridad']) || 0,
-              average: parseFloat(row['Promedio']) || 0,
-              scholarship: row['Beca'] || '',
-              lastContactDate: row['Fecha último contacto'] || '',
-              lastContactComment: row['Comentario último contacto'] || '',
+              name: getVal('Nombre') || '',
+              leader: getVal('Líder') || '',
+              advisor: getVal('Asesor') || '',
+              status: getVal('Estatus') || '',
+              isInscribed: String(getVal('Inscrito')) === '1',
+              priority: parseInt(getVal('Prioridad')) || 0,
+              average: parseFloat(getVal('Promedio')) || 0,
+              scholarship: getVal('Beca') || '',
+              lastContactDate: getVal('Fecha último contacto') || '',
+              lastContactComment: getVal('Comentario último contacto') || '',
               cycle: sheetInfo.cycle as any,
               interestLevel: '',
               programOfInterest: '',
-              competitorUniversity: '',
+              competitorUniversity: getVal('Atributos universidad') || '',
               interviewer: '',
               decisionTaken: ''
             });
@@ -58,14 +65,22 @@ export async function parseContinuidadExcel(file: File): Promise<{ students: Con
         if (generalWs) {
           const generalJson: any[] = XLSX.utils.sheet_to_json(generalWs, { defval: '' });
           generalJson.forEach(row => {
-            const id = String(row['Matrícula'] || '').trim();
+            const getVal = (search: string) => {
+              const normSearch = normalizeHeader(search);
+              const key = Object.keys(row).find(k => normalizeHeader(k).includes(normSearch));
+              return key ? row[key] : '';
+            };
+
+            const id = String(getVal('Matrícula') || '').trim();
             const student = studentMap.get(id);
             if (student) {
-              student.interestLevel = row['Nivel de riesgo'] || row['Nivel de interes'] || '';
-              student.programOfInterest = row['Programa de interés'] || '';
-              student.competitorUniversity = row['Atributos universidad'] || '';
-              student.interviewer = row['Entrevista'] || '';
-              student.decisionTaken = row['¿Ya tomaste alguna decisión sobre qué carrera vas a estudiar y en dónde?'] || '';
+              student.interestLevel = getVal('Nivel de riesgo') || getVal('Nivel de interes') || '';
+              student.programOfInterest = getVal('Programa de interés') || '';
+              if (!student.competitorUniversity) {
+                student.competitorUniversity = getVal('Atributos universidad') || '';
+              }
+              student.interviewer = getVal('Entrevista') || '';
+              student.decisionTaken = getVal('¿Ya tomaste alguna decisión sobre qué carrera vas a estudiar y en dónde?') || '';
             }
           });
         }
@@ -74,7 +89,6 @@ export async function parseContinuidadExcel(file: File): Promise<{ students: Con
         const genWs = workbook.Sheets['Generalidades'];
         if (genWs) {
           const genJson: any[] = XLSX.utils.sheet_to_json(genWs, { header: 1, defval: '' });
-          // Assumption: Statuses in col A, Mentoring in col B, Formats in col C
           genJson.slice(1).forEach(row => {
             if (row[0]) catalog.statuses.push(String(row[0]));
             if (row[1]) catalog.riskLevels.push(String(row[1]));

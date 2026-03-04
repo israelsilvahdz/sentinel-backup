@@ -1,14 +1,20 @@
 import * as XLSX from 'xlsx';
 import type { VocationalDiagnosis } from '@/types/student';
 
-const QUESTIONS = {
-  CERTAINTY: "¿Cómo describirías tu nivel de certeza sobre qué estudiar?",
-  URGENCY: "¿Qué tanta necesidad tienes de una sesión de orientación personalizada urgente?",
-  OBSTACLE: "¿Cuál consideras que es tu principal obstáculo actual para continuar tus estudios?",
-  RANKING: "Ordena las siguientes universidades según tu interés.",
-  CARRERAS: "Carreras que me interesan",
-  DETALLES: "Detalles"
+// Keywords to match headers flexibly
+const KEYWORDS = {
+  CERTAINTY: "certeza",
+  URGENCY: "urgencia",
+  OBSTACLE: "obstaculo",
+  RANKING: "ordena las siguientes universidades",
+  CARRERAS: "carreras que me interesan",
+  DETALLES: "detalles",
+  MATRICULA: "matricula"
 };
+
+function normalize(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
 
 export interface VocationalUploadResult {
   diagnoses: Record<string, VocationalDiagnosis>;
@@ -30,23 +36,29 @@ export async function parseVocationalExcel(file: File): Promise<VocationalUpload
         if (respWs) {
           const json: any[] = XLSX.utils.sheet_to_json(respWs, { defval: '' });
           json.forEach(row => {
-            const id = String(row['Matrícula'] || '').trim();
+            const keys = Object.keys(row);
+            const getVal = (keyword: string) => {
+              const foundKey = keys.find(k => normalize(k).includes(keyword));
+              return foundKey ? row[foundKey] : '';
+            };
+
+            const id = String(getVal(KEYWORDS.MATRICULA) || '').trim();
             if (!id) return;
 
-            // Ranking handling - support both semicolon and comma
-            const ranking = String(row[QUESTIONS.RANKING] || '');
+            const ranking = String(getVal(KEYWORDS.RANKING) || '');
+            // Split by comma or semicolon and clean up
             const firstUni = ranking.split(/[;,]/)[0]?.trim().toUpperCase() || '';
             const isSecondOption = firstUni !== '' && !firstUni.includes('TECMILENIO');
 
             diagnoses[id] = {
-              certaintyLevel: row[QUESTIONS.CERTAINTY] || '',
-              urgencyLevel: parseInt(row[QUESTIONS.URGENCY]) || 0,
-              mainObstacle: row[QUESTIONS.OBSTACLE] || '',
+              certaintyLevel: getVal(KEYWORDS.CERTAINTY) || '',
+              urgencyLevel: parseInt(getVal(KEYWORDS.URGENCY)) || 0,
+              mainObstacle: getVal(KEYWORDS.OBSTACLE) || '',
               universityRanking: ranking,
               isSecondOption,
               requiresWorkshop: false,
-              interestedCareers: row[QUESTIONS.CARRERAS] || '',
-              details: row[QUESTIONS.DETALLES] || '',
+              interestedCareers: getVal(KEYWORDS.CARRERAS) || '',
+              details: getVal(KEYWORDS.DETALLES) || '',
               lastUpdated: null
             };
           });
@@ -57,10 +69,16 @@ export async function parseVocationalExcel(file: File): Promise<VocationalUpload
         if (indecisosWs) {
           const json: any[] = XLSX.utils.sheet_to_json(indecisosWs, { defval: '' });
           json.forEach(row => {
-            const id = String(row['Matrícula'] || '').trim();
+            const keys = Object.keys(row);
+            const getVal = (keyword: string) => {
+              const foundKey = keys.find(k => normalize(k).includes(keyword));
+              return foundKey ? row[foundKey] : '';
+            };
+
+            const id = String(getVal(KEYWORDS.MATRICULA) || '').trim();
             if (!id) return;
 
-            const careersStr = String(row['Carreras'] || '').trim();
+            const careersStr = String(getVal('carreras') || '').trim();
             const careerItems = careersStr.split(/[,\/;]|\sy\s|\so\s/).map(i => i.trim()).filter(Boolean);
             
             if (careerItems.length > 1) {
@@ -68,7 +86,8 @@ export async function parseVocationalExcel(file: File): Promise<VocationalUpload
             }
 
             if (diagnoses[id]) {
-              diagnoses[id].requiresWorkshop = String(row['Taller']).toUpperCase() === 'TRUE' || String(row['Taller']) === '1';
+              const tallerVal = String(getVal('taller'));
+              diagnoses[id].requiresWorkshop = tallerVal.toUpperCase() === 'TRUE' || tallerVal === '1' || tallerVal.toUpperCase() === 'SI';
             }
           });
         }
