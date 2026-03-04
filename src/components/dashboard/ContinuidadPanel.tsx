@@ -114,10 +114,10 @@ export function ContinuidadPanel() {
         const voc = local?.vocationalDiagnosis;
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
-          case 'indeciso': return local?.isIndeciso;
-          case 'sos': return voc && voc.urgencyLevel >= 8;
-          case 'taller': return voc?.requiresWorkshop;
-          case 'risk': return s.average >= 90 && s.status.toLowerCase().includes('descartado');
+          case 'indeciso': return !s.isInscribed && local?.isIndeciso;
+          case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
+          case 'taller': return !s.isInscribed && voc?.requiresWorkshop;
+          case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
           default: return true;
         }
       });
@@ -130,14 +130,16 @@ export function ContinuidadPanel() {
     const total = students.length || 1;
     const inscribed = students.filter(s => s.isInscribed).length;
     const highInterest = students.filter(s => s.interestLevel?.toLowerCase().includes('alto')).length;
-    const talentRisk = students.filter(s => s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
+    const talentRisk = students.filter(s => !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
     
-    // Stats based on joined Firestore data
+    // Stats based on joined Firestore data - Exclude inscribed students
     let indecisosCount = 0;
     let sosCount = 0;
     let tallerCount = 0;
 
     students.forEach(s => {
+      if (s.isInscribed) return; // Ignore inscribed for these counts
+
       const local = localStatuses[s.id];
       if (local?.isIndeciso) indecisosCount++;
       if (local?.vocationalDiagnosis) {
@@ -326,9 +328,11 @@ function ContinuityCard({
   onUpdateIndeciso: (id: string, val: boolean) => void,
   onAddComment: (id: string, text: string, author: string) => void
 }) {
-  const isHighValueRisk = student.average >= 90 && student.status.toLowerCase().includes('descartado');
+  const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
-  const isSOS = vocational && vocational.urgencyLevel >= 8;
+  // If inscribed, SOS and Indeciso are cleared
+  const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
+  const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
   const isSecondOption = vocational?.isSecondOption;
 
   const [commentText, setCommentText] = useState('');
@@ -344,7 +348,7 @@ function ContinuityCard({
       "transition-all border-l-4",
       student.isInscribed ? "border-l-green-500" : "border-l-muted",
       (isHighValueRisk || isSOS) && "ring-2 ring-red-500/50",
-      localStatus?.isIndeciso && "border-l-purple-500 bg-purple-50/5"
+      isIndeciso && "border-l-purple-500 bg-purple-50/5"
     )}>
       <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/5" onClick={onToggle}>
         <div className="flex items-center gap-4 flex-1">
@@ -360,7 +364,7 @@ function ContinuityCard({
               {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
               {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
               {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
-              {localStatus?.isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
+              {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
               {isSecondOption && <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">Segunda Opción</Badge>}
             </h3>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -379,16 +383,18 @@ function ContinuityCard({
 
       {isExpanded && (
         <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2">
-          <div className="flex justify-end mb-2">
-            <div className="flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm">
-              <Checkbox 
-                id={`indeciso-${student.id}`} 
-                checked={localStatus?.isIndeciso || false} 
-                onCheckedChange={(checked) => onUpdateIndeciso(student.id, !!checked)}
-              />
-              <Label htmlFor={`indeciso-${student.id}`} className="text-xs font-bold cursor-pointer">Marcar como Indeciso</Label>
+          {!student.isInscribed && (
+            <div className="flex justify-end mb-2">
+              <div className="flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm">
+                <Checkbox 
+                  id={`indeciso-${student.id}`} 
+                  checked={localStatus?.isIndeciso || false} 
+                  onCheckedChange={(checked) => onUpdateIndeciso(student.id, !!checked)}
+                />
+                <Label htmlFor={`indeciso-${student.id}`} className="text-xs font-bold cursor-pointer">Marcar como Indeciso</Label>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-4">
@@ -441,7 +447,7 @@ function ContinuityCard({
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold text-muted-foreground uppercase">Urgencia S.O.S</p>
-                        <Badge variant={vocational.urgencyLevel >= 8 ? 'destructive' : 'outline'} className="text-lg py-0 px-2">
+                        <Badge variant={vocational.urgencyLevel >= 8 ? 'destructive' : 'outline'} className={cn("text-lg py-0 px-2", student.isInscribed && "opacity-50 grayscale")}>
                           {vocational.urgencyLevel}/10
                         </Badge>
                       </div>
@@ -463,7 +469,7 @@ function ContinuityCard({
                       <p className="text-xs font-bold text-muted-foreground uppercase">Preferencia de Universidades</p>
                       <p className="text-xs italic mt-1 leading-relaxed">{vocational.universityRanking}</p>
                     </div>
-                    {vocational.requiresWorkshop && (
+                    {vocational.requiresWorkshop && !student.isInscribed && (
                       <div className="flex items-center gap-2 p-2 bg-purple-100 text-purple-800 rounded-lg border border-purple-200">
                         <GraduationCap className="h-4 w-4" />
                         <span className="text-xs font-bold uppercase">Requiere Taller Vocacional</span>
