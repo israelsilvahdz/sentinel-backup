@@ -11,7 +11,7 @@ import {
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
-  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2
+  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -352,6 +352,13 @@ function ContinuityCard({
   const isWorkshopRequired = vocational?.requiresWorkshop && !student.isInscribed;
   const isWorkshopAttended = localStatus?.workshopAttended;
 
+  const tecmilenioRank = useMemo(() => {
+    if (!vocational?.universityRanking) return null;
+    const rankingArray = vocational.universityRanking.split(';').filter(Boolean).map(u => u.trim().toUpperCase());
+    const rank = rankingArray.indexOf('TECMILENIO') + 1;
+    return rank > 0 ? rank : null;
+  }, [vocational]);
+
   const [commentText, setCommentText] = useState('');
   const { leaders, tutors } = useDashboardFilters();
   const [author, setAuthor] = useState('');
@@ -382,9 +389,16 @@ function ContinuityCard({
               {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
               {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
               {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
+              {!student.isInscribed && tecmilenioRank !== null && (
+                <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(
+                  tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50"
+                )}>
+                  {tecmilenioRank === 1 ? <Trophy className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
+                  Opción {tecmilenioRank}
+                </Badge>
+              )}
               {isWorkshopRequired && !isWorkshopAttended && <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Pend. Taller</Badge>}
               {isWorkshopAttended && <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50"><CheckCircle2 className="h-3 w-3 mr-1" />Taller Tomado</Badge>}
-              {isSecondOption && <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">Segunda Opción</Badge>}
             </h3>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
               <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
@@ -440,7 +454,7 @@ function ContinuityCard({
             </div>
 
             <div className="space-y-4">
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Perfil Vocacional</Label>
+              <Label className="text-xs uppercase font-bold text-muted-foreground">Perfil Vocacional (Excel)</Label>
               <div className="space-y-2">
                 <div className="text-sm flex items-center gap-2">
                   <strong>Interés:</strong> 
@@ -470,7 +484,7 @@ function ContinuityCard({
               <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
                 <Stethoscope className="h-4 w-4" /> Diagnóstico Vocacional (Encuesta)
               </Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <Card className="bg-primary/5 border-primary/10">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex justify-between items-start">
@@ -496,11 +510,40 @@ function ContinuityCard({
                     </div>
                   </CardContent>
                 </Card>
+
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <ListOrdered className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-xs font-bold text-muted-foreground uppercase">Ranking de Universidades</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {vocational.universityRanking.split(';').filter(Boolean).map((uni, idx) => (
+                        <div key={idx} className="flex items-center">
+                          <Badge variant="outline" className={cn(
+                            "text-[10px] py-0 px-1.5",
+                            uni.trim().toUpperCase() === 'TECMILENIO' ? "bg-primary text-white border-primary" : "bg-white"
+                          )}>
+                            {idx + 1}. {uni.trim()}
+                          </Badge>
+                          {idx < vocational.universityRanking.split(';').filter(Boolean).length - 1 && <span className="text-muted-foreground mx-0.5">→</span>}
+                        </div>
+                      ))}
+                    </div>
+                    {tecmilenioRank && tecmilenioRank > 1 && !student.isInscribed && (
+                      <div className="bg-orange-100 text-orange-800 p-2 rounded-lg text-[10px] font-bold flex items-center gap-2 mt-2">
+                        <AlertCircle className="h-3 w-3" />
+                        COMPETENCIA: SOMOS LA OPCIÓN {tecmilenioRank}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <Card className="bg-muted/30">
                   <CardContent className="p-4 space-y-3">
                     <div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase">Preferencia de Universidades</p>
-                      <p className="text-[10px] sm:text-xs italic mt-1 leading-relaxed">{vocational.universityRanking}</p>
+                      <p className="text-xs font-bold text-muted-foreground uppercase">Carreras de Interés</p>
+                      <p className="text-xs font-semibold mt-1">{vocational.interestedCareers || 'No especificadas'}</p>
                     </div>
                     {vocational.requiresWorkshop && !student.isInscribed && (
                       <div className={cn(
