@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseContinuidadExcel } from '@/lib/continuityParser';
-import type { ContinuityStudent, ContinuityCatalog } from '@/types/student';
+import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment } from '@/types/student';
 import { 
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
-  ChevronDown, ChevronUp, BarChart3, PieChart
+  ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -20,18 +20,34 @@ import { Progress } from '../ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, PieChart as RePieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useDashboardFilters } from './DashboardClient';
+import { getAllContinuityStatuses, updateContinuityIndeciso, addContinuityComment } from '@/lib/firebase-services';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Checkbox } from '../ui/checkbox';
+import { Textarea } from '../ui/textarea';
 
 export function ContinuidadPanel() {
   const { toast } = useToast();
+  const { selectedValue, filterType } = useDashboardFilters();
   const [students, setStudents] = useState<ContinuityStudent[]>([]);
   const [catalog, setCatalog] = useState<ContinuityCatalog | null>(null);
+  const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAdvisor, setSelectedAdvisor] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedCycle, setSelectedCycle] = useState('all');
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLocalStatuses = async () => {
+      const statuses = await getAllContinuityStatuses();
+      setLocalStatuses(statuses);
+    };
+    loadLocalStatuses();
+  }, []);
 
   const handleFileUpload = async (file: File | null) => {
     if (!file) return;
@@ -59,18 +75,20 @@ export function ContinuidadPanel() {
       const matchesAdvisor = selectedAdvisor === 'all' || s.advisor === selectedAdvisor;
       const matchesStatus = selectedStatus === 'all' || s.status === selectedStatus;
       const matchesCycle = selectedCycle === 'all' || s.cycle === selectedCycle;
-      return matchesSearch && matchesAdvisor && matchesStatus && matchesCycle;
-    });
-  }, [students, searchTerm, selectedAdvisor, selectedStatus, selectedCycle]);
+      
+      // Filtro global de líder
+      const matchesGlobalLeader = (filterType === 'leader' && selectedValue) ? s.leader === selectedValue : true;
 
-  // KPIs
+      return matchesSearch && matchesAdvisor && matchesStatus && matchesCycle && matchesGlobalLeader;
+    });
+  }, [students, searchTerm, selectedAdvisor, selectedStatus, selectedCycle, filterType, selectedValue]);
+
   const stats = useMemo(() => {
     const total = students.length || 1;
     const inscribed = students.filter(s => s.isInscribed).length;
     const highInterest = students.filter(s => s.interestLevel?.toLowerCase().includes('alto')).length;
     const talentRisk = students.filter(s => s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
     
-    // Data for charts
     const statusDistribution = statuses.map(st => ({
       name: st,
       value: students.filter(s => s.status === st).length
@@ -87,6 +105,20 @@ export function ContinuidadPanel() {
 
     return { total, inscribed, highInterest, talentRisk, statusDistribution, advisorProgress };
   }, [students, advisors, statuses]);
+
+  const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
+    await updateContinuityIndeciso(studentId, isIndeciso);
+    setLocalStatuses(prev => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] || { comments: [] }), isIndeciso }
+    }));
+  };
+
+  const handleAddComment = async (studentId: string, text: string, author: string) => {
+    await addContinuityComment(studentId, text, author);
+    const updated = await getAllContinuityStatuses();
+    setLocalStatuses(updated);
+  };
 
   if (students.length === 0) {
     return (
@@ -197,8 +229,11 @@ export function ContinuidadPanel() {
               <ContinuityCard 
                 key={student.id} 
                 student={student} 
+                localStatus={localStatuses[student.id]}
                 isExpanded={expandedStudent === student.id}
                 onToggle={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
+                onUpdateIndeciso={handleUpdateIndeciso}
+                onAddComment={handleAddComment}
               />
             ))}
           </div>
@@ -208,14 +243,31 @@ export function ContinuidadPanel() {
   );
 }
 
-function ContinuityCard({ student, isExpanded, onToggle }: { student: ContinuityStudent, isExpanded: boolean, onToggle: () => void }) {
+function ContinuityCard({ 
+  student, localStatus, isExpanded, onToggle, onUpdateIndeciso, onAddComment 
+}: { 
+  student: ContinuityStudent, 
+  localStatus?: ContinuityLocalStatus,
+  isExpanded: boolean, 
+  onToggle: () => void,
+  onUpdateIndeciso: (id: string, val: boolean) => void,
+  onAddComment: (id: string, text: string, author: string) => void
+}) {
   const isHighValueRisk = student.average >= 90 && student.status.toLowerCase().includes('descartado');
+  const [commentText, setCommentText] = useState('');
+  const { leaders, tutors } = useDashboardFilters();
+  const [author, setAuthor] = useState('');
+
+  const signatoryOptions = useMemo(() => {
+    return [...new Set([...leaders, ...tutors])].sort((a, b) => a.localeCompare(b));
+  }, [leaders, tutors]);
 
   return (
     <Card className={cn(
       "transition-all border-l-4",
       student.isInscribed ? "border-l-green-500" : "border-l-muted",
-      isHighValueRisk && "ring-2 ring-red-500/50"
+      isHighValueRisk && "ring-2 ring-red-500/50",
+      localStatus?.isIndeciso && "border-l-purple-500 bg-purple-50/5"
     )}>
       <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/5" onClick={onToggle}>
         <div className="flex items-center gap-4 flex-1">
@@ -230,6 +282,7 @@ function ContinuityCard({ student, isExpanded, onToggle }: { student: Continuity
               {student.name}
               {isHighValueRisk && <Badge variant="destructive" className="animate-pulse">Alerta Fuga</Badge>}
               {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
+              {localStatus?.isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
             </h3>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
@@ -247,6 +300,17 @@ function ContinuityCard({ student, isExpanded, onToggle }: { student: Continuity
 
       {isExpanded && (
         <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2">
+          <div className="flex justify-end mb-2">
+            <div className="flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm">
+              <Checkbox 
+                id={`indeciso-${student.id}`} 
+                checked={localStatus?.isIndeciso || false} 
+                onCheckedChange={(checked) => onUpdateIndeciso(student.id, !!checked)}
+              />
+              <Label htmlFor={`indeciso-${student.id}`} className="text-xs font-bold cursor-pointer">Marcar como Indeciso</Label>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-4">
               <Label className="text-xs uppercase font-bold text-muted-foreground">Estado Operativo</Label>
@@ -273,7 +337,7 @@ function ContinuityCard({ student, isExpanded, onToggle }: { student: Continuity
             </div>
 
             <div className="space-y-4">
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Bitácora de Contacto</Label>
+              <Label className="text-xs uppercase font-bold text-muted-foreground">Bitácora de Contacto (Excel)</Label>
               <div className="bg-background p-3 rounded-lg border text-sm">
                 <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   <PhoneCall className="h-3 w-3" /> {student.lastContactDate || 'Sin fecha'}
@@ -288,6 +352,72 @@ function ContinuityCard({ student, isExpanded, onToggle }: { student: Continuity
             <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 flex gap-3">
               <MessageSquare className="h-5 w-5 text-primary shrink-0 mt-1" />
               <p className="text-sm leading-relaxed">{student.decisionTaken || "Sin respuesta declarada."}</p>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t space-y-4">
+            <Label className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
+              <History className="h-4 w-4" /> Bitácora de Seguimiento Interno (Sentinel)
+            </Label>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <ScrollArea className="h-[200px] pr-4">
+                  <div className="space-y-3">
+                    {localStatus?.comments && localStatus.comments.length > 0 ? (
+                      [...localStatus.comments].reverse().map(c => (
+                        <div key={c.id} className="bg-background p-3 rounded-lg border shadow-sm text-xs">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold text-primary flex items-center gap-1">
+                              <UserCog className="h-3 w-3" /> {c.author}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
+                            </span>
+                          </div>
+                          <p className="text-foreground/90 whitespace-pre-wrap">{c.text}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios internos aún.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="space-y-3 bg-background p-4 rounded-xl border">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold">Nueva nota de seguimiento:</Label>
+                  <Select value={author} onValueChange={setAuthor}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="¿Quién firma?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {signatoryOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Textarea 
+                    value={commentText} 
+                    onChange={e => setCommentText(e.target.value)}
+                    placeholder="Escribe aquí los detalles de la última interacción..."
+                    className="min-h-[100px] text-sm resize-none"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button 
+                    size="sm" 
+                    onClick={() => {
+                      if (!author || !commentText.trim()) return;
+                      onAddComment(student.id, commentText, author);
+                      setCommentText('');
+                    }}
+                    disabled={!commentText.trim() || !author}
+                  >
+                    <Send className="h-4 w-4 mr-2" /> Guardar Nota
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>

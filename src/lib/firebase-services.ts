@@ -1,5 +1,3 @@
-
-
 import { 
   getFirestore, 
   collection, 
@@ -14,10 +12,11 @@ import {
   setDoc,
   writeBatch,
   getDoc,
-  where
+  where,
+  arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -27,6 +26,7 @@ const PROFESSOR_CONTACTS_COLLECTION = 'professorContacts';
 const TEAMS_COLLECTION = 'teams';
 const CHANGE_LOG_COLLECTION = 'studentChangeLog';
 const WEIGHTING_SCHEMES_COLLECTION = 'weightingSchemes';
+const CONTINUITY_STATUS_COLLECTION = 'continuityStatus';
 
 
 /**
@@ -434,4 +434,60 @@ export const deleteWeightingScheme = async (schemeId: string): Promise<void> => 
         console.error("Error deleting weighting scheme:", error);
         throw error;
     }
+};
+
+// --- Funciones para Continuidad ---
+
+export const getContinuityLocalStatus = async (studentId: string): Promise<ContinuityLocalStatus | null> => {
+  try {
+    const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as ContinuityLocalStatus;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting continuity status:", error);
+    return null;
+  }
+};
+
+export const updateContinuityIndeciso = async (studentId: string, isIndeciso: boolean): Promise<void> => {
+  try {
+    const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+    await setDoc(docRef, { isIndeciso }, { merge: true });
+  } catch (error) {
+    console.error("Error updating indeciso status:", error);
+  }
+};
+
+export const addContinuityComment = async (studentId: string, text: string, author: string): Promise<void> => {
+  try {
+    const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+    const comment: ContinuityComment = {
+      id: Math.random().toString(36).substring(7),
+      text,
+      author,
+      createdAt: Timestamp.now()
+    };
+    await setDoc(docRef, {
+      comments: arrayUnion(comment)
+    }, { merge: true });
+  } catch (error) {
+    console.error("Error adding continuity comment:", error);
+  }
+};
+
+export const getAllContinuityStatuses = async (): Promise<Record<string, ContinuityLocalStatus>> => {
+  try {
+    const snapshot = await getDocs(collection(db, CONTINUITY_STATUS_COLLECTION));
+    const statuses: Record<string, ContinuityLocalStatus> = {};
+    snapshot.forEach(doc => {
+      statuses[doc.id] = doc.data() as ContinuityLocalStatus;
+    });
+    return statuses;
+  } catch (error) {
+    console.error("Error getting all continuity statuses:", error);
+    return {};
+  }
 };

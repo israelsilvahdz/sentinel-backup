@@ -144,6 +144,18 @@ export interface ContinuityCatalog {
   formats: string[];
 }
 
+export interface ContinuityComment {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: any;
+}
+
+export interface ContinuityLocalStatus {
+  isIndeciso: boolean;
+  comments: ContinuityComment[];
+}
+
 // --- NUEVOS TIPOS PARA TRABAJO EN EQUIPO ---
 
 export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low';
