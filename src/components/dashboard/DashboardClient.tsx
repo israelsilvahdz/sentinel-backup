@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -30,8 +29,9 @@ import { ProfessorSchedulePanel } from './ProfessorSchedulePanel';
 import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { TeamWorkPanel } from './TeamWorkPanel';
+import { ContinuidadPanel } from './ContinuidadPanel';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -46,7 +46,7 @@ import { xorCipher } from '@/lib/utils';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
-export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'team-work';
+export type ActiveView = 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'team-work' | 'continuidad';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -604,6 +604,7 @@ export function DashboardClient() {
         case 'oferta-academica': return <OfertaAcademicaPanel />;
         case 'irregular-students': return <IrregularStudentsPanel />;
         case 'team-work': return <TeamWorkPanel />;
+        case 'continuidad': return <ContinuidadPanel />;
         default: return <Dashboard />;
     }
   }
@@ -645,6 +646,12 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Ruta Diaria / Equipo" isActive={activeView === 'team-work'} onClick={() => handleSetActiveView('team-work')}>
                     <ClipboardList />
                     <span>Ruta Diaria / Equipo</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Continuidad Vocacional" isActive={activeView === 'continuidad'} onClick={() => handleSetActiveView('continuidad')}>
+                    <TrendingUp />
+                    <span>Continuidad</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

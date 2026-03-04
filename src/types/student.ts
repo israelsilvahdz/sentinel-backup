@@ -116,23 +116,32 @@ export interface OfertaAcademicaItem {
     room: string;
 }
 
-// Nuevo tipo para el parser del kardex
-export interface IrregularStudentInfo {
-    id: string;
-    name: string;
-    currentTerm: number;
-    pendingSubjects: { name: string; term: number }[];
+// NUEVOS TIPOS PARA CONTINUIDAD
+export interface ContinuityStudent {
+  id: string;
+  name: string;
+  leader: string;
+  advisor: string;
+  status: string;
+  isInscribed: boolean;
+  priority: number;
+  average: number;
+  scholarship: string;
+  lastContactDate: string;
+  lastContactComment: string;
+  cycle: 'Enero 26' | 'Agosto 26';
+  // Vocacional
+  interestLevel: string;
+  programOfInterest: string;
+  competitorUniversity: string;
+  interviewer: string;
+  decisionTaken: string;
 }
 
-export interface WeightingScheme {
-  id?: string;
-  name: string;
-  activities: {
-    name: string;
-    weight: number;
-    label?: string;
-  }[];
-  subjectNames: string[];
+export interface ContinuityCatalog {
+  statuses: string[];
+  riskLevels: string[];
+  formats: string[];
 }
 
 // --- NUEVOS TIPOS PARA TRABAJO EN EQUIPO ---
