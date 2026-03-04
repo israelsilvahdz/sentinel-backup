@@ -462,7 +462,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="print-online-flex" checked={options.includeOnlineFlexGroups} onCheckedChange={(checked) => setOptions(o => ({...o, includeOnlineFlexGroups: !!checked}))} />
-                    <Label htmlFor="print-online-flex">Grupos Online y Flex</Label>
+                    <Label htmlFor="print-online-flex">Grupos Online/Flex</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox id="print-student-phone" checked={options.includeStudentPhone} onCheckedChange={(checked) => setOptions(o => ({...o, includeStudentPhone: !!checked}))} />
@@ -945,13 +945,13 @@ export function StudentPanel() {
 
   const getPanelTitle = () => {
     if (caseType && caseTypeMap[caseType]) {
-        return <span className="font-bold text-primary">{caseTypeMap[caseType]}</span>;
+        return <span className="font-bold text-white">{caseTypeMap[caseType]}</span>;
     }
     if (subjectRiskFilter) {
         const riskTypeText = subjectRiskFilter.riskType === 'absences' ? 'Faltas' : 'Tareas (NE)';
-        return <span>Alumnos en riesgo por <span className="font-bold text-primary">{riskTypeText}</span> en <span className="font-bold text-primary">{subjectRiskFilter.subjectName}</span></span>;
+        return <span>Alumnos en riesgo por <span className="font-bold text-white">{riskTypeText}</span> en <span className="font-bold text-white">{subjectRiskFilter.subjectName}</span></span>;
     }
-    return <span>Explora y monitorea los casos individuales de cada alumno.</span>;
+    return <span className="text-emerald-50/80">Explora y monitorea los casos individuales de cada alumno.</span>;
   };
 
   const handleClearFilter = () => {
@@ -964,111 +964,114 @@ export function StudentPanel() {
 
   return (
     <div className="p-6 md:p-10 space-y-10 max-w-7xl mx-auto animate-in fade-in duration-700">
-       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/5 to-emerald-900/5 p-6 md:p-8 border border-primary/10 shadow-sm">
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 bg-white/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-2 border">
-                  <Zap className="h-3 w-3 text-primary" /> Gestión de Casos 2026
+       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-emerald-900 p-8 md:p-10 text-white shadow-2xl">
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
+            <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-2 border border-white/10 shadow-inner">
+                  <Zap className="h-3 w-3 text-emerald-300" /> Gestión de Casos 2026
                 </div>
-                <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-                  <Users className="h-8 w-8 text-primary" /> Panel de Alumnos
+                <h1 className="text-4xl font-black tracking-tight flex items-center gap-4">
+                  Panel de Alumnos
                 </h1>
-                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                <p className="text-base mt-1 flex items-center gap-2">
                     {getPanelTitle()}
                     {hasActiveFilter && (
-                        <Button variant="ghost" size="sm" onClick={handleClearFilter} className="h-6 px-2 text-xs font-bold text-destructive hover:bg-destructive/5 rounded-full">
-                          <X className="mr-1 h-3 w-3"/> Limpiar filtro
+                        <Button variant="secondary" size="sm" onClick={handleClearFilter} className="h-7 px-3 text-[10px] font-black uppercase tracking-widest bg-white/20 hover:bg-white/30 text-white border-none rounded-full transition-all">
+                          <X className="mr-1.5 h-3.5 w-3.5"/> Limpiar filtro
                         </Button>
                     )}
                 </p>
             </div>
-             <div className="flex items-center gap-2 flex-wrap bg-white/80 backdrop-blur-md p-2 rounded-2xl border shadow-sm">
-                <div className="flex items-center gap-1.5 border-r pr-2 mr-1">
+             <div className="flex items-center gap-3 flex-wrap bg-white/10 backdrop-blur-xl p-3 rounded-2xl border border-white/10 shadow-2xl">
+                <div className="flex items-center gap-2 border-r border-white/10 pr-3 mr-1">
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <FileUpload onFileSelect={handleDirectoryUpload} selectedFile={directoryFile} isLoading={isProcessingDirectory} variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 text-primary" label="" icon={<Contact className="h-5 w-5" />} />
+                                <FileUpload onFileSelect={handleDirectoryUpload} selectedFile={directoryFile} isLoading={isProcessingDirectory} variant="secondary" size="icon" className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 text-white border-none" label="" icon={<Contact className="h-5 w-5" />} />
                             </TooltipTrigger>
-                            <TooltipContent><p className="font-bold">Cargar Directorio</p></TooltipContent>
+                            <TooltipContent className="font-bold">Cargar Directorio</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <FileUpload onFileSelect={handleAthletesUpload} selectedFile={athletesFile} isLoading={isProcessingAthletes} variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/5 text-primary" label="" icon={<Award className="h-5 w-5" />} />
+                                <FileUpload onFileSelect={handleAthletesUpload} selectedFile={athletesFile} isLoading={isProcessingAthletes} variant="secondary" size="icon" className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 text-white border-none" label="" icon={<Award className="h-5 w-5" />} />
                             </TooltipTrigger>
-                            <TooltipContent><p className="font-bold">Cargar Atletas</p></TooltipContent>
+                            <TooltipContent className="font-bold">Cargar Atletas</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                 </div>
                 
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <Button variant="ghost" disabled={athleteStudents.length === 0} size="sm" className="h-9 rounded-xl font-bold text-xs gap-2">
-                            <Mail className="h-4 w-4 text-primary"/> Notificar Ausencia
-                        </Button>
-                    </DialogTrigger>
-                    <AthleteNotificationDialog students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
-                </Dialog>
-                 <Dialog>
-                    <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-9 rounded-xl font-bold text-xs gap-2">
-                            <Printer className="h-4 w-4 text-primary" /> Imprimir Lista
-                        </Button>
-                    </DialogTrigger>
-                    <PrintListDialog students={filteredStudents} contacts={studentContacts} />
-                </Dialog>
-                {hasData && (
-                <TooltipProvider>
-                    <Tooltip open={isCopied}>
-                        <TooltipTrigger asChild>
-                        <Button variant="ghost" onClick={handleCopyDirectory} size="sm" className="h-9 rounded-xl font-bold text-xs gap-2">
-                            {isCopied ? <Check className="text-primary h-4 w-4"/> : <ClipboardCopy className="h-4 w-4 text-primary" />}
-                             Copiar Directorio
-                        </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p className="font-bold">{isCopied ? '¡Copiado!' : 'Exportar a portapapeles'}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-                )}
+                <div className="flex items-center gap-2">
+                  <Dialog>
+                      <DialogTrigger asChild>
+                          <Button variant="secondary" disabled={athleteStudents.length === 0} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
+                              <Mail className="h-4 w-4 text-emerald-300"/> Notificar Ausencia
+                          </Button>
+                      </DialogTrigger>
+                      <AthleteNotificationDialog students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
+                  </Dialog>
+                  <Dialog>
+                      <DialogTrigger asChild>
+                          <Button variant="secondary" size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
+                              <Printer className="h-4 w-4 text-emerald-300" /> Imprimir Lista
+                          </Button>
+                      </DialogTrigger>
+                      <PrintListDialog students={filteredStudents} contacts={studentContacts} />
+                  </Dialog>
+                  {hasData && (
+                  <TooltipProvider>
+                      <Tooltip open={isCopied}>
+                          <TooltipTrigger asChild>
+                          <Button variant="secondary" onClick={handleCopyDirectory} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
+                              {isCopied ? <Check className="text-emerald-300 h-4 w-4"/> : <ClipboardCopy className="h-4 w-4 text-emerald-300" />}
+                               Copiar Directorio
+                          </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="font-bold">
+                              {isCopied ? '¡Copiado!' : 'Exportar a portapapeles'}
+                          </TooltipContent>
+                      </Tooltip>
+                  </TooltipProvider>
+                  )}
+                </div>
             </div>
         </div>
-        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute right-[-5%] top-[-20%] w-96 h-96 bg-white/10 rounded-full blur-[100px]" />
+        <div className="absolute left-[-5%] bottom-[-20%] w-64 h-64 bg-emerald-400/10 rounded-full blur-[80px]" />
       </header>
 
       {hasData && (
-        <section className="space-y-6">
-          <div className="relative group/search max-w-2xl mx-auto">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary/40 group-focus-within/search:text-primary transition-colors">
-                <Search className="h-5 w-5" />
+        <section className="space-y-8">
+          <div className="relative group/search max-w-2xl mx-auto transform transition-all duration-500 hover:scale-[1.02]">
+            <div className="absolute left-5 top-1/2 -translate-y-1/2 h-6 w-6 text-primary/30 group-focus-within/search:text-primary transition-colors z-10">
+                <Search className="h-6 w-6" />
             </div>
             <Input
                 type="text"
                 placeholder="Busca por nombre, matrícula o teléfono..."
-                className="pl-12 h-14 w-full bg-white border-none shadow-xl shadow-primary/5 rounded-2xl text-lg font-medium transition-all focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/40"
+                className="pl-14 h-16 w-full bg-white border-2 border-primary/5 shadow-2xl shadow-primary/10 rounded-2xl text-xl font-bold transition-all focus:border-primary/20 focus:ring-8 focus:ring-primary/5 placeholder:text-muted-foreground/30"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
            {filteredStudents.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 backdrop-blur-sm p-4 rounded-3xl border border-primary/5 shadow-sm sticky top-20 z-20">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/60 backdrop-blur-md p-4 rounded-3xl border border-primary/10 shadow-lg sticky top-20 z-20 animate-in fade-in slide-in-from-top-4 duration-700">
                 <div className="flex items-center gap-6">
-                    <div className="flex items-center space-x-3 bg-white px-4 py-2 rounded-2xl border shadow-sm">
+                    <div className="flex items-center space-x-3 bg-white px-5 py-2.5 rounded-2xl border shadow-sm transition-all hover:border-primary/20">
                         <Checkbox 
                             id="select-all" 
                             checked={selectedStudents.size === filteredStudents.length && filteredStudents.length > 0}
                             onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                            className="h-5 w-5 rounded-md border-primary/20"
+                            className="h-5 w-5 rounded-md border-primary/30 data-[state=checked]:bg-primary"
                         />
-                        <Label htmlFor="select-all" className="font-black text-sm uppercase tracking-tighter opacity-70 cursor-pointer">Seleccionar Todos ({selectedStudents.size})</Label>
+                        <Label htmlFor="select-all" className="font-black text-xs uppercase tracking-widest opacity-70 cursor-pointer">Seleccionar Todos ({selectedStudents.size})</Label>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button 
                         size="sm"
                         variant="secondary"
-                        className="rounded-xl h-10 px-5 font-bold shadow-md"
+                        className="rounded-xl h-11 px-6 font-bold shadow-md hover:shadow-lg transition-all"
                         onClick={() => setIsMailerOpen(true)}
                         disabled={selectedStudents.size === 0}
                     >
@@ -1077,7 +1080,7 @@ export function StudentPanel() {
                     </Button>
                     <Button 
                         size="sm"
-                        className="rounded-xl h-10 px-6 font-black shadow-lg shadow-primary/20"
+                        className="rounded-xl h-11 px-8 font-black shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
                         onClick={handleDownloadZip}
                         disabled={selectedStudents.size === 0 || downloadProgress > 0}
                     >
@@ -1089,18 +1092,19 @@ export function StudentPanel() {
            )}
 
            {downloadProgress > 0 && (
-                <Card className="p-6 border-none bg-primary/5 rounded-3xl animate-in zoom-in-95 duration-300">
-                    <div className="space-y-4">
+                <Card className="p-8 border-none bg-primary/10 rounded-3xl animate-in zoom-in-95 duration-500 shadow-xl shadow-primary/5">
+                    <div className="space-y-5">
                         <div className="flex justify-between items-end">
                             <div>
-                                <p className="text-lg font-black text-primary tracking-tight">{downloadStatus}</p>
-                                <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mt-1">Generando imágenes de alta resolución...</p>
+                                <p className="text-xl font-black text-primary tracking-tight">{downloadStatus}</p>
+                                <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mt-1">Renderizando motores de imagen de alta resolución...</p>
                             </div>
-                            <span className="text-2xl font-black tabular-nums text-primary">{Math.round(downloadProgress)}%</span>
+                            <span className="text-3xl font-black tabular-nums text-primary">{Math.round(downloadProgress)}%</span>
                         </div>
-                        <Progress value={downloadProgress} className="h-3 bg-white/50 rounded-full" />
-                        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground italic opacity-60">
-                            <AlertTriangle className="h-3 w-3" /> No cierres esta ventana durante el proceso.
+                        <Progress value={downloadProgress} className="h-4 bg-white/50 rounded-full border border-primary/10 shadow-inner" />
+                        <div className="flex items-center gap-3 text-xs font-bold text-muted-foreground italic opacity-70">
+                            <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                            <AlertTriangle className="h-4 w-4 text-destructive" /> No cierres ni recargues esta ventana hasta finalizar.
                         </div>
                     </div>
                 </Card>
@@ -1129,10 +1133,10 @@ export function StudentPanel() {
                 </div>
             </div>
           ) : (
-            <div className="text-center py-32 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10">
-                <Users className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
-                <h3 className="text-xl font-bold opacity-60">Sin coincidencias</h3>
-                <p className="text-muted-foreground text-sm max-w-xs mx-auto">No hay alumnos que coincidan con tu búsqueda o los filtros actuales.</p>
+            <div className="text-center py-32 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10 animate-in fade-in duration-1000">
+                <Users className="h-20 w-20 text-primary/10 mx-auto mb-6" />
+                <h3 className="text-2xl font-black opacity-40">Sin coincidencias</h3>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto font-medium">No hay alumnos que coincidan con tu búsqueda o los filtros actuales.</p>
             </div>
           )}
         </section>
