@@ -253,6 +253,7 @@ export function DashboardClient() {
               if (storedOferta) {
                   try {
                       const decrypted = xorCipher(storedOferta, storedKey);
+                      setAllStudents(allStudents); // This is just to trigger re-renders if needed, but the actual logic was above
                       setOfertaAcademica(JSON.parse(decrypted));
                   } catch (e) {
                       console.error("Fallo al desencriptar oferta:", e);
@@ -651,7 +652,7 @@ export function DashboardClient() {
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <SidebarProvider defaultOpen={true}>
+      <SidebarProvider defaultOpen={false}>
         <Sidebar className="border-none bg-primary shadow-2xl">
           <SidebarHeader className="bg-primary/50 backdrop-blur-md">
              <div className="flex items-center gap-3 px-6 py-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:group-hover:justify-start group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:group-hover:px-6 transition-all duration-300">
@@ -713,7 +714,7 @@ export function DashboardClient() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
+                  <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data(/collapsible=icon]:mx-auto">
                     <Users />
                     <span className="font-bold tracking-tight">Panel de Alumnos</span>
                   </SidebarMenuButton>
