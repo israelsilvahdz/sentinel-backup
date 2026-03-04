@@ -661,7 +661,7 @@ export function DashboardClient() {
                 <span className="font-black text-xl tracking-[0.15em] text-white group-data-[collapsible=icon]:hidden group-data-[collapsible=icon]:group-hover:inline whitespace-nowrap">SENTINEL</span>
              </div>
           </SidebarHeader>
-          <SidebarContent className="px-3 bg-primary/20 backdrop-blur-sm">
+          <SidebarContent className="px-3 bg-primary/20 backdrop-blur-sm no-scrollbar">
             <SidebarGroup className="mt-4">
               <SidebarMenu className="gap-2">
                 {deferredPrompt && (
