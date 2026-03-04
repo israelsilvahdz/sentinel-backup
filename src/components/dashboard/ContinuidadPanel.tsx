@@ -12,6 +12,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, PieChart
 } from 'lucide-react';
 import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
