@@ -14,7 +14,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarToggle,
 } from '@/components/ui/sidebar';
 import { FileUpload } from './FileUpload';
 import { Dashboard } from './Dashboard';
@@ -763,7 +762,6 @@ export function DashboardClient() {
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
-           <SidebarToggle className="bg-white text-primary border-primary shadow-xl z-50" />
         </Sidebar>
         <SidebarInset>
             <header className="flex h-14 items-center justify-between gap-4 border-b bg-white/80 backdrop-blur-md px-4 lg:px-6 sticky top-0 z-30 py-2">
