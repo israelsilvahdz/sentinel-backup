@@ -461,6 +461,15 @@ export const updateContinuityIndeciso = async (studentId: string, isIndeciso: bo
   }
 };
 
+export const updateContinuityWorkshopAttended = async (studentId: string, workshopAttended: boolean): Promise<void> => {
+  try {
+    const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+    await setDoc(docRef, { workshopAttended }, { merge: true });
+  } catch (error) {
+    console.error("Error updating workshop status:", error);
+  }
+};
+
 export const addContinuityComment = async (studentId: string, text: string, author: string): Promise<void> => {
   try {
     const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);

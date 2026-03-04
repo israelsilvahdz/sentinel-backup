@@ -165,6 +165,7 @@ export interface VocationalDiagnosis {
 
 export interface ContinuityLocalStatus {
   isIndeciso: boolean;
+  workshopAttended?: boolean;
   comments: ContinuityComment[];
   vocationalDiagnosis?: VocationalDiagnosis;
 }

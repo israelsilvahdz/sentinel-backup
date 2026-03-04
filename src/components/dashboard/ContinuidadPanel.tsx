@@ -11,7 +11,7 @@ import {
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
-  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X
+  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -24,7 +24,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, addContinuityComment, bulkUpdateContinuityVocational } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
@@ -116,7 +116,7 @@ export function ContinuidadPanel() {
           case 'inscribed': return s.isInscribed;
           case 'indeciso': return !s.isInscribed && local?.isIndeciso;
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
-          case 'taller': return !s.isInscribed && voc?.requiresWorkshop;
+          case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
           default: return true;
         }
@@ -144,7 +144,8 @@ export function ContinuidadPanel() {
       if (local?.isIndeciso) indecisosCount++;
       if (local?.vocationalDiagnosis) {
         if (local.vocationalDiagnosis.urgencyLevel >= 8) sosCount++;
-        if (local.vocationalDiagnosis.requiresWorkshop) tallerCount++;
+        // Count only those who require workshop AND haven't attended yet
+        if (local.vocationalDiagnosis.requiresWorkshop && !local.workshopAttended) tallerCount++;
       }
     });
     
@@ -171,6 +172,18 @@ export function ContinuidadPanel() {
       ...prev,
       [studentId]: { ...(prev[studentId] || { comments: [] }), isIndeciso }
     }));
+  };
+
+  const handleUpdateWorkshopAttended = async (studentId: string, attended: boolean) => {
+    await updateContinuityWorkshopAttended(studentId, attended);
+    setLocalStatuses(prev => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] || { comments: [] }), workshopAttended: attended }
+    }));
+    toast({
+      title: attended ? "Asistencia registrada" : "Asistencia removida",
+      description: `Se ha actualizado el estado del taller vocacional.`
+    });
   };
 
   const handleAddComment = async (studentId: string, text: string, author: string) => {
@@ -217,7 +230,7 @@ export function ContinuidadPanel() {
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="blue" onClick={() => handleKpiClick('inscribed')} />
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
-        <KpiCard title="Taller Voc." value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
+        <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
         <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" onClick={() => handleKpiClick('risk')} />
       </div>
 
@@ -308,6 +321,7 @@ export function ContinuidadPanel() {
                 isExpanded={expandedStudent === student.id}
                 onToggle={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
                 onUpdateIndeciso={handleUpdateIndeciso}
+                onUpdateWorkshopAttended={handleUpdateWorkshopAttended}
                 onAddComment={handleAddComment}
               />
             ))}
@@ -319,13 +333,14 @@ export function ContinuidadPanel() {
 }
 
 function ContinuityCard({ 
-  student, localStatus, isExpanded, onToggle, onUpdateIndeciso, onAddComment 
+  student, localStatus, isExpanded, onToggle, onUpdateIndeciso, onUpdateWorkshopAttended, onAddComment 
 }: { 
   student: ContinuityStudent, 
   localStatus?: ContinuityLocalStatus,
   isExpanded: boolean, 
   onToggle: () => void,
   onUpdateIndeciso: (id: string, val: boolean) => void,
+  onUpdateWorkshopAttended: (id: string, val: boolean) => void,
   onAddComment: (id: string, text: string, author: string) => void
 }) {
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
@@ -334,6 +349,8 @@ function ContinuityCard({
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
   const isSecondOption = vocational?.isSecondOption;
+  const isWorkshopRequired = vocational?.requiresWorkshop && !student.isInscribed;
+  const isWorkshopAttended = localStatus?.workshopAttended;
 
   const [commentText, setCommentText] = useState('');
   const { leaders, tutors } = useDashboardFilters();
@@ -359,15 +376,17 @@ function ContinuityCard({
             {student.isInscribed ? <GraduationCap className="h-5 w-5" /> : student.id.substring(0, 2)}
           </div>
           <div className="space-y-1">
-            <h3 className="font-bold flex items-center gap-2 flex-wrap">
+            <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base">
               {student.name}
               {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
               {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
               {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
               {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
+              {isWorkshopRequired && !isWorkshopAttended && <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Pend. Taller</Badge>}
+              {isWorkshopAttended && <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50"><CheckCircle2 className="h-3 w-3 mr-1" />Taller Tomado</Badge>}
               {isSecondOption && <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">Segunda Opción</Badge>}
             </h3>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
               <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
               <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
               <span className="font-mono">{student.id}</span>
@@ -376,7 +395,7 @@ function ContinuityCard({
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <Badge variant="outline" className="hidden sm:inline-flex">{student.status}</Badge>
+          <Badge variant="outline" className="hidden lg:inline-flex">{student.status}</Badge>
           {isExpanded ? <ChevronUp /> : <ChevronDown />}
         </div>
       </div>
@@ -384,7 +403,7 @@ function ContinuityCard({
       {isExpanded && (
         <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2">
           {!student.isInscribed && (
-            <div className="flex justify-end mb-2">
+            <div className="flex flex-wrap gap-3 justify-end mb-2">
               <div className="flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm">
                 <Checkbox 
                   id={`indeciso-${student.id}`} 
@@ -392,6 +411,20 @@ function ContinuityCard({
                   onCheckedChange={(checked) => onUpdateIndeciso(student.id, !!checked)}
                 />
                 <Label htmlFor={`indeciso-${student.id}`} className="text-xs font-bold cursor-pointer">Marcar como Indeciso</Label>
+              </div>
+              <div className={cn(
+                "flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm transition-colors",
+                isWorkshopRequired && !isWorkshopAttended && "ring-2 ring-blue-500/20"
+              )}>
+                <Checkbox 
+                  id={`taller-${student.id}`} 
+                  checked={localStatus?.workshopAttended || false} 
+                  onCheckedChange={(checked) => onUpdateWorkshopAttended(student.id, !!checked)}
+                />
+                <Label htmlFor={`taller-${student.id}`} className="text-xs font-bold cursor-pointer flex items-center gap-1">
+                  Taller Vocacional Tomado
+                  {isWorkshopRequired && <span className="text-[9px] text-blue-600 font-bold uppercase">(Prioridad)</span>}
+                </Label>
               </div>
             </div>
           )}
@@ -467,12 +500,15 @@ function ContinuityCard({
                   <CardContent className="p-4 space-y-3">
                     <div>
                       <p className="text-xs font-bold text-muted-foreground uppercase">Preferencia de Universidades</p>
-                      <p className="text-xs italic mt-1 leading-relaxed">{vocational.universityRanking}</p>
+                      <p className="text-[10px] sm:text-xs italic mt-1 leading-relaxed">{vocational.universityRanking}</p>
                     </div>
                     {vocational.requiresWorkshop && !student.isInscribed && (
-                      <div className="flex items-center gap-2 p-2 bg-purple-100 text-purple-800 rounded-lg border border-purple-200">
-                        <GraduationCap className="h-4 w-4" />
-                        <span className="text-xs font-bold uppercase">Requiere Taller Vocacional</span>
+                      <div className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg border text-xs font-bold uppercase",
+                        isWorkshopAttended ? "bg-green-100 text-green-800 border-green-200" : "bg-purple-100 text-purple-800 border-purple-200"
+                      )}>
+                        {isWorkshopAttended ? <CheckCircle2 className="h-4 w-4" /> : <GraduationCap className="h-4 w-4" />}
+                        <span>{isWorkshopAttended ? "Taller Realizado" : "Requiere Taller Vocacional"}</span>
                       </div>
                     )}
                   </CardContent>
