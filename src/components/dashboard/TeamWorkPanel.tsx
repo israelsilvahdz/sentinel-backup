@@ -42,7 +42,7 @@ import {
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
   AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles,
   ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical, UserCog, ListFilter,
-  Link2
+  Link2, Zap
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format, isToday } from 'date-fns';
@@ -392,8 +392,6 @@ export function TeamWorkPanel() {
   const pendingTabTasks = useMemo(() => {
     return tasks
       .filter(t => {
-        // En la pestaña pendientes principal, ocultamos las sub-tareas para que aparezcan solo dentro de sus padres
-        // A MENOS que se esté filtrando por algo específico o sea una búsqueda
         if (statusFilter === 'all' && !t.parentId) return t.status !== 'done';
         if (statusFilter === 'all' && t.parentId) return false;
         return t.status === statusFilter;
@@ -415,47 +413,47 @@ export function TeamWorkPanel() {
   if (!currentTeam) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-100px)] p-4">
-        <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
+        <Card className="w-full max-w-sm shadow-xl border-none bg-white/80 backdrop-blur-md">
           <CardHeader className="text-center pb-2">
-            <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-4">
+            <div className="mx-auto bg-primary/10 p-3 rounded-2xl w-fit mb-4">
               <ShieldCheck className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Ruta de Equipo</CardTitle>
-            <CardDescription>Introduce el código de equipo para acceder.</CardDescription>
+            <CardTitle className="text-2xl font-black">Ruta de Equipo</CardTitle>
+            <CardDescription className="text-xs uppercase tracking-widest font-bold opacity-60">Acceso Restringido</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="login" className="flex items-center gap-2">
+              <TabsList className="grid w-full grid-cols-2 mb-6 h-11 p-1 bg-muted/50 rounded-xl">
+                <TabsTrigger value="login" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
                   <LogIn className="h-4 w-4" /> Entrar
                 </TabsTrigger>
-                <TabsTrigger value="create" className="flex items-center gap-2">
+                <TabsTrigger value="create" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
                   <Sparkles className="h-4 w-4" /> Registrar
                 </TabsTrigger>
               </TabsList>
               
               <div className="space-y-4">
                 <div className="space-y-2 text-center">
-                  <Label className="text-lg">Código del Equipo</Label>
+                  <Label className="text-xs font-bold uppercase text-muted-foreground tracking-tighter">Código del Equipo</Label>
                   <Input 
                     value={authCode} 
                     onChange={e => setAuthCode(e.target.value)} 
                     placeholder="Ej. 12" 
-                    className="text-center text-3xl font-bold tracking-[0.5em] h-16"
+                    className="text-center text-3xl font-black tracking-[0.5em] h-16 border-2 focus:border-primary/50 transition-all rounded-xl"
                     maxLength={10}
                   />
                 </div>
               </div>
 
               <TabsContent value="login" className="pt-4">
-                <Button className="w-full h-12 text-lg" onClick={handleLogin} disabled={isLoading}>
+                <Button className="w-full h-12 text-lg font-bold rounded-xl shadow-lg" onClick={handleLogin} disabled={isLoading}>
                   {isLoading ? <Loader2 className="animate-spin mr-2" /> : <LogIn className="mr-2 h-5 w-5" />}
                   Cargar Tareas
                 </Button>
               </TabsContent>
 
               <TabsContent value="create" className="pt-4">
-                <Button variant="secondary" className="w-full h-12 text-lg" onClick={handleRegisterTeam} disabled={isLoading}>
+                <Button variant="secondary" className="w-full h-12 text-lg font-bold rounded-xl shadow-lg" onClick={handleRegisterTeam} disabled={isLoading}>
                   {isLoading ? <Loader2 className="animate-spin mr-2" /> : <PlusCircle className="mr-2 h-5 w-5" />}
                   Crear Equipo
                 </Button>
@@ -468,67 +466,78 @@ export function TeamWorkPanel() {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-8 pb-20">
-      <header className="flex items-center justify-between flex-wrap gap-4 bg-primary/5 p-6 rounded-2xl border border-primary/10">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria
-          </h1>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Equipo:</span>
-            <Badge variant="outline" className="text-foreground border-primary font-bold">{currentTeam.name}</Badge>
+    <div className="p-6 md:p-10 space-y-10 max-w-7xl mx-auto animate-in fade-in duration-700 pb-20">
+      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/5 to-emerald-900/5 p-6 md:p-8 border border-primary/10 shadow-sm">
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 bg-white/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2 border">
+              <Zap className="h-3 w-3 text-primary" /> Bitácora de Trabajo 2026
+            </div>
+            <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+              <ClipboardList className="h-8 w-8 text-primary" /> Ruta Diaria
+            </h1>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Equipo:</span>
+              <Badge variant="outline" className="text-primary border-primary/30 font-black px-3 py-0.5 bg-white/50">{currentTeam.name}</Badge>
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-white/80 backdrop-blur-md p-3 rounded-2xl shadow-sm border">
+            <div className="flex items-center gap-3 px-2">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <UserCog className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex flex-col">
+                <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Responsable:</Label>
+                <Select value={currentUser} onValueChange={handleUserChange}>
+                  <SelectTrigger className="w-[200px] h-7 border-none bg-transparent focus:ring-0 p-0 font-bold text-sm">
+                    <SelectValue placeholder="¿Quién eres?" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <ScrollArea className="max-h-[300px]">
+                      {signatoryOptions.map(option => (
+                        <SelectItem key={option} value={option} className="rounded-lg">{option}</SelectItem>
+                      ))}
+                      <SelectItem value="Secretaria" className="rounded-lg">Asistente / Sec.</SelectItem>
+                      <SelectItem value="Otro" className="rounded-lg">Otro Responsable</SelectItem>
+                    </ScrollArea>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="h-8 w-px bg-muted hidden sm:block" />
+            <Button variant="ghost" size="sm" className="text-xs font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl h-9" onClick={() => {
+              sessionStorage.removeItem('current_work_team');
+              setCurrentWorkTeam(null);
+            }}>
+              Salir del Equipo
+            </Button>
           </div>
         </div>
-        
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-background p-3 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-2">
-            <UserCog className="h-5 w-5 text-primary" />
-            <Label className="text-xs font-bold uppercase text-muted-foreground whitespace-nowrap">Firmar como:</Label>
-          </div>
-          <Select value={currentUser} onValueChange={handleUserChange}>
-            <SelectTrigger className="w-[220px] h-9 border-none bg-muted/50 focus:ring-0">
-              <SelectValue placeholder="¿Quién eres?" />
-            </SelectTrigger>
-            <SelectContent>
-              <ScrollArea className="max-h-[300px]">
-                {signatoryOptions.map(option => (
-                  <SelectItem key={option} value={option}>{option}</SelectItem>
-                ))}
-                <SelectItem value="Secretaria">Asistente / Sec.</SelectItem>
-                <SelectItem value="Otro">Otro Responsable</SelectItem>
-              </ScrollArea>
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="sm" className="text-xs h-8 text-muted-foreground hover:text-destructive" onClick={() => {
-            sessionStorage.removeItem('current_work_team');
-            setCurrentWorkTeam(null);
-          }}>
-            Salir
-          </Button>
-        </div>
+        <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
       </header>
 
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-muted/50 rounded-xl">
-          <TabsTrigger value="pending" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
+        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-white/50 backdrop-blur-sm border rounded-2xl shadow-sm mb-10">
+          <TabsTrigger value="pending" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all duration-300">
             <Clock className="h-4 w-4" /> Centro de Pendientes
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{tasks.filter(t => t.status !== 'done' && !t.parentId).length}</Badge>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-white/20 text-inherit border-none">{tasks.filter(t => t.status !== 'done' && !t.parentId).length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="route" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background shadow-sm">
+          <TabsTrigger value="route" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all duration-300">
             <PlayCircle className="h-4 w-4" /> Ruta de Hoy
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">{routeTasks.length}</Badge>
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-white/20 text-inherit border-none">{routeTasks.length}</Badge>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pending" className="space-y-6 pt-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap bg-card border p-4 rounded-xl shadow-sm">
+        <TabsContent value="pending" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between gap-4 flex-wrap bg-white/50 backdrop-blur-sm border-none shadow-sm p-4 rounded-2xl">
             <div className="flex items-center gap-6 flex-wrap">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Prioridad:</span>
+                <div className="p-1.5 bg-muted/50 rounded-lg"><Filter className="h-3.5 w-3.5 text-muted-foreground" /></div>
+                <span className="text-xs font-black uppercase tracking-tighter opacity-60">Prioridad:</span>
                 <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
-                  <SelectTrigger className="w-[130px] h-9"><SelectValue placeholder="Prioridad" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="w-[120px] h-8 text-xs font-bold border-none bg-muted/30 rounded-lg"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="urgent">Urgente</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
@@ -538,20 +547,20 @@ export function TeamWorkPanel() {
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <ListFilter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Estado:</span>
+                <div className="p-1.5 bg-muted/50 rounded-lg"><ListFilter className="h-3.5 w-3.5 text-muted-foreground" /></div>
+                <span className="text-xs font-black uppercase tracking-tighter opacity-60">Estado:</span>
                 <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
-                  <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="Estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Activos (Sin completados)</SelectItem>
-                    <SelectItem value="todo">Solo Pendientes</SelectItem>
-                    <SelectItem value="in-progress">Solo En Ruta</SelectItem>
-                    <SelectItem value="done">Solo Completados</SelectItem>
+                  <SelectTrigger className="w-[140px] h-8 text-xs font-bold border-none bg-muted/30 rounded-lg"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="all">Activos</SelectItem>
+                    <SelectItem value="todo">Pendientes</SelectItem>
+                    <SelectItem value="in-progress">En Ruta</SelectItem>
+                    <SelectItem value="done">Completados</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <Button onClick={() => setIsTaskDialogOpen(true)} className="shadow-sm">
+            <Button onClick={() => setIsTaskDialogOpen(true)} className="rounded-xl font-bold h-9 shadow-lg">
               <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Pendiente
             </Button>
           </div>
@@ -574,81 +583,83 @@ export function TeamWorkPanel() {
                 currentAuthor={currentUser}
               />
             )) : (
-              <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-bold">Sin resultados</h3>
-                <p className="text-muted-foreground">No hay tareas activas que coincidan con los filtros.</p>
+              <div className="text-center py-24 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10">
+                <AlertCircle className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+                <h3 className="text-xl font-bold opacity-60">Centro de mando vacío</h3>
+                <p className="text-muted-foreground text-sm max-w-xs mx-auto">No hay tareas que coincidan con tus filtros. Puedes crear un nuevo pendiente arriba.</p>
               </div>
             )}
           </div>
         </TabsContent>
 
-        <TabsContent value="route" className="pt-6">
+        <TabsContent value="route" className="animate-in slide-in-from-bottom-4 duration-500">
           <div className="max-w-3xl mx-auto space-y-8">
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center justify-between px-2">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <PlayCircle className="h-5 w-5 text-primary" /> Procedimiento del Día
+                <h2 className="text-2xl font-black flex items-center gap-3 text-primary">
+                  <PlayCircle className="h-6 w-6" /> Procedimiento del Día
                 </h2>
-                <span className="text-sm text-muted-foreground font-medium bg-muted/50 px-3 py-1 rounded-full">
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
                   {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
                 </span>
               </div>
               
-              <div className="relative space-y-4 pl-4 border-l-2 border-dashed border-muted-foreground/30 ml-2">
+              <div className="relative space-y-6 pl-6 border-l-2 border-dashed border-primary/20 ml-2">
                 {routeTasks.length > 0 ? routeTasks.map((task, index) => (
                   <div 
                     key={task.id} 
                     id={`route-card-${task.id}`}
-                    className="relative"
+                    className="relative group/route-item"
                     draggable
                     onDragStart={(e) => onDragStart(e, task.id)}
                     onDragOver={onDragOver}
                     onDrop={(e) => onDrop(e, task.id)}
                   >
-                    <div className="absolute -left-[25px] top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-4 border-background shadow-sm z-10" />
+                    <div className="absolute -left-[33px] top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-white border-4 border-primary shadow-lg z-10 transition-transform group-hover/route-item:scale-125" />
                     <Card className={cn(
-                      "hover:shadow-md transition-all border-l-4 overflow-hidden group cursor-grab active:cursor-grabbing select-none bg-background",
-                      draggedTaskId === task.id ? "opacity-40 grayscale" : "opacity-100"
+                      "hover:shadow-xl transition-all duration-300 border-none border-l-4 overflow-hidden bg-white/80 backdrop-blur-sm cursor-grab active:cursor-grabbing select-none group/card",
+                      draggedTaskId === task.id ? "opacity-40 scale-95" : "opacity-100"
                     )} style={{ borderLeftColor: PRIORITY_MAP[task.priority].color.split(' ')[0].replace('bg-', '') }}>
-                      <div className="p-4 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 flex-1 overflow-hidden">
-                          <GripVertical className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
-                          <div className="space-y-1 overflow-hidden">
+                      <div className="p-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 flex-1 overflow-hidden">
+                          <div className="flex flex-col gap-1 items-center shrink-0">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/card:opacity-100 transition-opacity" onClick={() => handleMoveInRoute(task.id, 'up')} disabled={index === 0}>
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover/card:text-primary transition-colors shrink-0" />
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/card:opacity-100 transition-opacity" onClick={() => handleMoveInRoute(task.id, 'down')} disabled={index === routeTasks.length - 1}>
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="space-y-1.5 overflow-hidden">
                             <div className="flex items-center gap-2 overflow-hidden">
-                              <Badge className={cn("text-[10px] h-5 shrink-0", PRIORITY_MAP[task.priority].color)}>
+                              <Badge className={cn("text-[9px] h-4 shrink-0 font-black uppercase tracking-tighter", PRIORITY_MAP[task.priority].color)}>
                                 {PRIORITY_MAP[task.priority].label}
                               </Badge>
-                              <h3 className="font-bold truncate">{task.title}</h3>
+                              <h3 className="font-bold text-base truncate tracking-tight">{task.title}</h3>
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                               <Clock className="h-3 w-3 shrink-0" />
-                               <span>{STATUS_MAP[task.status].label}</span>
+                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                               <div className="flex items-center gap-1.5">
+                                 <Clock className="h-3 w-3 text-primary" />
+                                 <span>{STATUS_MAP[task.status].label}</span>
+                               </div>
                                {task.parentTitle && (
-                                 <span className="flex items-center gap-1 text-blue-600 font-semibold truncate ml-2">
-                                   <Link2 className="h-3 w-3" /> De: {task.parentTitle}
-                                 </span>
+                                 <div className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md truncate">
+                                   <Link2 className="h-3 w-3" /> {task.parentTitle}
+                                 </div>
                                )}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <div className="flex flex-col gap-1 mr-2">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMoveInRoute(task.id, 'up')} disabled={index === 0}>
-                              <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMoveInRoute(task.id, 'down')} disabled={index === routeTasks.length - 1}>
-                              <ArrowDown className="h-3 w-3" />
-                            </Button>
-                          </div>
+                        <div className="flex items-center gap-2 shrink-0">
                           <div className="flex gap-2">
                             {task.status === 'in-progress' && (
-                              <Button size="sm" variant="outline" className="h-9 px-3" onClick={() => handleStatusChange(task.id, 'todo')}>
-                                <Clock className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Posponer</span>
+                              <Button size="sm" variant="ghost" className="h-9 px-4 rounded-xl font-bold text-muted-foreground hover:bg-muted" onClick={() => handleStatusChange(task.id, 'todo')}>
+                                <Clock className="h-4 w-4 mr-2" /> Posponer
                               </Button>
                             )}
-                            <Button size="sm" className="h-9 px-3 bg-green-600 hover:bg-green-700 text-white" onClick={() => handleStatusChange(task.id, 'done')}>
-                              <CheckCircle2 className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Finalizar</span>
+                            <Button size="sm" className="h-9 px-5 rounded-xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200" onClick={() => handleStatusChange(task.id, 'done')}>
+                              <CheckCircle2 className="h-4 w-4 mr-2" /> Finalizar
                             </Button>
                           </div>
                         </div>
@@ -656,34 +667,36 @@ export function TeamWorkPanel() {
                     </Card>
                   </div>
                 )) : (
-                  <div className="p-12 text-center bg-muted/20 rounded-xl border-2 border-dashed">
-                    <p className="text-muted-foreground italic">No hay tareas asignadas para la ruta de hoy.</p>
-                    <Button variant="link" onClick={() => setActiveTab('pending')}>Añadir desde pendientes</Button>
+                  <div className="p-16 text-center bg-white/30 rounded-3xl border-2 border-dashed border-primary/10">
+                    <p className="text-muted-foreground font-medium italic">No hay tareas asignadas para la ruta de hoy.</p>
+                    <Button variant="link" onClick={() => setActiveTab('pending')} className="font-bold mt-2">Explorar Centro de Pendientes</Button>
                   </div>
                 )}
               </div>
             </div>
 
             {completedTodayTasks.length > 0 && (
-              <div className="space-y-4 pt-8 border-t">
-                <h2 className="text-xl font-bold flex items-center gap-2 text-green-600">
+              <div className="space-y-4 pt-10 border-t border-muted/50">
+                <h2 className="text-xl font-black flex items-center gap-2 text-green-600 px-2">
                   <CheckCircle2 className="h-5 w-5" /> Completado Hoy
                 </h2>
                 <div className="grid grid-cols-1 gap-3">
                   {completedTodayTasks.map(task => (
-                    <Card key={task.id} className="bg-green-50/50 border-green-100">
-                      <div className="p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <Card key={task.id} className="bg-green-50/30 border-none shadow-sm group">
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          </div>
                           <div>
-                            <h3 className="font-semibold text-sm line-through text-muted-foreground">{task.title}</h3>
-                            <p className="text-[10px] text-muted-foreground">
+                            <h3 className="font-bold text-sm line-through text-green-800/50">{task.title}</h3>
+                            <p className="text-[10px] font-black uppercase text-green-600/60 tracking-widest mt-0.5">
                               Finalizado a las {format(task.completedAt.toDate(), "HH:mm")}
                             </p>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => handleStatusChange(task.id, 'todo')}>
-                          <History className="h-3 w-3 mr-1" /> Reabrir
+                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest h-8 px-3 rounded-lg text-green-700 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleStatusChange(task.id, 'todo')}>
+                          <History className="h-3 w-3 mr-1.5" /> Reabrir
                         </Button>
                       </div>
                     </Card>
@@ -696,28 +709,29 @@ export function TeamWorkPanel() {
       </Tabs>
 
       <Dialog open={isTaskDialogOpen} onOpenChange={(open) => { setIsTaskDialogOpen(open); if (!open) resetForm(); }}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl rounded-3xl border-none shadow-2xl">
           <DialogHeader>
-            <DialogTitle>{editingTask ? 'Editar Pendiente' : (taskForm.parentId ? 'Añadir Seguimiento' : 'Añadir Nueva Tarea')}</DialogTitle>
-            <DialogDescription>
-              {taskForm.parentTitle ? `Vinculado al caso: ${taskForm.parentTitle}` : "Describe el pendiente y vincula a los alumnos si es necesario."}
+            <DialogTitle className="text-2xl font-black">{editingTask ? 'Editar Pendiente' : (taskForm.parentId ? 'Añadir Seguimiento' : 'Nuevo Registro')}</DialogTitle>
+            <DialogDescription className="text-xs uppercase tracking-widest font-bold opacity-60">
+              {taskForm.parentTitle ? `Vinculado al caso: ${taskForm.parentTitle}` : "Completa los detalles para tu equipo"}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-4">
             <div className="space-y-2">
-              <Label>Título del Pendiente</Label>
+              <Label className="text-xs font-black uppercase opacity-60 tracking-tighter">Título de la acción</Label>
               <Input 
                 value={taskForm.title} 
                 onChange={e => setTaskForm({...taskForm, title: e.target.value})} 
                 placeholder="Ej. Entrevista con padres de familia"
+                className="rounded-xl h-11 border-muted-foreground/20 font-medium"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Prioridad</Label>
+                <Label className="text-xs font-black uppercase opacity-60 tracking-tighter">Prioridad</Label>
                 <Select value={taskForm.priority} onValueChange={(v: any) => setTaskForm({...taskForm, priority: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="rounded-xl h-11 border-muted-foreground/20 font-bold"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="urgent">Urgente</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
                     <SelectItem value="medium">Media</SelectItem>
@@ -726,43 +740,44 @@ export function TeamWorkPanel() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Fecha límite</Label>
-                <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm({...taskForm, dueDate: e.target.value})} />
+                <Label className="text-xs font-black uppercase opacity-60 tracking-tighter">Fecha límite</Label>
+                <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm({...taskForm, dueDate: e.target.value})} className="rounded-xl h-11 border-muted-foreground/20 font-bold" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Vincular Alumnos (Opcional)</Label>
+              <Label className="text-xs font-black uppercase opacity-60 tracking-tighter">Vincular Alumnos (Opcional)</Label>
               <StudentSearchPopover onStudentSelect={(s) => {
                 if (!taskForm.linkedStudents.find(ls => ls.id === s.id)) {
                   setTaskForm({...taskForm, linkedStudents: [...taskForm.linkedStudents, s]});
                 }
               }} />
               {taskForm.linkedStudents.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2 p-2 bg-muted/30 rounded-md">
+                <div className="flex flex-wrap gap-2 mt-2 p-3 bg-muted/20 rounded-2xl border border-dashed">
                   {taskForm.linkedStudents.map(ls => (
-                    <Badge key={ls.id} variant="secondary" className="gap-1 pr-1">
-                      {ls.name}
-                      <button onClick={() => setTaskForm({...taskForm, linkedStudents: taskForm.linkedStudents.filter(s => s.id !== ls.id)})} className="hover:text-destructive p-0.5"><Trash2 className="h-3 w-3" /></button>
+                    <Badge key={ls.id} variant="secondary" className="gap-2 h-7 pl-3 pr-1 rounded-lg bg-white border shadow-sm">
+                      <span className="font-bold text-[11px]">{ls.name}</span>
+                      <button onClick={() => setTaskForm({...taskForm, linkedStudents: taskForm.linkedStudents.filter(s => s.id !== ls.id)})} className="hover:bg-destructive/10 text-destructive p-1 rounded-md transition-colors"><Trash2 className="h-3 w-3" /></button>
                     </Badge>
                   ))}
                 </div>
               )}
             </div>
             <div className="space-y-2">
-              <Label>Descripción / Acuerdos</Label>
+              <Label className="text-xs font-black uppercase opacity-60 tracking-tighter">Descripción / Acuerdos</Label>
               <Textarea 
                 value={taskForm.description} 
                 onChange={e => setTaskForm({...taskForm, description: e.target.value})} 
-                placeholder="Detalles adicionales..."
-                rows={3}
+                placeholder="Detalles adicionales que el equipo debe conocer..."
+                rows={4}
+                className="rounded-xl border-muted-foreground/20 font-medium resize-none"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsTaskDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveTask} disabled={isLoading}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={() => setIsTaskDialogOpen(false)} className="rounded-xl font-bold text-muted-foreground">Cancelar</Button>
+            <Button onClick={handleSaveTask} disabled={isLoading} className="rounded-xl font-black h-11 shadow-lg shadow-primary/20 px-8">
               {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
-              {editingTask ? 'Actualizar' : 'Guardar'} Tarea
+              {editingTask ? 'Actualizar' : 'Guardar Registro'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -792,7 +807,6 @@ function TaskCard({
   const statusInfo = STATUS_MAP[task.status];
   const isDueToday = task.dueDate && isToday(task.dueDate.toDate());
 
-  // Buscar tareas que tengan este id como parentId
   const subTasks = useMemo(() => 
     allTasks.filter(t => t.parentId === task.id),
     [allTasks, task.id]
@@ -800,198 +814,199 @@ function TaskCard({
 
   return (
     <Card className={cn(
-      "hover:shadow-md transition-all duration-200 border-l-[6px] overflow-hidden bg-background", 
-      task.status === 'done' ? 'opacity-60 bg-muted/10' : 'opacity-100',
+      "transition-all duration-300 border-none border-l-4 shadow-sm hover:shadow-md overflow-hidden bg-white/80 backdrop-blur-sm group/main-card", 
+      task.status === 'done' ? 'opacity-60 bg-muted/10 grayscale-[0.5]' : 'opacity-100',
       task.priority === 'urgent' ? 'border-l-red-600' : 
       task.priority === 'high' ? 'border-l-orange-500' :
       task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500',
-      isDueToday && task.status !== 'done' && "ring-2 ring-primary/20",
-      task.parentId && "ml-8 bg-muted/5 scale-95 border-dashed" // Estilo visual para sub-tareas
+      isDueToday && task.status !== 'done' && "ring-2 ring-primary/20 scale-[1.01]",
+      task.parentId && "ml-10 bg-white/40 border-dashed"
     )}>
       <div 
-        className="p-4 cursor-pointer hover:bg-muted/5 flex items-center justify-between"
+        className="p-5 cursor-pointer flex items-center justify-between"
         onClick={() => onToggleExpand(task.id)}
       >
-        <div className="flex items-center gap-4 flex-1">
+        <div className="flex items-center gap-5 flex-1">
           <Checkbox 
             id={`check-${task.id}`}
             checked={task.status === 'done'} 
             onCheckedChange={(checked) => onStatusChange(task.id, checked ? 'done' : 'todo')} 
             onClick={(e) => e.stopPropagation()}
+            className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary"
           />
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <h3 className={cn(
-              "text-lg font-bold leading-none", 
+              "text-lg font-bold leading-tight tracking-tight", 
               task.status === 'done' && 'line-through text-muted-foreground'
             )}>
               {task.title}
             </h3>
-            <div className="flex flex-wrap gap-2">
-              <Badge className={cn("text-[10px] px-1.5 h-5", priorityInfo.color)}>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge className={cn("text-[9px] px-2 h-4 font-black uppercase tracking-tighter", priorityInfo.color)}>
                 {priorityInfo.label}
               </Badge>
-              <span className={cn("text-[10px] font-semibold flex items-center gap-1", statusInfo.color)}>
+              <span className={cn("text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 opacity-70", statusInfo.color)}>
                 {statusInfo.icon} {statusInfo.label}
               </span>
               {task.dueDate && (
                 <span className={cn(
-                  "text-[10px] font-semibold flex items-center gap-1",
-                  isDueToday && task.status !== 'done' ? "text-primary font-bold" : "text-muted-foreground"
+                  "text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5",
+                  isDueToday && task.status !== 'done' ? "text-primary animate-pulse" : "text-muted-foreground opacity-60"
                 )}>
                   <Calendar className="h-3 w-3" />
                   {format((task.dueDate as any).toDate(), 'dd MMM', { locale: es })}
                   {isDueToday && task.status !== 'done' && " (Hoy)"}
                 </span>
               )}
-              {task.parentTitle && (
-                <Badge variant="outline" className="text-[10px] h-5 border-blue-200 text-blue-700 bg-blue-50">
-                  <Link2 className="h-3 w-3 mr-1" /> De: {task.parentTitle}
-                </Badge>
-              )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           {task.linkedStudents.length > 0 && (
-            <div className="hidden sm:flex -space-x-2 mr-4">
+            <div className="hidden sm:flex -space-x-3 mr-2">
               {task.linkedStudents.slice(0, 3).map(s => (
-                <div key={s.id} className="h-7 w-7 rounded-full bg-primary/10 border-2 border-background flex items-center justify-center text-[10px] font-bold text-primary" title={s.name}>
+                <div key={s.id} className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-white shadow-sm flex items-center justify-center text-[10px] font-black text-primary uppercase" title={s.name}>
                   {s.name.substring(0, 1)}
                 </div>
               ))}
               {task.linkedStudents.length > 3 && (
-                <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                <div className="h-8 w-8 rounded-full bg-muted border-2 border-white shadow-sm flex items-center justify-center text-[10px] font-black text-muted-foreground">
                   +{task.linkedStudents.length - 3}
                 </div>
               )}
             </div>
           )}
           
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(task)}>
+          <div className="flex items-center gap-1 opacity-0 group-hover/main-card:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/5 text-muted-foreground hover:text-primary" onClick={() => onEdit(task)}>
               <Edit3 className="h-4 w-4" />
             </Button>
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-destructive/5 text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>¿Eliminar pendiente permanentemente?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción no se puede deshacer y el pendiente se borrará de la base de datos de inmediato.
+                  <AlertDialogTitle className="text-xl font-black">¿Eliminar registro?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm font-medium">
+                    Esta acción es irreversible y eliminará toda la información y comentarios vinculados a esta tarea.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Eliminar para siempre</AlertDialogAction>
+                <AlertDialogFooter className="gap-2 sm:gap-0">
+                  <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">Eliminar permanentemente</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           </div>
           
-          {isExpanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+          <div className={cn("p-1 rounded-full transition-colors", isExpanded ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
         </div>
       </div>
 
       {isExpanded && (
-        <CardContent className="p-4 pt-0 space-y-6 animate-in slide-in-from-top-2 duration-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed">
-            <div className="md:col-span-2 space-y-6">
-              <div className="space-y-2">
-                <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Descripción y Acuerdos</Label>
-                <div className="text-sm bg-muted/20 p-4 rounded-xl border border-dashed text-foreground/80 whitespace-pre-wrap min-h-[80px]">
+        <CardContent className="p-6 pt-0 space-y-8 animate-in slide-in-from-top-2 duration-300">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-muted/50">
+            <div className="md:col-span-2 space-y-8">
+              <div className="space-y-3">
+                <Label className="text-[10px] uppercase text-muted-foreground tracking-widest font-black flex items-center gap-2 opacity-60">
+                  <ClipboardList className="h-3 w-3" /> Descripción y Acuerdos
+                </Label>
+                <div className="text-sm bg-white/50 p-5 rounded-2xl border border-muted/50 text-foreground/80 font-medium whitespace-pre-wrap leading-relaxed shadow-inner">
                   {task.description || "Sin descripción adicional."}
                 </div>
               </div>
 
               {task.linkedStudents.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold">Alumnos Vinculados</Label>
+                <div className="space-y-3">
+                  <Label className="text-[10px] uppercase text-muted-foreground tracking-widest font-black flex items-center gap-2 opacity-60">
+                    <User className="h-3 w-3" /> Alumnos Vinculados
+                  </Label>
                   <div className="flex flex-wrap gap-2">
                     {task.linkedStudents.map(ls => (
-                      <Badge key={ls.id} variant="secondary" className="bg-primary/5 text-primary border-primary/10 hover:bg-primary/10 transition-colors py-1 pl-2 pr-1 gap-2">
-                        <User className="h-3 w-3" />
-                        {ls.name} <span className="opacity-60 font-mono text-[10px]">({ls.id})</span>
+                      <Badge key={ls.id} variant="secondary" className="bg-white text-primary border border-primary/10 hover:bg-primary/5 transition-all py-1.5 pl-3 pr-2 gap-3 rounded-xl shadow-sm">
+                        <span className="font-bold text-xs">{ls.name}</span>
+                        <span className="opacity-40 font-mono text-[9px] bg-primary/5 px-1.5 py-0.5 rounded uppercase tracking-tighter">ID: {ls.id}</span>
                       </Badge>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2 pt-2">
+              <div className="flex flex-wrap gap-3 pt-2">
                 {task.status === 'todo' && (
-                  <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'in-progress'); }}>
+                  <Button className="rounded-xl font-bold h-10 px-6 shadow-md shadow-primary/10" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'in-progress'); }}>
                     <PlayCircle className="mr-2 h-4 w-4" /> Iniciar Ruta Diaria
                   </Button>
                 )}
                 {task.status === 'in-progress' && (
-                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo'); }}>
-                    <Clock className="mr-2 h-4 w-4" /> Regresar a Pendientes
+                  <Button variant="secondary" className="rounded-xl font-bold h-10 px-6" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo'); }}>
+                    <Clock className="mr-2 h-4 w-4" /> Pausar y Regresar
                   </Button>
                 )}
                 {task.status === 'done' && (
-                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo'); }}>
+                  <Button variant="outline" className="rounded-xl font-bold h-10 px-6" onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, 'todo'); }}>
                     <History className="mr-2 h-4 w-4" /> Reabrir Tarea
                   </Button>
                 )}
               </div>
 
-              {/* Sección de Sub-tareas (Seguimientos vinculados) */}
-              <div className="space-y-3 pt-4 border-t">
+              <div className="space-y-4 pt-6 border-t border-muted/50">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold flex items-center gap-2">
-                    <History className="h-3 w-3" /> Seguimientos del Caso ({subTasks.length})
+                  <Label className="text-[10px] uppercase text-muted-foreground tracking-widest font-black flex items-center gap-2 opacity-60">
+                    <History className="h-3 w-3" /> Bitácora de Seguimiento ({subTasks.length})
                   </Label>
                   <Button 
                     size="sm" 
                     variant="link" 
-                    className="h-auto p-0 text-primary font-bold text-xs" 
+                    className="h-auto p-0 text-primary font-black text-[10px] uppercase tracking-widest hover:no-underline hover:opacity-70 transition-opacity" 
                     onClick={(e) => { e.stopPropagation(); onAddDerivedTask(task); }}
                   >
-                    <PlusCircle className="h-3 w-3 mr-1" /> Añadir Seguimiento
+                    <PlusCircle className="h-3.5 w-3.5 mr-1.5" /> Añadir Entrada
                   </Button>
                 </div>
                 
                 {subTasks.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {subTasks.map(st => (
-                      <div key={st.id} className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border border-dashed text-xs group/subtask">
-                        <div className="flex items-center gap-3">
+                      <div key={st.id} className="flex items-center justify-between bg-white/40 p-3 rounded-xl border border-muted/50 text-xs group/subtask shadow-sm">
+                        <div className="flex items-center gap-4">
                           <Checkbox 
                             checked={st.status === 'done'} 
                             onCheckedChange={(checked) => onStatusChange(st.id, checked ? 'done' : 'todo')}
+                            className="h-4 w-4 rounded data-[state=checked]:bg-primary"
                           />
-                          <span className={cn(st.status === 'done' && "line-through text-muted-foreground")}>
+                          <span className={cn("font-bold tracking-tight", st.status === 'done' && "line-through text-muted-foreground opacity-60")}>
                             {st.title}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className={cn("text-[9px] h-4", PRIORITY_MAP[st.priority].color)}>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className={cn("text-[8px] h-4 font-black uppercase tracking-tighter border-none", PRIORITY_MAP[st.priority].color)}>
                             {PRIORITY_MAP[st.priority].label}
                           </Badge>
                           <div className="flex items-center gap-1 opacity-0 group-hover/subtask:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onEdit(st); }}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-primary/5" onClick={(e) => { e.stopPropagation(); onEdit(st); }}>
                               <Edit3 className="h-3 w-3" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-destructive/5 text-destructive" onClick={(e) => e.stopPropagation()}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </AlertDialogTrigger>
-                              <AlertDialogContent>
+                              <AlertDialogContent className="rounded-3xl border-none">
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle>¿Eliminar seguimiento?</AlertDialogTitle>
-                                  <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                                  <AlertDialogTitle className="text-xl font-black">¿Eliminar entrada?</AlertDialogTitle>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteWorkTask(st.id).then(() => onToggleExpand(task.id))} className="bg-destructive">Eliminar</AlertDialogAction>
+                                  <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => deleteWorkTask(st.id).then(() => onToggleExpand(task.id))} className="bg-destructive rounded-xl">Eliminar</AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
@@ -1001,52 +1016,65 @@ function TaskCard({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground italic bg-muted/10 p-3 rounded-lg border border-dashed text-center">
-                    No hay tareas de seguimiento vinculadas.
+                  <p className="text-[11px] text-muted-foreground italic bg-muted/10 p-4 rounded-2xl border border-dashed text-center opacity-60">
+                    No hay registros de seguimiento vinculados a este caso.
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="space-y-4 border-l pl-6">
-              <Label className="text-xs uppercase text-muted-foreground tracking-wider font-bold flex items-center gap-2">
-                <MessageSquare className="h-3 w-3" /> Bitácora de Comentarios
+            <div className="space-y-5 border-l border-muted/50 pl-8 bg-muted/5 rounded-r-2xl py-2">
+              <Label className="text-[10px] uppercase text-muted-foreground tracking-widest font-black flex items-center gap-2 opacity-60">
+                <MessageSquare className="h-3 w-3 text-primary" /> Comentarios del Equipo
               </Label>
-              <ScrollArea className="h-[250px] pr-4">
-                <div className="space-y-3">
+              <ScrollArea className="h-[280px] pr-4">
+                <div className="space-y-4">
                   {task.comments && task.comments.length > 0 ? task.comments.map(c => (
-                    <div key={c.id} className="bg-muted/30 p-3 rounded-lg border text-xs">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-bold text-primary flex items-center gap-1">
-                          <UserCog className="h-3 w-3" /> {c.author}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
+                    <div key={c.id} className="bg-white p-4 rounded-2xl border border-muted/50 shadow-sm space-y-2 group/comment relative">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-black text-primary uppercase">
+                            {c.author.substring(0, 1)}
+                          </div>
+                          <span className="font-black text-xs text-primary tracking-tight">{c.author}</span>
+                        </div>
+                        <span className="text-[9px] font-bold text-muted-foreground opacity-50 uppercase tracking-widest">
                           {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
                         </span>
                       </div>
-                      <p className="text-foreground/90 whitespace-pre-wrap">{c.text}</p>
+                      <p className="text-sm font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">{c.text}</p>
                     </div>
                   )) : (
-                    <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios aún.</p>
+                    <div className="py-12 text-center">
+                      <MessageSquare className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2" />
+                      <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-widest opacity-40">Sin notas aún</p>
+                    </div>
                   )}
                 </div>
               </ScrollArea>
               
-              <div className="space-y-2 pt-2">
-                <div className="flex gap-2">
+              <div className="space-y-3 pt-2">
+                <div className="relative group/input">
                   <Textarea 
                     value={newComment} 
                     onChange={e => onCommentChange(e.target.value)}
-                    placeholder={currentAuthor ? `Comentar como ${currentAuthor}...` : "Escribe una nota..."}
-                    className="min-h-[60px] text-xs resize-none"
+                    placeholder={currentAuthor ? `Escribe como ${currentAuthor}...` : "Escribe una nota para el equipo..."}
+                    className="min-h-[80px] text-xs font-medium resize-none rounded-xl border-muted-foreground/20 bg-white/50 focus:bg-white transition-all shadow-inner"
                   />
-                </div>
-                <div className="flex justify-end">
-                  <Button size="sm" onClick={onAddComment} disabled={!newComment.trim() || !currentAuthor}>
-                    <Send className="h-3.5 w-3.5 mr-2" /> Enviar
+                  <Button 
+                    size="sm" 
+                    onClick={onAddComment} 
+                    disabled={!newComment.trim() || !currentAuthor}
+                    className="absolute bottom-2 right-2 rounded-lg h-8 w-8 p-0"
+                  >
+                    <Send className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                {!currentAuthor && <p className="text-[10px] text-destructive text-right font-semibold">Selecciona responsable arriba ↑</p>}
+                {!currentAuthor && (
+                  <p className="text-[10px] text-destructive font-black uppercase tracking-tighter text-right animate-pulse">
+                    ⚠️ Selecciona tu nombre arriba para comentar
+                  </p>
+                )}
               </div>
             </div>
           </div>
