@@ -17,7 +17,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Progress } from '../ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, PieChart as RePieChart, Pie } from 'recharts';
@@ -260,13 +260,13 @@ function ContinuityCard({ student, isExpanded, onToggle }: { student: Continuity
             <div className="space-y-4">
               <Label className="text-xs uppercase font-bold text-muted-foreground">Perfil Vocacional</Label>
               <div className="space-y-2">
-                <p className="text-sm flex items-center gap-2">
+                <div className="text-sm flex items-center gap-2">
                   <strong>Interés:</strong> 
                   <Badge className={cn(
                     student.interestLevel?.toLowerCase().includes('alto') ? "bg-red-500" : 
                     student.interestLevel?.toLowerCase().includes('medio') ? "bg-yellow-500" : "bg-green-500"
                   )}>{student.interestLevel || 'No definido'}</Badge>
-                </p>
+                </div>
                 <p className="text-sm"><strong>Programa:</strong> {student.programOfInterest || 'Pendiente'}</p>
                 <p className="text-sm"><strong>Compite con:</strong> {student.competitorUniversity || 'N/A'}</p>
               </div>
