@@ -16,7 +16,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -489,5 +489,24 @@ export const getAllContinuityStatuses = async (): Promise<Record<string, Continu
   } catch (error) {
     console.error("Error getting all continuity statuses:", error);
     return {};
+  }
+};
+
+export const bulkUpdateVocationalDiagnosis = async (diagnoses: Record<string, VocationalDiagnosis>): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    Object.entries(diagnoses).forEach(([studentId, diagnosis]) => {
+      const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+      batch.set(docRef, { 
+        vocationalDiagnosis: {
+          ...diagnosis,
+          lastUpdated: Timestamp.now()
+        }
+      }, { merge: true });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Error bulk updating vocational diagnoses:", error);
+    throw error;
   }
 };

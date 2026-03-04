@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseContinuidadExcel } from '@/lib/continuityParser';
-import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment } from '@/types/student';
+import { parseVocationalExcel } from '@/lib/vocationalParser';
+import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment, VocationalDiagnosis } from '@/types/student';
 import { 
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
-  ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle
+  ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
+  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -22,7 +24,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, addContinuityComment } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, addContinuityComment, bulkUpdateVocationalDiagnosis } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
@@ -35,6 +37,7 @@ export function ContinuidadPanel() {
   const [catalog, setCatalog] = useState<ContinuityCatalog | null>(null);
   const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessingVoc, setIsProcessingVoc] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAdvisor, setSelectedAdvisor] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -66,6 +69,24 @@ export function ContinuidadPanel() {
     }
   };
 
+  const handleVocationalUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsProcessingVoc(true);
+    try {
+      const diagnoses = await parseVocationalExcel(file);
+      if (diagnoses) {
+        await bulkUpdateVocationalDiagnosis(diagnoses);
+        const updated = await getAllContinuityStatuses();
+        setLocalStatuses(updated);
+        toast({ title: "Encuesta Vocacional Procesada", description: "El Diagnóstico Vocacional ha sido guardado permanentemente." });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error al cargar", description: "No se pudo procesar el archivo vocacional." });
+    } finally {
+      setIsProcessingVoc(false);
+    }
+  };
+
   const advisors = useMemo(() => [...new Set(students.map(s => s.advisor).filter(Boolean))].sort(), [students]);
   const statuses = useMemo(() => [...new Set(students.map(s => s.status).filter(Boolean))].sort(), [students]);
 
@@ -76,7 +97,6 @@ export function ContinuidadPanel() {
       const matchesStatus = selectedStatus === 'all' || s.status === selectedStatus;
       const matchesCycle = selectedCycle === 'all' || s.cycle === selectedCycle;
       
-      // Filtro global de líder
       const matchesGlobalLeader = (filterType === 'leader' && selectedValue) ? s.leader === selectedValue : true;
 
       return matchesSearch && matchesAdvisor && matchesStatus && matchesCycle && matchesGlobalLeader;
@@ -140,9 +160,12 @@ export function ContinuidadPanel() {
       <header className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Estrategia de Continuidad</h1>
-          <p className="text-muted-foreground">Monitoreo de inscripciones a profesional y seguimiento vocacional.</p>
+          <p className="text-muted-foreground">Inscripciones a profesional y seguimiento vocacional.</p>
         </div>
-        <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="outline" label="Actualizar Base" />
+        <div className="flex gap-2">
+          <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="secondary" label="Cargar Encuesta Vocacional" icon={<History className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="outline" label="Actualizar Base Operativa" />
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -254,6 +277,10 @@ function ContinuityCard({
   onAddComment: (id: string, text: string, author: string) => void
 }) {
   const isHighValueRisk = student.average >= 90 && student.status.toLowerCase().includes('descartado');
+  const vocational = localStatus?.vocationalDiagnosis;
+  const isSOS = vocational && vocational.urgencyLevel >= 8;
+  const isSecondOption = vocational?.isSecondOption;
+
   const [commentText, setCommentText] = useState('');
   const { leaders, tutors } = useDashboardFilters();
   const [author, setAuthor] = useState('');
@@ -266,7 +293,7 @@ function ContinuityCard({
     <Card className={cn(
       "transition-all border-l-4",
       student.isInscribed ? "border-l-green-500" : "border-l-muted",
-      isHighValueRisk && "ring-2 ring-red-500/50",
+      (isHighValueRisk || isSOS) && "ring-2 ring-red-500/50",
       localStatus?.isIndeciso && "border-l-purple-500 bg-purple-50/5"
     )}>
       <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-muted/5" onClick={onToggle}>
@@ -278,11 +305,13 @@ function ContinuityCard({
             {student.isInscribed ? <GraduationCap className="h-5 w-5" /> : student.id.substring(0, 2)}
           </div>
           <div className="space-y-1">
-            <h3 className="font-bold flex items-center gap-2">
+            <h3 className="font-bold flex items-center gap-2 flex-wrap">
               {student.name}
-              {isHighValueRisk && <Badge variant="destructive" className="animate-pulse">Alerta Fuga</Badge>}
+              {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
+              {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
               {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
               {localStatus?.isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
+              {isSecondOption && <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">Segunda Opción</Badge>}
             </h3>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
@@ -346,6 +375,55 @@ function ContinuityCard({
               </div>
             </div>
           </div>
+
+          {vocational && (
+            <div className="pt-6 border-t space-y-4">
+              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
+                <Stethoscope className="h-4 w-4" /> Diagnóstico Vocacional (Encuesta)
+              </Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="bg-primary/5 border-primary/10">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-xs font-bold text-muted-foreground uppercase">Nivel de Certeza</p>
+                        <p className="text-sm font-semibold">{vocational.certaintyLevel || 'No declarado'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-muted-foreground uppercase">Urgencia S.O.S</p>
+                        <Badge variant={vocational.urgencyLevel >= 8 ? 'destructive' : 'outline'} className="text-lg py-0 px-2">
+                          {vocational.urgencyLevel}/10
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase">Obstáculo Principal</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="secondary" className="bg-white border">
+                          {vocational.mainObstacle.includes('Económico') ? <Target className="h-3 w-3 mr-1 text-red-500" /> : <Lightbulb className="h-3 w-3 mr-1 text-yellow-500" />}
+                          {vocational.mainObstacle || 'Ninguno'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-muted/30">
+                  <CardContent className="p-4 space-y-3">
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase">Preferencia de Universidades</p>
+                      <p className="text-xs italic mt-1 leading-relaxed">{vocational.universityRanking}</p>
+                    </div>
+                    {vocational.requiresWorkshop && (
+                      <div className="flex items-center gap-2 p-2 bg-purple-100 text-purple-800 rounded-lg border border-purple-200">
+                        <GraduationCap className="h-4 w-4" />
+                        <span className="text-xs font-bold uppercase">Requiere Taller Vocacional</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
 
           <div className="pt-4 border-t">
             <Label className="text-xs uppercase font-bold text-muted-foreground block mb-2">Decisión sobre carrera</Label>

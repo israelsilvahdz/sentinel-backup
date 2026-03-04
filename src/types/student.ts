@@ -151,9 +151,22 @@ export interface ContinuityComment {
   createdAt: any;
 }
 
+export interface VocationalDiagnosis {
+  certaintyLevel: string;
+  urgencyLevel: number; // 1-10
+  mainObstacle: string;
+  universityRanking: string;
+  isSecondOption: boolean;
+  requiresWorkshop: boolean;
+  interestedCareers?: string;
+  details?: string;
+  lastUpdated: any;
+}
+
 export interface ContinuityLocalStatus {
   isIndeciso: boolean;
   comments: ContinuityComment[];
+  vocationalDiagnosis?: VocationalDiagnosis;
 }
 
 // --- NUEVOS TIPOS PARA TRABAJO EN EQUIPO ---
