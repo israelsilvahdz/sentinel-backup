@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -13,7 +14,8 @@ import {
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
-  School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase
+  School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
+  Command as CommandIcon
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -32,6 +34,57 @@ import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
 import { Textarea } from '../ui/textarea';
 import { RiasecChart } from './RiasecChart';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+
+// --- CONSTANTS FOR STANDARDIZATION ---
+
+const UNIVERSITY_OPTIONS = [
+  "TECMILENIO",
+  "UANL",
+  "TEC DE MONTERREY",
+  "UVM",
+  "UDEM",
+  "OTRA"
+];
+
+const CAREER_CATALOG = [
+  // Tecmilenio Core Offer
+  { name: "Administración de Empresas", inTec: true },
+  { name: "Administración de Negocios Internacionales", inTec: true },
+  { name: "Comercio Internacional", inTec: true },
+  { name: "Derecho", inTec: true },
+  { name: "Psicología", inTec: true },
+  { name: "Mercadotecnia", inTec: true },
+  { name: "Diseño Gráfico", inTec: true },
+  { name: "Animación y Arte Digital", inTec: true },
+  { name: "Ingeniería Industrial y de Sistemas", inTec: true },
+  { name: "Ingeniería en Mecatrónica", inTec: true },
+  { name: "Ingeniería en Sistemas de Computación", inTec: true },
+  { name: "Gastronomía", inTec: true },
+  { name: "Nutrición", inTec: true },
+  { name: "Turismo", inTec: true },
+  
+  // High Demand External (Loss reason)
+  { name: "Medicina", inTec: false },
+  { name: "Arquitectura", inTec: false },
+  { name: "Veterinaria", inTec: false },
+  { name: "Odontología", inTec: false },
+  { name: "Enfermería", inTec: false },
+  { name: "Ingeniería Civil", inTec: false },
+  { name: "Ingeniería Química", inTec: false },
+  { name: "Criminología", inTec: false },
+  { name: "Ciencias de la Comunicación", inTec: false },
+  { name: "Artes Visuales", inTec: false },
+  { name: "Música", inTec: false },
+  { name: "Diseño de Modas", inTec: false },
+  { name: "Relaciones Internacionales", inTec: false },
+  { name: "Finanzas", inTec: false },
+  { name: "Contaduría Pública", inTec: true },
+  { name: "Economía", inTec: false },
+  { name: "Filosofía y Letras", inTec: false },
+  { name: "Otra Carrera (No en lista)", inTec: false }
+].sort((a, b) => a.name.localeCompare(b.name));
 
 export function ContinuidadPanel() {
   const { toast } = useToast();
@@ -476,15 +529,18 @@ function ContinuityCard({
 
   // Tracking form states
   const [university, setUniversity] = useState(tracking.chosenUniversity);
-  const [careerInput, setCareerInput] = useState('');
-  const [careers, setCareers] = useState<string[]>(tracking.chosenCareers);
+  const [otherUniversity, setOtherUniversity] = useState('');
   const [procStatus, setProcStatus] = useState(tracking.processStatus);
   const [resDate, setResDate] = useState(tracking.resultDate);
+  const [careers, setCareers] = useState<string[]>(tracking.chosenCareers);
+  const [careerSearch, setCareerSearch] = useState('');
+  const [isCareerPopoverOpen, setIsCareerPopoverOpen] = useState(false);
 
-  const handleAddCareer = () => {
-    if (!careerInput.trim()) return;
-    setCareers(prev => [...prev, careerInput.trim()]);
-    setCareerInput('');
+  const handleAddCareer = (careerName: string) => {
+    if (careers.includes(careerName)) return;
+    setCareers(prev => [...prev, careerName]);
+    setIsCareerPopoverOpen(false);
+    setCareerSearch('');
   };
 
   const handleRemoveCareer = (idx: number) => {
@@ -492,13 +548,20 @@ function ContinuityCard({
   };
 
   const handleSaveTracking = () => {
+    const finalUniversity = university === 'OTRA' ? otherUniversity : university;
     onUpdateTracking(student.id, {
-      chosenUniversity: university,
+      chosenUniversity: finalUniversity,
       chosenCareers: careers,
       processStatus: procStatus,
       resultDate: resDate
     });
   };
+
+  const filteredCareerOptions = useMemo(() => {
+    if (!careerSearch) return CAREER_CATALOG;
+    const search = careerSearch.toLowerCase();
+    return CAREER_CATALOG.filter(c => c.name.toLowerCase().includes(search));
+  }, [careerSearch]);
 
   return (
     <Card className={cn(
@@ -600,7 +663,7 @@ function ContinuityCard({
             </div>
           )}
 
-          {/* New Decision Tracking Section */}
+          {/* New Decision Tracking Section with Standardized Selects */}
           {!student.isInscribed && (
             <div className="pt-4 border-t space-y-4">
               <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
@@ -610,32 +673,78 @@ function ContinuityCard({
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold">Universidad Elegida</Label>
-                    <Input 
-                      value={university} 
-                      onChange={e => setUniversity(e.target.value)} 
-                      placeholder="Ej. UANL, Tec de Monterrey..."
-                      className="rounded-xl h-10"
-                    />
+                    <Select value={UNIVERSITY_OPTIONS.includes(university) ? university : (university ? 'OTRA' : '')} onValueChange={(val) => {
+                      setUniversity(val);
+                      if (val !== 'OTRA') setOtherUniversity('');
+                    }}>
+                      <SelectTrigger className="rounded-xl h-10">
+                        <SelectValue placeholder="Seleccionar institución..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNIVERSITY_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {university === 'OTRA' && (
+                      <Input 
+                        value={otherUniversity} 
+                        onChange={e => setOtherUniversity(e.target.value)} 
+                        placeholder="Nombre de la universidad..."
+                        className="rounded-xl h-10 mt-2 animate-in fade-in"
+                      />
+                    )}
                   </div>
+                  
                   <div className="space-y-2">
                     <Label className="text-xs font-bold">Carrera(s) Seleccionada(s)</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        value={careerInput} 
-                        onChange={e => setCareerInput(e.target.value)} 
-                        placeholder="Añadir carrera..."
-                        className="rounded-xl h-10"
-                        onKeyDown={e => e.key === 'Enter' && handleAddCareer()}
-                      />
-                      <Button size="icon" variant="secondary" className="rounded-xl" onClick={handleAddCareer}><PlusCircle className="h-5 w-5" /></Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {careers.map((c, i) => (
-                        <Badge key={i} variant="secondary" className="pl-3 pr-1 py-1 rounded-lg bg-primary/5 text-primary border-primary/10 gap-2">
-                          {c}
-                          <button onClick={() => handleRemoveCareer(i)} className="hover:bg-destructive/10 text-destructive p-0.5 rounded"><MinusCircle className="h-3.5 w-3.5" /></button>
-                        </Badge>
-                      ))}
+                    <Popover open={isCareerPopoverOpen} onOpenChange={setIsCareerPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start rounded-xl h-10 text-muted-foreground font-normal">
+                          <Search className="mr-2 h-4 w-4" />
+                          Buscar carrera en catálogo...
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Ej. Medicina, Psicología..." value={careerSearch} onValueChange={setCareerSearch} />
+                          <CommandList>
+                            <CommandEmpty>No se encontró esa carrera.</CommandEmpty>
+                            <CommandGroup>
+                              <ScrollArea className="h-[200px]">
+                                {filteredCareerOptions.map(c => (
+                                  <CommandItem 
+                                    key={c.name} 
+                                    onSelect={() => handleAddCareer(c.name)}
+                                    className="flex items-center justify-between"
+                                  >
+                                    <span>{c.name}</span>
+                                    {c.inTec ? (
+                                      <Badge className="bg-primary/10 text-primary text-[8px] h-4">En Campus</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-[8px] h-4 text-orange-600">Externa</Badge>
+                                    )}
+                                  </CommandItem>
+                                ))}
+                              </ScrollArea>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {careers.map((c, i) => {
+                        const careerInfo = CAREER_CATALOG.find(cat => cat.name === c);
+                        return (
+                          <Badge key={i} variant="secondary" className={cn(
+                            "pl-3 pr-1 py-1 rounded-lg border gap-2 shadow-sm",
+                            careerInfo?.inTec ? "bg-primary/5 text-primary border-primary/10" : "bg-orange-50 text-orange-700 border-orange-100"
+                          )}>
+                            <span className="font-bold">{c}</span>
+                            {!careerInfo?.inTec && <AlertCircle className="h-3 w-3 shrink-0" title="Carrera no disponible en Tecmilenio" />}
+                            <button onClick={() => handleRemoveCareer(i)} className="hover:bg-destructive/10 text-destructive p-0.5 rounded"><MinusCircle className="h-3.5 w-3.5" /></button>
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
