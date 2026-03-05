@@ -157,17 +157,34 @@ export function ContinuidadPanel() {
     }
   };
 
-  // Helper to get group from monitoring data
+  // Helper to get group from monitoring data with robust ID matching
   const getStudentGroupFromMonitoring = (studentId: string): string => {
-    const monitorStudent = allStudentsMap.get(studentId);
+    const normalizedId = studentId.trim().toUpperCase();
+    
+    // Try exact match first
+    let monitorStudent = allStudentsMap.get(studentId) || allStudentsMap.get(normalizedId);
+    
+    // If not found, search the values (slower but more robust)
+    if (!monitorStudent) {
+      for (const student of allStudentsMap.values()) {
+        if (student.id.trim().toUpperCase() === normalizedId) {
+          monitorStudent = student;
+          break;
+        }
+      }
+    }
+
     if (!monitorStudent || !monitorStudent.subjectSummaries) return '';
     
     // Find the first group that isn't online/flexible
     const regularSubject = monitorStudent.subjectSummaries.find(s => 
-      s.group && !s.group.toUpperCase().startsWith('F') && !s.group.startsWith('10')
+      s.group && 
+      !s.group.toUpperCase().startsWith('F') && 
+      !s.group.startsWith('10') &&
+      s.group.trim() !== ''
     );
     
-    return regularSubject?.group || monitorStudent.subjectSummaries[0]?.group || '';
+    return regularSubject?.group || monitorStudent.subjectSummaries.find(s => s.group && s.group.trim() !== '')?.group || '';
   };
 
   // Enriched students with group from monitoring
@@ -203,7 +220,6 @@ export function ContinuidadPanel() {
       list = list.filter(s => {
         const local = localStatuses[s.id];
         const voc = local?.vocationalDiagnosis;
-        const topUni = voc?.universityRanking?.split(/[;,]/)[0]?.trim().toUpperCase() || '';
 
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
@@ -700,7 +716,7 @@ function ContinuityCard({
                 <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
                 <span className="flex items-center gap-1 font-mono font-bold text-foreground">
                   <Group className="h-3 w-3 text-muted-foreground" /> 
-                  {student.group ? `GPO: ${student.group}` : 'Sin Gpo (Monitoreo)'}
+                  {student.group ? `GPO: ${student.group}` : 'Sin Grupo'}
                 </span>
                 <span className="font-mono">{student.id}</span>
                 <span className="font-bold">Promedio: {student.average}</span>
