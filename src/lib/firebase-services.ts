@@ -16,7 +16,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -467,6 +467,16 @@ export const updateContinuityWorkshopAttended = async (studentId: string, worksh
     await setDoc(docRef, { workshopAttended }, { merge: true });
   } catch (error) {
     console.error("Error updating workshop status:", error);
+  }
+};
+
+export const updateContinuityTrackingInfo = async (studentId: string, info: ContinuityTrackingInfo): Promise<void> => {
+  try {
+    const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+    await setDoc(docRef, { trackingInfo: info }, { merge: true });
+  } catch (error) {
+    console.error("Error updating tracking info:", error);
+    throw error;
   }
 };
 

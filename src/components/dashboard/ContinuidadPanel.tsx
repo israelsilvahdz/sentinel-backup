@@ -7,13 +7,13 @@ import { useToast } from '@/hooks/use-toast';
 import { parseContinuidadExcel } from '@/lib/continuityParser';
 import { parseVocationalExcel } from '@/lib/vocationalParser';
 import { parseRiasecExcel, parseSourceReferences } from '@/lib/riasecParser';
-import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment, VocationalDiagnosis } from '@/types/student';
+import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment, VocationalDiagnosis, ContinuityTrackingInfo } from '@/types/student';
 import { 
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
-  School, Building2, Landmark, FileJson, Link as LinkIcon
+  School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -26,11 +26,12 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
 import { Textarea } from '../ui/textarea';
+import { RiasecChart } from './RiasecChart';
 
 export function ContinuidadPanel() {
   const { toast } = useToast();
@@ -132,16 +133,20 @@ export function ContinuidadPanel() {
   const advisors = useMemo(() => [...new Set(students.map(s => s.advisor).filter(Boolean))].sort(), [students]);
   const statuses = useMemo(() => [...new Set(students.map(s => s.status).filter(Boolean))].sort(), [students]);
 
+  const filteredByCycleStudents = useMemo(() => {
+    return students.filter(s => {
+      const matchesCycle = selectedCycle === 'all' || s.cycle === selectedCycle;
+      const matchesGlobalLeader = (filterType === 'leader' && selectedValue) ? s.leader === selectedValue : true;
+      return matchesCycle && matchesGlobalLeader;
+    });
+  }, [students, selectedCycle, filterType, selectedValue]);
+
   const filteredStudents = useMemo(() => {
-    let list = students.filter(s => {
+    let list = filteredByCycleStudents.filter(s => {
       const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.includes(searchTerm);
       const matchesAdvisor = selectedAdvisor === 'all' || s.advisor === selectedAdvisor;
       const matchesStatus = selectedStatus === 'all' || s.status === selectedStatus;
-      const matchesCycle = selectedCycle === 'all' || s.cycle === selectedCycle;
-      
-      const matchesGlobalLeader = (filterType === 'leader' && selectedValue) ? s.leader === selectedValue : true;
-
-      return matchesSearch && matchesAdvisor && matchesStatus && matchesCycle && matchesGlobalLeader;
+      return matchesSearch && matchesAdvisor && matchesStatus;
     });
 
     if (selectedKpi) {
@@ -165,12 +170,13 @@ export function ContinuidadPanel() {
     }
 
     return list;
-  }, [students, searchTerm, selectedAdvisor, selectedStatus, selectedCycle, filterType, selectedValue, selectedKpi, localStatuses]);
+  }, [filteredByCycleStudents, searchTerm, selectedAdvisor, selectedStatus, selectedKpi, localStatuses]);
 
   const stats = useMemo(() => {
-    const total = students.length || 1;
-    const inscribed = students.filter(s => s.isInscribed).length;
-    const talentRisk = students.filter(s => !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
+    const baseList = filteredByCycleStudents;
+    const total = baseList.length || 0;
+    const inscribed = baseList.filter(s => s.isInscribed).length;
+    const talentRisk = baseList.filter(s => !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
     
     let indecisosCount = 0;
     let sosCount = 0;
@@ -179,7 +185,7 @@ export function ContinuidadPanel() {
     let priUanl = 0;
     let priTec = 0;
 
-    students.forEach(s => {
+    baseList.forEach(s => {
       if (s.isInscribed) return;
 
       const local = localStatuses[s.id];
@@ -199,11 +205,11 @@ export function ContinuidadPanel() {
     
     const statusDistribution = statuses.map(st => ({
       name: st,
-      value: students.filter(s => s.status === st).length
+      value: baseList.filter(s => s.status === st).length
     })).sort((a,b) => b.value - a.value);
 
     const advisorProgress = advisors.map(adv => {
-      const advStudents = students.filter(s => s.advisor === adv);
+      const advStudents = baseList.filter(s => s.advisor === adv);
       return {
         name: adv,
         total: advStudents.length,
@@ -212,7 +218,7 @@ export function ContinuidadPanel() {
     }).sort((a,b) => b.total - a.total);
 
     return { total, inscribed, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, priTecmi, priUanl, priTec };
-  }, [students, advisors, statuses, localStatuses]);
+  }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
     await updateContinuityIndeciso(studentId, isIndeciso);
@@ -233,6 +239,15 @@ export function ContinuidadPanel() {
       description: `Se ha actualizado el estado del taller vocacional.`
     });
   };
+
+  const handleUpdateTracking = async (studentId: string, info: ContinuityTrackingInfo) => {
+    await updateContinuityTrackingInfo(studentId, info);
+    setLocalStatuses(prev => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] || { comments: [] }), trackingInfo: info }
+    }));
+    toast({ title: "Seguimiento Guardado", description: "Los datos de decisión final se han actualizado." });
+  }
 
   const handleAddComment = async (studentId: string, text: string, author: string) => {
     await addContinuityComment(studentId, text, author);
@@ -268,6 +283,17 @@ export function ContinuidadPanel() {
           <p className="text-muted-foreground">Inscripciones a profesional y seguimiento vocacional.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Select value={selectedCycle} onValueChange={setSelectedCycle}>
+            <SelectTrigger className="w-[180px] bg-primary text-white border-none font-bold">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Filtrar por Ciclo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los Ciclos</SelectItem>
+              <SelectItem value="Enero 26">Enero 26</SelectItem>
+              <SelectItem value="Agosto 26">Agosto 26</SelectItem>
+            </SelectContent>
+          </Select>
           <FileUpload onFileSelect={handleSourceMapUpload} selectedFile={null} isLoading={false} variant="outline" label="Catálogo Fuentes" icon={<LinkIcon className="h-4 w-4" />} />
           <FileUpload onFileSelect={handleRiasecUpload} selectedFile={null} isLoading={isProcessingRiasec} variant="secondary" label="Cargar RIASEC" icon={<FileJson className="h-4 w-4" />} />
           <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Encuesta Vocacional" icon={<History className="h-4 w-4" />} />
@@ -379,14 +405,6 @@ export function ContinuidadPanel() {
                 {statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={selectedCycle} onValueChange={setSelectedCycle}>
-              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Ciclo" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Ambos Ciclos</SelectItem>
-                <SelectItem value="Enero 26">Enero 26</SelectItem>
-                <SelectItem value="Agosto 26">Agosto 26</SelectItem>
-              </SelectContent>
-            </Select>
             
             {selectedKpi && (
               <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="text-destructive h-10">
@@ -405,6 +423,7 @@ export function ContinuidadPanel() {
                 onToggle={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
                 onUpdateIndeciso={handleUpdateIndeciso}
                 onUpdateWorkshopAttended={handleUpdateWorkshopAttended}
+                onUpdateTracking={handleUpdateTracking}
                 onAddComment={handleAddComment}
               />
             ))}
@@ -416,7 +435,7 @@ export function ContinuidadPanel() {
 }
 
 function ContinuityCard({ 
-  student, localStatus, isExpanded, onToggle, onUpdateIndeciso, onUpdateWorkshopAttended, onAddComment 
+  student, localStatus, isExpanded, onToggle, onUpdateIndeciso, onUpdateWorkshopAttended, onUpdateTracking, onAddComment 
 }: { 
   student: ContinuityStudent, 
   localStatus?: ContinuityLocalStatus,
@@ -424,11 +443,13 @@ function ContinuityCard({
   onToggle: () => void,
   onUpdateIndeciso: (id: string, val: boolean) => void,
   onUpdateWorkshopAttended: (id: string, val: boolean) => void,
+  onUpdateTracking: (id: string, info: ContinuityTrackingInfo) => void,
   onAddComment: (id: string, text: string, author: string) => void
 }) {
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
   const riasec = localStatus?.riasecDiagnosis;
+  const tracking = localStatus?.trackingInfo || { chosenUniversity: '', chosenCareers: [], processStatus: 'Pendiente', resultDate: '' };
   
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
@@ -452,6 +473,32 @@ function ContinuityCard({
   const signatoryOptions = useMemo(() => {
     return [...new Set([...leaders, ...tutors])].sort((a, b) => a.localeCompare(b));
   }, [leaders, tutors]);
+
+  // Tracking form states
+  const [university, setUniversity] = useState(tracking.chosenUniversity);
+  const [careerInput, setCareerInput] = useState('');
+  const [careers, setCareers] = useState<string[]>(tracking.chosenCareers);
+  const [procStatus, setProcStatus] = useState(tracking.processStatus);
+  const [resDate, setResDate] = useState(tracking.resultDate);
+
+  const handleAddCareer = () => {
+    if (!careerInput.trim()) return;
+    setCareers(prev => [...prev, careerInput.trim()]);
+    setCareerInput('');
+  };
+
+  const handleRemoveCareer = (idx: number) => {
+    setCareers(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveTracking = () => {
+    onUpdateTracking(student.id, {
+      chosenUniversity: university,
+      chosenCareers: careers,
+      processStatus: procStatus,
+      resultDate: resDate
+    });
+  };
 
   return (
     <Card className={cn(
@@ -549,6 +596,86 @@ function ContinuityCard({
                   Taller Vocacional Tomado
                   {isWorkshopRequired && <span className="text-[9px] text-blue-600 font-bold uppercase">(Prioridad)</span>}
                 </Label>
+              </div>
+            </div>
+          )}
+
+          {/* New Decision Tracking Section */}
+          {!student.isInscribed && (
+            <div className="pt-4 border-t space-y-4">
+              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" /> Seguimiento de Decisión Final
+              </Label>
+              <div className="bg-background p-6 rounded-2xl border shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold">Universidad Elegida</Label>
+                    <Input 
+                      value={university} 
+                      onChange={e => setUniversity(e.target.value)} 
+                      placeholder="Ej. UANL, Tec de Monterrey..."
+                      className="rounded-xl h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold">Carrera(s) Seleccionada(s)</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        value={careerInput} 
+                        onChange={e => setCareerInput(e.target.value)} 
+                        placeholder="Añadir carrera..."
+                        className="rounded-xl h-10"
+                        onKeyDown={e => e.key === 'Enter' && handleAddCareer()}
+                      />
+                      <Button size="icon" variant="secondary" className="rounded-xl" onClick={handleAddCareer}><PlusCircle className="h-5 w-5" /></Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {careers.map((c, i) => (
+                        <Badge key={i} variant="secondary" className="pl-3 pr-1 py-1 rounded-lg bg-primary/5 text-primary border-primary/10 gap-2">
+                          {c}
+                          <button onClick={() => handleRemoveCareer(i)} className="hover:bg-destructive/10 text-destructive p-0.5 rounded"><MinusCircle className="h-3.5 w-3.5" /></button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold">Estatus del Proceso</Label>
+                      <Select value={procStatus} onValueChange={setProcStatus}>
+                        <SelectTrigger className="rounded-xl h-10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pendiente">Pendiente</SelectItem>
+                          <SelectItem value="Interesado">Interesado</SelectItem>
+                          <SelectItem value="Aplicando">Aplicando</SelectItem>
+                          <SelectItem value="Admitido">Admitido</SelectItem>
+                          <SelectItem value="Inscrito">Inscrito en otra</SelectItem>
+                          <SelectItem value="Declinado">Declinado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold flex items-center gap-1.5">
+                        <CalendarIcon className="h-3 w-3" /> Fecha Resultados
+                      </Label>
+                      <Input 
+                        type="date" 
+                        value={resDate} 
+                        onChange={e => setResDate(e.target.value)}
+                        className="rounded-xl h-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-4 flex justify-end">
+                    <Button onClick={handleSaveTracking} className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/10">
+                      <Send className="mr-2 h-4 w-4" /> Guardar Seguimiento
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

@@ -180,12 +180,20 @@ export interface VocationalDiagnosis {
   lastUpdated: any;
 }
 
+export interface ContinuityTrackingInfo {
+  chosenUniversity: string;
+  chosenCareers: string[];
+  processStatus: string;
+  resultDate: string;
+}
+
 export interface ContinuityLocalStatus {
   isIndeciso: boolean;
   workshopAttended?: boolean;
   comments: ContinuityComment[];
   vocationalDiagnosis?: VocationalDiagnosis;
   riasecDiagnosis?: RiasecDiagnosis;
+  trackingInfo?: ContinuityTrackingInfo;
 }
 
 // --- NUEVOS TIPOS PARA TRABAJO EN EQUIPO ---
