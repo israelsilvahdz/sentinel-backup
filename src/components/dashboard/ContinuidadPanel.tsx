@@ -15,7 +15,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
   School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
-  Command as CommandIcon
+  Command as CommandIcon, UserX
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -37,8 +37,8 @@ import { RiasecChart } from './RiasecChart';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 
-// --- CONSTANTS FOR STANDARDIZATION ---
-
+// --- CATALOGO MAESTRO DE CARRERAS (CONTROL DE OFERTA) ---
+// Aquí puedes marcar qué carreras tenemos en campus y cuáles no.
 const UNIVERSITY_OPTIONS = [
   "TECMILENIO",
   "UANL",
@@ -49,7 +49,7 @@ const UNIVERSITY_OPTIONS = [
 ];
 
 const CAREER_CATALOG = [
-  // Tecmilenio Core Offer
+  // Oferta Core Tecmilenio (In Campus)
   { name: "Administración de Empresas", inTec: true },
   { name: "Administración de Negocios Internacionales", inTec: true },
   { name: "Comercio Internacional", inTec: true },
@@ -64,8 +64,9 @@ const CAREER_CATALOG = [
   { name: "Gastronomía", inTec: true },
   { name: "Nutrición", inTec: true },
   { name: "Turismo", inTec: true },
+  { name: "Contaduría Pública", inTec: true },
   
-  // High Demand External (Loss reason)
+  // Carreras Externas (Causas de Fuga Frecuentes)
   { name: "Medicina", inTec: false },
   { name: "Arquitectura", inTec: false },
   { name: "Veterinaria", inTec: false },
@@ -80,7 +81,6 @@ const CAREER_CATALOG = [
   { name: "Diseño de Modas", inTec: false },
   { name: "Relaciones Internacionales", inTec: false },
   { name: "Finanzas", inTec: false },
-  { name: "Contaduría Pública", inTec: true },
   { name: "Economía", inTec: false },
   { name: "Filosofía y Letras", inTec: false },
   { name: "Otra Carrera (No en lista)", inTec: false }
@@ -210,6 +210,7 @@ export function ContinuidadPanel() {
 
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
+          case 'pending': return !s.isInscribed;
           case 'indeciso': return !s.isInscribed && local?.isIndeciso;
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
           case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
@@ -229,6 +230,7 @@ export function ContinuidadPanel() {
     const baseList = filteredByCycleStudents;
     const total = baseList.length || 0;
     const inscribed = baseList.filter(s => s.isInscribed).length;
+    const pending = total - inscribed;
     const talentRisk = baseList.filter(s => !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
     
     let indecisosCount = 0;
@@ -270,7 +272,7 @@ export function ContinuidadPanel() {
       };
     }).sort((a,b) => b.total - a.total);
 
-    return { total, inscribed, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, priTecmi, priUanl, priTec };
+    return { total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, priTecmi, priUanl, priTec };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
@@ -354,9 +356,10 @@ export function ContinuidadPanel() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         <KpiCard title="Total Alumnos" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="green" onClick={() => handleKpiClick('inscribed')} />
+        <KpiCard title="Pendientes" value={stats.pending} icon={UserX} color="blue" onClick={() => handleKpiClick('pending')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
         <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
@@ -663,7 +666,7 @@ function ContinuityCard({
             </div>
           )}
 
-          {/* New Decision Tracking Section with Standardized Selects */}
+          {/* Decision Tracking Section */}
           {!student.isInscribed && (
             <div className="pt-4 border-t space-y-4">
               <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
