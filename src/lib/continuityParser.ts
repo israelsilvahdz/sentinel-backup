@@ -120,8 +120,10 @@ const CAREER_CHOICE_COLUMNS = {
   CARRERA_OPCION_2: '¿Qué carrera has elegido estudiar?',
   CARRERA_OPCION_3: '¿Cuáles carreras estás contemplando?',
   YA_ELIGIO_UNIVERSIDAD: '¿Ya elegiste universidad?',
-  UNIVERSIDAD: '¿Cuál universidad?',
-  ETAPA: 'En que proceso te encuentras en la universidad'
+  UNIVERSIDAD_1: '¿Cuál universidad?',
+  UNIVERSIDAD_2: '¿Cuáles universidades estás teniendo en cuenta?',
+  ETAPA: 'En que proceso te encuentras en la universidad',
+  FECHA_RESULTADOS: 'Indica la fecha en que recibirás resultados'
 };
 
 function extractMatriculaFromEmail(email: string): string | null {
@@ -159,18 +161,23 @@ export async function parseCareerChoiceSurvey(file: File): Promise<Record<string
           const id = extractMatriculaFromEmail(email);
           if (!id) return;
 
-          // Priority logic for career name
+          // Consolidated logic for career name
           const carrera = getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_1) || 
                           getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_2) || 
                           getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_3);
+
+          // Consolidated logic for university
+          const universidad = getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_1) || 
+                              getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_2);
 
           results[id] = {
             fechaRespuesta: String(getVal(CAREER_CHOICE_COLUMNS.TIME)),
             yaEligioCarrera: String(getVal(CAREER_CHOICE_COLUMNS.YA_ELIGIO_CARRERA)),
             carreraElegida: String(carrera),
             yaEligioUniversidad: String(getVal(CAREER_CHOICE_COLUMNS.YA_ELIGIO_UNIVERSIDAD)),
-            universidadElegida: String(getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD)),
-            etapaProceso: String(getVal(CAREER_CHOICE_COLUMNS.ETAPA))
+            universidadElegida: String(universidad),
+            etapaProceso: String(getVal(CAREER_CHOICE_COLUMNS.ETAPA)),
+            fechaEntregaResultados: String(getVal(CAREER_CHOICE_COLUMNS.FECHA_RESULTADOS))
           };
         });
 

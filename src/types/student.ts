@@ -195,6 +195,7 @@ export interface CareerChoiceSurvey {
   yaEligioUniversidad: string;
   universidadElegida: string;
   etapaProceso: string;
+  fechaEntregaResultados?: string;
 }
 
 export interface ContinuityLocalStatus {

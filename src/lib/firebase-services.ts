@@ -609,13 +609,16 @@ export const bulkUpdateCareerSurvey = async (
       const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
       
       const officialStatus = officialStatuses[studentId] || '';
-      const declaredUni = survey.universidadElegida.toLowerCase();
+      const declaredUni = (survey.universidadElegida || '').toLowerCase();
       const isTecmilenio = declaredUni.includes('tecmilenio');
       const isOfficialInscribed = officialStatus.toLowerCase() === 'inscrito' || officialStatus.toLowerCase() === 'inscrita';
+      const choseCareer = (survey.yaEligioCarrera || '').toLowerCase() === 'si';
       
       const updateData: any = {
         encuestaEleccionReciente: survey,
-        lastSurveyUpdate: Timestamp.now()
+        lastSurveyUpdate: Timestamp.now(),
+        // Update Indeciso based on choice
+        isIndeciso: !choseCareer
       };
 
       // Trigger Alert: Declared Tecmilenio but not officialy inscribed
