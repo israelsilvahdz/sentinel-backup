@@ -188,13 +188,24 @@ export interface ContinuityTrackingInfo {
   resultDate: string;
 }
 
+export interface CareerChoiceSurvey {
+  fechaRespuesta: string;
+  yaEligioCarrera: string;
+  carreraElegida: string;
+  yaEligioUniversidad: string;
+  universidadElegida: string;
+  etapaProceso: string;
+}
+
 export interface ContinuityLocalStatus {
   isIndeciso: boolean;
   workshopAttended?: boolean;
+  alertaFalsaInscripcion?: boolean;
   comments: ContinuityComment[];
   vocationalDiagnosis?: VocationalDiagnosis;
   riasecDiagnosis?: RiasecDiagnosis;
   trackingInfo?: ContinuityTrackingInfo;
+  encuestaEleccionReciente?: CareerChoiceSurvey;
 }
 
 // --- NUEVOS TIPOS PARA TRABAJO EN EQUIPO ---

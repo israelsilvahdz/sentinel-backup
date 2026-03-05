@@ -16,7 +16,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo, CareerOption } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo, CareerOption, CareerChoiceSurvey } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -591,6 +591,46 @@ export const updateCareerCatalog = async (options: CareerOption[]): Promise<void
     await setDoc(docRef, { options, lastUpdated: Timestamp.now() });
   } catch (error) {
     console.error("Error al actualizar catálogo de carreras:", error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza masivamente los datos de la encuesta de elección de carrera.
+ */
+export const bulkUpdateCareerSurvey = async (
+  surveys: Record<string, CareerChoiceSurvey>,
+  officialStatuses: Record<string, string>
+): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    
+    Object.entries(surveys).forEach(([studentId, survey]) => {
+      const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+      
+      const officialStatus = officialStatuses[studentId] || '';
+      const declaredUni = survey.universidadElegida.toLowerCase();
+      const isTecmilenio = declaredUni.includes('tecmilenio');
+      const isOfficialInscribed = officialStatus.toLowerCase() === 'inscrito' || officialStatus.toLowerCase() === 'inscrita';
+      
+      const updateData: any = {
+        encuestaEleccionReciente: survey,
+        lastSurveyUpdate: Timestamp.now()
+      };
+
+      // Trigger Alert: Declared Tecmilenio but not officialy inscribed
+      if (isTecmilenio && !isOfficialInscribed) {
+        updateData.alertaFalsaInscripcion = true;
+      } else {
+        updateData.alertaFalsaInscripcion = false;
+      }
+
+      batch.set(docRef, updateData, { merge: true });
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.error("Error bulk updating career survey:", error);
     throw error;
   }
 };

@@ -1,6 +1,5 @@
-
 import * as XLSX from 'xlsx';
-import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team } from '@/types/student';
+import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team, CareerChoiceSurvey } from '@/types/student';
 import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams } from './firebase-services';
 import type { StudentData, Subject } from '@/types/student';
 import { generateKeyFromData } from './utils';
@@ -692,4 +691,77 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
         reader.onerror = (error) => reject(error);
         reader.readAsArrayBuffer(file);
     });
+}
+
+// --- PARSER PARA ENCUESTA DE ELECCIÓN DE CARRERA RECIENTE ---
+
+const CAREER_CHOICE_COLUMNS = {
+  EMAIL: 'Email',
+  TIME: 'Completion time',
+  YA_ELIGIO_CARRERA: '¿Ya elegiste carrera?',
+  CARRERA_OPCION_1: '¿Cuál de las siguientes carreras elegiste?',
+  CARRERA_OPCION_2: '¿Qué carrera has elegido estudiar?',
+  CARRERA_OPCION_3: '¿Cuáles carreras estás contemplando?',
+  YA_ELIGIO_UNIVERSIDAD: '¿Ya elegiste universidad?',
+  UNIVERSIDAD: '¿Cuál universidad?',
+  ETAPA: 'En que proceso te encuentras en la universidad'
+};
+
+function extractMatriculaFromEmail(email: string): string | null {
+  if (!email) return null;
+  const match = email.match(/^al([0-9]+)@/i);
+  if (match) {
+    return `T${match[1]}`;
+  }
+  return null;
+}
+
+export async function parseCareerChoiceSurvey(file: File): Promise<Record<string, CareerChoiceSurvey> | null> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const ws = workbook.Sheets[sheetName];
+        const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (json.length === 0) return resolve(null);
+
+        const results: Record<string, CareerChoiceSurvey> = {};
+
+        json.forEach(row => {
+          const keys = Object.keys(row);
+          const getVal = (exactName: string) => {
+            const foundKey = keys.find(k => k.trim() === exactName);
+            return foundKey ? row[foundKey] : '';
+          };
+
+          const email = String(getVal(CAREER_CHOICE_COLUMNS.EMAIL)).trim();
+          const id = extractMatriculaFromEmail(email);
+          if (!id) return;
+
+          // Priority logic for career name
+          const carrera = getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_1) || 
+                          getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_2) || 
+                          getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_3);
+
+          results[id] = {
+            fechaRespuesta: String(getVal(CAREER_CHOICE_COLUMNS.TIME)),
+            yaEligioCarrera: String(getVal(CAREER_CHOICE_COLUMNS.YA_ELIGIO_CARRERA)),
+            carreraElegida: String(carrera),
+            yaEligioUniversidad: String(getVal(CAREER_CHOICE_COLUMNS.YA_ELIGIO_UNIVERSIDAD)),
+            universidadElegida: String(getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD)),
+            etapaProceso: String(getVal(CAREER_CHOICE_COLUMNS.ETAPA))
+          };
+        });
+
+        resolve(results);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
 }

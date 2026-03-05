@@ -4,17 +4,17 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
-import { parseContinuidadExcel } from '@/lib/continuityParser';
+import { parseContinuidadExcel, parseCareerChoiceSurvey } from '@/lib/continuityParser';
 import { parseVocationalExcel } from '@/lib/vocationalParser';
 import { parseRiasecExcel } from '@/lib/riasecParser';
-import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, VocationalDiagnosis, ContinuityTrackingInfo, CareerOption, CareerType } from '@/types/student';
+import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, VocationalDiagnosis, ContinuityTrackingInfo, CareerOption, CareerType, CareerChoiceSurvey } from '@/types/student';
 import { 
   Users, Target, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
   Landmark, FileJson, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
-  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group
+  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -26,7 +26,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
@@ -81,6 +81,7 @@ export function ContinuidadPanel() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessingVoc, setIsProcessingVoc] = useState(false);
   const [isProcessingRiasec, setIsProcessingRiasec] = useState(false);
+  const [isProcessingSurvey, setIsProcessingSurvey] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAdvisor, setSelectedAdvisor] = useState('all');
@@ -157,6 +158,27 @@ export function ContinuidadPanel() {
     }
   };
 
+  const handleSurveyUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsProcessingSurvey(true);
+    try {
+      const surveys = await parseCareerChoiceSurvey(file);
+      if (surveys) {
+        const officialStatuses: Record<string, string> = {};
+        students.forEach(s => officialStatuses[s.id] = s.status);
+        
+        await bulkUpdateCareerSurvey(surveys, officialStatuses);
+        const updated = await getAllContinuityStatuses();
+        setLocalStatuses(updated);
+        toast({ title: "Encuesta de Elección Procesada", description: `Se actualizaron ${Object.keys(surveys).length} expedientes con información reciente.` });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error al cargar encuesta", description: "Revisa el formato del archivo CSV." });
+    } finally {
+      setIsProcessingSurvey(false);
+    }
+  };
+
   // Helper to get group from monitoring data with robust ID matching
   const getStudentGroupFromMonitoring = (studentId: string): string => {
     const normalizedId = studentId.trim().toUpperCase();
@@ -228,6 +250,7 @@ export function ContinuidadPanel() {
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
           case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
+          case 'fake': return local?.alertaFalsaInscripcion;
           default: return true;
         }
       });
@@ -246,11 +269,14 @@ export function ContinuidadPanel() {
     let indecisosCount = 0;
     let sosCount = 0;
     let tallerCount = 0;
+    let fakeInscribedCount = 0;
 
     baseList.forEach(s => {
+      const local = localStatuses[s.id];
+      if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
+
       if (s.isInscribed) return;
 
-      const local = localStatuses[s.id];
       if (local?.isIndeciso) indecisosCount++;
       
       const voc = local?.vocationalDiagnosis;
@@ -274,7 +300,7 @@ export function ContinuidadPanel() {
       };
     }).sort((a,b) => b.total - a.total);
 
-    return { total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount };
+    return { total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, fakeInscribedCount };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
@@ -366,15 +392,17 @@ export function ContinuidadPanel() {
           />
 
           <FileUpload onFileSelect={handleRiasecUpload} selectedFile={null} isLoading={isProcessingRiasec} variant="secondary" label="Cargar RIASEC" icon={<FileJson className="h-4 w-4" />} />
-          <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Encuesta Vocacional" icon={<History className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleSurveyUpload} selectedFile={null} isLoading={isProcessingSurvey} variant="outline" label="Cargar Encuesta" icon={<MessageSquare className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Excel Operativo" icon={<History className="h-4 w-4" />} />
           <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="default" label="Actualizar Base Operativa" />
         </div>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <KpiCard title="Total Alumnos" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="green" onClick={() => handleKpiClick('inscribed')} />
         <KpiCard title="No Inscritos" value={stats.pending} icon={UserX} color="blue" onClick={() => handleKpiClick('pending')} />
+        <KpiCard title="Falsa Inscripción" value={stats.fakeInscribedCount} icon={FileWarning} color="red" onClick={() => handleKpiClick('fake')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
         <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
@@ -607,11 +635,13 @@ function ContinuityCard({
   const vocational = localStatus?.vocationalDiagnosis;
   const riasec = localStatus?.riasecDiagnosis;
   const tracking = localStatus?.trackingInfo || { chosenUniversity: '', chosenCareers: [], processStatus: 'Pendiente', resultDate: '' };
+  const survey = localStatus?.encuestaEleccionReciente;
   
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
   const isWorkshopRequired = vocational?.requiresWorkshop && !student.isInscribed;
   const isWorkshopAttended = localStatus?.workshopAttended;
+  const hasFalseInscribedAlert = localStatus?.alertaFalsaInscripcion;
 
   const universityRankingArray = useMemo(() => {
     if (!vocational?.universityRanking) return [];
@@ -672,7 +702,7 @@ function ContinuityCard({
     <Card className={cn(
       "transition-all border-l-4",
       student.isInscribed ? "border-l-green-500" : "border-l-muted",
-      (isHighValueRisk || isSOS) && "ring-2 ring-red-500/50",
+      (isHighValueRisk || isSOS || hasFalseInscribedAlert) && "ring-2 ring-red-500/50",
       isIndeciso && "border-l-purple-500 bg-purple-50/5"
     )}>
       <div className="p-4 flex flex-col cursor-pointer hover:bg-muted/5" onClick={onToggle}>
@@ -688,6 +718,18 @@ function ContinuityCard({
               <div className="flex items-center gap-2">
                 <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base">
                   {student.name}
+                  {hasFalseInscribedAlert && (
+                    <TooltipUI>
+                      <TooltipTrigger asChild>
+                        <Badge variant="destructive" className="animate-pulse flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" /> FALSA INSCRIPCIÓN
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs font-bold">
+                        El alumno declaró "Tecmilenio" en la encuesta más reciente, pero NO figura como inscrito oficialmente en el reporte diario.
+                      </TooltipContent>
+                    </TooltipUI>
+                  )}
                   {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
                   {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
                   {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
@@ -755,6 +797,45 @@ function ContinuityCard({
 
       {isExpanded && (
         <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2">
+          
+          {/* Latest Declared Survey Status (Most Up-to-date Info) */}
+          {survey && (
+            <div className="space-y-3">
+              <Label className="text-xs uppercase font-black text-emerald-700 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" /> Último Estatus Declarado (Encuesta Reciente)
+              </Label>
+              <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Carrera Seleccionada</p>
+                  <p className="text-sm font-bold text-emerald-900">{survey.carreraElegida || 'Sin especificar'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Universidad</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-emerald-900">{survey.universidadElegida}</p>
+                    {survey.universidadElegida.toLowerCase().includes('tecmilenio') && (
+                      <Badge className="bg-emerald-600 text-[8px] h-4">Validando...</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Etapa del Proceso</p>
+                  <Badge variant="outline" className="bg-white border-emerald-200 text-emerald-700 font-bold uppercase text-[9px]">
+                    {survey.etapaProceso}
+                  </Badge>
+                </div>
+                <div className="md:col-span-3 flex justify-between items-center pt-2 border-t border-emerald-100">
+                  <p className="text-[10px] text-emerald-600/70 italic">Respondido el: {survey.fechaRespuesta}</p>
+                  {hasFalseInscribedAlert && (
+                    <div className="flex items-center gap-2 text-red-600 text-[10px] font-black uppercase bg-white px-3 py-1 rounded-full border border-red-100 shadow-sm animate-pulse">
+                      <AlertTriangle className="h-3 w-3" /> Discrepancia detectada: Declaró inscripción pero no es oficial.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {!student.isInscribed && (
             <div className="flex flex-wrap gap-3 justify-end mb-2">
               <div className="flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm">
@@ -786,7 +867,7 @@ function ContinuityCard({
           {!student.isInscribed && (
             <div className="pt-4 border-t space-y-4">
               <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" /> Seguimiento de Decisión Final
+                <CheckCircle2 className="h-4 w-4" /> Seguimiento de Decisión Final (Captura Asesor)
               </Label>
               <div className="bg-background p-6 rounded-2xl border shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
@@ -1047,7 +1128,7 @@ function ContinuityCard({
           )}
 
           <div className="pt-4 border-t">
-            <Label className="text-xs uppercase font-bold text-muted-foreground block mb-2">Decisión sobre carrera</Label>
+            <Label className="text-xs uppercase font-bold text-muted-foreground block mb-2">Decisión sobre carrera (Histórico)</Label>
             <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 flex gap-3">
               <MessageSquare className="h-5 w-5 text-primary shrink-0 mt-1" />
               <p className="text-sm leading-relaxed">{student.decisionTaken || "Sin respuesta declarada."}</p>
