@@ -14,7 +14,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
   School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
-  Command as CommandIcon, UserX, Loader2, Trash2, Globe, Save
+  Command as CommandIcon, UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -36,6 +36,7 @@ import { RiasecChart } from './RiasecChart';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { TooltipProvider, Tooltip as TooltipUI, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 
 const UNIVERSITY_OPTIONS = [
   "TECMILENIO",
@@ -70,7 +71,7 @@ const DEFAULT_CAREER_CATALOG: CareerOption[] = [
 export function ContinuidadPanel() {
   const { toast } = useToast();
   const { 
-    selectedValue, filterType, 
+    selectedValue, filterType, setActiveView, setContextualStudentIds,
     continuityStudents: students, setContinuityStudents: setStudents, 
     continuityCatalog: catalog, setContinuityCatalog: setCatalog 
   } = useDashboardFilters();
@@ -85,6 +86,7 @@ export function ContinuidadPanel() {
   const [selectedAdvisor, setSelectedAdvisor] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedCycle, setSelectedCycle] = useState('all');
+  const [selectedGroup, setSelectedGroup] = useState('all');
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState('stats');
@@ -157,6 +159,7 @@ export function ContinuidadPanel() {
 
   const advisors = useMemo(() => [...new Set(students.map(s => s.advisor).filter(Boolean))].sort(), [students]);
   const statuses = useMemo(() => [...new Set(students.map(s => s.status).filter(Boolean))].sort(), [students]);
+  const groups = useMemo(() => [...new Set(students.map(s => s.group).filter(Boolean))].sort(), [students]);
 
   const filteredByCycleStudents = useMemo(() => {
     return students.filter(s => {
@@ -171,7 +174,8 @@ export function ContinuidadPanel() {
       const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.id.includes(searchTerm);
       const matchesAdvisor = selectedAdvisor === 'all' || s.advisor === selectedAdvisor;
       const matchesStatus = selectedStatus === 'all' || s.status === selectedStatus;
-      return matchesSearch && matchesAdvisor && matchesStatus;
+      const matchesGroup = selectedGroup === 'all' || s.group === selectedGroup;
+      return matchesSearch && matchesAdvisor && matchesStatus && matchesGroup;
     });
 
     if (selectedKpi) {
@@ -196,7 +200,7 @@ export function ContinuidadPanel() {
     }
 
     return list;
-  }, [filteredByCycleStudents, searchTerm, selectedAdvisor, selectedStatus, selectedKpi, localStatuses]);
+  }, [filteredByCycleStudents, searchTerm, selectedAdvisor, selectedStatus, selectedGroup, selectedKpi, localStatuses]);
 
   const stats = useMemo(() => {
     const baseList = filteredByCycleStudents;
@@ -285,6 +289,11 @@ export function ContinuidadPanel() {
   const handleKpiClick = (kpi: string) => {
     setSelectedKpi(kpi);
     setActiveTab('list');
+  };
+
+  const handleJumpToStudent = (studentId: string) => {
+    setContextualStudentIds(new Set([studentId]));
+    setActiveView('students');
   };
 
   if (students.length === 0) {
@@ -401,6 +410,13 @@ export function ContinuidadPanel() {
                 {advisors.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los grupos</SelectItem>
+                {groups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="Estatus" /></SelectTrigger>
               <SelectContent>
@@ -429,6 +445,7 @@ export function ContinuidadPanel() {
                 onUpdateWorkshopAttended={handleUpdateWorkshopAttended}
                 onUpdateTracking={handleUpdateTracking}
                 onAddComment={handleAddComment}
+                onJumpToStudent={() => handleJumpToStudent(student.id)}
               />
             ))}
           </div>
@@ -547,7 +564,7 @@ function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[]
 }
 
 function ContinuityCard({ 
-  student, localStatus, isExpanded, careerCatalog, onToggle, onUpdateIndeciso, onUpdateWorkshopAttended, onUpdateTracking, onAddComment 
+  student, localStatus, isExpanded, careerCatalog, onToggle, onUpdateIndeciso, onUpdateWorkshopAttended, onUpdateTracking, onAddComment, onJumpToStudent
 }: { 
   student: ContinuityStudent, 
   localStatus?: ContinuityLocalStatus,
@@ -557,7 +574,8 @@ function ContinuityCard({
   onUpdateIndeciso: (id: string, val: boolean) => void,
   onUpdateWorkshopAttended: (id: string, val: boolean) => void,
   onUpdateTracking: (id: string, info: ContinuityTrackingInfo) => void,
-  onAddComment: (id: string, text: string, author: string) => void
+  onAddComment: (id: string, text: string, author: string) => void,
+  onJumpToStudent: () => void
 }) {
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
@@ -624,6 +642,7 @@ function ContinuityCard({
   }, [careerSearch, careerCatalog]);
 
   return (
+    <TooltipProvider>
     <Card className={cn(
       "transition-all border-l-4",
       student.isInscribed ? "border-l-green-500" : "border-l-muted",
@@ -640,25 +659,36 @@ function ContinuityCard({
               {student.isInscribed ? <GraduationCap className="h-5 w-5" /> : student.id.substring(0, 2)}
             </div>
             <div className="space-y-1">
-              <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base">
-                {student.name}
-                {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
-                {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
-                {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
-                {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
-                {!student.isInscribed && tecmilenioRank !== null && (
-                  <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(
-                    tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50"
-                  )}>
-                    {tecmilenioRank === 1 ? <Trophy className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
-                    Opción {tecmilenioRank}
-                  </Badge>
-                )}
-                {riasec && <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 flex items-center gap-1"><Sparkles className="h-3 w-3" /> RIASEC OK</Badge>}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base">
+                  {student.name}
+                  {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
+                  {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
+                  {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
+                  {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
+                  {!student.isInscribed && tecmilenioRank !== null && (
+                    <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(
+                      tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50"
+                    )}>
+                      {tecmilenioRank === 1 ? <Trophy className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
+                      Opción {tecmilenioRank}
+                    </Badge>
+                  )}
+                  {riasec && <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 flex items-center gap-1"><Sparkles className="h-3 w-3" /> RIASEC OK</Badge>}
+                </h3>
+                <TooltipUI>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-primary hover:bg-primary/5" onClick={(e) => { e.stopPropagation(); onJumpToStudent(); }}>
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="font-bold">Ver Expediente Académico</TooltipContent>
+                </TooltipUI>
+              </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
                 <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
+                <span className="flex items-center gap-1 font-mono font-bold"><Group className="h-3 w-3" /> {student.group || 'Sin Gpo'}</span>
                 <span className="font-mono">{student.id}</span>
                 <span className="font-bold">Promedio: {student.average}</span>
               </div>
@@ -1063,6 +1093,7 @@ function ContinuityCard({
         </CardContent>
       )}
     </Card>
+    </TooltipProvider>
   );
 }
 

@@ -139,6 +139,7 @@ export interface ContinuityStudent {
   name: string;
   leader: string;
   advisor: string;
+  group: string; // Grupo del alumno
   status: string;
   isInscribed: boolean;
   priority: number;

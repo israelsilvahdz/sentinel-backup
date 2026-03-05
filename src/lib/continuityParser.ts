@@ -43,6 +43,7 @@ export async function parseContinuidadExcel(file: File): Promise<{ students: Con
               name: getVal('Nombre') || '',
               leader: getVal('Líder') || '',
               advisor: getVal('Asesor') || '',
+              group: getVal('Grupo') || '',
               status: getVal('Estatus') || '',
               isInscribed: String(getVal('Inscrito')) === '1',
               priority: parseInt(getVal('Prioridad')) || 0,
