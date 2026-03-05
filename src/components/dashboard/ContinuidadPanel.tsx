@@ -75,7 +75,7 @@ export function ContinuidadPanel() {
     continuityCatalog: catalog, setContinuityCatalog: setCatalog 
   } = useDashboardFilters();
   
-  const [localStatuses, setLocalStatuses] = setLocalStatuses || useState<Record<string, ContinuityLocalStatus>>({});
+  const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
   const [careerCatalog, setCareerCatalog] = useState<CareerOption[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessingVoc, setIsProcessingVoc] = useState(false);
