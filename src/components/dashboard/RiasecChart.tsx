@@ -25,12 +25,12 @@ export function RiasecChart({ diagnosis }: RiasecChartProps) {
   const chartData = useMemo(() => {
     const { scores } = diagnosis;
     return [
-      { subject: 'Realista', A: scores.realistic, fullMark: 100 },
-      { subject: 'Investigador', A: scores.investigative, fullMark: 100 },
-      { subject: 'Artístico', A: scores.artistic, fullMark: 100 },
-      { subject: 'Social', A: scores.social, fullMark: 100 },
-      { subject: 'Emprendedor', A: scores.enterprising, fullMark: 100 },
-      { subject: 'Convencional', A: scores.conventional, fullMark: 100 },
+      { subject: 'Realista', A: scores.realistic, fullMark: 10 },
+      { subject: 'Investigador', A: scores.investigative, fullMark: 10 },
+      { subject: 'Artístico', A: scores.artistic, fullMark: 10 },
+      { subject: 'Social', A: scores.social, fullMark: 10 },
+      { subject: 'Emprendedor', A: scores.enterprising, fullMark: 10 },
+      { subject: 'Convencional', A: scores.conventional, fullMark: 10 },
     ];
   }, [diagnosis]);
 
@@ -65,7 +65,7 @@ export function RiasecChart({ diagnosis }: RiasecChartProps) {
                   dataKey="subject" 
                   tick={{ fontSize: 11, fontWeight: 'bold', fill: 'hsl(var(--foreground))' }} 
                 />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} axisLine={false} tick={false} />
+                <PolarRadiusAxis angle={30} domain={[0, 10]} axisLine={false} tick={false} />
                 <Radar
                   name="Puntuación"
                   dataKey="A"
