@@ -6,13 +6,14 @@ import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseContinuidadExcel } from '@/lib/continuityParser';
 import { parseVocationalExcel } from '@/lib/vocationalParser';
+import { parseRiasecExcel, parseSourceReferences } from '@/lib/riasecParser';
 import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment, VocationalDiagnosis } from '@/types/student';
 import { 
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
-  School, Building2, Landmark
+  School, Building2, Landmark, FileJson, Link as LinkIcon
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -25,7 +26,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
@@ -42,6 +43,9 @@ export function ContinuidadPanel() {
   const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessingVoc, setIsProcessingVoc] = useState(false);
+  const [isProcessingRiasec, setIsProcessingRiasec] = useState(false);
+  const [sourceMap, setSourceMap] = useState<Record<string, string>>({});
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAdvisor, setSelectedAdvisor] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -91,6 +95,37 @@ export function ContinuidadPanel() {
       toast({ variant: 'destructive', title: "Error al cargar", description: "No se pudo procesar el archivo vocacional." });
     } finally {
       setIsProcessingVoc(false);
+    }
+  };
+
+  const handleSourceMapUpload = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const map = await parseSourceReferences(file);
+      if (map) {
+        setSourceMap(map);
+        toast({ title: "Referencias de Fuentes Cargadas", description: "El mapa de archivos PDF está listo para cruzar con RIASEC." });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error al cargar fuentes" });
+    }
+  };
+
+  const handleRiasecUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsProcessingRiasec(true);
+    try {
+      const diagnoses = await parseRiasecExcel(file, sourceMap);
+      if (diagnoses) {
+        await bulkUpdateRiasecDiagnoses(diagnoses);
+        const updated = await getAllContinuityStatuses();
+        setLocalStatuses(updated);
+        toast({ title: "Test RIASEC Procesado", description: `Se actualizaron ${Object.keys(diagnoses).length} perfiles con datos vocacionales.` });
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error al cargar RIASEC" });
+    } finally {
+      setIsProcessingRiasec(false);
     }
   };
 
@@ -232,9 +267,11 @@ export function ContinuidadPanel() {
           <h1 className="text-3xl font-bold tracking-tight">Estrategia de Continuidad</h1>
           <p className="text-muted-foreground">Inscripciones a profesional y seguimiento vocacional.</p>
         </div>
-        <div className="flex gap-2">
-          <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="secondary" label="Cargar Encuesta Vocacional" icon={<History className="h-4 w-4" />} />
-          <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="outline" label="Actualizar Base Operativa" />
+        <div className="flex flex-wrap gap-2">
+          <FileUpload onFileSelect={handleSourceMapUpload} selectedFile={null} isLoading={false} variant="outline" label="Catálogo Fuentes" icon={<LinkIcon className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleRiasecUpload} selectedFile={null} isLoading={isProcessingRiasec} variant="secondary" label="Cargar RIASEC" icon={<FileJson className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Encuesta Vocacional" icon={<History className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="default" label="Actualizar Base Operativa" />
         </div>
       </header>
 
@@ -391,6 +428,7 @@ function ContinuityCard({
 }) {
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
+  const riasec = localStatus?.riasecDiagnosis;
   
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
@@ -446,6 +484,7 @@ function ContinuityCard({
                     Opción {tecmilenioRank}
                   </Badge>
                 )}
+                {riasec && <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 flex items-center gap-1"><Sparkles className="h-3 w-3" /> RIASEC OK</Badge>}
               </h3>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
@@ -555,6 +594,15 @@ function ContinuityCard({
               </div>
             </div>
           </div>
+
+          {riasec && (
+            <div className="pt-6 border-t space-y-4">
+              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
+                <Sparkles className="h-4 w-4" /> Diagnóstico Vocacional (Modelo RIASEC)
+              </Label>
+              <RiasecChart diagnosis={riasec} />
+            </div>
+          )}
 
           {vocational && (
             <div className="pt-6 border-t space-y-4">

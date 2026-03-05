@@ -1,11 +1,10 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Minus, Plus, Phone, Camera, User as UserIcon, Download } from 'lucide-react';
-import { type Student, type Subject } from "@/types/student";
+import { Minus, Plus, Phone, Camera, User as UserIcon, Download, Sparkles } from 'lucide-react';
+import { type Student, type Subject, type ContinuityLocalStatus } from "@/types/student";
 import { getActivityList } from '@/lib/ponderaciones';
 import { isWithoutRight } from '@/lib/dataProcessor';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +19,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { RiskCell, CopyButton } from './StudentCardShared';
+import { RiasecChart } from './RiasecChart';
+import { getContinuityLocalStatus } from '@/lib/firebase-services';
 import * as htmlToImage from 'html-to-image';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
@@ -82,14 +83,19 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
     const [isLoading, setIsLoading] = useState(false);
     const [openSubject, setOpenSubject] = useState<string | null>(null);
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+    const [localStatus, setLocalStatus] = useState<ContinuityLocalStatus | null>(null);
 
     useEffect(() => {
-        async function loadSubjects() {
-            if (isOpen && student.id && subjects.length === 0) {
+        async function loadData() {
+            if (isOpen && student.id) {
                 setIsLoading(true);
                 try {
-                    const fetchedSubjects = await loadStudentSubjects(student.id);
+                    const [fetchedSubjects, status] = await Promise.all([
+                        subjects.length === 0 ? loadStudentSubjects(student.id) : subjects,
+                        getContinuityLocalStatus(student.id)
+                    ]);
                     setSubjects(fetchedSubjects);
+                    setLocalStatus(status);
                 } catch (error) {
                     console.error("Failed to load subjects for student " + student.id, error);
                 } finally {
@@ -97,7 +103,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                 }
             }
         }
-        loadSubjects();
+        loadData();
     }, [isOpen, student.id, subjects.length, loadStudentSubjects]);
     
     const handleProfessorClick = (professorName: string) => {
@@ -126,6 +132,11 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                     <TabsTrigger value="materias" className="text-xs sm:text-sm">Materias</TabsTrigger>
                     <TabsTrigger value="calificaciones" className="text-xs sm:text-sm">Calificaciones</TabsTrigger>
                     <TabsTrigger value="horario" className="text-xs sm:text-sm">Horario</TabsTrigger>
+                    {localStatus?.riasecDiagnosis && (
+                      <TabsTrigger value="vocacional" className="text-xs sm:text-sm text-primary font-bold">
+                        <Sparkles className="mr-1 h-3 w-3 sm:h-4 sm:w-4"/> Vocacional
+                      </TabsTrigger>
+                    )}
                     <TabsTrigger value="horario-profes" className="text-xs sm:text-sm">Profesores</TabsTrigger>
                     <TabsTrigger value="contacto" className="text-xs sm:text-sm"><Phone className="mr-1 h-3 w-3 sm:h-4 sm:w-4"/>Contacto</TabsTrigger>
                 </TabsList>
@@ -278,6 +289,16 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
         </TabsContent>
         <TabsContent value="horario">
           <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} professorContacts={professorContacts} />
+        </TabsContent>
+        <TabsContent value="vocacional" className="p-4 sm:p-6 bg-muted/10 rounded-xl mt-4">
+          {localStatus?.riasecDiagnosis ? (
+            <RiasecChart diagnosis={localStatus.riasecDiagnosis} />
+          ) : (
+            <div className="py-12 text-center">
+              <Sparkles className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground font-medium">No hay diagnóstico RIASEC cargado para este alumno.</p>
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="horario-profes">
           <StudentProfessorsSchedule studentSubjects={subjects} studentName={student.name} />

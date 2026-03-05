@@ -16,7 +16,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -522,10 +522,6 @@ export const bulkUpdateContinuityVocational = async (
       if (indecisosIds.has(studentId)) {
         updateData.isIndeciso = true;
       } else {
-        // If they are in the survey but NOT in the indecisos tab, 
-        // they might have decided, so we could optionally clear their indecisive status
-        // but user says "los que tienen solo una ya no son indecisos" 
-        // which implies we should only mark TRUE if > 1 career.
         updateData.isIndeciso = false;
       }
 
@@ -535,6 +531,25 @@ export const bulkUpdateContinuityVocational = async (
     await batch.commit();
   } catch (error) {
     console.error("Error bulk updating vocational diagnoses:", error);
+    throw error;
+  }
+};
+
+export const bulkUpdateRiasecDiagnoses = async (diagnoses: Record<string, RiasecDiagnosis>): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    Object.entries(diagnoses).forEach(([studentId, diagnosis]) => {
+      const docRef = doc(db, CONTINUITY_STATUS_COLLECTION, studentId);
+      batch.set(docRef, { 
+        riasecDiagnosis: {
+          ...diagnosis,
+          lastUpdated: Timestamp.now()
+        }
+      }, { merge: true });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Error bulk updating RIASEC diagnoses:", error);
     throw error;
   }
 };

@@ -116,6 +116,23 @@ export interface OfertaAcademicaItem {
     room: string;
 }
 
+// RIASEC Dimension Scores
+export interface RiasecScores {
+  realistic: number;
+  investigative: number;
+  artistic: number;
+  social: number;
+  enterprising: number;
+  conventional: number;
+}
+
+export interface RiasecDiagnosis {
+  scores: RiasecScores;
+  recommendedCareers: string[];
+  sourceFile: string; // From Fuente cross-ref
+  lastUpdated: any;
+}
+
 // NUEVOS TIPOS PARA CONTINUIDAD
 export interface ContinuityStudent {
   id: string;
@@ -168,6 +185,7 @@ export interface ContinuityLocalStatus {
   workshopAttended?: boolean;
   comments: ContinuityComment[];
   vocationalDiagnosis?: VocationalDiagnosis;
+  riasecDiagnosis?: RiasecDiagnosis;
 }
 
 // --- NUEVOS TIPOS PARA TRABAJO EN EQUIPO ---
