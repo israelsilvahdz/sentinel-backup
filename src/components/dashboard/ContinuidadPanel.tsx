@@ -6,22 +6,21 @@ import { FileUpload } from './FileUpload';
 import { useToast } from '@/hooks/use-toast';
 import { parseContinuidadExcel } from '@/lib/continuityParser';
 import { parseVocationalExcel } from '@/lib/vocationalParser';
-import { parseRiasecExcel, parseSourceReferences } from '@/lib/riasecParser';
-import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment, VocationalDiagnosis, ContinuityTrackingInfo, CareerOption, CareerType } from '@/types/student';
+import { parseRiasecExcel } from '@/lib/riasecParser';
+import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, VocationalDiagnosis, ContinuityTrackingInfo, CareerOption, CareerType } from '@/types/student';
 import { 
-  Users, Target, Award, AlertCircle, Search, Filter, 
+  Users, Target, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
-  ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
+  ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
-  School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
-  Command as CommandIcon, UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group
+  Landmark, FileJson, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
+  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Progress } from '../ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -73,7 +72,8 @@ export function ContinuidadPanel() {
   const { 
     selectedValue, filterType, setActiveView, setContextualStudentIds,
     continuityStudents: students, setContinuityStudents: setStudents, 
-    continuityCatalog: catalog, setContinuityCatalog: setCatalog 
+    continuityCatalog: catalog, setContinuityCatalog: setCatalog,
+    allStudentsMap
   } = useDashboardFilters();
   
   const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
@@ -157,17 +157,38 @@ export function ContinuidadPanel() {
     }
   };
 
-  const advisors = useMemo(() => [...new Set(students.map(s => s.advisor).filter(Boolean))].sort(), [students]);
-  const statuses = useMemo(() => [...new Set(students.map(s => s.status).filter(Boolean))].sort(), [students]);
-  const groups = useMemo(() => [...new Set(students.map(s => s.group).filter(Boolean))].sort(), [students]);
+  // Helper to get group from monitoring data
+  const getStudentGroupFromMonitoring = (studentId: string): string => {
+    const monitorStudent = allStudentsMap.get(studentId);
+    if (!monitorStudent || !monitorStudent.subjectSummaries) return '';
+    
+    // Find the first group that isn't online/flexible
+    const regularSubject = monitorStudent.subjectSummaries.find(s => 
+      s.group && !s.group.toUpperCase().startsWith('F') && !s.group.startsWith('10')
+    );
+    
+    return regularSubject?.group || monitorStudent.subjectSummaries[0]?.group || '';
+  };
+
+  // Enriched students with group from monitoring
+  const enrichedStudents = useMemo(() => {
+    return students.map(s => ({
+      ...s,
+      group: getStudentGroupFromMonitoring(s.id) || s.group || ''
+    }));
+  }, [students, allStudentsMap]);
+
+  const advisors = useMemo(() => [...new Set(enrichedStudents.map(s => s.advisor).filter(Boolean))].sort(), [enrichedStudents]);
+  const statuses = useMemo(() => [...new Set(enrichedStudents.map(s => s.status).filter(Boolean))].sort(), [enrichedStudents]);
+  const groups = useMemo(() => [...new Set(enrichedStudents.map(s => s.group).filter(Boolean))].sort(), [enrichedStudents]);
 
   const filteredByCycleStudents = useMemo(() => {
-    return students.filter(s => {
+    return enrichedStudents.filter(s => {
       const matchesCycle = selectedCycle === 'all' || s.cycle === selectedCycle;
       const matchesGlobalLeader = (filterType === 'leader' && selectedValue) ? s.leader === selectedValue : true;
       return matchesCycle && matchesGlobalLeader;
     });
-  }, [students, selectedCycle, filterType, selectedValue]);
+  }, [enrichedStudents, selectedCycle, filterType, selectedValue]);
 
   const filteredStudents = useMemo(() => {
     let list = filteredByCycleStudents.filter(s => {
@@ -191,9 +212,6 @@ export function ContinuidadPanel() {
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
           case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
-          case 'pri-tecmilenio': return !s.isInscribed && topUni.includes('TECMILENIO');
-          case 'pri-uanl': return !s.isInscribed && topUni.includes('UANL');
-          case 'pri-tec': return !s.isInscribed && topUni.includes('TEC') && !topUni.includes('MILENIO');
           default: return true;
         }
       });
@@ -212,9 +230,6 @@ export function ContinuidadPanel() {
     let indecisosCount = 0;
     let sosCount = 0;
     let tallerCount = 0;
-    let priTecmi = 0;
-    let priUanl = 0;
-    let priTec = 0;
 
     baseList.forEach(s => {
       if (s.isInscribed) return;
@@ -226,11 +241,6 @@ export function ContinuidadPanel() {
       if (voc) {
         if (voc.urgencyLevel >= 8) sosCount++;
         if (voc.requiresWorkshop && !local.workshopAttended) tallerCount++;
-        
-        const topUni = voc.universityRanking?.split(/[;,]/)[0]?.trim().toUpperCase() || '';
-        if (topUni.includes('TECMILENIO')) priTecmi++;
-        else if (topUni.includes('UANL')) priUanl++;
-        else if (topUni.includes('TEC') && !topUni.includes('MILENIO')) priTec++;
       }
     });
     
@@ -248,7 +258,7 @@ export function ContinuidadPanel() {
       };
     }).sort((a,b) => b.total - a.total);
 
-    return { total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, priTecmi, priUanl, priTec };
+    return { total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
@@ -688,7 +698,10 @@ function ContinuityCard({
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
                 <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
-                <span className="flex items-center gap-1 font-mono font-bold"><Group className="h-3 w-3" /> {student.group || 'Sin Gpo'}</span>
+                <span className="flex items-center gap-1 font-mono font-bold text-foreground">
+                  <Group className="h-3 w-3 text-muted-foreground" /> 
+                  {student.group ? `GPO: ${student.group}` : 'Sin Gpo (Monitoreo)'}
+                </span>
                 <span className="font-mono">{student.id}</span>
                 <span className="font-bold">Promedio: {student.average}</span>
               </div>
