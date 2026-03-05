@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -26,7 +27,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey, getContinuityLocalStatus } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
@@ -131,7 +132,7 @@ export function ContinuidadPanel() {
         await bulkUpdateContinuityVocational(result.diagnoses, result.indecisosIds);
         const updated = await getAllContinuityStatuses();
         setLocalStatuses(updated);
-        toast({ title: "Encuesta Vocacional Procesada", description: "El Diagnóstico Vocacional ha sido guardado permanentemente." });
+        toast({ title: "Diagnóstico Vocacional Guardado", description: "Los datos operativos han sido actualizados." });
       }
     } catch (error) {
       toast({ variant: 'destructive', title: "Error al cargar", description: "No se pudo procesar el archivo vocacional." });
@@ -144,7 +145,7 @@ export function ContinuidadPanel() {
     if (!file) return;
     setIsProcessingRiasec(true);
     try {
-      const diagnoses = await parseRiasecExcel(file, {}); // No source map needed for now
+      const diagnoses = await parseRiasecExcel(file, {});
       if (diagnoses) {
         await bulkUpdateRiasecDiagnoses(diagnoses);
         const updated = await getAllContinuityStatuses();
@@ -170,7 +171,7 @@ export function ContinuidadPanel() {
         await bulkUpdateCareerSurvey(surveys, officialStatuses);
         const updated = await getAllContinuityStatuses();
         setLocalStatuses(updated);
-        toast({ title: "Encuesta de Elección Procesada", description: `Se actualizaron ${Object.keys(surveys).length} expedientes con información reciente.` });
+        toast({ title: "Encuesta Reciente Guardada", description: `Se actualizaron ${Object.keys(surveys).length} respuestas y se activaron alertas de discrepancia.` });
       }
     } catch (error) {
       toast({ variant: 'destructive', title: "Error al cargar encuesta", description: "Revisa el formato del archivo CSV." });
@@ -179,14 +180,9 @@ export function ContinuidadPanel() {
     }
   };
 
-  // Helper to get group from monitoring data with robust ID matching
   const getStudentGroupFromMonitoring = (studentId: string): string => {
     const normalizedId = studentId.trim().toUpperCase();
-    
-    // Try exact match first
     let monitorStudent = allStudentsMap.get(studentId) || allStudentsMap.get(normalizedId);
-    
-    // If not found, search the values (slower but more robust)
     if (!monitorStudent) {
       for (const student of allStudentsMap.values()) {
         if (student.id.trim().toUpperCase() === normalizedId) {
@@ -195,21 +191,16 @@ export function ContinuidadPanel() {
         }
       }
     }
-
     if (!monitorStudent || !monitorStudent.subjectSummaries) return '';
-    
-    // Find the first group that isn't online/flexible
     const regularSubject = monitorStudent.subjectSummaries.find(s => 
       s.group && 
       !s.group.toUpperCase().startsWith('F') && 
       !s.group.startsWith('10') &&
       s.group.trim() !== ''
     );
-    
     return regularSubject?.group || monitorStudent.subjectSummaries.find(s => s.group && s.group.trim() !== '')?.group || '';
   };
 
-  // Enriched students with group from monitoring
   const enrichedStudents = useMemo(() => {
     return students.map(s => ({
       ...s,
@@ -242,7 +233,6 @@ export function ContinuidadPanel() {
       list = list.filter(s => {
         const local = localStatuses[s.id];
         const voc = local?.vocationalDiagnosis;
-
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
@@ -255,7 +245,6 @@ export function ContinuidadPanel() {
         }
       });
     }
-
     return list;
   }, [filteredByCycleStudents, searchTerm, selectedAdvisor, selectedStatus, selectedGroup, selectedKpi, localStatuses]);
 
@@ -265,72 +254,44 @@ export function ContinuidadPanel() {
     const inscribed = baseList.filter(s => s.isInscribed).length;
     const pending = total - inscribed;
     const talentRisk = baseList.filter(s => !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
-    
     let indecisosCount = 0;
     let sosCount = 0;
     let tallerCount = 0;
     let fakeInscribedCount = 0;
-
     baseList.forEach(s => {
       const local = localStatuses[s.id];
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
-
       if (s.isInscribed) return;
-
       if (local?.isIndeciso) indecisosCount++;
-      
       const voc = local?.vocationalDiagnosis;
       if (voc) {
         if (voc.urgencyLevel >= 8) sosCount++;
         if (voc.requiresWorkshop && !local.workshopAttended) tallerCount++;
       }
     });
-    
-    const statusDistribution = statuses.map(st => ({
-      name: st,
-      value: baseList.filter(s => s.status === st).length
-    })).sort((a,b) => b.value - a.value);
-
+    const statusDistribution = statuses.map(st => ({ name: st, value: baseList.filter(s => s.status === st).length })).sort((a,b) => b.value - a.value);
     const advisorProgress = advisors.map(adv => {
       const advStudents = baseList.filter(s => s.advisor === adv);
-      return {
-        name: adv,
-        total: advStudents.length,
-        inscribed: advStudents.filter(s => s.isInscribed).length
-      };
+      return { name: adv, total: advStudents.length, inscribed: advStudents.filter(s => s.isInscribed).length };
     }).sort((a,b) => b.total - a.total);
-
     return { total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, fakeInscribedCount };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
     await updateContinuityIndeciso(studentId, isIndeciso);
-    setLocalStatuses(prev => ({
-      ...prev,
-      [studentId]: { ...(prev[studentId] || { comments: [] }), isIndeciso }
-    }));
+    setLocalStatuses(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || { comments: [] }), isIndeciso } }));
   };
 
   const handleUpdateWorkshopAttended = async (studentId: string, attended: boolean) => {
     await updateContinuityWorkshopAttended(studentId, attended);
-    setLocalStatuses(prev => ({
-      ...prev,
-      [studentId]: { ...(prev[studentId] || { comments: [] }), workshopAttended: attended }
-    }));
-    toast({
-      title: attended ? "Asistencia registrada" : "Asistencia removida",
-      description: `Se ha actualizado el estado del taller vocacional.`
-    });
+    setLocalStatuses(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || { comments: [] }), workshopAttended: attended } }));
   };
 
   const handleUpdateTracking = async (studentId: string, info: ContinuityTrackingInfo) => {
     await updateContinuityTrackingInfo(studentId, info);
-    setLocalStatuses(prev => ({
-      ...prev,
-      [studentId]: { ...(prev[studentId] || { comments: [] }), trackingInfo: info }
-    }));
-    toast({ title: "Seguimiento Guardado", description: "Los datos de decisión final se han actualizado." });
-  }
+    setLocalStatuses(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || { comments: [] }), trackingInfo: info } }));
+    toast({ title: "Seguimiento Guardado" });
+  };
 
   const handleAddComment = async (studentId: string, text: string, author: string) => {
     await addContinuityComment(studentId, text, author);
@@ -355,9 +316,9 @@ export function ContinuidadPanel() {
           <TrendingUp className="h-16 w-16 text-primary" />
         </div>
         <div className="text-center max-w-md">
-          <h1 className="text-3xl font-bold mb-2">Seguimiento de Continuidad</h1>
-          <p className="text-muted-foreground mb-6">Carga el archivo Excel de Continuidad para visualizar las metas de inscripción y el perfil vocacional de los alumnos.</p>
-          <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} label="Cargar Excel de Continuidad" />
+          <h1 className="text-3xl font-bold mb-2">Estrategia de Continuidad</h1>
+          <p className="text-muted-foreground mb-6">Carga la Base Maestra de Continuidad para visualizar las metas de inscripción.</p>
+          <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} label="Cargar Base Maestra (Continuidad)" />
         </div>
       </div>
     );
@@ -367,14 +328,14 @@ export function ContinuidadPanel() {
     <div className="p-4 md:p-8 space-y-8 pb-20">
       <header className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Estrategia de Continuidad</h1>
-          <p className="text-muted-foreground">Inscripciones a profesional y seguimiento vocacional.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Continuidad Académica</h1>
+          <p className="text-muted-foreground">Gestión de inscripciones y seguimiento vocacional avanzado.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={selectedCycle} onValueChange={setSelectedCycle}>
-            <SelectTrigger className="w-[180px] bg-primary text-white border-none font-bold">
+            <SelectTrigger className="w-[180px] bg-primary text-white border-none font-bold rounded-xl">
               <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filtrar por Ciclo" />
+              <SelectValue placeholder="Ciclo" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los Ciclos</SelectItem>
@@ -391,18 +352,18 @@ export function ContinuidadPanel() {
             }} 
           />
 
-          <FileUpload onFileSelect={handleRiasecUpload} selectedFile={null} isLoading={isProcessingRiasec} variant="secondary" label="Cargar RIASEC" icon={<FileJson className="h-4 w-4" />} />
-          <FileUpload onFileSelect={handleSurveyUpload} selectedFile={null} isLoading={isProcessingSurvey} variant="outline" label="Cargar Encuesta" icon={<MessageSquare className="h-4 w-4" />} />
-          <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Excel Operativo" icon={<History className="h-4 w-4" />} />
-          <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="default" label="Actualizar Base Operativa" />
+          <FileUpload onFileSelect={handleRiasecUpload} selectedFile={null} isLoading={isProcessingRiasec} variant="outline" label="Cargar RIASEC" icon={<FileJson className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleSurveyUpload} selectedFile={null} isLoading={isProcessingSurvey} variant="secondary" label="Cargar Encuesta Reciente" icon={<MessageSquare className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Cargar Diagnóstico (Excel)" icon={<History className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="default" label="Cargar Base Maestra" />
         </div>
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-        <KpiCard title="Total Alumnos" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
+        <KpiCard title="Universo" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="green" onClick={() => handleKpiClick('inscribed')} />
         <KpiCard title="No Inscritos" value={stats.pending} icon={UserX} color="blue" onClick={() => handleKpiClick('pending')} />
-        <KpiCard title="Falsa Inscripción" value={stats.fakeInscribedCount} icon={FileWarning} color="red" onClick={() => handleKpiClick('fake')} />
+        <KpiCard title="Falsa Inscrip." value={stats.fakeInscribedCount} icon={FileWarning} color="red" onClick={() => handleKpiClick('fake')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
         <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
@@ -418,7 +379,7 @@ export function ContinuidadPanel() {
         <TabsContent value="stats" className="space-y-6 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader><CardTitle>Avance de Inscritos por Asesor</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Avance por Asesor</CardTitle></CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.advisorProgress} layout="vertical" margin={{ left: 100 }}>
@@ -433,7 +394,6 @@ export function ContinuidadPanel() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader><CardTitle>Distribución por Estatus</CardTitle></CardHeader>
               <CardContent className="h-[350px]">
@@ -478,14 +438,12 @@ export function ContinuidadPanel() {
                 {statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            
             {selectedKpi && (
               <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="text-destructive h-10">
-                <X className="mr-2 h-4 w-4" /> Limpiar Filtro: {selectedKpi === 'pending' ? 'No Inscritos' : selectedKpi}
+                <X className="mr-2 h-4 w-4" /> Limpiar: {selectedKpi === 'pending' ? 'No Inscritos' : selectedKpi}
               </Button>
             )}
           </div>
-
           <div className="space-y-3">
             {filteredStudents.map(student => (
               <ContinuityCard 
@@ -548,7 +506,7 @@ function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[]
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5">
+        <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5 rounded-xl">
           <Briefcase className="h-4 w-4" /> Gestionar Carreras
         </Button>
       </DialogTrigger>
@@ -557,7 +515,6 @@ function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[]
           <DialogTitle className="text-2xl font-black">Catálogo Maestro de Carreras</DialogTitle>
           <DialogDescription>Define qué carreras tenemos en campus, en otros campus Tecmilenio o si son oferta externa.</DialogDescription>
         </DialogHeader>
-        
         <div className="flex gap-2 items-end py-4 border-b">
           <div className="flex-1 space-y-2">
             <Label className="text-xs font-bold uppercase">Nueva Carrera</Label>
@@ -576,7 +533,6 @@ function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[]
           </div>
           <Button onClick={handleAddCareer} className="rounded-xl h-10 px-4"><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
         </div>
-
         <ScrollArea className="flex-1 pr-4 py-4">
           <div className="space-y-2">
             {localCatalog.map(c => (
@@ -605,7 +561,6 @@ function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[]
             ))}
           </div>
         </ScrollArea>
-
         <DialogFooter className="pt-4 border-t">
           <Button variant="ghost" onClick={() => setIsOpen(false)} className="rounded-xl font-bold">Cancelar</Button>
           <Button onClick={handleSave} disabled={isSaving} className="rounded-xl font-black px-8">
@@ -636,32 +591,20 @@ function ContinuityCard({
   const riasec = localStatus?.riasecDiagnosis;
   const tracking = localStatus?.trackingInfo || { chosenUniversity: '', chosenCareers: [], processStatus: 'Pendiente', resultDate: '' };
   const survey = localStatus?.encuestaEleccionReciente;
-  
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
   const isWorkshopRequired = vocational?.requiresWorkshop && !student.isInscribed;
   const isWorkshopAttended = localStatus?.workshopAttended;
   const hasFalseInscribedAlert = localStatus?.alertaFalsaInscripcion;
-
-  const universityRankingArray = useMemo(() => {
-    if (!vocational?.universityRanking) return [];
-    return vocational.universityRanking.split(/[;,]/).filter(Boolean).map(u => u.trim());
-  }, [vocational]);
-
+  const universityRankingArray = useMemo(() => vocational?.universityRanking ? vocational.universityRanking.split(/[;,]/).filter(Boolean).map(u => u.trim()) : [], [vocational]);
   const tecmilenioRank = useMemo(() => {
     const idx = universityRankingArray.findIndex(u => u.toUpperCase().includes('TECMILENIO'));
     return idx !== -1 ? idx + 1 : null;
   }, [universityRankingArray]);
-
   const [commentText, setCommentText] = useState('');
   const { leaders, tutors } = useDashboardFilters();
   const [author, setAuthor] = useState('');
-
-  const signatoryOptions = useMemo(() => {
-    return [...new Set([...leaders, ...tutors])].sort((a, b) => a.localeCompare(b));
-  }, [leaders, tutors]);
-
-  // Tracking form states
+  const signatoryOptions = useMemo(() => [...new Set([...leaders, ...tutors])].sort(), [leaders, tutors]);
   const [university, setUniversity] = useState(tracking.chosenUniversity);
   const [otherUniversity, setOtherUniversity] = useState('');
   const [procStatus, setProcStatus] = useState(tracking.processStatus);
@@ -669,49 +612,18 @@ function ContinuityCard({
   const [careers, setCareers] = useState<string[]>(tracking.chosenCareers);
   const [careerSearch, setCareerSearch] = useState('');
   const [isCareerPopoverOpen, setIsCareerPopoverOpen] = useState(false);
-
-  const handleAddCareer = (careerName: string) => {
-    if (careers.includes(careerName)) return;
-    setCareers(prev => [...prev, careerName]);
-    setIsCareerPopoverOpen(false);
-    setCareerSearch('');
-  };
-
-  const handleRemoveCareer = (idx: number) => {
-    setCareers(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleSaveTracking = () => {
-    const finalUniversity = university === 'OTRA' ? otherUniversity : university;
-    onUpdateTracking(student.id, {
-      chosenUniversity: finalUniversity,
-      chosenCareers: careers,
-      processStatus: procStatus,
-      resultDate: resDate
-    });
-  };
-
-  const filteredCareerOptions = useMemo(() => {
-    if (!careerSearch) return careerCatalog;
-    const search = careerSearch.toLowerCase();
-    return careerCatalog.filter(c => c.name.toLowerCase().includes(search));
-  }, [careerSearch, careerCatalog]);
+  const handleAddCareer = (careerName: string) => { if (!careers.includes(careerName)) setCareers(prev => [...prev, careerName]); setIsCareerPopoverOpen(false); setCareerSearch(''); };
+  const handleRemoveCareer = (idx: number) => { setCareers(prev => prev.filter((_, i) => i !== idx)); };
+  const handleSaveTracking = () => { onUpdateTracking(student.id, { chosenUniversity: university === 'OTRA' ? otherUniversity : university, chosenCareers: careers, processStatus: procStatus, resultDate: resDate }); };
+  const filteredCareerOptions = useMemo(() => careerSearch ? careerCatalog.filter(c => c.name.toLowerCase().includes(careerSearch.toLowerCase())) : careerCatalog, [careerSearch, careerCatalog]);
 
   return (
     <TooltipProvider>
-    <Card className={cn(
-      "transition-all border-l-4",
-      student.isInscribed ? "border-l-green-500" : "border-l-muted",
-      (isHighValueRisk || isSOS || hasFalseInscribedAlert) && "ring-2 ring-red-500/50",
-      isIndeciso && "border-l-purple-500 bg-purple-50/5"
-    )}>
+    <Card className={cn("transition-all border-l-4", student.isInscribed ? "border-l-green-500" : "border-l-muted", (isHighValueRisk || isSOS || hasFalseInscribedAlert) && "ring-2 ring-red-500/50", isIndeciso && "border-l-purple-500 bg-purple-50/5")}>
       <div className="p-4 flex flex-col cursor-pointer hover:bg-muted/5" onClick={onToggle}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
-            <div className={cn(
-              "h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm",
-              student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40"
-            )}>
+            <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm", student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40")}>
               {student.isInscribed ? <GraduationCap className="h-5 w-5" /> : student.id.substring(0, 2)}
             </div>
             <div className="space-y-1">
@@ -725,9 +637,7 @@ function ContinuityCard({
                           <AlertTriangle className="h-3 w-3" /> FALSA INSCRIPCIÓN
                         </Badge>
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-xs font-bold">
-                        El alumno declaró "Tecmilenio" en la encuesta más reciente, pero NO figura como inscrito oficialmente en el reporte diario.
-                      </TooltipContent>
+                      <TooltipContent className="max-w-xs font-bold">Diferencia entre encuesta y base operativa.</TooltipContent>
                     </TooltipUI>
                   )}
                   {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
@@ -735,14 +645,11 @@ function ContinuityCard({
                   {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
                   {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
                   {!student.isInscribed && tecmilenioRank !== null && (
-                    <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(
-                      tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50"
-                    )}>
+                    <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50")}>
                       {tecmilenioRank === 1 ? <Trophy className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
                       Opción {tecmilenioRank}
                     </Badge>
                   )}
-                  {riasec && <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 flex items-center gap-1"><Sparkles className="h-3 w-3" /> RIASEC OK</Badge>}
                 </h3>
                 <TooltipUI>
                   <TooltipTrigger asChild>
@@ -756,10 +663,7 @@ function ContinuityCard({
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
                 <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
                 <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
-                <span className="flex items-center gap-1 font-mono font-bold text-foreground">
-                  <Group className="h-3 w-3 text-muted-foreground" /> 
-                  {student.group ? `GPO: ${student.group}` : 'Sin Grupo'}
-                </span>
+                <span className="flex items-center gap-1 font-mono font-bold text-foreground"><Group className="h-3 w-3 text-muted-foreground" /> {student.group || 'Sin Grupo'}</span>
                 <span className="font-mono">{student.id}</span>
                 <span className="font-bold">Promedio: {student.average}</span>
               </div>
@@ -770,35 +674,9 @@ function ContinuityCard({
             {isExpanded ? <ChevronUp /> : <ChevronDown />}
           </div>
         </div>
-
-        {/* Banner Summary Info */}
-        {!student.isInscribed && (vocational?.interestedCareers || vocational?.universityRanking) && (
-          <div className="mt-2 pl-14 flex flex-col gap-1 border-t border-dashed pt-2">
-            {vocational?.interestedCareers && (
-              <div className="text-[10px] text-primary font-bold flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3" />
-                <span className="uppercase text-[9px] text-muted-foreground font-semibold">Carreras:</span> {vocational.interestedCareers}
-              </div>
-            )}
-            {universityRankingArray.length > 0 && (
-              <div className="text-[10px] text-foreground font-medium flex items-center gap-1.5">
-                <ListOrdered className="h-3 w-3 text-muted-foreground" />
-                <span className="uppercase text-[9px] text-muted-foreground font-semibold">Top 3:</span> 
-                {universityRankingArray.slice(0, 3).map((uni, i) => (
-                  <span key={i} className={cn(uni.toUpperCase().includes('TECMILENIO') ? "text-primary font-bold" : "")}>
-                    {i + 1}. {uni}{i < Math.min(universityRankingArray.length, 3) - 1 ? ", " : ""}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
-
       {isExpanded && (
         <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2">
-          
-          {/* Latest Declared Survey Status (Most Up-to-date Info) */}
           {survey && (
             <div className="space-y-3">
               <Label className="text-xs uppercase font-black text-emerald-700 flex items-center gap-2">
@@ -811,392 +689,57 @@ function ContinuityCard({
                 </div>
                 <div className="space-y-1">
                   <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Universidad</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-emerald-900">{survey.universidadElegida}</p>
-                    {survey.universidadElegida.toLowerCase().includes('tecmilenio') && (
-                      <Badge className="bg-emerald-600 text-[8px] h-4">Validando...</Badge>
-                    )}
-                  </div>
+                  <p className="text-sm font-bold text-emerald-900">{survey.universidadElegida}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Etapa del Proceso</p>
-                  <Badge variant="outline" className="bg-white border-emerald-200 text-emerald-700 font-bold uppercase text-[9px]">
-                    {survey.etapaProceso}
-                  </Badge>
-                </div>
-                <div className="md:col-span-3 flex justify-between items-center pt-2 border-t border-emerald-100">
-                  <p className="text-[10px] text-emerald-600/70 italic">Respondido el: {survey.fechaRespuesta}</p>
-                  {hasFalseInscribedAlert && (
-                    <div className="flex items-center gap-2 text-red-600 text-[10px] font-black uppercase bg-white px-3 py-1 rounded-full border border-red-100 shadow-sm animate-pulse">
-                      <AlertTriangle className="h-3 w-3" /> Discrepancia detectada: Declaró inscripción pero no es oficial.
-                    </div>
-                  )}
+                  <Badge variant="outline" className="bg-white border-emerald-200 text-emerald-700 font-bold uppercase text-[9px]">{survey.etapaProceso}</Badge>
                 </div>
               </div>
             </div>
           )}
-
-          {!student.isInscribed && (
-            <div className="flex flex-wrap gap-3 justify-end mb-2">
-              <div className="flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm">
-                <Checkbox 
-                  id={`indeciso-${student.id}`} 
-                  checked={localStatus?.isIndeciso || false} 
-                  onCheckedChange={(checked) => onUpdateIndeciso(student.id, !!checked)}
-                />
-                <Label htmlFor={`indeciso-${student.id}`} className="text-xs font-bold cursor-pointer">Marcar como Indeciso</Label>
-              </div>
-              <div className={cn(
-                "flex items-center space-x-2 bg-background p-2 rounded-lg border shadow-sm transition-colors",
-                isWorkshopRequired && !isWorkshopAttended && "ring-2 ring-blue-500/20"
-              )}>
-                <Checkbox 
-                  id={`taller-${student.id}`} 
-                  checked={localStatus?.workshopAttended || false} 
-                  onCheckedChange={(checked) => onUpdateWorkshopAttended(student.id, !!checked)}
-                />
-                <Label htmlFor={`taller-${student.id}`} className="text-xs font-bold cursor-pointer flex items-center gap-1">
-                  Taller Vocacional Tomado
-                  {isWorkshopRequired && <span className="text-[9px] text-blue-600 font-bold uppercase">(Prioridad)</span>}
-                </Label>
-              </div>
-            </div>
-          )}
-
-          {/* Decision Tracking Section */}
           {!student.isInscribed && (
             <div className="pt-4 border-t space-y-4">
-              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" /> Seguimiento de Decisión Final (Captura Asesor)
-              </Label>
+              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Seguimiento de Decisión Final</Label>
               <div className="bg-background p-6 rounded-2xl border shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold">Universidad Elegida</Label>
-                    <Select value={UNIVERSITY_OPTIONS.includes(university) ? university : (university ? 'OTRA' : '')} onValueChange={(val) => {
-                      setUniversity(val);
-                      if (val !== 'OTRA') setOtherUniversity('');
-                    }}>
-                      <SelectTrigger className="rounded-xl h-10">
-                        <SelectValue placeholder="Seleccionar institución..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {UNIVERSITY_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                      </SelectContent>
+                    <Select value={UNIVERSITY_OPTIONS.includes(university) ? university : (university ? 'OTRA' : '')} onValueChange={(val) => { setUniversity(val); if (val !== 'OTRA') setOtherUniversity(''); }}>
+                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                      <SelectContent>{UNIVERSITY_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
                     </Select>
-                    {university === 'OTRA' && (
-                      <Input 
-                        value={otherUniversity} 
-                        onChange={e => setOtherUniversity(e.target.value)} 
-                        placeholder="Nombre de la universidad..."
-                        className="rounded-xl h-10 mt-2 animate-in fade-in"
-                      />
-                    )}
+                    {university === 'OTRA' && <Input value={otherUniversity} onChange={e => setOtherUniversity(e.target.value)} placeholder="¿Cuál?" className="rounded-xl mt-2" />}
                   </div>
-                  
                   <div className="space-y-2">
                     <Label className="text-xs font-bold">Carrera(s) Seleccionada(s)</Label>
                     <Popover open={isCareerPopoverOpen} onOpenChange={setIsCareerPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start rounded-xl h-10 text-muted-foreground font-normal">
-                          <Search className="mr-2 h-4 w-4" />
-                          Buscar carrera en catálogo...
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Ej. Medicina, Psicología..." value={careerSearch} onValueChange={setCareerSearch} />
-                          <CommandList>
-                            <CommandEmpty>No se encontró esa carrera.</CommandEmpty>
-                            <CommandGroup>
-                              <ScrollArea className="h-[200px]">
-                                {filteredCareerOptions.map(c => (
-                                  <CommandItem 
-                                    key={c.name} 
-                                    onSelect={() => handleAddCareer(c.name)}
-                                    className="flex items-center justify-between"
-                                  >
-                                    <span className="text-xs font-bold">{c.name}</span>
-                                    <Badge className={cn(
-                                      "text-[8px] h-4 font-black uppercase",
-                                      c.type === 'in-campus' ? "bg-primary/10 text-primary" : 
-                                      c.type === 'other-campus' ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700"
-                                    )}>
-                                      {c.type === 'in-campus' ? 'Local' : c.type === 'other-campus' ? 'Otro Campus' : 'Externa'}
-                                    </Badge>
-                                  </CommandItem>
-                                ))}
-                              </ScrollArea>
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
+                      <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start rounded-xl h-10 text-muted-foreground"><Search className="mr-2 h-4 w-4" /> Buscar carrera...</Button></PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0"><Command><CommandInput placeholder="Ej. Medicina..." value={careerSearch} onValueChange={setCareerSearch} /><CommandList><CommandEmpty>No encontrada.</CommandEmpty><CommandGroup><ScrollArea className="h-[200px]">{filteredCareerOptions.map(c => <CommandItem key={c.name} onSelect={() => handleAddCareer(c.name)} className="flex items-center justify-between"><span className="text-xs font-bold">{c.name}</span><Badge className={cn("text-[8px] h-4 uppercase", c.type === 'in-campus' ? "bg-primary/10 text-primary" : c.type === 'other-campus' ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700")}>{c.type === 'in-campus' ? 'Local' : c.type === 'other-campus' ? 'Otro TM' : 'Externa'}</Badge></CommandItem>)}</ScrollArea></CommandGroup></CommandList></Command></PopoverContent>
                     </Popover>
-                    
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {careers.map((c, i) => {
-                        const careerInfo = careerCatalog.find(cat => cat.name === c);
-                        return (
-                          <Badge key={i} variant="secondary" className={cn(
-                            "pl-3 pr-1 py-1 rounded-lg border gap-2 shadow-sm",
-                            careerInfo?.type === 'in-campus' ? "bg-primary/5 text-primary border-primary/10" : 
-                            careerInfo?.type === 'other-campus' ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-orange-50 text-orange-700 border-orange-100"
-                          )}>
-                            <span className="font-bold">{c}</span>
-                            {careerInfo?.type === 'external' && <AlertCircle className="h-3 w-3 shrink-0" title="Carrera no disponible en Tecmilenio" />}
-                            {careerInfo?.type === 'other-campus' && <Globe className="h-3 w-3 shrink-0" title="Disponible en otro campus Tecmilenio" />}
-                            <button onClick={() => handleRemoveCareer(i)} className="hover:bg-destructive/10 text-destructive p-0.5 rounded"><MinusCircle className="h-3.5 w-3.5" /></button>
-                          </Badge>
-                        );
-                      })}
-                    </div>
+                    <div className="flex flex-wrap gap-2 mt-3">{careers.map((c, i) => <Badge key={i} variant="secondary" className="pl-3 pr-1 py-1 rounded-lg border gap-2">{c}<button onClick={() => handleRemoveCareer(i)} className="text-destructive"><MinusCircle className="h-3.5 w-3.5" /></button></Badge>)}</div>
                   </div>
                 </div>
-
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold">Estatus del Proceso</Label>
-                      <Select value={procStatus} onValueChange={setProcStatus}>
-                        <SelectTrigger className="rounded-xl h-10">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Pendiente">Pendiente</SelectItem>
-                          <SelectItem value="Interesado">Interesado</SelectItem>
-                          <SelectItem value="Aplicando">Aplicando</SelectItem>
-                          <SelectItem value="Admitido">Admitido</SelectItem>
-                          <SelectItem value="Inscrito">Inscrito en otra</SelectItem>
-                          <SelectItem value="Declinado">Declinado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold flex items-center gap-1.5">
-                        <CalendarIcon className="h-3 w-3" /> Fecha Resultados
-                      </Label>
-                      <Input 
-                        type="date" 
-                        value={resDate} 
-                        onChange={e => setResDate(e.target.value)}
-                        className="rounded-xl h-10"
-                      />
-                    </div>
+                    <div className="space-y-2"><Label className="text-xs font-bold">Estatus</Label><Select value={procStatus} onValueChange={setProcStatus}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Pendiente">Pendiente</SelectItem><SelectItem value="Admitido">Admitido</SelectItem><SelectItem value="Inscrito">Inscrito en otra</SelectItem><SelectItem value="Declinado">Declinado</SelectItem></SelectContent></Select></div>
+                    <div className="space-y-2"><Label className="text-xs font-bold">Fecha Resultados</Label><Input type="date" value={resDate} onChange={e => setResDate(e.target.value)} className="rounded-xl" /></div>
                   </div>
-                  <div className="pt-4 flex justify-end">
-                    <Button onClick={handleSaveTracking} className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/10">
-                      <Send className="mr-2 h-4 w-4" /> Guardar Seguimiento
-                    </Button>
-                  </div>
+                  <div className="pt-4 flex justify-end"><Button onClick={handleSaveTracking} className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/10"><Send className="mr-2 h-4 w-4" /> Guardar</Button></div>
                 </div>
               </div>
             </div>
           )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-4">
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Estado Operativo</Label>
-              <div className="space-y-2">
-                <p className="text-sm"><strong>Beca actual:</strong> {student.scholarship}</p>
-                <p className="text-sm"><strong>Prioridad de interés:</strong> {student.priority}/5</p>
-                <p className="text-sm"><strong>Líder:</strong> {student.leader}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Perfil Vocacional (Excel)</Label>
-              <div className="space-y-2">
-                <div className="text-sm flex items-center gap-2">
-                  <strong>Interés:</strong> 
-                  <Badge className={cn(
-                    student.interestLevel?.toLowerCase().includes('alto') ? "bg-red-500" : 
-                    student.interestLevel?.toLowerCase().includes('medio') ? "bg-yellow-500" : "bg-green-500"
-                  )}>{student.interestLevel || 'No definido'}</Badge>
-                </div>
-                <p className="text-sm"><strong>Programa:</strong> {student.programOfInterest || 'Pendiente'}</p>
-                <div className="text-sm">
-                  <strong>Compite con:</strong> 
-                  <span className={cn(
-                    "ml-1 font-bold",
-                    (student.competitorUniversity?.toUpperCase().includes('TEC') || student.competitorUniversity?.toUpperCase().includes('UANL')) ? "text-destructive" : "text-foreground"
-                  )}>{student.competitorUniversity || 'N/A'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <Label className="text-xs uppercase font-bold text-muted-foreground">Bitácora de Contacto (Excel)</Label>
-              <div className="bg-background p-3 rounded-lg border text-sm">
-                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  <PhoneCall className="h-3 w-3" /> {student.lastContactDate || 'Sin fecha'}
-                </p>
-                <p className="italic text-foreground/80">"{student.lastContactComment || 'No hay comentarios registrados.'}"</p>
-              </div>
-            </div>
-          </div>
-
-          {riasec && (
-            <div className="pt-6 border-t space-y-4">
-              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
-                <Sparkles className="h-4 w-4" /> Diagnóstico Vocacional (Modelo RIASEC)
-              </Label>
-              <RiasecChart diagnosis={riasec} />
-            </div>
-          )}
-
-          {vocational && (
-            <div className="pt-6 border-t space-y-4">
-              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2">
-                <Stethoscope className="h-4 w-4" /> Diagnóstico Vocacional (Encuesta)
-              </Label>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <Card className="bg-primary/5 border-primary/10">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-xs font-bold text-muted-foreground uppercase">Nivel de Certeza</p>
-                        <p className="text-sm font-semibold">{vocational.certaintyLevel || 'No declarado'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-bold text-muted-foreground uppercase">Urgencia S.O.S</p>
-                        <Badge variant={vocational.urgencyLevel >= 8 ? 'destructive' : 'outline'} className={cn("text-lg py-0 px-2", student.isInscribed && "opacity-50 grayscale")}>
-                          {vocational.urgencyLevel}/10
-                        </Badge>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase">Obstáculo Principal</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="bg-white border text-left h-auto py-1">
-                          {vocational.mainObstacle.includes('Económico') ? <Landmark className="h-3 w-3 mr-1 text-red-500 shrink-0" /> : <Lightbulb className="h-3 w-3 mr-1 text-yellow-500 shrink-0" />}
-                          <span className="whitespace-normal leading-tight">{vocational.mainObstacle || 'Ninguno'}</span>
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-muted/30">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <ListOrdered className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-xs font-bold text-muted-foreground uppercase">Ranking de Universidades</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {universityRankingArray.length > 0 ? universityRankingArray.map((uni, idx) => (
-                        <div key={idx} className="flex items-center">
-                          <Badge variant="outline" className={cn(
-                            "text-[10px] py-0 px-1.5 h-6",
-                            uni.toUpperCase().includes('TECMILENIO') ? "bg-primary text-white border-primary" : "bg-white"
-                          )}>
-                            {idx + 1}. {uni}
-                          </Badge>
-                          {idx < universityRankingArray.length - 1 && <span className="text-muted-foreground mx-0.5">→</span>}
-                        </div>
-                      )) : (
-                        <p className="text-xs text-muted-foreground italic">No se declaró un ranking.</p>
-                      )}
-                    </div>
-                    {tecmilenioRank && tecmilenioRank > 1 && !student.isInscribed && (
-                      <div className="bg-orange-100 text-orange-800 p-2 rounded-lg text-[10px] font-bold flex items-center gap-2 mt-2">
-                        <AlertCircle className="h-3 w-3" />
-                        COMPETENCIA: SOMOS LA OPCIÓN {tecmilenioRank}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-muted/30">
-                  <CardContent className="p-4 space-y-3">
-                    <div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase">Carreras de Interés</p>
-                      <p className="text-xs font-semibold mt-1 leading-relaxed">{vocational.interestedCareers || 'No especificadas'}</p>
-                    </div>
-                    {vocational.requiresWorkshop && !student.isInscribed && (
-                      <div className={cn(
-                        "flex items-center gap-2 p-2 rounded-lg border text-xs font-bold uppercase",
-                        isWorkshopAttended ? "bg-green-100 text-green-800 border-green-200" : "bg-purple-100 text-purple-800 border-purple-200"
-                      )}>
-                        {isWorkshopAttended ? <CheckCircle2 className="h-4 w-4" /> : <GraduationCap className="h-4 w-4" />}
-                        <span>{isWorkshopAttended ? "Taller Realizado" : "Requiere Taller Vocacional"}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          )}
-
-          <div className="pt-4 border-t">
-            <Label className="text-xs uppercase font-bold text-muted-foreground block mb-2">Decisión sobre carrera (Histórico)</Label>
-            <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 flex gap-3">
-              <MessageSquare className="h-5 w-5 text-primary shrink-0 mt-1" />
-              <p className="text-sm leading-relaxed">{student.decisionTaken || "Sin respuesta declarada."}</p>
-            </div>
-          </div>
-
           <div className="pt-6 border-t space-y-4">
-            <Label className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
-              <History className="h-4 w-4" /> Bitácora de Seguimiento Interno (Sentinel)
-            </Label>
-            
+            <Label className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2"><History className="h-4 w-4" /> Bitácora de Seguimiento Sentinel</Label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <ScrollArea className="h-[200px] pr-4">
-                  <div className="space-y-3">
-                    {localStatus?.comments && localStatus.comments.length > 0 ? (
-                      [...localStatus.comments].reverse().map(c => (
-                        <div key={c.id} className="bg-background p-3 rounded-lg border shadow-sm text-xs">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="font-bold text-primary flex items-center gap-1">
-                              <UserCog className="h-3 w-3" /> {c.author}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}
-                            </span>
-                          </div>
-                          <p className="text-foreground/90 whitespace-pre-wrap">{c.text}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios internos aún.</p>
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
-
+              <ScrollArea className="h-[200px] pr-4">
+                <div className="space-y-3">{localStatus?.comments?.length ? [...localStatus.comments].reverse().map(c => <div key={c.id} className="bg-background p-3 rounded-lg border shadow-sm text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold text-primary">{c.author}</span><span className="text-[10px] text-muted-foreground">{format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}</span></div><p className="whitespace-pre-wrap">{c.text}</p></div>) : <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios.</p>}</div>
+              </ScrollArea>
               <div className="space-y-3 bg-background p-4 rounded-xl border">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold">Nueva nota de seguimiento:</Label>
-                  <Select value={author} onValueChange={setAuthor}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="¿Quién firma?" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {signatoryOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Textarea 
-                    value={commentText} 
-                    onChange={e => setCommentText(e.target.value)}
-                    placeholder="Escribe aquí los detalles de la última interacción..."
-                    className="min-h-[100px] text-sm resize-none"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button 
-                    size="sm" 
-                    onClick={() => {
-                      if (!author || !commentText.trim()) return;
-                      onAddComment(student.id, commentText, author);
-                      setCommentText('');
-                    }}
-                    disabled={!commentText.trim() || !author}
-                  >
-                    <Send className="h-4 w-4 mr-2" /> Guardar Nota
-                  </Button>
-                </div>
+                <Select value={author} onValueChange={setAuthor}><SelectTrigger className="h-8 text-xs"><SelectValue placeholder="¿Quién firma?" /></SelectTrigger><SelectContent>{signatoryOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent></Select>
+                <Textarea value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Detalles de la interacción..." className="min-h-[100px] text-sm resize-none" />
+                <div className="flex justify-end"><Button size="sm" onClick={() => { if (!author || !commentText.trim()) return; onAddComment(student.id, commentText, author); setCommentText(''); }} disabled={!commentText.trim() || !author}><Send className="h-4 w-4 mr-2" /> Guardar Nota</Button></div>
               </div>
             </div>
           </div>
@@ -1207,38 +750,16 @@ function ContinuityCard({
   );
 }
 
-function KpiCard({ 
-  title, value, icon: Icon, color, onClick 
-}: { 
-  title: string, value: number | string, icon: any, color?: string, onClick?: () => void 
-}) {
-  const colors = {
-    red: "text-red-600 bg-red-50 border-red-100",
-    blue: "text-blue-600 bg-blue-50 border-blue-100",
-    yellow: "text-yellow-600 bg-yellow-50 border-yellow-100",
-    purple: "text-purple-600 bg-purple-50 border-purple-200",
-    green: "text-green-600 bg-green-50 border-green-100",
-    default: "text-primary bg-primary/5 border-primary/10"
-  };
+function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string, value: number | string, icon: any, color?: string, onClick?: () => void }) {
+  const colors = { red: "text-red-600 bg-red-50 border-red-100", blue: "text-blue-600 bg-blue-50 border-blue-100", green: "text-green-600 bg-green-50 border-green-100", purple: "text-purple-600 bg-purple-50 border-purple-200", default: "text-primary bg-primary/5 border-primary/10" };
   const colorClass = color ? (colors[color as keyof typeof colors] || colors.default) : colors.default;
-
   return (
-    <Card 
-      className={cn(
-        "shadow-sm transition-all", 
-        onClick && "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95"
-      )}
-      onClick={onClick}
-    >
+    <Card className={cn("shadow-sm transition-all rounded-2xl", onClick && "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95")} onClick={onClick}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <div className={cn("p-2 rounded-lg", colorClass)}>
-          <Icon className="h-4 w-4" />
-        </div>
+        <CardTitle className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground">{title}</CardTitle>
+        <div className={cn("p-2 rounded-xl", colorClass)}><Icon className="h-4 w-4" /></div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-      </CardContent>
+      <CardContent><div className="text-2xl font-black">{value}</div></CardContent>
     </Card>
   );
 }
