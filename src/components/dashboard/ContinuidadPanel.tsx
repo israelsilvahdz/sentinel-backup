@@ -14,7 +14,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
   School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
-  Command as CommandIcon, UserX, Loader2, Trash2, Globe
+  Command as CommandIcon, UserX, Loader2, Trash2, Globe, Save
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -75,7 +75,7 @@ export function ContinuidadPanel() {
     continuityCatalog: catalog, setContinuityCatalog: setCatalog 
   } = useDashboardFilters();
   
-  const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
+  const [localStatuses, setLocalStatuses] = setLocalStatuses || useState<Record<string, ContinuityLocalStatus>>({});
   const [careerCatalog, setCareerCatalog] = useState<CareerOption[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessingVoc, setIsProcessingVoc] = useState(false);
