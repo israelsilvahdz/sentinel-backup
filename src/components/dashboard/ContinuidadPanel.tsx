@@ -15,7 +15,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
   Landmark, FileJson, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
-  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning
+  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, PieChart as RePieChart, Pie } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
 import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey, getContinuityLocalStatus } from '@/lib/firebase-services';
 import { format } from 'date-fns';
@@ -67,6 +67,8 @@ const DEFAULT_CAREER_CATALOG: CareerOption[] = [
   { name: "Arquitectura", type: 'external' },
   { name: "Veterinaria", type: 'external' }
 ].sort((a, b) => a.name.localeCompare(b.name));
+
+const COLORS = ['#17594A', '#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6'];
 
 export function ContinuidadPanel() {
   const { toast } = useToast();
@@ -233,15 +235,27 @@ export function ContinuidadPanel() {
       list = list.filter(s => {
         const local = localStatuses[s.id];
         const voc = local?.vocationalDiagnosis;
+        const survey = local?.encuestaEleccionReciente;
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
           case 'indeciso': return !s.isInscribed && local?.isIndeciso;
+          case 'career-no': return !s.isInscribed && survey?.yaEligioCarrera?.toLowerCase() === 'no';
+          case 'uni-no': return !s.isInscribed && survey?.yaEligioUniversidad?.toLowerCase() === 'no';
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
           case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
           case 'fake': return local?.alertaFalsaInscripcion;
-          default: return true;
+          default: 
+            if (selectedKpi.startsWith('career:')) {
+              const careerName = selectedKpi.replace('career:', '');
+              return survey?.carreraElegida === careerName || survey?.carreraElegida?.includes(careerName);
+            }
+            if (selectedKpi.startsWith('uni:')) {
+              const uniName = selectedKpi.replace('uni:', '');
+              return survey?.universidadElegida === uniName || survey?.universidadElegida?.includes(uniName);
+            }
+            return true;
         }
       });
     }
@@ -254,27 +268,78 @@ export function ContinuidadPanel() {
     const inscribed = baseList.filter(s => s.isInscribed).length;
     const pending = total - inscribed;
     const talentRisk = baseList.filter(s => !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado')).length;
+    
     let indecisosCount = 0;
     let sosCount = 0;
     let tallerCount = 0;
     let fakeInscribedCount = 0;
+    let surveyCareerNo = 0;
+    let surveyUniNo = 0;
+
+    const careersCounts: Record<string, number> = {};
+    const universitiesCounts: Record<string, number> = {};
+
     baseList.forEach(s => {
       const local = localStatuses[s.id];
+      const survey = local?.encuestaEleccionReciente;
+
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
-      if (s.isInscribed) return;
-      if (local?.isIndeciso) indecisosCount++;
-      const voc = local?.vocationalDiagnosis;
-      if (voc) {
-        if (voc.urgencyLevel >= 8) sosCount++;
-        if (voc.requiresWorkshop && !local.workshopAttended) tallerCount++;
+      
+      if (!s.isInscribed) {
+        if (local?.isIndeciso) indecisosCount++;
+        if (survey?.yaEligioCarrera?.toLowerCase() === 'no') surveyCareerNo++;
+        if (survey?.yaEligioUniversidad?.toLowerCase() === 'no') surveyUniNo++;
+
+        if (survey?.carreraElegida) {
+          const c = survey.carreraElegida;
+          careersCounts[c] = (careersCounts[c] || 0) + 1;
+        }
+        if (survey?.universidadElegida) {
+          const u = survey.universidadElegida;
+          universitiesCounts[u] = (universitiesCounts[u] || 0) + 1;
+        }
+
+        const voc = local?.vocationalDiagnosis;
+        if (voc) {
+          if (voc.urgencyLevel >= 8) sosCount++;
+          if (voc.requiresWorkshop && !local.workshopAttended) tallerCount++;
+        }
       }
     });
+
     const statusDistribution = statuses.map(st => ({ name: st, value: baseList.filter(s => s.status === st).length })).sort((a,b) => b.value - a.value);
+    
     const advisorProgress = advisors.map(adv => {
       const advStudents = baseList.filter(s => s.advisor === adv);
       return { name: adv, total: advStudents.length, inscribed: advStudents.filter(s => s.isInscribed).length };
     }).sort((a,b) => b.total - a.total);
-    return { total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, indecisosCount, sosCount, tallerCount, fakeInscribedCount };
+
+    const careerReport = Object.entries(careersCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a,b) => b.value - a.value)
+      .slice(0, 10);
+
+    const universityReport = Object.entries(universitiesCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a,b) => b.value - a.value)
+      .slice(0, 10);
+
+    const careerDecisionData = [
+      { name: 'Decididos', value: total - surveyCareerNo },
+      { name: 'Indecisos', value: surveyCareerNo }
+    ];
+
+    const uniDecisionData = [
+      { name: 'Decididos', value: total - surveyUniNo },
+      { name: 'Sin Decidir', value: surveyUniNo }
+    ];
+
+    return { 
+      total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, 
+      indecisosCount, sosCount, tallerCount, fakeInscribedCount,
+      surveyCareerNo, surveyUniNo, careerReport, universityReport,
+      careerDecisionData, uniDecisionData
+    };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
   const handleUpdateIndeciso = async (studentId: string, isIndeciso: boolean) => {
@@ -359,13 +424,15 @@ export function ContinuidadPanel() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-10 gap-4">
         <KpiCard title="Universo" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="green" onClick={() => handleKpiClick('inscribed')} />
         <KpiCard title="No Inscritos" value={stats.pending} icon={UserX} color="blue" onClick={() => handleKpiClick('pending')} />
         <KpiCard title="Falsa Inscrip." value={stats.fakeInscribedCount} icon={FileWarning} color="red" onClick={() => handleKpiClick('fake')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
+        <KpiCard title="Sin Carrera" value={stats.surveyCareerNo} icon={Sparkles} color="purple" onClick={() => handleKpiClick('career-no')} />
+        <KpiCard title="Sin Uni" value={stats.surveyUniNo} icon={Landmark} color="purple" onClick={() => handleKpiClick('uni-no')} />
         <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
         <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" onClick={() => handleKpiClick('risk')} />
       </div>
@@ -378,6 +445,66 @@ export function ContinuidadPanel() {
 
         <TabsContent value="stats" className="space-y-6 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-2"><PieChart className="h-5 w-5 text-primary" /><CardTitle>Decisión de Carrera vs Universidad</CardTitle></CardHeader>
+              <CardContent className="h-[300px] flex gap-4">
+                <div className="flex-1 flex flex-col items-center">
+                  <p className="text-xs font-bold uppercase opacity-60 mb-2">Carrera</p>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie data={stats.careerDecisionData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {stats.careerDecisionData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#17594A' : '#F59E0B'} />)}
+                      </Pie>
+                      <Tooltip />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-1 flex flex-col items-center">
+                  <p className="text-xs font-bold uppercase opacity-60 mb-2">Universidad</p>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie data={stats.uniDecisionData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {stats.uniDecisionData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#17594A' : '#EF4444'} />)}
+                      </Pie>
+                      <Tooltip />
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-2"><Globe className="h-5 w-5 text-primary" /><CardTitle>Top Universidades Destino (No Inscritos)</CardTitle></CardHeader>
+              <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.universityReport} layout="vertical" margin={{ left: 100 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" />
+                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} />
+                    <Tooltip cursor={{ fill: 'transparent' }} />
+                    <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} onClick={(data) => handleKpiClick(`uni:${data.name}`)} className="cursor-pointer" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras de Interés (Población No Inscrita)</CardTitle><CardDescription>Haz clic en una barra para ver a los alumnos interesados.</CardDescription></CardHeader>
+              <CardContent className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.careerReport}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
+                    <YAxis />
+                    <Tooltip cursor={{ fill: 'transparent' }} />
+                    <Bar dataKey="value" fill="#17594A" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
+                      {stats.careerReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader><CardTitle>Avance por Asesor</CardTitle></CardHeader>
               <CardContent className="h-[350px]">
@@ -395,7 +522,7 @@ export function ContinuidadPanel() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle>Distribución por Estatus</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Distribución por Estatus Oficial</CardTitle></CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.statusDistribution}>
@@ -440,7 +567,7 @@ export function ContinuidadPanel() {
             </Select>
             {selectedKpi && (
               <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="text-destructive h-10">
-                <X className="mr-2 h-4 w-4" /> Limpiar: {selectedKpi === 'pending' ? 'No Inscritos' : selectedKpi}
+                <X className="mr-2 h-4 w-4" /> Limpiar: {selectedKpi.includes(':') ? selectedKpi.split(':')[1] : selectedKpi}
               </Button>
             )}
           </div>
