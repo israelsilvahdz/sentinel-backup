@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -8,14 +7,14 @@ import { useToast } from '@/hooks/use-toast';
 import { parseContinuidadExcel } from '@/lib/continuityParser';
 import { parseVocationalExcel } from '@/lib/vocationalParser';
 import { parseRiasecExcel, parseSourceReferences } from '@/lib/riasecParser';
-import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment, VocationalDiagnosis, ContinuityTrackingInfo } from '@/types/student';
+import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, ContinuityComment, VocationalDiagnosis, ContinuityTrackingInfo, CareerOption, CareerType } from '@/types/student';
 import { 
   Users, Target, Award, AlertCircle, Search, Filter, 
   TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
   ChevronDown, ChevronUp, BarChart3, PieChart, Send, UserCog, History, Clock, HelpCircle,
   Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
   School, Building2, Landmark, FileJson, Link as LinkIcon, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
-  Command as CommandIcon, UserX
+  Command as CommandIcon, UserX, Loader2, Trash2, Globe
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -28,7 +27,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox } from '../ui/checkbox';
@@ -36,9 +35,8 @@ import { Textarea } from '../ui/textarea';
 import { RiasecChart } from './RiasecChart';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 
-// --- CATALOGO MAESTRO DE CARRERAS (CONTROL DE OFERTA) ---
-// Aquí puedes marcar qué carreras tenemos en campus y cuáles no.
 const UNIVERSITY_OPTIONS = [
   "TECMILENIO",
   "UANL",
@@ -48,42 +46,25 @@ const UNIVERSITY_OPTIONS = [
   "OTRA"
 ];
 
-const CAREER_CATALOG = [
-  // Oferta Core Tecmilenio (In Campus)
-  { name: "Administración de Empresas", inTec: true },
-  { name: "Administración de Negocios Internacionales", inTec: true },
-  { name: "Comercio Internacional", inTec: true },
-  { name: "Derecho", inTec: true },
-  { name: "Psicología", inTec: true },
-  { name: "Mercadotecnia", inTec: true },
-  { name: "Diseño Gráfico", inTec: true },
-  { name: "Animación y Arte Digital", inTec: true },
-  { name: "Ingeniería Industrial y de Sistemas", inTec: true },
-  { name: "Ingeniería en Mecatrónica", inTec: true },
-  { name: "Ingeniería en Sistemas de Computación", inTec: true },
-  { name: "Gastronomía", inTec: true },
-  { name: "Nutrición", inTec: true },
-  { name: "Turismo", inTec: true },
-  { name: "Contaduría Pública", inTec: true },
-  
-  // Carreras Externas (Causas de Fuga Frecuentes)
-  { name: "Medicina", inTec: false },
-  { name: "Arquitectura", inTec: false },
-  { name: "Veterinaria", inTec: false },
-  { name: "Odontología", inTec: false },
-  { name: "Enfermería", inTec: false },
-  { name: "Ingeniería Civil", inTec: false },
-  { name: "Ingeniería Química", inTec: false },
-  { name: "Criminología", inTec: false },
-  { name: "Ciencias de la Comunicación", inTec: false },
-  { name: "Artes Visuales", inTec: false },
-  { name: "Música", inTec: false },
-  { name: "Diseño de Modas", inTec: false },
-  { name: "Relaciones Internacionales", inTec: false },
-  { name: "Finanzas", inTec: false },
-  { name: "Economía", inTec: false },
-  { name: "Filosofía y Letras", inTec: false },
-  { name: "Otra Carrera (No en lista)", inTec: false }
+const DEFAULT_CAREER_CATALOG: CareerOption[] = [
+  { name: "Administración de Empresas", type: 'in-campus' },
+  { name: "Administración de Negocios Internacionales", type: 'in-campus' },
+  { name: "Comercio Internacional", type: 'in-campus' },
+  { name: "Derecho", type: 'in-campus' },
+  { name: "Psicología", type: 'in-campus' },
+  { name: "Mercadotecnia", type: 'in-campus' },
+  { name: "Diseño Gráfico", type: 'in-campus' },
+  { name: "Animación y Arte Digital", type: 'in-campus' },
+  { name: "Ingeniería Industrial y de Sistemas", type: 'in-campus' },
+  { name: "Ingeniería en Mecatrónica", type: 'in-campus' },
+  { name: "Ingeniería en Sistemas de Computación", type: 'in-campus' },
+  { name: "Gastronomía", type: 'in-campus' },
+  { name: "Nutrición", type: 'in-campus' },
+  { name: "Turismo", type: 'in-campus' },
+  { name: "Contaduría Pública", type: 'in-campus' },
+  { name: "Medicina", type: 'external' },
+  { name: "Arquitectura", type: 'external' },
+  { name: "Veterinaria", type: 'external' }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 export function ContinuidadPanel() {
@@ -95,10 +76,10 @@ export function ContinuidadPanel() {
   } = useDashboardFilters();
   
   const [localStatuses, setLocalStatuses] = useState<Record<string, ContinuityLocalStatus>>({});
+  const [careerCatalog, setCareerCatalog] = useState<CareerOption[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isProcessingVoc, setIsProcessingVoc] = useState(false);
   const [isProcessingRiasec, setIsProcessingRiasec] = useState(false);
-  const [sourceMap, setSourceMap] = useState<Record<string, string>>({});
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAdvisor, setSelectedAdvisor] = useState('all');
@@ -110,11 +91,15 @@ export function ContinuidadPanel() {
   const [selectedKpi, setSelectedKpi] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadLocalStatuses = async () => {
-      const statuses = await getAllContinuityStatuses();
+    const loadData = async () => {
+      const [statuses, careers] = await Promise.all([
+        getAllContinuityStatuses(),
+        getCareerCatalog()
+      ]);
       setLocalStatuses(statuses);
+      setCareerCatalog(careers.length > 0 ? careers : DEFAULT_CAREER_CATALOG);
     };
-    loadLocalStatuses();
+    loadData();
   }, []);
 
   const handleFileUpload = async (file: File | null) => {
@@ -152,29 +137,16 @@ export function ContinuidadPanel() {
     }
   };
 
-  const handleSourceMapUpload = async (file: File | null) => {
-    if (!file) return;
-    try {
-      const map = await parseSourceReferences(file);
-      if (map) {
-        setSourceMap(map);
-        toast({ title: "Referencias de Fuentes Cargadas", description: "El mapa de archivos PDF está listo para cruzar con RIASEC." });
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: "Error al cargar fuentes" });
-    }
-  };
-
   const handleRiasecUpload = async (file: File | null) => {
     if (!file) return;
     setIsProcessingRiasec(true);
     try {
-      const diagnoses = await parseRiasecExcel(file, sourceMap);
+      const diagnoses = await parseRiasecExcel(file, {}); // No source map needed for now
       if (diagnoses) {
         await bulkUpdateRiasecDiagnoses(diagnoses);
         const updated = await getAllContinuityStatuses();
         setLocalStatuses(updated);
-        toast({ title: "Test RIASEC Procesado", description: `Se actualizaron ${Object.keys(diagnoses).length} perfiles con datos vocacionales.` });
+        toast({ title: "Test RIASEC Procesado", description: `Se actualizaron ${Object.keys(diagnoses).length} perfiles.` });
       }
     } catch (error) {
       toast({ variant: 'destructive', title: "Error al cargar RIASEC" });
@@ -349,7 +321,15 @@ export function ContinuidadPanel() {
               <SelectItem value="Agosto 26">Agosto 26</SelectItem>
             </SelectContent>
           </Select>
-          <FileUpload onFileSelect={handleSourceMapUpload} selectedFile={null} isLoading={false} variant="outline" label="Catálogo Fuentes" icon={<LinkIcon className="h-4 w-4" />} />
+          
+          <CareerManagementDialog 
+            catalog={careerCatalog} 
+            onUpdate={async (newCatalog) => {
+              setCareerCatalog(newCatalog);
+              await updateCareerCatalog(newCatalog);
+            }} 
+          />
+
           <FileUpload onFileSelect={handleRiasecUpload} selectedFile={null} isLoading={isProcessingRiasec} variant="secondary" label="Cargar RIASEC" icon={<FileJson className="h-4 w-4" />} />
           <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Encuesta Vocacional" icon={<History className="h-4 w-4" />} />
           <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="default" label="Actualizar Base Operativa" />
@@ -359,44 +339,11 @@ export function ContinuidadPanel() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         <KpiCard title="Total Alumnos" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="green" onClick={() => handleKpiClick('inscribed')} />
-        <KpiCard title="Pendientes" value={stats.pending} icon={UserX} color="blue" onClick={() => handleKpiClick('pending')} />
+        <KpiCard title="No Inscritos" value={stats.pending} icon={UserX} color="blue" onClick={() => handleKpiClick('pending')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
         <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
         <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" onClick={() => handleKpiClick('risk')} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-primary/5 border-primary/20 cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => handleKpiClick('pri-tecmilenio')}>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-primary flex items-center gap-2">
-              <Trophy className="h-4 w-4" /> Prioridad Tecmilenio
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-primary">{stats.priTecmi} <span className="text-sm font-normal text-muted-foreground">alumnos</span></div>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-50 border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleKpiClick('pri-uanl')}>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-blue-700 flex items-center gap-2">
-              <Landmark className="h-4 w-4" /> Prioridad UANL
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-blue-700">{stats.priUanl} <span className="text-sm font-normal text-muted-foreground">alumnos</span></div>
-          </CardContent>
-        </Card>
-        <Card className="bg-orange-50 border-orange-200 cursor-pointer hover:bg-orange-100 transition-colors" onClick={() => handleKpiClick('pri-tec')}>
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-orange-700 flex items-center gap-2">
-              <School className="h-4 w-4" /> Prioridad TEC
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-orange-700">{stats.priTec} <span className="text-sm font-normal text-muted-foreground">alumnos</span></div>
-          </CardContent>
-        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -418,7 +365,7 @@ export function ContinuidadPanel() {
                     <Tooltip />
                     <Legend />
                     <Bar dataKey="inscribed" name="Inscritos" fill="hsl(var(--primary))" stackId="a" />
-                    <Bar dataKey="total" name="Pendientes" fill="hsl(var(--muted))" stackId="a" />
+                    <Bar dataKey="total" name="No Inscritos" fill="hsl(var(--muted))" stackId="a" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -464,7 +411,7 @@ export function ContinuidadPanel() {
             
             {selectedKpi && (
               <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="text-destructive h-10">
-                <X className="mr-2 h-4 w-4" /> Limpiar Filtro KPI
+                <X className="mr-2 h-4 w-4" /> Limpiar Filtro: {selectedKpi === 'pending' ? 'No Inscritos' : selectedKpi}
               </Button>
             )}
           </div>
@@ -476,6 +423,7 @@ export function ContinuidadPanel() {
                 student={student} 
                 localStatus={localStatuses[student.id]}
                 isExpanded={expandedStudent === student.id}
+                careerCatalog={careerCatalog}
                 onToggle={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
                 onUpdateIndeciso={handleUpdateIndeciso}
                 onUpdateWorkshopAttended={handleUpdateWorkshopAttended}
@@ -490,12 +438,121 @@ export function ContinuidadPanel() {
   );
 }
 
+function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[], onUpdate: (c: CareerOption[]) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [localCatalog, setLocalCatalog] = useState<CareerOption[]>([]);
+  const [newCareerName, setNewCareerName] = useState('');
+  const [newCareerType, setNewCareerType] = useState<CareerType>('in-campus');
+  const [isSaving, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setLocalCatalog([...catalog]);
+  }, [isOpen, catalog]);
+
+  const handleAddCareer = () => {
+    if (!newCareerName.trim()) return;
+    const updated = [...localCatalog, { name: newCareerName.trim(), type: newCareerType }].sort((a,b) => a.name.localeCompare(b.name));
+    setLocalCatalog(updated);
+    setNewCareerName('');
+  };
+
+  const handleRemoveCareer = (name: string) => {
+    setLocalCatalog(localCatalog.filter(c => c.name !== name));
+  };
+
+  const handleTypeChange = (name: string, type: CareerType) => {
+    setLocalCatalog(localCatalog.map(c => c.name === name ? { ...c, type } : c));
+  };
+
+  const handleSave = async () => {
+    setIsSubmitting(true);
+    try {
+      await onUpdate(localCatalog);
+      setIsOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5">
+          <Briefcase className="h-4 w-4" /> Gestionar Carreras
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl rounded-3xl h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-black">Catálogo Maestro de Carreras</DialogTitle>
+          <DialogDescription>Define qué carreras tenemos en campus, en otros campus Tecmilenio o si son oferta externa.</DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex gap-2 items-end py-4 border-b">
+          <div className="flex-1 space-y-2">
+            <Label className="text-xs font-bold uppercase">Nueva Carrera</Label>
+            <Input value={newCareerName} onChange={e => setNewCareerName(e.target.value)} placeholder="Ej. Medicina Veterinaria..." className="rounded-xl" />
+          </div>
+          <div className="w-[180px] space-y-2">
+            <Label className="text-xs font-bold uppercase">Clasificación</Label>
+            <Select value={newCareerType} onValueChange={(v: any) => setNewCareerType(v)}>
+              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="in-campus">En este Campus</SelectItem>
+                <SelectItem value="other-campus">Campus Externo TM</SelectItem>
+                <SelectItem value="external">Universidad Externa</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleAddCareer} className="rounded-xl h-10 px-4"><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
+        </div>
+
+        <ScrollArea className="flex-1 pr-4 py-4">
+          <div className="space-y-2">
+            {localCatalog.map(c => (
+              <div key={c.name} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-transparent hover:border-primary/10 transition-all">
+                <span className="font-bold text-sm flex-1">{c.name}</span>
+                <div className="flex items-center gap-2">
+                  <Select value={c.type} onValueChange={(v: any) => handleTypeChange(c.name, v)}>
+                    <SelectTrigger className={cn(
+                      "w-[160px] h-8 text-[10px] font-black uppercase rounded-lg border-none shadow-sm",
+                      c.type === 'in-campus' ? "bg-primary/10 text-primary" : 
+                      c.type === 'other-campus' ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700"
+                    )}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in-campus">En este Campus</SelectItem>
+                      <SelectItem value="other-campus">Campus Externo TM</SelectItem>
+                      <SelectItem value="external">Univ. Externa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleRemoveCareer(c.name)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+
+        <DialogFooter className="pt-4 border-t">
+          <Button variant="ghost" onClick={() => setIsOpen(false)} className="rounded-xl font-bold">Cancelar</Button>
+          <Button onClick={handleSave} disabled={isSaving} className="rounded-xl font-black px-8">
+            {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />} Guardar Catálogo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ContinuityCard({ 
-  student, localStatus, isExpanded, onToggle, onUpdateIndeciso, onUpdateWorkshopAttended, onUpdateTracking, onAddComment 
+  student, localStatus, isExpanded, careerCatalog, onToggle, onUpdateIndeciso, onUpdateWorkshopAttended, onUpdateTracking, onAddComment 
 }: { 
   student: ContinuityStudent, 
   localStatus?: ContinuityLocalStatus,
   isExpanded: boolean, 
+  careerCatalog: CareerOption[],
   onToggle: () => void,
   onUpdateIndeciso: (id: string, val: boolean) => void,
   onUpdateWorkshopAttended: (id: string, val: boolean) => void,
@@ -561,10 +618,10 @@ function ContinuityCard({
   };
 
   const filteredCareerOptions = useMemo(() => {
-    if (!careerSearch) return CAREER_CATALOG;
+    if (!careerSearch) return careerCatalog;
     const search = careerSearch.toLowerCase();
-    return CAREER_CATALOG.filter(c => c.name.toLowerCase().includes(search));
-  }, [careerSearch]);
+    return careerCatalog.filter(c => c.name.toLowerCase().includes(search));
+  }, [careerSearch, careerCatalog]);
 
   return (
     <Card className={cn(
@@ -719,12 +776,14 @@ function ContinuityCard({
                                     onSelect={() => handleAddCareer(c.name)}
                                     className="flex items-center justify-between"
                                   >
-                                    <span>{c.name}</span>
-                                    {c.inTec ? (
-                                      <Badge className="bg-primary/10 text-primary text-[8px] h-4">En Campus</Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="text-[8px] h-4 text-orange-600">Externa</Badge>
-                                    )}
+                                    <span className="text-xs font-bold">{c.name}</span>
+                                    <Badge className={cn(
+                                      "text-[8px] h-4 font-black uppercase",
+                                      c.type === 'in-campus' ? "bg-primary/10 text-primary" : 
+                                      c.type === 'other-campus' ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700"
+                                    )}>
+                                      {c.type === 'in-campus' ? 'Local' : c.type === 'other-campus' ? 'Otro Campus' : 'Externa'}
+                                    </Badge>
                                   </CommandItem>
                                 ))}
                               </ScrollArea>
@@ -736,14 +795,16 @@ function ContinuityCard({
                     
                     <div className="flex flex-wrap gap-2 mt-3">
                       {careers.map((c, i) => {
-                        const careerInfo = CAREER_CATALOG.find(cat => cat.name === c);
+                        const careerInfo = careerCatalog.find(cat => cat.name === c);
                         return (
                           <Badge key={i} variant="secondary" className={cn(
                             "pl-3 pr-1 py-1 rounded-lg border gap-2 shadow-sm",
-                            careerInfo?.inTec ? "bg-primary/5 text-primary border-primary/10" : "bg-orange-50 text-orange-700 border-orange-100"
+                            careerInfo?.type === 'in-campus' ? "bg-primary/5 text-primary border-primary/10" : 
+                            careerInfo?.type === 'other-campus' ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-orange-50 text-orange-700 border-orange-100"
                           )}>
                             <span className="font-bold">{c}</span>
-                            {!careerInfo?.inTec && <AlertCircle className="h-3 w-3 shrink-0" title="Carrera no disponible en Tecmilenio" />}
+                            {careerInfo?.type === 'external' && <AlertCircle className="h-3 w-3 shrink-0" title="Carrera no disponible en Tecmilenio" />}
+                            {careerInfo?.type === 'other-campus' && <Globe className="h-3 w-3 shrink-0" title="Disponible en otro campus Tecmilenio" />}
                             <button onClick={() => handleRemoveCareer(i)} className="hover:bg-destructive/10 text-destructive p-0.5 rounded"><MinusCircle className="h-3.5 w-3.5" /></button>
                           </Badge>
                         );

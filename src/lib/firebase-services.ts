@@ -16,7 +16,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo, CareerOption } from '@/types/student';
 
 // Obtiene la instancia de Firestore del singleton del lado del cliente
 const db = getFirestore(getFirebaseApp());
@@ -27,6 +27,7 @@ const TEAMS_COLLECTION = 'teams';
 const CHANGE_LOG_COLLECTION = 'studentChangeLog';
 const WEIGHTING_SCHEMES_COLLECTION = 'weightingSchemes';
 const CONTINUITY_STATUS_COLLECTION = 'continuityStatus';
+const CAREER_CATALOG_COLLECTION = 'careerCatalog';
 
 
 /**
@@ -560,6 +561,36 @@ export const bulkUpdateRiasecDiagnoses = async (diagnoses: Record<string, Riasec
     await batch.commit();
   } catch (error) {
     console.error("Error bulk updating RIASEC diagnoses:", error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene el catálogo maestro de carreras de Firestore.
+ */
+export const getCareerCatalog = async (): Promise<CareerOption[]> => {
+  try {
+    const docRef = doc(db, CAREER_CATALOG_COLLECTION, 'master');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data().options || [];
+    }
+    return [];
+  } catch (error) {
+    console.error("Error al obtener catálogo de carreras:", error);
+    return [];
+  }
+};
+
+/**
+ * Actualiza el catálogo maestro de carreras en Firestore.
+ */
+export const updateCareerCatalog = async (options: CareerOption[]): Promise<void> => {
+  try {
+    const docRef = doc(db, CAREER_CATALOG_COLLECTION, 'master');
+    await setDoc(docRef, { options, lastUpdated: Timestamp.now() });
+  } catch (error) {
+    console.error("Error al actualizar catálogo de carreras:", error);
     throw error;
   }
 };

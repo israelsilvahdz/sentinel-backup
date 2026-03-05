@@ -231,3 +231,9 @@ export interface WorkTask {
   comments?: WorkTaskComment[];
   order?: number; // Para el orden en la ruta diaria
 }
+
+export type CareerType = 'in-campus' | 'external' | 'other-campus';
+export interface CareerOption {
+  name: string;
+  type: CareerType;
+}
