@@ -27,7 +27,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, PieChart as RePieChart, Pie, LabelList } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey, getContinuityLocalStatus } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Textarea } from '../ui/textarea';
@@ -256,7 +256,6 @@ export function ContinuidadPanel() {
       if (!s.isInscribed && !survey) surveyPendingCount++;
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
-      // Analytics based ONLY on Non-Inscribed students as requested
       if (!s.isInscribed && survey) {
         const hasDecided = (survey.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
         const hasDecidedUni = (survey.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
@@ -269,7 +268,6 @@ export function ContinuidadPanel() {
           metaTmCount++;
         }
 
-        // Sure Report: Only if they explicitly answered "Sí"
         if (survey.carreraElegida && hasDecided) {
           const options = survey.carreraElegida.split(';').map(o => o.trim()).filter(Boolean);
           options.forEach(o => {
@@ -277,7 +275,6 @@ export function ContinuidadPanel() {
           });
         } 
         
-        // Unsure Report: Only if they answered "No"
         if (survey.carreraElegida && !hasDecided) {
           const options = survey.carreraElegida.split(';').map(o => o.trim()).filter(Boolean);
           options.forEach(o => {
@@ -317,16 +314,16 @@ export function ContinuidadPanel() {
       .sort((a,b) => b.value - a.value)
       .slice(0, 10);
 
-    // Percentage Calculation for Pie Charts (Non-inscribed base)
-    const surveyResponders = baseList.filter(s => !s.isInscribed && localStatuses[s.id]?.encuestaEleccionReciente).length || 1;
+    const respondersList = baseList.filter(s => !s.isInscribed && localStatuses[s.id]?.encuestaEleccionReciente);
+    const surveyRespondersCount = respondersList.length || 1;
     
     const careerDecisionData = [
-      { name: 'Decididos', value: surveyResponders - surveyCareerNo },
+      { name: 'Decididos', value: surveyRespondersCount - surveyCareerNo },
       { name: 'Indecisos', value: surveyCareerNo }
     ];
 
     const uniDecisionData = [
-      { name: 'Decididos', value: surveyResponders - surveyUniNo },
+      { name: 'Decididos', value: surveyRespondersCount - surveyUniNo },
       { name: 'Sin Decidir', value: surveyUniNo }
     ];
 
@@ -334,7 +331,7 @@ export function ContinuidadPanel() {
       total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, 
       indecisosCount, sosCount, metaTmCount, fakeInscribedCount,
       surveyCareerNo, surveyUniNo, careerSureReport, careerUnsureReport, universityReport,
-      careerDecisionData, uniDecisionData, surveyPendingCount
+      careerDecisionData, uniDecisionData, surveyPendingCount, surveyRespondersCount
     };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
@@ -445,8 +442,10 @@ export function ContinuidadPanel() {
             <Card>
               <CardHeader className="flex flex-row items-center gap-2">
                 <PieChart className="h-5 w-5 text-primary" />
-                <CardTitle>Decisión de Carrera vs Universidad</CardTitle>
-                <CardDescription>Población No Inscrita</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle>Decisión de Carrera vs Universidad</CardTitle>
+                  <CardDescription>Población No Inscrita ({stats.surveyRespondersCount} encuestados)</CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="h-[300px] flex gap-4">
                 <div className="flex-1 flex flex-col items-center">
@@ -459,7 +458,7 @@ export function ContinuidadPanel() {
                         outerRadius={80} 
                         paddingAngle={5} 
                         dataKey="value"
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        label={({ value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
                         onClick={(data) => {
                           if (data.name === 'Indecisos') handleKpiClick('career-no');
                         }}
@@ -481,7 +480,7 @@ export function ContinuidadPanel() {
                         outerRadius={80} 
                         paddingAngle={5} 
                         dataKey="value"
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        label={({ value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
                         onClick={(data) => {
                           if (data.name === 'Sin Decidir') handleKpiClick('uni-no');
                         }}
