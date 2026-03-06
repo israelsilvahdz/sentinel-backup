@@ -15,7 +15,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, HelpCircle,
   AlertTriangle, Sparkles, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered,
   Landmark, FileJson, PlusCircle, Calendar as CalendarIcon, Briefcase,
-  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart, ClipboardList
+  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart, ClipboardList, Printer, FileText
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -141,7 +141,7 @@ export function ContinuidadPanel() {
         await bulkUpdateCareerSurvey(surveys, officialStatuses);
         const updated = await getAllContinuityStatuses();
         setLocalStatuses(updated);
-        toast({ title: "Encuesta Reciente Guardada", description: `Se actualizaron ${Object.keys(surveys).length} respuestas y se activaron alertas de discrepancia.` });
+        toast({ title: "Encuesta Reciente Guardada", description: `Se actualizaron ${Object.keys(surveys).length} respuestas.` });
       }
     } catch (error) {
       toast({ variant: 'destructive', title: "Error al cargar encuesta", description: "Revisa el formato del archivo CSV." });
@@ -372,6 +372,146 @@ export function ContinuidadPanel() {
     setActiveView('students');
   };
 
+  const handlePrintReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const summaryTable = `
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Indicador</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Universo Total</td><td>${stats.total}</td></tr>
+          <tr><td>Alumnos Inscritos</td><td>${stats.inscribed}</td></tr>
+          <tr><td>Prospectos Pendientes (Meta)</td><td>${stats.pending}</td></tr>
+          <tr><td>Pendientes de Encuesta</td><td>${stats.surveyPendingCount}</td></tr>
+          <tr><td>Alertas de Falsa Inscripción</td><td>${stats.fakeInscribedCount}</td></tr>
+          <tr><td>Alumnos Urgentes SOS</td><td>${stats.sosCount}</td></tr>
+          <tr><td>Indecisos (Carrera)</td><td>${stats.surveyCareerNo}</td></tr>
+          <tr><td>Meta Tecmilenio (No Inscritos)</td><td>${stats.metaTmCount}</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    const careerTable = `
+      <div class="two-col">
+        <div>
+          <h3>Top 10 Carreras Elegidas (Sí decidió)</h3>
+          <table class="report-table">
+            <thead><tr><th>Carrera</th><th>Alumnos</th></tr></thead>
+            <tbody>
+              ${stats.careerSureReport.map(c => `<tr><td>${c.name}</td><td>${c.value}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Top 10 Carreras Contempladas (No decidió)</h3>
+          <table class="report-table">
+            <thead><tr><th>Carrera</th><th>Alumnos</th></tr></thead>
+            <tbody>
+              ${stats.careerUnsureReport.map(c => `<tr><td>${c.name}</td><td>${c.value}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    const universityTable = `
+      <h3>Top 10 Universidades Destino (Competencia)</h3>
+      <table class="report-table">
+        <thead><tr><th>Universidad</th><th>Alumnos</th></tr></thead>
+        <tbody>
+          ${stats.universityReport.map(u => `<tr><td>${u.name}</td><td>${u.value}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+
+    const studentsTable = `
+      <h3 style="page-break-before: always;">Listado Detallado de Alumnos (${filteredStudents.length})</h3>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Matrícula</th>
+            <th>Nombre</th>
+            <th>Asesor</th>
+            <th>Carrera Decl.</th>
+            <th>Uni Decl.</th>
+            <th>Etapa</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredStudents.map(s => {
+            const survey = localStatuses[s.id]?.encuestaEleccionReciente;
+            return `
+              <tr>
+                <td>${s.id}</td>
+                <td>${s.name}</td>
+                <td>${s.advisor}</td>
+                <td>${survey?.carreraElegida || 'N/D'}</td>
+                <td>${survey?.universidadElegida || 'N/D'}</td>
+                <td>${survey?.etapaProceso || 'N/D'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Reporte Ejecutivo Continuidad - ${selectedCycle}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; color: #333; line-height: 1.4; padding: 40px; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #17594A; padding-bottom: 20px; margin-bottom: 30px; }
+            .header h1 { margin: 0; color: #17594A; font-size: 24px; font-weight: 900; text-transform: uppercase; }
+            .header p { margin: 5px 0 0; color: #666; font-size: 12px; font-weight: bold; }
+            .report-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 11px; }
+            .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            .report-table th { background-color: #f8f9fa; color: #17594A; font-weight: 900; text-transform: uppercase; font-size: 9px; }
+            .report-table tr:nth-child(even) { background-color: #fafafa; }
+            h2, h3 { color: #17594A; text-transform: uppercase; font-weight: 900; letter-spacing: 1px; font-size: 16px; margin-top: 30px; }
+            .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+            .footer { margin-top: 50px; font-size: 10px; text-align: center; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+            @media print {
+              .no-print { display: none; }
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1>Reporte Ejecutivo de Continuidad</h1>
+              <p>Ciclo: ${selectedCycle} | Generado: ${format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}</p>
+            </div>
+            <img src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" height="40" />
+          </div>
+
+          <h2>1. Resumen de Población y Metas</h2>
+          ${summaryTable}
+
+          <h2>2. Hallazgos de la Encuesta Reciente</h2>
+          <p style="font-size: 11px; font-style: italic; color: #666;">Análisis basado en ${stats.surveyRespondersCount} prospectos encuestados que no están inscritos.</p>
+          ${careerTable}
+          ${universityTable}
+
+          ${studentsTable}
+
+          <div class="footer">
+            Sentinel Academic 2026 - Universidad Tecmilenio - Confidencial
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   if (students.length === 0) {
     return (
       <div className="p-8 flex flex-col items-center justify-center min-h-[calc(100vh-100px)] space-y-6">
@@ -407,6 +547,10 @@ export function ContinuidadPanel() {
             </SelectContent>
           </Select>
           
+          <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5 rounded-xl" onClick={handlePrintReport}>
+            <FileText className="h-4 w-4" /> Generar Reporte PDF
+          </Button>
+
           <CareerManagementDialog 
             catalog={careerCatalog} 
             onUpdate={async (newCatalog) => {
