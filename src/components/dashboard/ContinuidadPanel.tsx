@@ -376,136 +376,169 @@ export function ContinuidadPanel() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const summaryTable = `
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>Indicador</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Universo Total</td><td>${stats.total}</td></tr>
-          <tr><td>Alumnos Inscritos</td><td>${stats.inscribed}</td></tr>
-          <tr><td>Prospectos Pendientes (Meta)</td><td>${stats.pending}</td></tr>
-          <tr><td>Pendientes de Encuesta</td><td>${stats.surveyPendingCount}</td></tr>
-          <tr><td>Alertas de Falsa Inscripción</td><td>${stats.fakeInscribedCount}</td></tr>
-          <tr><td>Alumnos Urgentes SOS</td><td>${stats.sosCount}</td></tr>
-          <tr><td>Indecisos (Carrera)</td><td>${stats.surveyCareerNo}</td></tr>
-          <tr><td>Meta Tecmilenio (No Inscritos)</td><td>${stats.metaTmCount}</td></tr>
-        </tbody>
-      </table>
-    `;
+    const kpiItems = [
+      { label: 'Universo', value: stats.total, color: '#64748b' },
+      { label: 'Inscritos', value: stats.inscribed, color: '#10b981' },
+      { label: 'No Inscritos', value: stats.pending, color: '#3b82f6' },
+      { label: 'Urgente SOS', value: stats.sosCount, color: '#ef4444' },
+      { label: 'Meta TM', value: stats.metaTmCount, color: '#17594A' },
+      { label: 'Falsa Insc.', value: stats.fakeInscribedCount, color: '#f43f5e' },
+    ];
 
-    const careerTable = `
-      <div class="two-col">
-        <div>
-          <h3>Top 10 Carreras Elegidas (Sí decidió)</h3>
-          <table class="report-table">
-            <thead><tr><th>Carrera</th><th>Alumnos</th></tr></thead>
-            <tbody>
-              ${stats.careerSureReport.map(c => `<tr><td>${c.name}</td><td>${c.value}</td></tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <h3>Top 10 Carreras Contempladas (No decidió)</h3>
-          <table class="report-table">
-            <thead><tr><th>Carrera</th><th>Alumnos</th></tr></thead>
-            <tbody>
-              ${stats.careerUnsureReport.map(c => `<tr><td>${c.name}</td><td>${c.value}</td></tr>`).join('')}
-            </tbody>
-          </table>
+    const kpisHtml = kpiItems.map(k => `
+      <div class="kpi-card" style="border-left: 4px solid ${k.color}">
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-value" style="color: ${k.color}">${k.value}</div>
+      </div>
+    `).join('');
+
+    const maxCareerSure = Math.max(...stats.careerSureReport.map(c => c.value), 1);
+    const careerSureBars = stats.careerSureReport.map(c => `
+      <div class="chart-row">
+        <div class="chart-label">${c.name}</div>
+        <div class="chart-bar-container">
+          <div class="chart-bar" style="width: ${(c.value / maxCareerSure) * 100}%; background-color: #17594A;"></div>
+          <span class="chart-value">${c.value}</span>
         </div>
       </div>
-    `;
+    `).join('');
 
-    const universityTable = `
-      <h3>Top 10 Universidades Destino (Competencia)</h3>
-      <table class="report-table">
-        <thead><tr><th>Universidad</th><th>Alumnos</th></tr></thead>
-        <tbody>
-          ${stats.universityReport.map(u => `<tr><td>${u.name}</td><td>${u.value}</td></tr>`).join('')}
-        </tbody>
-      </table>
-    `;
-
-    const studentsTable = `
-      <h3 style="page-break-before: always;">Listado Detallado de Alumnos (${filteredStudents.length})</h3>
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>Matrícula</th>
-            <th>Nombre</th>
-            <th>Asesor</th>
-            <th>Carrera Decl.</th>
-            <th>Uni Decl.</th>
-            <th>Etapa</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filteredStudents.map(s => {
-            const survey = localStatuses[s.id]?.encuestaEleccionReciente;
-            return `
-              <tr>
-                <td>${s.id}</td>
-                <td>${s.name}</td>
-                <td>${s.advisor}</td>
-                <td>${survey?.carreraElegida || 'N/D'}</td>
-                <td>${survey?.universidadElegida || 'N/D'}</td>
-                <td>${survey?.etapaProceso || 'N/D'}</td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-    `;
+    const maxUni = Math.max(...stats.universityReport.map(u => u.value), 1);
+    const uniBars = stats.universityReport.map(u => `
+      <div class="chart-row">
+        <div class="chart-label">${u.name}</div>
+        <div class="chart-bar-container">
+          <div class="chart-bar" style="width: ${(u.value / maxUni) * 100}%; background-color: #3b82f6;"></div>
+          <span class="chart-value">${u.value}</span>
+        </div>
+      </div>
+    `).join('');
 
     printWindow.document.write(`
       <html>
         <head>
           <title>Reporte Ejecutivo Continuidad - ${selectedCycle}</title>
           <style>
-            body { font-family: 'Inter', sans-serif; color: #333; line-height: 1.4; padding: 40px; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #17594A; padding-bottom: 20px; margin-bottom: 30px; }
-            .header h1 { margin: 0; color: #17594A; font-size: 24px; font-weight: 900; text-transform: uppercase; }
-            .header p { margin: 5px 0 0; color: #666; font-size: 12px; font-weight: bold; }
-            .report-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 11px; }
-            .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-            .report-table th { background-color: #f8f9fa; color: #17594A; font-weight: 900; text-transform: uppercase; font-size: 9px; }
-            .report-table tr:nth-child(even) { background-color: #fafafa; }
-            h2, h3 { color: #17594A; text-transform: uppercase; font-weight: 900; letter-spacing: 1px; font-size: 16px; margin-top: 30px; }
-            .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-            .footer { margin-top: 50px; font-size: 10px; text-align: center; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+            body { 
+              font-family: 'Inter', -apple-system, sans-serif; 
+              color: #1e293b; 
+              line-height: 1.5; 
+              padding: 40px; 
+              background-color: #fff;
+            }
+            .no-print-btn {
+              position: fixed; top: 20px; right: 20px;
+              padding: 10px 20px; background: #17594A; color: white;
+              border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
+              z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+            .header { 
+              display: flex; justify-content: space-between; align-items: center; 
+              border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 40px; 
+            }
+            .header-info h1 { margin: 0; color: #17594A; font-size: 28px; font-weight: 900; letter-spacing: -0.025em; text-transform: uppercase; }
+            .header-info p { margin: 4px 0 0; color: #64748b; font-size: 14px; font-weight: 600; }
+            
+            .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 40px; }
+            .kpi-card { background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; }
+            .kpi-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 4px; }
+            .kpi-value { font-size: 24px; font-weight: 900; }
+
+            h2 { color: #17594A; font-size: 18px; font-weight: 800; text-transform: uppercase; margin: 40px 0 20px; display: flex; align-items: center; gap: 8px; }
+            h2::before { content: ''; display: block; width: 4px; height: 24px; background: #17594A; border-radius: 2px; }
+
+            .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+            .chart-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; }
+            .chart-title { font-size: 14px; font-weight: 800; margin-bottom: 20px; color: #475569; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
+            
+            .chart-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+            .chart-label { font-size: 11px; font-weight: 700; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .chart-bar-container { display: flex; align-items: center; gap: 10px; height: 12px; }
+            .chart-bar { height: 100%; border-radius: 6px; }
+            .chart-value { font-size: 11px; font-weight: 800; color: #64748b; }
+
+            .data-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 20px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+            .data-table th { background: #f8fafc; color: #475569; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+            .data-table td { padding: 12px 16px; font-size: 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+            .data-table tr:last-child td { border-bottom: none; }
+            .data-table tr:nth-child(even) { background-color: #fcfcfd; }
+            
+            .badge { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; display: inline-block; }
+            .badge-primary { background: #17594A15; color: #17594A; }
+            .badge-risk { background: #ef444415; color: #ef4444; }
+
+            .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 10px; text-align: center; color: #94a3b8; font-weight: 600; }
+
             @media print {
-              .no-print { display: none; }
+              .no-print-btn { display: none; }
               body { padding: 0; }
+              .chart-box { break-inside: avoid; }
+              .data-table { break-inside: auto; }
+              .data-table tr { break-inside: avoid; break-after: auto; }
             }
           </style>
         </head>
         <body>
+          <button class="no-print-btn" onclick="window.print()">Imprimir Reporte</button>
+          
           <div class="header">
-            <div>
-              <h1>Reporte Ejecutivo de Continuidad</h1>
-              <p>Ciclo: ${selectedCycle} | Generado: ${format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}</p>
+            <div class="header-info">
+              <h1>Continuidad Académica</h1>
+              <p>Ciclo: ${selectedCycle} • Generado: ${format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}</p>
             </div>
-            <img src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" height="40" />
+            <img src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" height="45" />
           </div>
 
-          <h2>1. Resumen de Población y Metas</h2>
-          ${summaryTable}
+          <h2>Resumen de Operación y Metas</h2>
+          <div class="kpi-grid">${kpisHtml}</div>
 
-          <h2>2. Hallazgos de la Encuesta Reciente</h2>
-          <p style="font-size: 11px; font-style: italic; color: #666;">Análisis basado en ${stats.surveyRespondersCount} prospectos encuestados que no están inscritos.</p>
-          ${careerTable}
-          ${universityTable}
+          <h2>Hallazgos de la Encuesta Reciente</h2>
+          <div class="section-grid">
+            <div class="chart-box">
+              <div class="chart-title">Top Carreras Elegidas (Decididos)</div>
+              ${careerSureBars || '<p style="font-size: 12px; color: #94a3b8; font-style: italic;">No hay datos suficientes.</p>'}
+            </div>
+            <div class="chart-box">
+              <div class="chart-title">Top Universidades Competencia</div>
+              ${uniBars || '<p style="font-size: 12px; color: #94a3b8; font-style: italic;">No hay datos suficientes.</p>'}
+            </div>
+          </div>
 
-          ${studentsTable}
+          <h2 style="page-break-before: always;">Detalle de Alumnos Prioritarios (${filteredStudents.length})</h2>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Matrícula</th>
+                <th>Nombre Completo</th>
+                <th>Carrera Declarada</th>
+                <th>Universidad</th>
+                <th>Etapa del Proceso</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredStudents.map(s => {
+                const survey = localStatuses[s.id]?.encuestaEleccionReciente;
+                const isRisk = !s.isInscribed && (localStatuses[s.id]?.vocationalDiagnosis?.urgencyLevel || 0) >= 8;
+                return `
+                  <tr>
+                    <td style="font-family: monospace; font-weight: 700;">${s.id}</td>
+                    <td style="font-weight: 700;">
+                      ${s.name}
+                      ${isRisk ? '<span class="badge badge-risk" style="margin-left: 8px;">SOS</span>' : ''}
+                    </td>
+                    <td><span class="badge badge-primary">${survey?.carreraElegida || 'N/D'}</span></td>
+                    <td style="font-weight: 600;">${survey?.universidadElegida || 'N/D'}</td>
+                    <td style="color: #64748b; font-weight: 600;">${survey?.etapaProceso || 'N/D'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
 
           <div class="footer">
-            Sentinel Academic 2026 - Universidad Tecmilenio - Confidencial
+            Sentinel Academic 2026 • Universidad Tecmilenio • Confidencial para fines administrativos
           </div>
-          <script>window.print();</script>
         </body>
       </html>
     `);
