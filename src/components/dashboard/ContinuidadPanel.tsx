@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, PieChart as RePieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, PieChart as RePieChart, Pie, LabelList } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
 import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey, getContinuityLocalStatus } from '@/lib/firebase-services';
 import { format } from 'date-fns';
@@ -36,7 +36,7 @@ import { RiasecChart } from './RiasecChart';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
-import { TooltipProvider, Tooltip as TooltipUI, TooltipTrigger, TooltipContent } from '../ui/tooltip';
+import { TooltipProvider, Tooltip as TooltipUI, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const UNIVERSITY_OPTIONS = [
   "TECMILENIO",
@@ -312,7 +312,7 @@ export function ContinuidadPanel() {
     const advisorProgress = advisors.map(adv => {
       const advStudents = baseList.filter(s => s.advisor === adv);
       return { name: adv, total: advStudents.length, inscribed: advStudents.filter(s => s.isInscribed).length };
-    }).sort((a,b) => b.total - a.total);
+    }).sort((a,b) => a.total - a.total);
 
     const careerReport = Object.entries(careersCounts)
       .map(([name, value]) => ({ name, value }))
@@ -452,7 +452,17 @@ export function ContinuidadPanel() {
                   <p className="text-xs font-bold uppercase opacity-60 mb-2">Carrera</p>
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
-                      <Pie data={stats.careerDecisionData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      <Pie 
+                        data={stats.careerDecisionData} 
+                        innerRadius={60} 
+                        outerRadius={80} 
+                        paddingAngle={5} 
+                        dataKey="value"
+                        onClick={(data) => {
+                          if (data.name === 'Indecisos') handleKpiClick('career-no');
+                        }}
+                        className="cursor-pointer"
+                      >
                         {stats.careerDecisionData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#17594A' : '#F59E0B'} />)}
                       </Pie>
                       <Tooltip />
@@ -463,7 +473,17 @@ export function ContinuidadPanel() {
                   <p className="text-xs font-bold uppercase opacity-60 mb-2">Universidad</p>
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
-                      <Pie data={stats.uniDecisionData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      <Pie 
+                        data={stats.uniDecisionData} 
+                        innerRadius={60} 
+                        outerRadius={80} 
+                        paddingAngle={5} 
+                        dataKey="value"
+                        onClick={(data) => {
+                          if (data.name === 'Sin Decidir') handleKpiClick('uni-no');
+                        }}
+                        className="cursor-pointer"
+                      >
                         {stats.uniDecisionData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#17594A' : '#EF4444'} />)}
                       </Pie>
                       <Tooltip />
@@ -477,12 +497,14 @@ export function ContinuidadPanel() {
               <CardHeader className="flex flex-row items-center gap-2"><Globe className="h-5 w-5 text-primary" /><CardTitle>Top Universidades Destino (No Inscritos)</CardTitle></CardHeader>
               <CardContent className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.universityReport} layout="vertical" margin={{ left: 100 }}>
+                  <BarChart data={stats.universityReport} layout="vertical" margin={{ left: 100, right: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" />
+                    <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} />
                     <Tooltip cursor={{ fill: 'transparent' }} />
-                    <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} onClick={(data) => handleKpiClick(`uni:${data.name}`)} className="cursor-pointer" />
+                    <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} onClick={(data) => handleKpiClick(`uni:${data.name}`)} className="cursor-pointer">
+                      <LabelList dataKey="value" position="right" className="fill-foreground font-black text-[10px]" />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -492,12 +514,13 @@ export function ContinuidadPanel() {
               <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras de Interés (Población No Inscrita)</CardTitle><CardDescription>Haz clic en una barra para ver a los alumnos interesados.</CardDescription></CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.careerReport}>
+                  <BarChart data={stats.careerReport} margin={{ top: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
-                    <YAxis />
+                    <YAxis hide />
                     <Tooltip cursor={{ fill: 'transparent' }} />
                     <Bar dataKey="value" fill="#17594A" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
+                      <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
                       {stats.careerReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Bar>
                   </BarChart>
@@ -716,33 +739,21 @@ function ContinuityCard({
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
   const riasec = localStatus?.riasecDiagnosis;
-  const tracking = localStatus?.trackingInfo || { chosenUniversity: '', chosenCareers: [], processStatus: 'Pendiente', resultDate: '' };
   const survey = localStatus?.encuestaEleccionReciente;
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
-  const isWorkshopRequired = vocational?.requiresWorkshop && !student.isInscribed;
-  const isWorkshopAttended = localStatus?.workshopAttended;
   const hasFalseInscribedAlert = localStatus?.alertaFalsaInscripcion;
+  
   const universityRankingArray = useMemo(() => vocational?.universityRanking ? vocational.universityRanking.split(/[;,]/).filter(Boolean).map(u => u.trim()) : [], [vocational]);
   const tecmilenioRank = useMemo(() => {
     const idx = universityRankingArray.findIndex(u => u.toUpperCase().includes('TECMILENIO'));
     return idx !== -1 ? idx + 1 : null;
   }, [universityRankingArray]);
+
   const [commentText, setCommentText] = useState('');
   const { leaders, tutors } = useDashboardFilters();
   const [author, setAuthor] = useState('');
   const signatoryOptions = useMemo(() => [...new Set([...leaders, ...tutors])].sort(), [leaders, tutors]);
-  const [university, setUniversity] = useState(tracking.chosenUniversity);
-  const [otherUniversity, setOtherUniversity] = useState('');
-  const [procStatus, setProcStatus] = useState(tracking.processStatus);
-  const [resDate, setResDate] = useState(tracking.resultDate);
-  const [careers, setCareers] = useState<string[]>(tracking.chosenCareers);
-  const [careerSearch, setCareerSearch] = useState('');
-  const [isCareerPopoverOpen, setIsCareerPopoverOpen] = useState(false);
-  const handleAddCareer = (careerName: string) => { if (!careers.includes(careerName)) setCareers(prev => [...prev, careerName]); setIsCareerPopoverOpen(false); setCareerSearch(''); };
-  const handleRemoveCareer = (idx: number) => { setCareers(prev => prev.filter((_, i) => i !== idx)); };
-  const handleSaveTracking = () => { onUpdateTracking(student.id, { chosenUniversity: university === 'OTRA' ? otherUniversity : university, chosenCareers: careers, processStatus: procStatus, resultDate: resDate }); };
-  const filteredCareerOptions = useMemo(() => careerSearch ? careerCatalog.filter(c => c.name.toLowerCase().includes(careerSearch.toLowerCase())) : careerCatalog, [careerSearch, careerCatalog]);
 
   return (
     <TooltipProvider>
@@ -809,54 +820,35 @@ function ContinuityCard({
               <Label className="text-xs uppercase font-black text-emerald-700 flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" /> Último Estatus Declarado (Encuesta Reciente)
               </Label>
-              <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="space-y-1">
-                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Carrera Seleccionada</p>
+                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">
+                    {survey.yaEligioCarrera === 'Sí' ? 'Carrera Elegida' : 'Carreras Contempladas'}
+                  </p>
                   <p className="text-sm font-bold text-emerald-900">{survey.carreraElegida || 'Sin especificar'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Universidad</p>
-                  <p className="text-sm font-bold text-emerald-900">{survey.universidadElegida}</p>
+                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">
+                    {survey.yaEligioUniversidad === 'Sí' ? 'Universidad Elegida' : 'Universidades Contempladas'}
+                  </p>
+                  <p className="text-sm font-bold text-emerald-900">{survey.universidadElegida || 'Sin especificar'}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Etapa del Proceso</p>
                   <Badge variant="outline" className="bg-white border-emerald-200 text-emerald-700 font-bold uppercase text-[9px]">{survey.etapaProceso}</Badge>
                 </div>
+                {survey.fechaEntregaResultados && (
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Fecha Resultados</p>
+                    <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-xs">
+                      <CalendarIcon className="h-3 w-3" /> {survey.fechaEntregaResultados}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
-          {!student.isInscribed && (
-            <div className="pt-4 border-t space-y-4">
-              <Label className="text-xs uppercase font-bold text-primary flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Seguimiento de Decisión Final</Label>
-              <div className="bg-background p-6 rounded-2xl border shadow-sm grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold">Universidad Elegida</Label>
-                    <Select value={UNIVERSITY_OPTIONS.includes(university) ? university : (university ? 'OTRA' : '')} onValueChange={(val) => { setUniversity(val); if (val !== 'OTRA') setOtherUniversity(''); }}>
-                      <SelectTrigger className="rounded-xl"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                      <SelectContent>{UNIVERSITY_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
-                    </Select>
-                    {university === 'OTRA' && <Input value={otherUniversity} onChange={e => setOtherUniversity(e.target.value)} placeholder="¿Cuál?" className="rounded-xl mt-2" />}
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold">Carrera(s) Seleccionada(s)</Label>
-                    <Popover open={isCareerPopoverOpen} onOpenChange={setIsCareerPopoverOpen}>
-                      <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start rounded-xl h-10 text-muted-foreground"><Search className="mr-2 h-4 w-4" /> Buscar carrera...</Button></PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0"><Command><CommandInput placeholder="Ej. Medicina..." value={careerSearch} onValueChange={setCareerSearch} /><CommandList><CommandEmpty>No encontrada.</CommandEmpty><CommandGroup><ScrollArea className="h-[200px]">{filteredCareerOptions.map(c => <CommandItem key={c.name} onSelect={() => handleAddCareer(c.name)} className="flex items-center justify-between"><span className="text-xs font-bold">{c.name}</span><Badge className={cn("text-[8px] h-4 uppercase", c.type === 'in-campus' ? "bg-primary/10 text-primary" : c.type === 'other-campus' ? "bg-purple-100 text-purple-700" : "bg-orange-100 text-orange-700")}>{c.type === 'in-campus' ? 'Local' : c.type === 'other-campus' ? 'Otro TM' : 'Externa'}</Badge></CommandItem>)}</ScrollArea></CommandGroup></CommandList></Command></PopoverContent>
-                    </Popover>
-                    <div className="flex flex-wrap gap-2 mt-3">{careers.map((c, i) => <Badge key={i} variant="secondary" className="pl-3 pr-1 py-1 rounded-lg border gap-2">{c}<button onClick={() => handleRemoveCareer(i)} className="text-destructive"><MinusCircle className="h-3.5 w-3.5" /></button></Badge>)}</div>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label className="text-xs font-bold">Estatus</Label><Select value={procStatus} onValueChange={setProcStatus}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Pendiente">Pendiente</SelectItem><SelectItem value="Admitido">Admitido</SelectItem><SelectItem value="Inscrito">Inscrito en otra</SelectItem><SelectItem value="Declinado">Declinado</SelectItem></SelectContent></Select></div>
-                    <div className="space-y-2"><Label className="text-xs font-bold">Fecha Resultados</Label><Input type="date" value={resDate} onChange={e => setResDate(e.target.value)} className="rounded-xl" /></div>
-                  </div>
-                  <div className="pt-4 flex justify-end"><Button onClick={handleSaveTracking} className="rounded-xl font-bold h-11 px-8 shadow-lg shadow-primary/10"><Send className="mr-2 h-4 w-4" /> Guardar</Button></div>
-                </div>
-              </div>
-            </div>
-          )}
+          
           <div className="pt-6 border-t space-y-4">
             <Label className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2"><History className="h-4 w-4" /> Bitácora de Seguimiento Sentinel</Label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
