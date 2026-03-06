@@ -206,9 +206,9 @@ export function ContinuidadPanel() {
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
-          case 'indeciso': return !s.isInscribed && (local?.isIndeciso || (survey?.yaEligioCarrera || '').toLowerCase().trim().includes('no'));
-          case 'career-no': return !s.isInscribed && (survey?.yaEligioCarrera || '').toLowerCase().trim().includes('no');
-          case 'uni-no': return !s.isInscribed && (survey?.yaEligioUniversidad || '').toLowerCase().trim().includes('no');
+          case 'indeciso': return !s.isInscribed && (local?.isIndeciso || !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si'));
+          case 'career-no': return !s.isInscribed && !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
+          case 'uni-no': return !s.isInscribed && !(survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
           case 'sos': return !s.isInscribed && local?.vocationalDiagnosis && local.vocationalDiagnosis.urgencyLevel >= 8;
           case 'meta-tm': return !s.isInscribed && (survey?.universidadElegida || '').toLowerCase().includes('tecmilenio');
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
@@ -253,9 +253,10 @@ export function ContinuidadPanel() {
 
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
+      // Analytics based ONLY on Non-Inscribed students as requested
       if (!s.isInscribed && survey) {
-        const hasDecided = (survey.yaEligioCarrera || '').toLowerCase().trim().includes('si');
-        const hasDecidedUni = (survey.yaEligioUniversidad || '').toLowerCase().trim().includes('si');
+        const hasDecided = (survey.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
+        const hasDecidedUni = (survey.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
 
         if (!hasDecided) indecisosCount++;
         if (!hasDecided) surveyCareerNo++;
@@ -265,7 +266,7 @@ export function ContinuidadPanel() {
           metaTmCount++;
         }
 
-        // Sure Report: Only if they answered "Sí"
+        // Sure Report: Only if they explicitly answered "Sí"
         if (survey.carreraElegida && hasDecided) {
           const options = survey.carreraElegida.split(';').map(o => o.trim()).filter(Boolean);
           options.forEach(o => {
@@ -313,13 +314,16 @@ export function ContinuidadPanel() {
       .sort((a,b) => b.value - a.value)
       .slice(0, 10);
 
+    // Percentage Calculation for Pie Charts (Non-inscribed base)
+    const surveyResponders = baseList.filter(s => !s.isInscribed && localStatuses[s.id]?.encuestaEleccionReciente).length || 1;
+    
     const careerDecisionData = [
-      { name: 'Decididos', value: total - surveyCareerNo },
+      { name: 'Decididos', value: surveyResponders - surveyCareerNo },
       { name: 'Indecisos', value: surveyCareerNo }
     ];
 
     const uniDecisionData = [
-      { name: 'Decididos', value: total - surveyUniNo },
+      { name: 'Decididos', value: surveyResponders - surveyUniNo },
       { name: 'Sin Decidir', value: surveyUniNo }
     ];
 
@@ -435,10 +439,14 @@ export function ContinuidadPanel() {
         <TabsContent value="stats" className="space-y-6 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
-              <CardHeader className="flex flex-row items-center gap-2"><PieChart className="h-5 w-5 text-primary" /><CardTitle>Decisión de Carrera vs Universidad</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2">
+                <PieChart className="h-5 w-5 text-primary" />
+                <CardTitle>Decisión de Carrera vs Universidad</CardTitle>
+                <CardDescription>Población No Inscrita</CardDescription>
+              </CardHeader>
               <CardContent className="h-[300px] flex gap-4">
                 <div className="flex-1 flex flex-col items-center">
-                  <p className="text-xs font-bold uppercase opacity-60 mb-2">Carrera</p>
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-2">Carrera</p>
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie 
@@ -447,6 +455,7 @@ export function ContinuidadPanel() {
                         outerRadius={80} 
                         paddingAngle={5} 
                         dataKey="value"
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                         onClick={(data) => {
                           if (data.name === 'Indecisos') handleKpiClick('career-no');
                         }}
@@ -459,7 +468,7 @@ export function ContinuidadPanel() {
                   </ResponsiveContainer>
                 </div>
                 <div className="flex-1 flex flex-col items-center">
-                  <p className="text-xs font-bold uppercase opacity-60 mb-2">Universidad</p>
+                  <p className="text-[10px] font-black uppercase opacity-60 mb-2">Universidad</p>
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie 
@@ -468,6 +477,7 @@ export function ContinuidadPanel() {
                         outerRadius={80} 
                         paddingAngle={5} 
                         dataKey="value"
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                         onClick={(data) => {
                           if (data.name === 'Sin Decidir') handleKpiClick('uni-no');
                         }}
@@ -483,7 +493,10 @@ export function ContinuidadPanel() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center gap-2"><Globe className="h-5 w-5 text-primary" /><CardTitle>Top Universidades Destino (No Inscritos)</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" />
+                <CardTitle>Top Universidades Destino (No Inscritos)</CardTitle>
+              </CardHeader>
               <CardContent className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.universityReport} layout="vertical" margin={{ left: 100, right: 40 }}>
@@ -500,25 +513,37 @@ export function ContinuidadPanel() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras Elegidas (Decisión Única)</CardTitle><CardDescription>Alumnos que respondieron "Sí" a la elección de carrera.</CardDescription></CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <CardTitle>Top Carreras Elegidas (Decisión Única)</CardTitle>
+                <CardDescription>Alumnos No Inscritos con "Sí" en elección de carrera.</CardDescription>
+              </CardHeader>
               <CardContent className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.careerSureReport} margin={{ top: 20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
-                    <YAxis hide />
-                    <Tooltip cursor={{ fill: 'transparent' }} />
-                    <Bar dataKey="value" fill="#17594A" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
-                      <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
-                      {stats.careerSureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                {stats.careerSureReport.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.careerSureReport} margin={{ top: 20, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
+                      <YAxis hide />
+                      <Tooltip cursor={{ fill: 'transparent' }} />
+                      <Bar dataKey="value" fill="#17594A" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
+                        <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
+                        {stats.careerSureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">No hay datos de decisiones únicas.</div>
+                )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center gap-2"><ListOrdered className="h-5 w-5 text-orange-500" /><CardTitle>Top Carreras Contempladas (Indecisos)</CardTitle><CardDescription>Alumnos que respondieron "No" a la elección de carrera.</CardDescription></CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2">
+                <ListOrdered className="h-5 w-5 text-orange-500" />
+                <CardTitle>Top Carreras Contempladas (Indecisos)</CardTitle>
+                <CardDescription>Alumnos No Inscritos con "No" en elección de carrera.</CardDescription>
+              </CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.careerUnsureReport} margin={{ top: 20, bottom: 20 }}>
@@ -746,7 +771,7 @@ function ContinuityCard({
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
   const survey = localStatus?.encuestaEleccionReciente;
-  const hasDecided = (survey?.yaEligioCarrera || '').toLowerCase().trim().includes('si');
+  const hasDecided = (survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
   
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
   const isIndeciso = !student.isInscribed && (localStatus?.isIndeciso || !hasDecided);
