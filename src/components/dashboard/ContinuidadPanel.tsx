@@ -907,15 +907,53 @@ function ContinuityCard({
 }
 
 function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string, value: number | string, icon: any, color?: string, onClick?: () => void }) {
-  const colors = { red: "text-red-600 bg-red-50 border-red-100", blue: "text-blue-600 bg-blue-50 border-blue-100", green: "text-green-600 bg-green-50 border-green-100", purple: "text-purple-600 bg-purple-50 border-purple-200", default: "text-primary bg-primary/5 border-primary/10" };
-  const colorClass = color ? (colors[color as keyof typeof colors] || colors.default) : colors.default;
+  const themes = {
+    red: "from-red-50 to-white border-red-100 text-red-600 shadow-red-500/5",
+    blue: "from-blue-50 to-white border-blue-100 text-blue-600 shadow-blue-500/5",
+    green: "from-emerald-50 to-white border-emerald-100 text-emerald-600 shadow-emerald-500/5",
+    purple: "from-purple-50 to-white border-purple-100 text-purple-600 shadow-purple-500/5",
+    default: "from-slate-50 to-white border-slate-100 text-slate-600 shadow-slate-500/5",
+  };
+
+  const iconBg = {
+    red: "bg-red-500/10 text-red-600",
+    blue: "bg-blue-500/10 text-blue-600",
+    green: "bg-emerald-500/10 text-emerald-600",
+    purple: "bg-purple-500/10 text-purple-600",
+    default: "bg-slate-500/10 text-slate-600",
+  }
+
+  const themeClass = color ? (themes[color as keyof typeof themes] || themes.default) : themes.default;
+  const iconClass = color ? (iconBg[color as keyof typeof iconBg] || iconBg.default) : iconBg.default;
+
   return (
-    <Card className={cn("shadow-sm transition-all rounded-2xl", onClick && "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95")} onClick={onClick}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-[10px] font-black uppercase tracking-tighter text-muted-foreground">{title}</CardTitle>
-        <div className={cn("p-2 rounded-xl", colorClass)}><Icon className="h-4 w-4" /></div>
+    <Card 
+      className={cn(
+        "relative overflow-hidden group transition-all duration-500 border border-transparent bg-gradient-to-br shadow-sm",
+        themeClass,
+        onClick && "cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 hover:border-current/20"
+      )}
+      onClick={onClick}
+    >
+      <div className="absolute -right-2 -bottom-2 opacity-[0.04] transition-transform group-hover:scale-125 group-hover:rotate-12 duration-700 pointer-events-none">
+        <Icon className="h-20 w-20" />
+      </div>
+      
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-4 relative z-10">
+        <CardTitle className="text-[9px] font-black uppercase tracking-[0.15em] opacity-70 leading-none">
+          {title}
+        </CardTitle>
+        <div className={cn("p-2 rounded-xl transition-all duration-500 group-hover:scale-110", iconClass)}>
+          <Icon className="h-4 w-4" />
+        </div>
       </CardHeader>
-      <CardContent><div className="text-2xl font-black">{value}</div></CardContent>
+      
+      <CardContent className="p-4 pt-0 relative z-10">
+        <div className="text-3xl font-black tracking-tighter tabular-nums mb-1">
+          {value}
+        </div>
+        <div className="h-1 w-8 rounded-full bg-current/20 transition-all duration-500 group-hover:w-full" />
+      </CardContent>
     </Card>
   );
 }
