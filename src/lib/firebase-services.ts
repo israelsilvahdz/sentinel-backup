@@ -1,3 +1,4 @@
+
 import { 
   getFirestore, 
   collection, 
@@ -611,14 +612,14 @@ export const bulkUpdateCareerSurvey = async (
       const officialStatus = officialStatuses[studentId] || '';
       const declaredUni = (survey.universidadElegida || '').toLowerCase();
       const isTecmilenio = declaredUni.includes('tecmilenio');
-      const isOfficialInscribed = officialStatus.toLowerCase() === 'inscrito' || officialStatus.toLowerCase() === 'inscrita';
-      const choseCareer = (survey.yaEligioCarrera || '').toLowerCase() === 'si';
+      const isOfficialInscribed = officialStatus.toLowerCase().includes('inscrit');
+      const choseCareer = (survey.yaEligioCareer || survey.yaEligioCarrera || '').toLowerCase().trim().includes('si');
       
       const updateData: any = {
         encuestaEleccionReciente: survey,
         lastSurveyUpdate: Timestamp.now(),
-        // Update Indeciso based on choice
-        isIndeciso: !choseCareer || (survey.carreraElegida || '').includes(';')
+        // Update Indeciso based strictly on choice
+        isIndeciso: !choseCareer
       };
 
       // STRICT ALERT TRIGGER:
@@ -627,10 +628,7 @@ export const bulkUpdateCareerSurvey = async (
       // 2. Official status is NOT inscribed.
       // 3. AND the student EXPLICITLY declared they are already enrolled.
       const surveyStage = (survey.etapaProceso || '').toLowerCase().trim();
-      const declaresEnrolledStrict = 
-        surveyStage === 'declara inscrito' || 
-        surveyStage === 'inscrito' || 
-        surveyStage === 'inscrita';
+      const declaresEnrolledStrict = surveyStage.includes('inscrit');
 
       if (isTecmilenio && !isOfficialInscribed && declaresEnrolledStrict) {
         updateData.alertaFalsaInscripcion = true;

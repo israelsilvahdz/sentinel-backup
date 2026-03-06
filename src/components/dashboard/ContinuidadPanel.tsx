@@ -70,7 +70,7 @@ export function ContinuidadPanel() {
         getAllContinuityStatuses(),
         getCareerCatalog()
       ]);
-      setLocalStatuses(statuses);
+      setLocalStatuses(statuses || {});
       setCareerCatalog(careers.length > 0 ? careers : []);
     };
     loadData();
@@ -202,16 +202,15 @@ export function ContinuidadPanel() {
     if (selectedKpi) {
       list = list.filter(s => {
         const local = localStatuses[s.id];
-        const voc = local?.vocationalDiagnosis;
         const survey = local?.encuestaEleccionReciente;
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
-          case 'indeciso': return !s.isInscribed && local?.isIndeciso;
-          case 'career-no': return !s.isInscribed && (survey?.yaEligioCarrera?.toLowerCase() === 'no' || (survey?.carreraElegida || '').includes(';'));
-          case 'uni-no': return !s.isInscribed && survey?.yaEligioUniversidad?.toLowerCase() === 'no';
-          case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
-          case 'meta-tm': return !s.isInscribed && survey?.universidadElegida?.toLowerCase().includes('tecmilenio');
+          case 'indeciso': return !s.isInscribed && (local?.isIndeciso || (survey?.yaEligioCarrera || '').toLowerCase().trim().includes('no'));
+          case 'career-no': return !s.isInscribed && (survey?.yaEligioCarrera || '').toLowerCase().trim().includes('no');
+          case 'uni-no': return !s.isInscribed && (survey?.yaEligioUniversidad || '').toLowerCase().trim().includes('no');
+          case 'sos': return !s.isInscribed && local?.vocationalDiagnosis && local.vocationalDiagnosis.urgencyLevel >= 8;
+          case 'meta-tm': return !s.isInscribed && (survey?.universidadElegida || '').toLowerCase().includes('tecmilenio');
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
           case 'fake': return local?.alertaFalsaInscripcion;
           default: 
@@ -255,25 +254,27 @@ export function ContinuidadPanel() {
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
       if (!s.isInscribed && survey) {
-        const isMultipleCareers = (survey.carreraElegida || '').includes(';');
-        const choseCareer = survey.yaEligioCarrera?.toLowerCase() === 'si' && !isMultipleCareers;
+        const hasDecided = (survey.yaEligioCarrera || '').toLowerCase().trim().includes('si');
+        const hasDecidedUni = (survey.yaEligioUniversidad || '').toLowerCase().trim().includes('si');
 
-        if (local?.isIndeciso || isMultipleCareers) indecisosCount++;
-        if (survey.yaEligioCarrera?.toLowerCase() === 'no' || isMultipleCareers) surveyCareerNo++;
-        if (survey.yaEligioUniversidad?.toLowerCase() === 'no') surveyUniNo++;
+        if (!hasDecided) indecisosCount++;
+        if (!hasDecided) surveyCareerNo++;
+        if (!hasDecidedUni) surveyUniNo++;
 
         if (survey.universidadElegida?.toLowerCase().includes('tecmilenio')) {
           metaTmCount++;
         }
 
-        // Sure Report: Single decision
-        if (survey.carreraElegida && choseCareer) {
-          const c = survey.carreraElegida;
-          careersSureCounts[c] = (careersSureCounts[c] || 0) + 1;
+        // Sure Report: Only if they answered "Sí"
+        if (survey.carreraElegida && hasDecided) {
+          const options = survey.carreraElegida.split(';').map(o => o.trim()).filter(Boolean);
+          options.forEach(o => {
+            careersSureCounts[o] = (careersSureCounts[o] || 0) + 1;
+          });
         } 
         
-        // Unsure Report: Multiple or contemplation
-        if (survey.carreraElegida && (isMultipleCareers || survey.yaEligioCarrera?.toLowerCase() === 'no')) {
+        // Unsure Report: Only if they answered "No"
+        if (survey.carreraElegida && !hasDecided) {
           const options = survey.carreraElegida.split(';').map(o => o.trim()).filter(Boolean);
           options.forEach(o => {
             careersUnsureCounts[o] = (careersUnsureCounts[o] || 0) + 1;
@@ -295,7 +296,7 @@ export function ContinuidadPanel() {
     const advisorProgress = advisors.map(adv => {
       const advStudents = baseList.filter(s => s.advisor === adv);
       return { name: adv, total: advStudents.length, inscribed: advStudents.filter(s => s.isInscribed).length };
-    }).sort((a,b) => a.total - a.total);
+    }).sort((a,b) => b.total - a.total);
 
     const careerSureReport = Object.entries(careersSureCounts)
       .map(([name, value]) => ({ name, value }))
@@ -499,7 +500,7 @@ export function ContinuidadPanel() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras Elegidas (Decisión Única)</CardTitle><CardDescription>Alumnos seguros de su elección.</CardDescription></CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras Elegidas (Decisión Única)</CardTitle><CardDescription>Alumnos que respondieron "Sí" a la elección de carrera.</CardDescription></CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.careerSureReport} margin={{ top: 20, bottom: 20 }}>
@@ -517,7 +518,7 @@ export function ContinuidadPanel() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center gap-2"><ListOrdered className="h-5 w-5 text-orange-500" /><CardTitle>Top Carreras Contempladas (Indecisos)</CardTitle><CardDescription>Carreras en consideración por alumnos sin decisión única.</CardDescription></CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2"><ListOrdered className="h-5 w-5 text-orange-500" /><CardTitle>Top Carreras Contempladas (Indecisos)</CardTitle><CardDescription>Alumnos que respondieron "No" a la elección de carrera.</CardDescription></CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.careerUnsureReport} margin={{ top: 20, bottom: 20 }}>
@@ -744,10 +745,11 @@ function ContinuityCard({
 }) {
   const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
-  const riasec = localStatus?.riasecDiagnosis;
   const survey = localStatus?.encuestaEleccionReciente;
+  const hasDecided = (survey?.yaEligioCarrera || '').toLowerCase().trim().includes('si');
+  
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
-  const isIndeciso = !student.isInscribed && (localStatus?.isIndeciso || (survey?.carreraElegida || '').includes(';'));
+  const isIndeciso = !student.isInscribed && (localStatus?.isIndeciso || !hasDecided);
   const hasFalseInscribedAlert = localStatus?.alertaFalsaInscripcion;
   
   const universityRankingArray = useMemo(() => vocational?.universityRanking ? vocational.universityRanking.split(/[;,]/).filter(Boolean).map(u => u.trim()) : [], [vocational]);
@@ -829,7 +831,7 @@ function ContinuityCard({
               <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="space-y-1">
                   <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">
-                    {(survey.yaEligioCarrera === 'Sí' && !(survey.carreraElegida || '').includes(';')) ? 'Carrera Elegida' : 'Carreras Contempladas'}
+                    {hasDecided ? 'Carrera Elegida' : 'Carreras Contempladas'}
                   </p>
                   <p className="text-sm font-bold text-emerald-900">{survey.carreraElegida || 'Sin especificar'}</p>
                 </div>
