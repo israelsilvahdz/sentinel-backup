@@ -15,7 +15,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, HelpCircle,
   AlertTriangle, Sparkles, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered,
   Landmark, FileJson, PlusCircle, Calendar as CalendarIcon, Briefcase,
-  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart
+  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart, ClipboardList
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -206,6 +206,7 @@ export function ContinuidadPanel() {
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
+          case 'pending-survey': return !local?.encuestaEleccionReciente;
           case 'indeciso': return !s.isInscribed && (local?.isIndeciso || !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si'));
           case 'career-no': return !s.isInscribed && !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
           case 'uni-no': return !s.isInscribed && !(survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
@@ -242,6 +243,7 @@ export function ContinuidadPanel() {
     let fakeInscribedCount = 0;
     let surveyCareerNo = 0;
     let surveyUniNo = 0;
+    let surveyPendingCount = 0;
 
     const careersSureCounts: Record<string, number> = {};
     const careersUnsureCounts: Record<string, number> = {};
@@ -251,6 +253,7 @@ export function ContinuidadPanel() {
       const local = localStatuses[s.id];
       const survey = local?.encuestaEleccionReciente;
 
+      if (!survey) surveyPendingCount++;
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
       // Analytics based ONLY on Non-Inscribed students as requested
@@ -331,7 +334,7 @@ export function ContinuidadPanel() {
       total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, 
       indecisosCount, sosCount, metaTmCount, fakeInscribedCount,
       surveyCareerNo, surveyUniNo, careerSureReport, careerUnsureReport, universityReport,
-      careerDecisionData, uniDecisionData
+      careerDecisionData, uniDecisionData, surveyPendingCount
     };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
 
@@ -417,10 +420,11 @@ export function ContinuidadPanel() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-10 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-11 gap-4">
         <KpiCard title="Universo" value={stats.total} icon={Users} onClick={() => handleKpiClick('all')} />
         <KpiCard title="Inscritos" value={stats.inscribed} icon={Target} color="green" onClick={() => handleKpiClick('inscribed')} />
         <KpiCard title="No Inscritos" value={stats.pending} icon={UserX} color="blue" onClick={() => handleKpiClick('pending')} />
+        <KpiCard title="Pend. Encuesta" value={stats.surveyPendingCount} icon={ClipboardList} color="default" onClick={() => handleKpiClick('pending-survey')} />
         <KpiCard title="Falsa Inscrip." value={stats.fakeInscribedCount} icon={FileWarning} color="red" onClick={() => handleKpiClick('fake')} />
         <KpiCard title="Urgente SOS" value={stats.sosCount} icon={AlertTriangle} color="red" onClick={() => handleKpiClick('sos')} />
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
