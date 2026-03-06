@@ -203,13 +203,18 @@ export function ContinuidadPanel() {
       list = list.filter(s => {
         const local = localStatuses[s.id];
         const survey = local?.encuestaEleccionReciente;
+        const yaEligioNormalizado = (survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        const yaEligioUniNormalizado = (survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
           case 'pending-survey': return !s.isInscribed && !local?.encuestaEleccionReciente;
-          case 'indeciso': return !s.isInscribed && (local?.isIndeciso || !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si'));
-          case 'career-no': return !s.isInscribed && !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
-          case 'uni-no': return !s.isInscribed && !(survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
+          case 'indeciso': 
+          case 'career-no': return !s.isInscribed && yaEligioNormalizado.includes('no');
+          case 'career-yes': return !s.isInscribed && yaEligioNormalizado.includes('si');
+          case 'uni-no': return !s.isInscribed && yaEligioUniNormalizado.includes('no');
+          case 'uni-yes': return !s.isInscribed && yaEligioUniNormalizado.includes('si');
           case 'sos': return !s.isInscribed && local?.vocationalDiagnosis && local.vocationalDiagnosis.urgencyLevel >= 8;
           case 'meta-tm': return !s.isInscribed && (survey?.universidadElegida || '').toLowerCase().includes('tecmilenio');
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
@@ -461,6 +466,7 @@ export function ContinuidadPanel() {
                         label={({ value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
                         onClick={(data) => {
                           if (data.name === 'Indecisos') handleKpiClick('career-no');
+                          else handleKpiClick('career-yes');
                         }}
                         className="cursor-pointer"
                       >
@@ -483,6 +489,7 @@ export function ContinuidadPanel() {
                         label={({ value, percent }) => `${value} (${(percent * 100).toFixed(0)}%)`}
                         onClick={(data) => {
                           if (data.name === 'Sin Decidir') handleKpiClick('uni-no');
+                          else handleKpiClick('uni-yes');
                         }}
                         className="cursor-pointer"
                       >
@@ -625,7 +632,7 @@ export function ContinuidadPanel() {
             </Select>
             {selectedKpi && (
               <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="text-destructive h-10">
-                <X className="mr-2 h-4 w-4" /> Limpiar: {selectedKpi.includes(':') ? selectedKpi.split(':')[1] : selectedKpi}
+                <X className="mr-2 h-4 w-4" /> Limpiar: {selectedKpi.includes(':') ? selectedKpi.split(':')[1] : (selectedKpi === 'career-yes' ? 'Decididos' : (selectedKpi === 'career-no' ? 'Indecisos' : selectedKpi))}
               </Button>
             )}
           </div>
