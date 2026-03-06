@@ -11,10 +11,10 @@ import { parseRiasecExcel } from '@/lib/riasecParser';
 import type { ContinuityStudent, ContinuityCatalog, ContinuityLocalStatus, VocationalDiagnosis, ContinuityTrackingInfo, CareerOption, CareerType, CareerChoiceSurvey } from '@/types/student';
 import { 
   Users, Target, AlertCircle, Search, Filter, 
-  TrendingUp, BookOpen, MessageSquare, PhoneCall, GraduationCap,
-  ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, Clock, HelpCircle,
-  Stethoscope, AlertTriangle, Lightbulb, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered, Sparkles,
-  Landmark, FileJson, PlusCircle, MinusCircle, Calendar as CalendarIcon, Briefcase,
+  TrendingUp, BookOpen, MessageSquare, 
+  ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, HelpCircle,
+  AlertTriangle, Sparkles, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered,
+  Landmark, FileJson, PlusCircle, Calendar as CalendarIcon, Briefcase,
   UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart
 } from 'lucide-react';
 import { Input } from '../ui/input';
@@ -27,12 +27,10 @@ import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell, PieChart as RePieChart, Pie, LabelList } from 'recharts';
 import { useDashboardFilters } from './DashboardClient';
-import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey, getContinuityLocalStatus } from '@/lib/firebase-services';
+import { getAllContinuityStatuses, updateContinuityIndeciso, updateContinuityWorkshopAttended, addContinuityComment, bulkUpdateContinuityVocational, bulkUpdateRiasecDiagnoses, updateContinuityTrackingInfo, getCareerCatalog, updateCareerCatalog, bulkUpdateCareerSurvey } from '@/lib/firebase-services';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Checkbox } from '../ui/checkbox';
 import { Textarea } from '../ui/textarea';
-import { RiasecChart } from './RiasecChart';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -246,7 +244,8 @@ export function ContinuidadPanel() {
     let surveyCareerNo = 0;
     let surveyUniNo = 0;
 
-    const careersCounts: Record<string, number> = {};
+    const careersSureCounts: Record<string, number> = {};
+    const careersUnsureCounts: Record<string, number> = {};
     const universitiesCounts: Record<string, number> = {};
 
     baseList.forEach(s => {
@@ -255,32 +254,39 @@ export function ContinuidadPanel() {
 
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
-      if (!s.isInscribed) {
-        const isMultipleCareers = (survey?.carreraElegida || '').includes(';');
-        const choseCareer = survey?.yaEligioCarrera?.toLowerCase() === 'si' && !isMultipleCareers;
+      if (!s.isInscribed && survey) {
+        const isMultipleCareers = (survey.carreraElegida || '').includes(';');
+        const choseCareer = survey.yaEligioCarrera?.toLowerCase() === 'si' && !isMultipleCareers;
 
         if (local?.isIndeciso || isMultipleCareers) indecisosCount++;
-        if (survey?.yaEligioCarrera?.toLowerCase() === 'no' || isMultipleCareers) surveyCareerNo++;
-        if (survey?.yaEligioUniversidad?.toLowerCase() === 'no') surveyUniNo++;
+        if (survey.yaEligioCarrera?.toLowerCase() === 'no' || isMultipleCareers) surveyCareerNo++;
+        if (survey.yaEligioUniversidad?.toLowerCase() === 'no') surveyUniNo++;
 
-        if (survey?.universidadElegida?.toLowerCase().includes('tecmilenio')) {
+        if (survey.universidadElegida?.toLowerCase().includes('tecmilenio')) {
           metaTmCount++;
         }
 
-        // Only count in Top Careers if they have a SINGLE career chosen
-        if (survey?.carreraElegida && choseCareer) {
+        // Sure Report: Single decision
+        if (survey.carreraElegida && choseCareer) {
           const c = survey.carreraElegida;
-          careersCounts[c] = (careersCounts[c] || 0) + 1;
+          careersSureCounts[c] = (careersSureCounts[c] || 0) + 1;
+        } 
+        
+        // Unsure Report: Multiple or contemplation
+        if (survey.carreraElegida && (isMultipleCareers || survey.yaEligioCarrera?.toLowerCase() === 'no')) {
+          const options = survey.carreraElegida.split(';').map(o => o.trim()).filter(Boolean);
+          options.forEach(o => {
+            careersUnsureCounts[o] = (careersUnsureCounts[o] || 0) + 1;
+          });
         }
-        if (survey?.universidadElegida) {
+
+        if (survey.universidadElegida) {
           const u = survey.universidadElegida;
           universitiesCounts[u] = (universitiesCounts[u] || 0) + 1;
         }
 
         const voc = local?.vocationalDiagnosis;
-        if (voc) {
-          if (voc.urgencyLevel >= 8) sosCount++;
-        }
+        if (voc && voc.urgencyLevel >= 8) sosCount++;
       }
     });
 
@@ -291,7 +297,12 @@ export function ContinuidadPanel() {
       return { name: adv, total: advStudents.length, inscribed: advStudents.filter(s => s.isInscribed).length };
     }).sort((a,b) => a.total - a.total);
 
-    const careerReport = Object.entries(careersCounts)
+    const careerSureReport = Object.entries(careersSureCounts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a,b) => b.value - a.value)
+      .slice(0, 10);
+
+    const careerUnsureReport = Object.entries(careersUnsureCounts)
       .map(([name, value]) => ({ name, value }))
       .sort((a,b) => b.value - a.value)
       .slice(0, 10);
@@ -314,7 +325,7 @@ export function ContinuidadPanel() {
     return { 
       total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, 
       indecisosCount, sosCount, metaTmCount, fakeInscribedCount,
-      surveyCareerNo, surveyUniNo, careerReport, universityReport,
+      surveyCareerNo, surveyUniNo, careerSureReport, careerUnsureReport, universityReport,
       careerDecisionData, uniDecisionData
     };
   }, [filteredByCycleStudents, advisors, statuses, localStatuses]);
@@ -487,18 +498,36 @@ export function ContinuidadPanel() {
               </CardContent>
             </Card>
 
-            <Card className="lg:col-span-2">
-              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras de Interés (Población No Inscrita)</CardTitle><CardDescription>Muestra solo alumnos con decisión única. Haz clic en una barra para ver a los alumnos interesados.</CardDescription></CardHeader>
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras Elegidas (Decisión Única)</CardTitle><CardDescription>Alumnos seguros de su elección.</CardDescription></CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.careerReport} margin={{ top: 20, bottom: 20 }}>
+                  <BarChart data={stats.careerSureReport} margin={{ top: 20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
                     <YAxis hide />
                     <Tooltip cursor={{ fill: 'transparent' }} />
                     <Bar dataKey="value" fill="#17594A" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
                       <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
-                      {stats.careerReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                      {stats.careerSureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-2"><ListOrdered className="h-5 w-5 text-orange-500" /><CardTitle>Top Carreras Contempladas (Indecisos)</CardTitle><CardDescription>Carreras en consideración por alumnos sin decisión única.</CardDescription></CardHeader>
+              <CardContent className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.careerUnsureReport} margin={{ top: 20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
+                    <YAxis hide />
+                    <Tooltip cursor={{ fill: 'transparent' }} />
+                    <Bar dataKey="value" fill="#F59E0B" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
+                      <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
+                      {stats.careerUnsureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -739,7 +768,7 @@ function ContinuityCard({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
             <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm", student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40")}>
-              {student.isInscribed ? <GraduationCap className="h-5 w-5" /> : student.id.substring(0, 2)}
+              {student.isInscribed ? <CapIcon className="h-5 w-5" /> : student.id.substring(0, 2)}
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">

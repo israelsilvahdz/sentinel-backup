@@ -153,7 +153,7 @@ export async function parseCareerChoiceSurvey(file: File): Promise<Record<string
         json.forEach(row => {
           const keys = Object.keys(row);
           const getVal = (exactName: string) => {
-            const foundKey = keys.find(k => k.trim() === exactName);
+            const foundKey = keys.find(k => k.trim().toLowerCase() === exactName.toLowerCase());
             return foundKey ? row[foundKey] : '';
           };
 
@@ -162,13 +162,25 @@ export async function parseCareerChoiceSurvey(file: File): Promise<Record<string
           if (!id) return;
 
           // Consolidated logic for career name
-          const carrera = getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_1) || 
-                          getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_2) || 
-                          getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_3);
+          // Check standard columns first, then look for "Otra" specified values
+          let carrera = getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_1) || 
+                        getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_2) || 
+                        getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_3);
+          
+          // If the value is "Otra", look for a text input column that might contain the specific name
+          if (String(carrera).toLowerCase() === 'otra') {
+            const otherCol = keys.find(k => k.toLowerCase().includes('especifica') || k.toLowerCase().includes('cual carrera'));
+            if (otherCol) carrera = row[otherCol];
+          }
 
           // Consolidated logic for university
-          const universidad = getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_1) || 
-                              getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_2);
+          let universidad = getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_1) || 
+                            getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_2);
+          
+          if (String(universidad).toLowerCase() === 'otra') {
+            const otherUniCol = keys.find(k => k.toLowerCase().includes('cual universidad'));
+            if (otherUniCol) universidad = row[otherUniCol];
+          }
 
           results[id] = {
             fechaRespuesta: String(getVal(CAREER_CHOICE_COLUMNS.TIME)),
