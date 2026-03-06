@@ -34,39 +34,9 @@ import { Checkbox } from '../ui/checkbox';
 import { Textarea } from '../ui/textarea';
 import { RiasecChart } from './RiasecChart';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { TooltipProvider, Tooltip as TooltipUI, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-
-const UNIVERSITY_OPTIONS = [
-  "TECMILENIO",
-  "UANL",
-  "TEC DE MONTERREY",
-  "UVM",
-  "UDEM",
-  "OTRA"
-];
-
-const DEFAULT_CAREER_CATALOG: CareerOption[] = [
-  { name: "Administración de Empresas", type: 'in-campus' },
-  { name: "Administración de Negocios Internacionales", type: 'in-campus' },
-  { name: "Comercio Internacional", type: 'in-campus' },
-  { name: "Derecho", type: 'in-campus' },
-  { name: "Psicología", type: 'in-campus' },
-  { name: "Mercadotecnia", type: 'in-campus' },
-  { name: "Diseño Gráfico", type: 'in-campus' },
-  { name: "Animación y Arte Digital", type: 'in-campus' },
-  { name: "Ingeniería Industrial y de Sistemas", type: 'in-campus' },
-  { name: "Ingeniería en Mecatrónica", type: 'in-campus' },
-  { name: "Ingeniería en Sistemas de Computación", type: 'in-campus' },
-  { name: "Gastronomía", type: 'in-campus' },
-  { name: "Nutrición", type: 'in-campus' },
-  { name: "Turismo", type: 'in-campus' },
-  { name: "Contaduría Pública", type: 'in-campus' },
-  { name: "Medicina", type: 'external' },
-  { name: "Arquitectura", type: 'external' },
-  { name: "Veterinaria", type: 'external' }
-].sort((a, b) => a.name.localeCompare(b.name));
 
 const COLORS = ['#17594A', '#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6'];
 
@@ -103,7 +73,7 @@ export function ContinuidadPanel() {
         getCareerCatalog()
       ]);
       setLocalStatuses(statuses);
-      setCareerCatalog(careers.length > 0 ? careers : DEFAULT_CAREER_CATALOG);
+      setCareerCatalog(careers.length > 0 ? careers : []);
     };
     loadData();
   }, []);
@@ -240,7 +210,7 @@ export function ContinuidadPanel() {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
           case 'indeciso': return !s.isInscribed && local?.isIndeciso;
-          case 'career-no': return !s.isInscribed && survey?.yaEligioCarrera?.toLowerCase() === 'no';
+          case 'career-no': return !s.isInscribed && (survey?.yaEligioCarrera?.toLowerCase() === 'no' || (survey?.carreraElegida || '').includes(';'));
           case 'uni-no': return !s.isInscribed && survey?.yaEligioUniversidad?.toLowerCase() === 'no';
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
           case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
@@ -286,11 +256,15 @@ export function ContinuidadPanel() {
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
       if (!s.isInscribed) {
-        if (local?.isIndeciso) indecisosCount++;
-        if (survey?.yaEligioCarrera?.toLowerCase() === 'no') surveyCareerNo++;
+        const isMultipleCareers = (survey?.carreraElegida || '').includes(';');
+        const choseCareer = survey?.yaEligioCarrera?.toLowerCase() === 'si' && !isMultipleCareers;
+
+        if (local?.isIndeciso || isMultipleCareers) indecisosCount++;
+        if (survey?.yaEligioCarrera?.toLowerCase() === 'no' || isMultipleCareers) surveyCareerNo++;
         if (survey?.yaEligioUniversidad?.toLowerCase() === 'no') surveyUniNo++;
 
-        if (survey?.carreraElegida) {
+        // Only count in Top Careers if they have a SINGLE career chosen
+        if (survey?.carreraElegida && choseCareer) {
           const c = survey.carreraElegida;
           careersCounts[c] = (careersCounts[c] || 0) + 1;
         }
@@ -511,7 +485,7 @@ export function ContinuidadPanel() {
             </Card>
 
             <Card className="lg:col-span-2">
-              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras de Interés (Población No Inscrita)</CardTitle><CardDescription>Haz clic en una barra para ver a los alumnos interesados.</CardDescription></CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /><CardTitle>Top Carreras de Interés (Población No Inscrita)</CardTitle><CardDescription>Muestra solo alumnos con decisión única. Haz clic en una barra para ver a los alumnos interesados.</CardDescription></CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.careerReport} margin={{ top: 20, bottom: 20 }}>
@@ -741,7 +715,7 @@ function ContinuityCard({
   const riasec = localStatus?.riasecDiagnosis;
   const survey = localStatus?.encuestaEleccionReciente;
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
-  const isIndeciso = !student.isInscribed && localStatus?.isIndeciso;
+  const isIndeciso = !student.isInscribed && (localStatus?.isIndeciso || (survey?.carreraElegida || '').includes(';'));
   const hasFalseInscribedAlert = localStatus?.alertaFalsaInscripcion;
   
   const universityRankingArray = useMemo(() => vocational?.universityRanking ? vocational.universityRanking.split(/[;,]/).filter(Boolean).map(u => u.trim()) : [], [vocational]);
@@ -823,7 +797,7 @@ function ContinuityCard({
               <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="space-y-1">
                   <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">
-                    {survey.yaEligioCarrera === 'Sí' ? 'Carrera Elegida' : 'Carreras Contempladas'}
+                    {(survey.yaEligioCarrera === 'Sí' && !(survey.carreraElegida || '').includes(';')) ? 'Carrera Elegida' : 'Carreras Contempladas'}
                   </p>
                   <p className="text-sm font-bold text-emerald-900">{survey.carreraElegida || 'Sin especificar'}</p>
                 </div>
