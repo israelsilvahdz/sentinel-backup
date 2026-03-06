@@ -626,16 +626,13 @@ export const bulkUpdateCareerSurvey = async (
       // 1. Declared Tecmilenio.
       // 2. Official status is NOT inscribed.
       // 3. AND the student EXPLICITLY declared they are already enrolled.
-      // 4. AND the stage is NOT "NINGUNO".
       const surveyStage = (survey.etapaProceso || '').toLowerCase().trim();
       const declaresEnrolledStrict = 
         surveyStage === 'declara inscrito' || 
         surveyStage === 'inscrito' || 
         surveyStage === 'inscrita';
-      
-      const isNoneStage = surveyStage === 'ninguno' || surveyStage === '';
 
-      if (isTecmilenio && !isOfficialInscribed && declaresEnrolledStrict && !isNoneStage) {
+      if (isTecmilenio && !isOfficialInscribed && declaresEnrolledStrict) {
         updateData.alertaFalsaInscripcion = true;
       } else {
         updateData.alertaFalsaInscripcion = false;

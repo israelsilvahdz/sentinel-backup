@@ -213,7 +213,7 @@ export function ContinuidadPanel() {
           case 'career-no': return !s.isInscribed && (survey?.yaEligioCarrera?.toLowerCase() === 'no' || (survey?.carreraElegida || '').includes(';'));
           case 'uni-no': return !s.isInscribed && survey?.yaEligioUniversidad?.toLowerCase() === 'no';
           case 'sos': return !s.isInscribed && voc && voc.urgencyLevel >= 8;
-          case 'taller': return !s.isInscribed && voc?.requiresWorkshop && !local?.workshopAttended;
+          case 'meta-tm': return !s.isInscribed && survey?.universidadElegida?.toLowerCase().includes('tecmilenio');
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
           case 'fake': return local?.alertaFalsaInscripcion;
           default: 
@@ -241,7 +241,7 @@ export function ContinuidadPanel() {
     
     let indecisosCount = 0;
     let sosCount = 0;
-    let tallerCount = 0;
+    let metaTmCount = 0;
     let fakeInscribedCount = 0;
     let surveyCareerNo = 0;
     let surveyUniNo = 0;
@@ -263,6 +263,10 @@ export function ContinuidadPanel() {
         if (survey?.yaEligioCarrera?.toLowerCase() === 'no' || isMultipleCareers) surveyCareerNo++;
         if (survey?.yaEligioUniversidad?.toLowerCase() === 'no') surveyUniNo++;
 
+        if (survey?.universidadElegida?.toLowerCase().includes('tecmilenio')) {
+          metaTmCount++;
+        }
+
         // Only count in Top Careers if they have a SINGLE career chosen
         if (survey?.carreraElegida && choseCareer) {
           const c = survey.carreraElegida;
@@ -276,7 +280,6 @@ export function ContinuidadPanel() {
         const voc = local?.vocationalDiagnosis;
         if (voc) {
           if (voc.urgencyLevel >= 8) sosCount++;
-          if (voc.requiresWorkshop && !local.workshopAttended) tallerCount++;
         }
       }
     });
@@ -310,7 +313,7 @@ export function ContinuidadPanel() {
 
     return { 
       total, inscribed, pending, talentRisk, statusDistribution, advisorProgress, 
-      indecisosCount, sosCount, tallerCount, fakeInscribedCount,
+      indecisosCount, sosCount, metaTmCount, fakeInscribedCount,
       surveyCareerNo, surveyUniNo, careerReport, universityReport,
       careerDecisionData, uniDecisionData
     };
@@ -407,7 +410,7 @@ export function ContinuidadPanel() {
         <KpiCard title="Indecisos" value={stats.indecisosCount} icon={HelpCircle} color="purple" onClick={() => handleKpiClick('indeciso')} />
         <KpiCard title="Sin Carrera" value={stats.surveyCareerNo} icon={Sparkles} color="purple" onClick={() => handleKpiClick('career-no')} />
         <KpiCard title="Sin Uni" value={stats.surveyUniNo} icon={Landmark} color="purple" onClick={() => handleKpiClick('uni-no')} />
-        <KpiCard title="Pend. Taller" value={stats.tallerCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('taller')} />
+        <KpiCard title="Meta TM (No Insc.)" value={stats.metaTmCount} icon={CapIcon} color="blue" onClick={() => handleKpiClick('meta-tm')} />
         <KpiCard title="Fuga Talento" value={stats.talentRisk} icon={AlertCircle} color="red" onClick={() => handleKpiClick('risk')} />
       </div>
 
