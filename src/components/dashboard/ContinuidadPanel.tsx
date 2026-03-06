@@ -206,7 +206,7 @@ export function ContinuidadPanel() {
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
-          case 'pending-survey': return !local?.encuestaEleccionReciente;
+          case 'pending-survey': return !s.isInscribed && !local?.encuestaEleccionReciente;
           case 'indeciso': return !s.isInscribed && (local?.isIndeciso || !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si'));
           case 'career-no': return !s.isInscribed && !(survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
           case 'uni-no': return !s.isInscribed && !(survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
@@ -253,7 +253,7 @@ export function ContinuidadPanel() {
       const local = localStatuses[s.id];
       const survey = local?.encuestaEleccionReciente;
 
-      if (!survey) surveyPendingCount++;
+      if (!s.isInscribed && !survey) surveyPendingCount++;
       if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
       // Analytics based ONLY on Non-Inscribed students as requested
