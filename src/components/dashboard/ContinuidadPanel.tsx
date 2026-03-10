@@ -21,7 +21,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -36,7 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { TooltipProvider, Tooltip as TooltipUI, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
-const COLORS = ['#17594A', '#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6'];
+const COLORS = ['#17594A', '#F59E0B', '#3B82F6', '#EF4444', '#8B5CF6', '#10B981', '#6366F1', '#EC4899'];
 
 export function ContinuidadPanel() {
   const { toast } = useToast();
@@ -392,144 +392,227 @@ export function ContinuidadPanel() {
       </div>
     `).join('');
 
-    const maxCareerSure = Math.max(...stats.careerSureReport.map(c => c.value), 1);
-    const careerSureBars = stats.careerSureReport.map(c => `
-      <div class="chart-row">
-        <div class="chart-label">${c.name}</div>
-        <div class="chart-bar-container">
-          <div class="chart-bar" style="width: ${(c.value / maxCareerSure) * 100}%; background-color: #17594A;"></div>
-          <span class="chart-value">${c.value}</span>
+    const careerDecPct = Math.round((stats.careerDecisionData[0].value / stats.surveyRespondersCount) * 100);
+    const uniDecPct = Math.round((stats.uniDecisionData[0].value / stats.surveyRespondersCount) * 100);
+
+    const generateBarRows = (data: {name: string, value: number}[], max: number, color: string, isVertical = false) => {
+      if (data.length === 0) return '<p class="empty-msg">No hay datos suficientes.</p>';
+      
+      if (isVertical) {
+        return `
+          <div class="vertical-bars-container">
+            ${data.map((item, i) => `
+              <div class="v-bar-wrapper">
+                <div class="v-bar-value">${item.value}</div>
+                <div class="v-bar" style="height: ${(item.value / max) * 100}%; background-color: ${COLORS[i % COLORS.length]};"></div>
+                <div class="v-bar-label">${item.name}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      return data.map(item => `
+        <div class="h-bar-row">
+          <div class="h-bar-label">${item.name}</div>
+          <div class="h-bar-container">
+            <div class="h-bar" style="width: ${(item.value / max) * 100}%; background-color: ${color};"></div>
+            <span class="h-bar-value">${item.value}</span>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `).join('');
+    };
 
     const maxUni = Math.max(...stats.universityReport.map(u => u.value), 1);
-    const uniBars = stats.universityReport.map(u => `
-      <div class="chart-row">
-        <div class="chart-label">${u.name}</div>
-        <div class="chart-bar-container">
-          <div class="chart-bar" style="width: ${(u.value / maxUni) * 100}%; background-color: #3b82f6;"></div>
-          <span class="chart-value">${u.value}</span>
-        </div>
-      </div>
-    `).join('');
+    const maxCareerSure = Math.max(...stats.careerSureReport.map(c => c.value), 1);
+    const maxCareerUnsure = Math.max(...stats.careerUnsureReport.map(c => c.value), 1);
 
     printWindow.document.write(`
       <html>
         <head>
-          <title>Reporte Ejecutivo Continuidad - ${selectedCycle}</title>
+          <title>Análisis Estratégico Continuidad - ${selectedCycle}</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
             body { 
               font-family: 'Inter', -apple-system, sans-serif; 
               color: #1e293b; 
-              line-height: 1.5; 
               padding: 40px; 
               background-color: #fff;
+              line-height: 1.4;
             }
             .no-print-btn {
               position: fixed; top: 20px; right: 20px;
-              padding: 10px 20px; background: #17594A; color: white;
-              border: none; border-radius: 8px; cursor: pointer; font-weight: bold;
-              z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+              padding: 12px 24px; background: #17594A; color: white;
+              border: none; border-radius: 12px; cursor: pointer; font-weight: 800;
+              z-index: 100; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+              text-transform: uppercase; letter-spacing: 0.05em;
             }
             .header { 
               display: flex; justify-content: space-between; align-items: center; 
-              border-bottom: 2px solid #e2e8f0; padding-bottom: 24px; margin-bottom: 40px; 
+              border-bottom: 2px solid #f1f5f9; padding-bottom: 30px; margin-bottom: 40px; 
             }
-            .header-info h1 { margin: 0; color: #17594A; font-size: 28px; font-weight: 900; letter-spacing: -0.025em; text-transform: uppercase; }
-            .header-info p { margin: 4px 0 0; color: #64748b; font-size: 14px; font-weight: 600; }
+            .header-info h1 { margin: 0; color: #17594A; font-size: 32px; font-weight: 900; letter-spacing: -0.04em; }
+            .header-info p { margin: 4px 0 0; color: #64748b; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
             
             .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 40px; }
-            .kpi-card { background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; }
-            .kpi-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; margin-bottom: 4px; }
-            .kpi-value { font-size: 24px; font-weight: 900; }
+            .kpi-card { background: #f8fafc; padding: 20px 10px; border-radius: 16px; border: 1px solid #e2e8f0; text-align: center; }
+            .kpi-label { font-size: 9px; font-weight: 900; text-transform: uppercase; color: #64748b; letter-spacing: 0.1em; margin-bottom: 8px; }
+            .kpi-value { font-size: 28px; font-weight: 900; }
 
-            h2 { color: #17594A; font-size: 18px; font-weight: 800; text-transform: uppercase; margin: 40px 0 20px; display: flex; align-items: center; gap: 8px; }
-            h2::before { content: ''; display: block; width: 4px; height: 24px; background: #17594A; border-radius: 2px; }
+            .analitica-grid { 
+              display: grid; 
+              grid-template-columns: 1fr 1fr; 
+              gap: 24px; 
+              margin-bottom: 40px;
+            }
+            .chart-card { 
+              background: #fff; border: 1px solid #f1f5f9; border-radius: 24px; padding: 24px; 
+              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            }
+            .chart-header { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid #f8fafc; padding-bottom: 12px; }
+            .chart-title { font-size: 13px; font-weight: 900; color: #334155; text-transform: uppercase; letter-spacing: 0.05em; }
+            .chart-subtitle { font-size: 10px; font-weight: 600; color: #94a3b8; }
 
-            .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
-            .chart-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; }
-            .chart-title { font-size: 14px; font-weight: 800; margin-bottom: 20px; color: #475569; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; }
-            
-            .chart-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
-            .chart-label { font-size: 11px; font-weight: 700; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .chart-bar-container { display: flex; align-items: center; gap: 10px; height: 12px; }
-            .chart-bar { height: 100%; border-radius: 6px; }
-            .chart-value { font-size: 11px; font-weight: 800; color: #64748b; }
+            /* Donut Styles */
+            .donuts-container { display: flex; justify-content: space-around; align-items: center; height: 180px; }
+            .donut-item { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 50%; }
+            .donut-label { font-size: 10px; font-weight: 900; color: #64748b; text-transform: uppercase; }
+            .donut-graphic { 
+              position: relative; width: 100px; height: 100px; border-radius: 50%; 
+              display: flex; align-items: center; justify-content: center;
+            }
+            .donut-inner { width: 70px; height: 70px; background: #fff; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+            .donut-pct { font-size: 18px; font-weight: 900; color: #17594A; }
+            .donut-val { font-size: 9px; font-weight: 700; color: #94a3b8; }
 
-            .data-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 20px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-            .data-table th { background: #f8fafc; color: #475569; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 12px 16px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-            .data-table td { padding: 12px 16px; font-size: 12px; border-bottom: 1px solid #f1f5f9; color: #334155; }
-            .data-table tr:last-child td { border-bottom: none; }
-            .data-table tr:nth-child(even) { background-color: #fcfcfd; }
-            
-            .badge { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; display: inline-block; }
+            /* Horizontal Bars */
+            .h-bar-row { margin-bottom: 10px; }
+            .h-bar-label { font-size: 10px; font-weight: 700; color: #475569; margin-bottom: 4px; }
+            .h-bar-container { display: flex; align-items: center; gap: 12px; }
+            .h-bar { height: 14px; border-radius: 7px; min-width: 2px; }
+            .h-bar-value { font-size: 10px; font-weight: 900; color: #64748b; }
+
+            /* Vertical Bars */
+            .vertical-bars-container { display: flex; align-items: flex-end; justify-content: space-between; height: 180px; padding-top: 20px; }
+            .v-bar-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; gap: 8px; }
+            .v-bar { width: 12px; border-radius: 6px 6px 0 0; min-height: 2px; }
+            .v-bar-value { font-size: 9px; font-weight: 900; color: #1e293b; }
+            .v-bar-label { font-size: 8px; font-weight: 700; color: #94a3b8; transform: rotate(-45deg); text-align: right; width: 40px; white-space: nowrap; margin-top: 10px; }
+
+            .data-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 40px; border: 1px solid #f1f5f9; border-radius: 20px; overflow: hidden; page-break-before: always; }
+            .data-table th { background: #f8fafc; color: #475569; font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 16px; text-align: left; }
+            .data-table td { padding: 14px 16px; font-size: 11px; border-bottom: 1px solid #f8fafc; color: #334155; }
+            .badge { padding: 4px 10px; border-radius: 8px; font-size: 9px; font-weight: 900; text-transform: uppercase; display: inline-block; background: #f1f5f9; color: #475569; }
             .badge-primary { background: #17594A15; color: #17594A; }
-            .badge-risk { background: #ef444415; color: #ef4444; }
+            .badge-risk { background: #ef4444; color: #fff; }
 
-            .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 10px; text-align: center; color: #94a3b8; font-weight: 600; }
+            .footer { margin-top: 60px; padding-top: 30px; border-top: 2px solid #f1f5f9; font-size: 10px; text-align: center; color: #cbd5e1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+            .empty-msg { font-size: 11px; color: #94a3b8; font-style: italic; text-align: center; padding: 40px 0; }
 
             @media print {
               .no-print-btn { display: none; }
               body { padding: 0; }
-              .chart-box { break-inside: avoid; }
+              .chart-card { break-inside: avoid; }
               .data-table { break-inside: auto; }
-              .data-table tr { break-inside: avoid; break-after: auto; }
+              .data-table tr { break-inside: avoid; }
             }
           </style>
         </head>
         <body>
-          <button class="no-print-btn" onclick="window.print()">Imprimir Reporte</button>
+          <button class="no-print-btn" onclick="window.print()">Descargar PDF</button>
           
           <div class="header">
             <div class="header-info">
-              <h1>Continuidad Académica</h1>
-              <p>Ciclo: ${selectedCycle} • Generado: ${format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}</p>
+              <h1>Resumen Analítico de Continuidad</h1>
+              <p>Ciclo Académico: ${selectedCycle} • Generado el ${format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}</p>
             </div>
-            <img src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" height="45" />
+            <img src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" height="40" />
           </div>
 
-          <h2>Resumen de Operación y Metas</h2>
           <div class="kpi-grid">${kpisHtml}</div>
 
-          <h2>Hallazgos de la Encuesta Reciente</h2>
-          <div class="section-grid">
-            <div class="chart-box">
-              <div class="chart-title">Top Carreras Elegidas (Decididos)</div>
-              ${careerSureBars || '<p style="font-size: 12px; color: #94a3b8; font-style: italic;">No hay datos suficientes.</p>'}
+          <div class="analitica-grid">
+            <!-- Donuts -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">Decisión de Carrera vs Universidad</div>
+              </div>
+              <div class="chart-subtitle" style="margin-bottom: 20px;">Población No Inscrita (${stats.surveyRespondersCount} encuestados)</div>
+              <div class="donuts-container">
+                <div class="donut-item">
+                  <div class="donut-label">Carrera</div>
+                  <div class="donut-graphic" style="background: conic-gradient(#17594A ${careerDecPct}%, #f59e0b 0);">
+                    <div class="donut-inner">
+                      <div class="donut-pct">${careerDecPct}%</div>
+                      <div class="donut-val">${stats.surveyRespondersCount - stats.surveyCareerNo} alumnos</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="donut-item">
+                  <div class="donut-label">Universidad</div>
+                  <div class="donut-graphic" style="background: conic-gradient(#17594A ${uniDecPct}%, #ef4444 0);">
+                    <div class="donut-inner">
+                      <div class="donut-pct">${uniDecPct}%</div>
+                      <div class="donut-val">${stats.surveyRespondersCount - stats.surveyUniNo} alumnos</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="chart-box">
-              <div class="chart-title">Top Universidades Competencia</div>
-              ${uniBars || '<p style="font-size: 12px; color: #94a3b8; font-style: italic;">No hay datos suficientes.</p>'}
+
+            <!-- Uni Horiz Bars -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">Top Universidades Destino (No Inscritos)</div>
+              </div>
+              <div style="margin-top: 10px;">
+                ${generateBarRows(stats.universityReport, maxUni, '#3b82f6')}
+              </div>
+            </div>
+
+            <!-- Career Vertical Bars (Sure) -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">Top Carreras Elegidas (Decisión Única)</div>
+              </div>
+              <div class="chart-subtitle">Alumnos con "Sí" en elección de carrera.</div>
+              ${generateBarRows(stats.careerSureReport, maxCareerSure, '', true)}
+            </div>
+
+            <!-- Career Vertical Bars (Unsure) -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">Top Carreras Contempladas (Indecisos)</div>
+              </div>
+              <div class="chart-subtitle">Alumnos con "No" en elección de carrera.</div>
+              ${generateBarRows(stats.careerUnsureReport, maxCareerUnsure, '', true)}
             </div>
           </div>
 
-          <h2 style="page-break-before: always;">Detalle de Alumnos Prioritarios (${filteredStudents.length})</h2>
           <table class="data-table">
             <thead>
               <tr>
-                <th>Matrícula</th>
-                <th>Nombre Completo</th>
+                <th>ID</th>
+                <th>Nombre del Prospecto</th>
                 <th>Carrera Declarada</th>
-                <th>Universidad</th>
-                <th>Etapa del Proceso</th>
+                <th>Universidad Destino</th>
+                <th>Etapa</th>
               </tr>
             </thead>
             <tbody>
               ${filteredStudents.map(s => {
                 const survey = localStatuses[s.id]?.encuestaEleccionReciente;
-                const isRisk = !s.isInscribed && (localStatuses[s.id]?.vocationalDiagnosis?.urgencyLevel || 0) >= 8;
+                const isSOS = !s.isInscribed && (localStatuses[s.id]?.vocationalDiagnosis?.urgencyLevel || 0) >= 8;
                 return `
                   <tr>
-                    <td style="font-family: monospace; font-weight: 700;">${s.id}</td>
-                    <td style="font-weight: 700;">
+                    <td style="font-family: monospace; font-weight: 700; color: #64748b;">${s.id}</td>
+                    <td style="font-weight: 800;">
                       ${s.name}
-                      ${isRisk ? '<span class="badge badge-risk" style="margin-left: 8px;">SOS</span>' : ''}
+                      ${isSOS ? '<span class="badge badge-risk" style="margin-left: 8px;">SOS</span>' : ''}
                     </td>
                     <td><span class="badge badge-primary">${survey?.carreraElegida || 'N/D'}</span></td>
-                    <td style="font-weight: 600;">${survey?.universidadElegida || 'N/D'}</td>
-                    <td style="color: #64748b; font-weight: 600;">${survey?.etapaProceso || 'N/D'}</td>
+                    <td style="font-weight: 700;">${survey?.universidadElegida || 'N/D'}</td>
+                    <td style="font-weight: 600; color: #64748b;">${survey?.etapaProceso || 'N/D'}</td>
                   </tr>
                 `;
               }).join('')}
@@ -537,7 +620,7 @@ export function ContinuidadPanel() {
           </table>
 
           <div class="footer">
-            Sentinel Academic 2026 • Universidad Tecmilenio • Confidencial para fines administrativos
+            Sentinel Academic Intelligence • Estrategia de Retención y Cierre • Universidad Tecmilenio
           </div>
         </body>
       </html>
@@ -569,7 +652,7 @@ export function ContinuidadPanel() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Select value={selectedCycle} onValueChange={setSelectedCycle}>
-            <SelectTrigger className="w-[180px] bg-primary text-white border-none font-bold rounded-xl">
+            <SelectTrigger className="w-[180px] bg-primary text-white border-none font-bold rounded-xl shadow-lg">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Ciclo" />
             </SelectTrigger>
@@ -580,7 +663,7 @@ export function ContinuidadPanel() {
             </SelectContent>
           </Select>
           
-          <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5 rounded-xl" onClick={handlePrintReport}>
+          <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5 rounded-xl shadow-sm" onClick={handlePrintReport}>
             <FileText className="h-4 w-4" /> Generar Reporte PDF
           </Button>
 
@@ -614,24 +697,24 @@ export function ContinuidadPanel() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="stats"><BarChart3 className="mr-2 h-4 w-4" /> Analíticos</TabsTrigger>
-          <TabsTrigger value="list"><Filter className="mr-2 h-4 w-4" /> Base Operativa</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-white/50 backdrop-blur-sm border rounded-2xl shadow-sm mb-8">
+          <TabsTrigger value="stats" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all"><BarChart3 className="mr-2 h-4 w-4" /> Analíticos</TabsTrigger>
+          <TabsTrigger value="list" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all"><Filter className="mr-2 h-4 w-4" /> Base Operativa</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stats" className="space-y-6 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
+            <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm rounded-3xl overflow-hidden">
+              <CardHeader className="flex flex-row items-center gap-2 border-b border-muted/50 pb-4">
                 <PieChart className="h-5 w-5 text-primary" />
                 <div className="flex flex-col">
-                  <CardTitle>Decisión de Carrera vs Universidad</CardTitle>
-                  <CardDescription>Población No Inscrita ({stats.surveyRespondersCount} encuestados)</CardDescription>
+                  <CardTitle className="text-base font-black">Decisión de Carrera vs Universidad</CardTitle>
+                  <CardDescription className="text-[10px] uppercase tracking-widest font-bold opacity-60">Población No Inscrita ({stats.surveyRespondersCount} encuestados)</CardDescription>
                 </div>
               </CardHeader>
-              <CardContent className="h-[300px] flex gap-4">
+              <CardContent className="h-[300px] flex gap-4 pt-6">
                 <div className="flex-1 flex flex-col items-center">
-                  <p className="text-[10px] font-black uppercase opacity-60 mb-2">Carrera</p>
+                  <p className="text-[9px] font-black uppercase opacity-40 mb-2 tracking-tighter">Carrera</p>
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie 
@@ -649,12 +732,12 @@ export function ContinuidadPanel() {
                       >
                         {stats.careerDecisionData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#17594A' : '#F59E0B'} />)}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
                     </RePieChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="flex-1 flex flex-col items-center">
-                  <p className="text-[10px] font-black uppercase opacity-60 mb-2">Universidad</p>
+                  <p className="text-[9px] font-black uppercase opacity-40 mb-2 tracking-tighter">Universidad</p>
                   <ResponsiveContainer width="100%" height="100%">
                     <RePieChart>
                       <Pie 
@@ -672,26 +755,26 @@ export function ContinuidadPanel() {
                       >
                         {stats.uniDecisionData.map((entry, index) => <Cell key={`cell-${index}`} fill={index === 0 ? '#17594A' : '#EF4444'} />)}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
                     </RePieChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
+            <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm rounded-3xl overflow-hidden">
+              <CardHeader className="flex flex-row items-center gap-2 border-b border-muted/50 pb-4">
                 <Globe className="h-5 w-5 text-primary" />
-                <CardTitle>Top Universidades Destino (No Inscritos)</CardTitle>
+                <CardTitle className="text-base font-black">Top Universidades Destino (No Inscritos)</CardTitle>
               </CardHeader>
-              <CardContent className="h-[300px]">
+              <CardContent className="h-[300px] pt-6">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.universityReport} layout="vertical" margin={{ left: 100, right: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} strokeOpacity={0.1} />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} />
-                    <Tooltip cursor={{ fill: 'transparent' }} />
-                    <Bar dataKey="value" fill="#3B82F6" radius={[0, 4, 4, 0]} onClick={(data) => handleKpiClick(`uni:${data.name}`)} className="cursor-pointer">
+                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }} contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                    <Bar dataKey="value" fill="#3B82F6" radius={[0, 10, 10, 0]} onClick={(data) => handleKpiClick(`uni:${data.name}`)} className="cursor-pointer" barSize={16}>
                       <LabelList dataKey="value" position="right" className="fill-foreground font-black text-[10px]" />
                     </Bar>
                   </BarChart>
@@ -699,21 +782,23 @@ export function ContinuidadPanel() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
+            <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm rounded-3xl overflow-hidden">
+              <CardHeader className="flex flex-row items-center gap-2 border-b border-muted/50 pb-4">
                 <BookOpen className="h-5 w-5 text-primary" />
-                <CardTitle>Top Carreras Elegidas (Decisión Única)</CardTitle>
-                <CardDescription>Alumnos No Inscritos con "Sí" en elección de carrera.</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle className="text-base font-black">Top Carreras Elegidas (Decisión Única)</CardTitle>
+                  <CardDescription className="text-[10px] uppercase tracking-widest font-bold opacity-60">Alumnos No Inscritos con "Sí" en elección de carrera.</CardDescription>
+                </div>
               </CardHeader>
-              <CardContent className="h-[350px]">
+              <CardContent className="h-[350px] pt-6">
                 {stats.careerSureReport.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={stats.careerSureReport} margin={{ top: 20, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                      <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 'bold' }} angle={-45} textAnchor="end" height={80} interval={0} axisLine={false} tickLine={false} />
                       <YAxis hide />
-                      <Tooltip cursor={{ fill: 'transparent' }} />
-                      <Bar dataKey="value" fill="#17594A" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
+                      <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                      <Bar dataKey="value" fill="#17594A" radius={[10, 10, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer" barSize={30}>
                         <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
                         {stats.careerSureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                       </Bar>
@@ -725,54 +810,25 @@ export function ContinuidadPanel() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center gap-2">
+            <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm rounded-3xl overflow-hidden">
+              <CardHeader className="flex flex-row items-center gap-2 border-b border-muted/50 pb-4">
                 <ListOrdered className="h-5 w-5 text-orange-500" />
-                <CardTitle>Top Carreras Contempladas (Indecisos)</CardTitle>
-                <CardDescription>Alumnos No Inscritos con "No" en elección de carrera.</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle className="text-base font-black">Top Carreras Contempladas (Indecisos)</CardTitle>
+                  <CardDescription className="text-[10px] uppercase tracking-widest font-bold opacity-60">Alumnos No Inscritos con "No" en elección de carrera.</CardDescription>
+                </div>
               </CardHeader>
-              <CardContent className="h-[350px]">
+              <CardContent className="h-[350px] pt-6">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.careerUnsureReport} margin={{ top: 20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} interval={0} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                    <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 'bold' }} angle={-45} textAnchor="end" height={80} interval={0} axisLine={false} tickLine={false} />
                     <YAxis hide />
-                    <Tooltip cursor={{ fill: 'transparent' }} />
-                    <Bar dataKey="value" fill="#F59E0B" radius={[4, 4, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer">
+                    <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                    <Bar dataKey="value" fill="#F59E0B" radius={[10, 10, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer" barSize={30}>
                       <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
                       {stats.careerUnsureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Avance por Asesor</CardTitle></CardHeader>
-              <CardContent className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.advisorProgress} layout="vertical" margin={{ left: 100 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="inscribed" name="Inscritos" fill="hsl(var(--primary))" stackId="a" />
-                    <Bar dataKey="total" name="No Inscritos" fill="hsl(var(--muted))" stackId="a" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Distribución por Estatus Oficial</CardTitle></CardHeader>
-              <CardContent className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.statusDistribution}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={80} />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -875,7 +931,7 @@ function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[]
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5 rounded-xl">
+        <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5 rounded-xl shadow-sm">
           <Briefcase className="h-4 w-4" /> Gestionar Carreras
         </Button>
       </DialogTrigger>
@@ -977,16 +1033,16 @@ function ContinuityCard({
 
   return (
     <TooltipProvider>
-    <Card className={cn("transition-all border-l-4", student.isInscribed ? "border-l-green-500" : "border-l-muted", (isHighValueRisk || isSOS || hasFalseInscribedAlert) && "ring-2 ring-red-500/50", isIndeciso && "border-l-purple-500 bg-purple-50/5")}>
+    <Card className={cn("transition-all border-l-4 shadow-sm hover:shadow-md rounded-2xl overflow-hidden", student.isInscribed ? "border-l-green-500" : "border-l-muted", (isHighValueRisk || isSOS || hasFalseInscribedAlert) && "ring-2 ring-red-500/50", isIndeciso && "border-l-purple-500 bg-purple-50/5")}>
       <div className="p-4 flex flex-col cursor-pointer hover:bg-muted/5" onClick={onToggle}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
-            <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm", student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40")}>
+            <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-inner", student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40")}>
               {student.isInscribed ? <CapIcon className="h-5 w-5" /> : student.id.substring(0, 2)}
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base">
+                <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base tracking-tight">
                   {student.name}
                   {hasFalseInscribedAlert && (
                     <TooltipUI>
@@ -1028,13 +1084,13 @@ function ContinuityCard({
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Badge variant="outline" className="hidden lg:inline-flex">{student.status}</Badge>
-            {isExpanded ? <ChevronUp /> : <ChevronDown />}
+            <Badge variant="outline" className="hidden lg:inline-flex rounded-lg border-muted-foreground/20 text-muted-foreground">{student.status}</Badge>
+            {isExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
           </div>
         </div>
       </div>
       {isExpanded && (
-        <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2">
+        <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
           {survey && (
             <div className="space-y-3">
               <Label className="text-xs uppercase font-black text-emerald-700 flex items-center gap-2">
@@ -1076,9 +1132,9 @@ function ContinuityCard({
                 <div className="space-y-3">{localStatus?.comments?.length ? [...localStatus.comments].reverse().map(c => <div key={c.id} className="bg-background p-3 rounded-lg border shadow-sm text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold text-primary">{c.author}</span><span className="text-[10px] text-muted-foreground">{format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}</span></div><p className="whitespace-pre-wrap">{c.text}</p></div>) : <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios.</p>}</div>
               </ScrollArea>
               <div className="space-y-3 bg-background p-4 rounded-xl border">
-                <Select value={author} onValueChange={setAuthor}><SelectTrigger className="h-8 text-xs"><SelectValue placeholder="¿Quién firma?" /></SelectTrigger><SelectContent>{signatoryOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent></Select>
-                <Textarea value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Detalles de la interacción..." className="min-h-[100px] text-sm resize-none" />
-                <div className="flex justify-end"><Button size="sm" onClick={() => { if (!author || !commentText.trim()) return; onAddComment(student.id, commentText, author); setCommentText(''); }} disabled={!commentText.trim() || !author}><Send className="h-4 w-4 mr-2" /> Guardar Nota</Button></div>
+                <Select value={author} onValueChange={setAuthor}><SelectTrigger className="h-8 text-xs rounded-lg"><SelectValue placeholder="¿Quién firma?" /></SelectTrigger><SelectContent className="rounded-xl">{signatoryOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent></Select>
+                <Textarea value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Detalles de la interacción..." className="min-h-[100px] text-sm rounded-xl resize-none" />
+                <div className="flex justify-end"><Button size="sm" className="rounded-xl font-bold" onClick={() => { if (!author || !commentText.trim()) return; onAddComment(student.id, commentText, author); setCommentText(''); }} disabled={!commentText.trim() || !author}><Send className="h-4 w-4 mr-2" /> Guardar Nota</Button></div>
               </div>
             </div>
           </div>
@@ -1112,7 +1168,7 @@ function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string, 
   return (
     <Card 
       className={cn(
-        "relative overflow-hidden group transition-all duration-500 border border-transparent bg-gradient-to-br shadow-sm",
+        "relative overflow-hidden group transition-all duration-500 border border-transparent bg-gradient-to-br shadow-sm rounded-2xl",
         themeClass,
         onClick && "cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 hover:border-current/20"
       )}
@@ -1126,7 +1182,7 @@ function KpiCard({ title, value, icon: Icon, color, onClick }: { title: string, 
         <CardTitle className="text-[9px] font-black uppercase tracking-[0.15em] opacity-70 leading-none">
           {title}
         </CardTitle>
-        <div className={cn("p-2 rounded-xl transition-all duration-500 group-hover:scale-110", iconClass)}>
+        <div className={cn("p-2 rounded-xl transition-all duration-500 group-hover:scale-110 shadow-inner", iconClass)}>
           <Icon className="h-4 w-4" />
         </div>
       </CardHeader>
