@@ -618,7 +618,6 @@ export const bulkUpdateCareerSurvey = async (
       const updateData: any = {
         encuestaEleccionReciente: survey,
         lastSurveyUpdate: Timestamp.now(),
-        // Update Indeciso based strictly on choice
         isIndeciso: !choseCareer
       };
 
@@ -626,11 +625,13 @@ export const bulkUpdateCareerSurvey = async (
       // Only trigger if:
       // 1. Declared Tecmilenio.
       // 2. Official status is NOT inscribed.
-      // 3. AND the student EXPLICITLY declared they are already enrolled.
+      // 3. AND the student EXPLICITLY declared they are already enrolled ("inscrito" or "inscrita").
+      // 4. AND stage is NOT "ninguno" or "informes".
       const surveyStage = (survey.etapaProceso || '').toLowerCase().trim();
-      const declaresEnrolledStrict = surveyStage.includes('inscrit');
+      const declaresEnrolledStrict = surveyStage === 'inscrito' || surveyStage === 'inscrita' || surveyStage === 'declara inscrito';
+      const isLowInterestStage = surveyStage.includes('ninguno') || surveyStage.includes('informes');
 
-      if (isTecmilenio && !isOfficialInscribed && declaresEnrolledStrict) {
+      if (isTecmilenio && !isOfficialInscribed && declaresEnrolledStrict && !isLowInterestStage) {
         updateData.alertaFalsaInscripcion = true;
       } else {
         updateData.alertaFalsaInscripcion = false;

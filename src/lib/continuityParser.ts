@@ -1,3 +1,4 @@
+
 import * as XLSX from 'xlsx';
 import type { ContinuityStudent, ContinuityCatalog, CareerChoiceSurvey } from '@/types/student';
 
@@ -162,12 +163,10 @@ export async function parseCareerChoiceSurvey(file: File): Promise<Record<string
           if (!id) return;
 
           // Consolidated logic for career name
-          // Check standard columns first, then look for "Otra" specified values
           let carrera = getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_1) || 
                         getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_2) || 
                         getVal(CAREER_CHOICE_COLUMNS.CARRERA_OPCION_3);
           
-          // If the value is "Otra", look for a text input column that might contain the specific name
           if (String(carrera).toLowerCase() === 'otra') {
             const otherCol = keys.find(k => k.toLowerCase().includes('especifica') || k.toLowerCase().includes('cual carrera'));
             if (otherCol) carrera = row[otherCol];
@@ -177,8 +176,8 @@ export async function parseCareerChoiceSurvey(file: File): Promise<Record<string
           let universidad = getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_1) || 
                             getVal(CAREER_CHOICE_COLUMNS.UNIVERSIDAD_2);
           
-          if (String(universidad).toLowerCase() === 'otra') {
-            const otherUniCol = keys.find(k => k.toLowerCase().includes('cual universidad'));
+          if (String(universidad).toLowerCase().includes('otra')) {
+            const otherUniCol = keys.find(k => k.toLowerCase().includes('especifica') || k.toLowerCase().includes('cual universidad'));
             if (otherUniCol) universidad = row[otherUniCol];
           }
 

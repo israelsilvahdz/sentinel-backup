@@ -121,7 +121,8 @@ const LOCAL_STORAGE_KEYS = {
     CURRENT_FILE_NAME: 'academic_sentinel_current_file_name',
     DATA_KEY: 'academic_sentinel_data_key',
     CONTINUITY_STUDENTS: 'academic_sentinel_continuity_students',
-    CONTINUITY_CATALOG: 'academic_sentinel_continuity_catalog'
+    CONTINUITY_CATALOG: 'academic_sentinel_continuity_catalog',
+    ACTIVE_VIEW: 'academic_sentinel_active_view'
 };
 
 
@@ -237,6 +238,9 @@ export function DashboardClient() {
           const storedFileName = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME);
           if (storedFileName) setCurrentFileName(storedFileName);
 
+          const storedActiveView = localStorage.getItem(LOCAL_STORAGE_KEYS.ACTIVE_VIEW);
+          if (storedActiveView) setActiveView(storedActiveView as ActiveView);
+
           const storedKey = localStorage.getItem(LOCAL_STORAGE_KEYS.DATA_KEY);
           if (storedKey) {
               setDataKey(storedKey);
@@ -253,7 +257,6 @@ export function DashboardClient() {
               if (storedOferta) {
                   try {
                       const decrypted = xorCipher(storedOferta, storedKey);
-                      setAllStudents(allStudents); // This is just to trigger re-renders if needed, but the actual logic was above
                       setOfertaAcademica(JSON.parse(decrypted));
                   } catch (e) {
                       console.error("Fallo al desencriptar oferta:", e);
@@ -320,6 +323,7 @@ export function DashboardClient() {
             localStorage.setItem(LOCAL_STORAGE_KEYS.DATA_KEY, dataKey);
         }
         localStorage.setItem(LOCAL_STORAGE_KEYS.PLAN_TYPE, planType);
+        localStorage.setItem(LOCAL_STORAGE_KEYS.ACTIVE_VIEW, activeView);
         if (currentFileName) {
             localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME, currentFileName);
         }
@@ -327,7 +331,7 @@ export function DashboardClient() {
     } catch(error) {
         console.error("Error saving data to Local Storage", error);
     }
-  }, [allStudents, planType, ofertaAcademica, dataKey, currentFileName, continuityStudents, continuityCatalog]);
+  }, [allStudents, planType, ofertaAcademica, dataKey, currentFileName, continuityStudents, continuityCatalog, activeView]);
 
 
   const handleSetFilterType = (type: FilterType) => {
@@ -448,6 +452,7 @@ export function DashboardClient() {
       setContinuityStudents([]);
       setContinuityCatalog(null);
       setDataKey(null);
+      setActiveView('welcome');
 
       toast({ title: 'Datos Locales Eliminados', description: 'Los datos guardados en el navegador han sido borrados. Los datos en la nube permanecen.' });
     } catch (error) {
@@ -608,7 +613,7 @@ export function DashboardClient() {
     };
   }, [currentFileName, planType]);
 
-  const contextValue: DashboardContextType = {
+  const contextValue: DashboardContextType = useMemo(() => ({
     filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, weightingSchemes, fetchWeightingSchemes,
     isLoading: isLoading || isProcessing,
     hasData: allStudents.length > 0,
@@ -628,7 +633,9 @@ export function DashboardClient() {
     continuityStudents, setContinuityStudents,
     continuityCatalog, setContinuityCatalog,
     toast,
-  };
+  }), [
+    filteredStudents, allStudents, allStudentsMap, latestComparison, studentContacts, professorContacts, teams, teamTasks, weightingSchemes, isLoading, isProcessing, leaders, tutors, subjects, professors, groups, filterType, selectedValue, groupId, caseType, subjectRiskFilter, contextualStudentIds, activeView, planType, ofertaAcademica, continuityStudents, continuityCatalog, toast, fetchStudentContact, fetchTeams, fetchTeamTasks, fetchWeightingSchemes
+  ]);
 
   const renderActiveView = () => {
     switch (activeView) {
