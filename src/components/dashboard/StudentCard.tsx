@@ -109,6 +109,18 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
     return (parts[0]?.charAt(0) || '') + (parts[1]?.charAt(0) || '');
   }, [student.name]);
 
+  const formatWhatsAppNumber = (phone: string): string => {
+    if (!phone) return '';
+    const trimmed = phone.trim();
+    // If it starts with +, it's an international number with LADA already
+    if (trimmed.startsWith('+')) {
+        return trimmed.replace(/\D/g, '');
+    }
+    // Default: local number, apply Mexican LADA (52)
+    const clean = trimmed.replace(/\D/g, '');
+    return `52${clean.slice(-10)}`;
+  };
+
   const generateMessage = (recipient: 'student' | 'parent'): string => {
         const increaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
         const decreaseChangesBySubject: Record<string, { absences: boolean, missed: boolean }> = {};
@@ -218,9 +230,8 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
                 return;
             }
 
-            const cleanNumber = phoneNumber.replace(/\D/g, '');
-            const finalPhoneNumber = `52${cleanNumber.slice(-10)}`;
-            const whatsappUrl = `https://wa.me/${finalPhoneNumber}?text=${encodeURIComponent(message)}`;
+            const formattedNumber = formatWhatsAppNumber(phoneNumber);
+            const whatsappUrl = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;
             
             window.open(whatsappUrl, '_blank');
             
@@ -287,9 +298,8 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
             ].join('\n\n');
 
 
-            const cleanParentPhone = parentPhone.replace(/\D/g, '');
-            const finalParentPhone = `52${cleanParentPhone.slice(-10)}`;
-            const whatsappUrl = `https://wa.me/${finalParentPhone}?text=${encodeURIComponent(reportMessage)}`;
+            const formattedParentPhone = formatWhatsAppNumber(parentPhone);
+            const whatsappUrl = `https://wa.me/${formattedParentPhone}?text=${encodeURIComponent(reportMessage)}`;
 
             window.open(whatsappUrl, '_blank');
             toast({ title: "WhatsApp Abierto", description: "Se ha abierto WhatsApp con el reporte detallado." });
