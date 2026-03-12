@@ -16,7 +16,7 @@ import {
   AlertTriangle, Sparkles, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered,
   Landmark, FileJson, PlusCircle, Calendar as CalendarIcon, Briefcase,
   UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart, ClipboardList, Printer, FileText,
-  Building2, GraduationCap, MapPin, Star
+  Building2, GraduationCap, MapPin, Star, Smartphone
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -201,13 +201,17 @@ export function ContinuidadPanel() {
     });
 
     if (selectedKpi) {
+      // Bloqueo estricto: Si hay un filtro analítico activo, solo mostramos alumnos NO inscritos
+      // (A menos que el filtro sea precisamente el de inscritos oficiales)
+      if (selectedKpi !== 'inscribed') {
+        list = list.filter(s => !s.isInscribed);
+      }
+
       list = list.filter(s => {
         const local = localStatuses[s.id];
         const survey = local?.encuestaEleccionReciente;
         const yaEligioNormalizado = (survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
         const yaEligioUniNormalizado = (survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-
-        if (selectedKpi !== 'inscribed' && s.isInscribed) return false;
 
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
@@ -379,6 +383,90 @@ export function ContinuidadPanel() {
   const handleJumpToStudent = (studentId: string) => {
     setContextualStudentIds(new Set([studentId]));
     setActiveView('students');
+  };
+
+  const handlePrintFilteredList = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const titleInfo = getKpiTitle();
+    const listTitle = titleInfo ? `${titleInfo.type}: ${titleInfo.value}` : 'Lista Operativa de Continuidad';
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${listTitle}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+            body { 
+              font-family: 'Inter', -apple-system, sans-serif; 
+              color: #1e293b; padding: 40px; background-color: #fff;
+            }
+            .header { border-bottom: 2px solid #17594A; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+            .header h1 { margin: 0; color: #17594A; font-size: 24px; font-weight: 900; }
+            .header p { margin: 5px 0 0; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+            
+            .student-list { display: grid; grid-template-columns: 1fr; gap: 15px; }
+            .student-card { 
+              border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; 
+              display: flex; justify-content: space-between; align-items: center;
+              page-break-inside: avoid;
+            }
+            .student-info { flex: 1; }
+            .student-name { font-size: 14px; font-weight: 800; color: #1e293b; margin-bottom: 4px; }
+            .student-meta { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+            .student-data { text-align: right; }
+            .badge { 
+              display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 800; 
+              text-transform: uppercase; margin-left: 8px;
+            }
+            .badge-primary { background: #17594A15; color: #17594A; }
+            .badge-secondary { background: #3b82f615; color: #3b82f6; }
+            .badge-sos { background: #ef4444; color: #fff; }
+            
+            .no-print-btn {
+              position: fixed; top: 20px; right: 20px;
+              padding: 10px 20px; background: #17594A; color: white;
+              border: none; border-radius: 8px; cursor: pointer; font-weight: 800;
+              z-index: 100;
+            }
+            @media print { .no-print-btn { display: none; } body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <button class="no-print-btn" onclick="window.print()">Imprimir / PDF</button>
+          <div class="header">
+            <div>
+              <h1>${listTitle}</h1>
+              <p>Ciclo: ${selectedCycle} • Total: ${filteredStudents.length} alumnos</p>
+            </div>
+            <img src="https://edukapp.com.mx/Vistas/img/ImgLogo/tecmilenio_Logo.png" height="30" />
+          </div>
+          <div class="student-list">
+            ${filteredStudents.map(s => {
+              const survey = localStatuses[s.id]?.encuestaEleccionReciente;
+              const isSOS = !s.isInscribed && (localStatuses[s.id]?.vocationalDiagnosis?.urgencyLevel || 0) >= 8;
+              return `
+                <div class="student-card">
+                  <div class="student-info">
+                    <div class="student-name">
+                      ${s.name}
+                      ${isSOS ? '<span class="badge badge-sos">SOS</span>' : ''}
+                    </div>
+                    <div class="student-meta">${s.id} • ${s.advisor} • GPO: ${s.group || 'N/D'}</div>
+                  </div>
+                  <div class="student-data">
+                    <span class="badge badge-primary">${survey?.carreraElegida || 'Sin Carrera'}</span>
+                    <span class="badge badge-secondary">${survey?.universidadElegida || 'Sin Uni'}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handlePrintReport = () => {
@@ -699,7 +787,11 @@ export function ContinuidadPanel() {
           </Select>
           
           <Button variant="outline" className="gap-2 font-bold border-primary text-primary hover:bg-primary/5 rounded-xl shadow-sm" onClick={handlePrintReport}>
-            <FileText className="h-4 w-4" /> Generar Reporte PDF
+            <BarChart3 className="h-4 w-4" /> Reporte Analítico PDF
+          </Button>
+
+          <Button variant="secondary" className="gap-2 font-bold rounded-xl shadow-sm" onClick={handlePrintFilteredList}>
+            <Printer className="h-4 w-4" /> Imprimir Lista Operativa
           </Button>
 
           <CareerManagementDialog 
@@ -711,7 +803,7 @@ export function ContinuidadPanel() {
           />
 
           <FileUpload onFileSelect={handleRiasecUpload} selectedFile={null} isLoading={isProcessingRiasec} variant="outline" label="Cargar RIASEC" icon={<FileJson className="h-4 w-4" />} />
-          <FileUpload onFileSelect={handleSurveyUpload} selectedFile={null} isLoading={isProcessingSurvey} variant="secondary" label="Cargar Encuesta Reciente" icon={<MessageSquare className="h-4 w-4" />} />
+          <FileUpload onFileSelect={handleSurveyUpload} selectedFile={null} isLoading={isProcessingSurvey} variant="outline" label="Cargar Encuesta Reciente" icon={<MessageSquare className="h-4 w-4" />} />
           <FileUpload onFileSelect={handleVocationalUpload} selectedFile={null} isLoading={isProcessingVoc} variant="outline" label="Cargar Diagnóstico (Excel)" icon={<History className="h-4 w-4" />} />
           <FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} variant="default" label="Cargar Base Maestra" />
         </div>
@@ -1022,7 +1114,7 @@ function CareerManagementDialog({ catalog, onUpdate }: { catalog: CareerOption[]
         <ScrollArea className="flex-1 pr-4 py-4">
           <div className="space-y-2">
             {localCatalog.map(c => (
-              <div key={c.name} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-transparent hover:border-primary/10 transition-all">
+              <div key={c.name} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl border border-transparent border-primary/10 transition-all">
                 <span className="font-bold text-sm flex-1">{c.name}</span>
                 <div className="flex items-center gap-2">
                   <Select value={c.type} onValueChange={(v: any) => handleTypeChange(c.name, v)}>
