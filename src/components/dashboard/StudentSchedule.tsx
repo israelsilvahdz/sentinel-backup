@@ -6,13 +6,13 @@ import { type Subject, type ProfessorContact } from '@/types/student';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Copy, Mail, Clock, Users, Link as LinkIcon, Check, Info, User as UserIcon, BookOpen, GraduationCap } from 'lucide-react';
+import { Copy, Mail, Clock, Users, Link as LinkIcon, Check, Info, User as UserIcon, BookOpen, GraduationCap, Calendar, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
-import { Calendar } from '../ui/calendar';
+import { Calendar as CalendarPicker } from '../ui/calendar';
 import { Checkbox } from '../ui/checkbox';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -22,7 +22,6 @@ import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { Switch } from '../ui/switch';
 import { useDashboardFilters } from './DashboardClient';
-
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -50,7 +49,6 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
 
 const ONLINE_SUBJECTS = ['Ciencias de la Vida', 'El mundo contemporáneo'];
 
-
 const TIME_SLOTS_TETRA = [
     { start: '07:00', end: '08:59' },
     { start: '09:00', end: '10:59' },
@@ -67,11 +65,29 @@ const TIME_SLOTS_SEMESTRAL = [
     { start: '12:30', end: '13:29' },
 ];
 
+const SUBJECT_COLORS = [
+  { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', accent: 'bg-blue-500', icon: 'text-blue-400', dayAccent: 'bg-blue-400' },
+  { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', accent: 'bg-emerald-500', icon: 'text-emerald-400', dayAccent: 'bg-emerald-400' },
+  { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', accent: 'bg-orange-500', icon: 'text-orange-400', dayAccent: 'bg-orange-400' },
+  { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', accent: 'bg-purple-500', icon: 'text-purple-400', dayAccent: 'bg-purple-400' },
+  { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', accent: 'bg-amber-500', icon: 'text-amber-400', dayAccent: 'bg-amber-400' },
+  { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', accent: 'bg-rose-500', icon: 'text-rose-400', dayAccent: 'bg-rose-400' },
+  { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', accent: 'bg-indigo-500', icon: 'text-indigo-400', dayAccent: 'bg-indigo-400' },
+];
+
+function getSubjectColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % SUBJECT_COLORS.length;
+  return SUBJECT_COLORS[index];
+}
+
 function isSubjectInSlot(subject: Subject, slot: { start: string, end: string }, planType: 'semestral' | 'tetramestral'): boolean {
     if (!subject.schedule?.startTime) return false;
     return subject.schedule.startTime === slot.start;
 }
-
 
 export function StudentSchedule({ subjects, studentName, planType, professorContacts }: StudentScheduleProps) {
   const { toast } = useToast();
@@ -122,9 +138,7 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
         );
         setAffectedClasses(classesOnAffectedDays);
         
-        if (isPartialAbsence) {
-            // Wait for selection
-        } else {
+        if (!isPartialAbsence) {
             const uniqueTeachers = new Map<string, {name: string, email: string | null}>();
             classesOnAffectedDays.forEach(subject => {
                  if (!uniqueTeachers.has(subject.professorName!)) {
@@ -134,7 +148,6 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
             });
             setTeachersToNotify(Array.from(uniqueTeachers.values()));
         }
-
     } else {
         setTeachersToNotify([]);
         setAffectedClasses([]);
@@ -156,7 +169,6 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
     }
   }, [isPartialAbsence, selectedClasses, affectedClasses, getProfessorEmail]);
 
-
   const scheduleByDayAndSlot = useMemo(() => {
     const grid: Record<string, (Subject | null)[]> = {};
 
@@ -177,7 +189,6 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
     if (thu9amSubject) {
         const tue9amIndex = TIME_SLOTS.findIndex(slot => slot.start === '09:00');
         const tue10amIndex = TIME_SLOTS.findIndex(slot => slot.start === '10:00');
-        
         if (tue9amIndex !== -1) grid['MAR'][tue9amIndex] = thu9amSubject;
         if (tue10amIndex !== -1) grid['MAR'][tue10amIndex] = thu9amSubject;
     }
@@ -185,7 +196,6 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
     return grid;
   }, [subjects, TIME_SLOTS, planType]);
 
-  
   const handleCopyTeachersForDay = (day: string) => {
      const teachersForDay: string[] = [];
      scheduleByDayAndSlot[day].forEach(subject => {
@@ -241,7 +251,6 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
     return `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
-
   const handleCopyToClipboard = () => {
     const link = generateMailtoLink();
     if (link) {
@@ -253,72 +262,72 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
 
   return (
     <TooltipProvider>
-      <div className="p-2 sm:p-6 bg-white/50 backdrop-blur-sm rounded-3xl border border-primary/5 shadow-inner space-y-8 animate-in fade-in duration-700">
-           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="p-4 sm:p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-200/60 shadow-inner space-y-10 animate-in fade-in duration-700">
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2">
              <div className="space-y-1">
-                <h3 className="text-xl font-black text-primary tracking-tight">Agenda Semestral</h3>
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest opacity-60 flex items-center gap-2">
-                    <Clock className="h-3 w-3" /> Distribución de bloques académicos
+                <h3 className="text-2xl font-black text-primary tracking-tight">Planificador de Agenda</h3>
+                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-60 flex items-center gap-2">
+                    <Calendar className="h-3 w-3" /> Distribución Semanal de Bloques
                 </p>
              </div>
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button className="rounded-xl font-black shadow-lg shadow-primary/20 h-11 px-8 hover:scale-[1.02] active:scale-95 transition-all">
-                        <Mail className="mr-2 h-4 w-4" />
+                    <Button className="rounded-2xl font-black shadow-xl shadow-primary/20 h-12 px-8 hover:scale-[1.02] active:scale-95 transition-all">
+                        <Mail className="mr-2 h-5 w-5" />
                         Notificar Profesores
                     </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent className="sm:max-w-4xl rounded-3xl border-none shadow-2xl">
+                <AlertDialogContent className="sm:max-w-4xl rounded-[2.5rem] border-none shadow-2xl p-8">
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-2xl font-black">Central de Notificaciones</AlertDialogTitle>
+                    <AlertDialogTitle className="text-3xl font-black text-primary">Central de Notificaciones</AlertDialogTitle>
                     <AlertDialogDescription className="text-xs uppercase font-black tracking-widest opacity-60">
                       Envío masivo de avisos de ausencia para {studentName}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <ScrollArea className="max-h-[60vh] pr-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-6">
+                  <ScrollArea className="max-h-[60vh] pr-6 -mr-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10 py-6">
                         <div className="flex flex-col items-center md:col-span-1">
-                           <Label className="mb-4 text-xs font-black uppercase tracking-tighter opacity-70">1. Rango de Fechas</Label>
-                           <Calendar
+                           <Label className="mb-4 text-[10px] font-black uppercase tracking-widest opacity-70">1. Rango de Fechas</Label>
+                           <CalendarPicker
                               mode="range"
                               selected={dateRange}
                               onSelect={setDateRange}
                               locale={es}
                               numberOfMonths={1}
-                              className="rounded-2xl border bg-muted/20"
+                              className="rounded-3xl border bg-white shadow-sm p-4"
                           />
                         </div>
 
                         <div className="space-y-8 md:col-span-2">
                           <div className="grid grid-cols-2 gap-4">
-                            <div className="flex items-center space-x-3 bg-muted/30 p-3 rounded-xl border border-dashed">
-                                <Checkbox id="future-notice" checked={isFutureNotice} onCheckedChange={(checked) => setIsFutureNotice(!!checked)} />
-                                <Label htmlFor="future-notice" className="text-xs font-bold cursor-pointer">Aviso preventivo</Label>
+                            <div className="flex items-center space-x-3 bg-white p-4 rounded-2xl border border-dashed border-primary/20 shadow-sm">
+                                <Checkbox id="future-notice" checked={isFutureNotice} onCheckedChange={(checked) => setIsFutureNotice(!!checked)} className="h-5 w-5 rounded-lg" />
+                                <Label htmlFor="future-notice" className="text-xs font-black uppercase opacity-70 cursor-pointer">Aviso preventivo</Label>
                             </div>
-                             <div className="flex items-center space-x-3 bg-muted/30 p-3 rounded-xl border border-dashed">
-                                <Checkbox id="has-proof" checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} />
-                                <Label htmlFor="has-proof" className="text-xs font-bold cursor-pointer">Con comprobante</Label>
+                             <div className="flex items-center space-x-3 bg-white p-4 rounded-2xl border border-dashed border-primary/20 shadow-sm">
+                                <Checkbox id="has-proof" checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} className="h-5 w-5 rounded-lg" />
+                                <Label htmlFor="has-proof" className="text-xs font-black uppercase opacity-70 cursor-pointer">Con comprobante</Label>
                             </div>
                           </div>
 
                           <div>
-                            <Label className="text-xs font-black uppercase tracking-tighter opacity-70 mb-3 block">2. Motivo de la Notificación</Label>
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-4 block">2. Motivo de la Notificación</Label>
                             <RadioGroup
                                 defaultValue="Ausencia"
                                 onValueChange={(value) => setNotificationReason(value)}
                                 value={notificationReason}
-                                className="grid grid-cols-2 gap-3"
+                                className="grid grid-cols-2 sm:grid-cols-3 gap-3"
                             >
                                 {['Ausencia', 'Enfermedad', 'Cita Médica', 'Asunto Familiar', 'Salida de Difusión', 'Otro'].map(reason => (
-                                    <div key={reason} className="flex items-center space-x-2 bg-white border p-3 rounded-xl shadow-sm hover:border-primary/30 transition-colors cursor-pointer">
-                                        <RadioGroupItem value={reason} id={`reason-${reason}`} />
-                                        <Label htmlFor={`reason-${reason}`} className="text-xs font-bold cursor-pointer">{reason}</Label>
+                                    <div key={reason} className="flex items-center space-x-2 bg-white border p-3 rounded-xl shadow-sm hover:border-primary/30 transition-all cursor-pointer group/radio">
+                                        <RadioGroupItem value={reason} id={`reason-${reason}`} className="h-4 w-4 border-2" />
+                                        <Label htmlFor={`reason-${reason}`} className="text-xs font-bold cursor-pointer group-hover/radio:text-primary transition-colors">{reason}</Label>
                                     </div>
                                 ))}
                             </RadioGroup>
                           </div>
                           
-                           <div className="flex items-center space-x-3 bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                           <div className="flex items-center space-x-4 bg-primary/5 p-5 rounded-3xl border border-primary/10 shadow-inner">
                               <Switch id="partial-absence" checked={isPartialAbsence} onCheckedChange={(v) => { setIsPartialAbsence(v); if(!v) setSelectedClasses(new Set()); }} />
                               <Label htmlFor="partial-absence" className="text-sm font-black text-primary cursor-pointer flex items-center gap-2">
                                 <LinkIcon className="h-4 w-4" /> ¿Es ausencia parcializada por clase?
@@ -327,15 +336,15 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
 
                            {isPartialAbsence && (
                              <div className="space-y-3">
-                               <Label className="text-xs font-black uppercase opacity-60">Clases afectadas</Label>
-                               <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-2">
+                               <Label className="text-[10px] font-black uppercase opacity-60 tracking-widest">Clases afectadas</Label>
+                               <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                  {affectedClasses.map(c => (
-                                   <div key={c.id} className="flex items-center justify-between bg-white p-3 rounded-xl border shadow-sm">
-                                      <div className="flex items-center space-x-3">
-                                        <Checkbox id={`class-${c.id}`} checked={selectedClasses.has(c.id)} onCheckedChange={() => setSelectedClasses(prev => { const next = new Set(prev); if (next.has(c.id)) next.delete(c.id); else next.add(c.id); return next; })} />
-                                        <Label htmlFor={`class-${c.id}`} className="text-xs font-bold cursor-pointer">{c.name}</Label>
+                                   <div key={c.id} className="flex items-center justify-between bg-white p-4 rounded-2xl border shadow-sm hover:shadow-md transition-all group/clase">
+                                      <div className="flex items-center space-x-4">
+                                        <Checkbox id={`class-${c.id}`} checked={selectedClasses.has(c.id)} onCheckedChange={() => setSelectedClasses(prev => { const next = new Set(prev); if (next.has(c.id)) next.delete(c.id); else next.add(c.id); return next; })} className="h-5 w-5 rounded-lg" />
+                                        <Label htmlFor={`class-${c.id}`} className="text-sm font-bold cursor-pointer group-hover/clase:text-primary transition-colors">{c.name}</Label>
                                       </div>
-                                      <Badge variant="secondary" className="text-[10px] font-mono">{c.schedule?.startTime}</Badge>
+                                      <Badge variant="secondary" className="text-[10px] font-mono h-6 bg-primary/5 text-primary border-none">{c.schedule?.startTime}</Badge>
                                    </div>
                                  ))}
                                </div>
@@ -343,85 +352,114 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                            )}
 
                           <div className="space-y-3">
-                            <Label htmlFor="custom-notes" className="text-xs font-black uppercase opacity-60">3. Notas Estratégicas</Label>
-                             <Textarea id="custom-notes" placeholder="Detalles para los profesores..." value={customNotes} onChange={(e) => setCustomNotes(e.target.value)} className="rounded-2xl resize-none" />
+                            <Label htmlFor="custom-notes" className="text-[10px] font-black uppercase opacity-60 tracking-widest">3. Notas Estratégicas</Label>
+                             <Textarea id="custom-notes" placeholder="Detalles específicos para los profesores..." value={customNotes} onChange={(e) => setCustomNotes(e.target.value)} className="rounded-2xl resize-none min-h-[100px] border-slate-200 focus:ring-primary/20" />
                           </div>
+                          
                           <div className="space-y-3">
-                              <Label className="text-xs font-black uppercase opacity-60 flex items-center gap-2"><Users className="h-3 w-3"/>Destinatarios Detectados ({teachersToNotify.length})</Label>
-                              <div className="bg-muted/30 p-4 rounded-2xl border border-dashed flex flex-wrap gap-2">
+                              <Label className="text-[10px] font-black uppercase opacity-60 tracking-widest flex items-center gap-2">
+                                <Users className="h-3 w-3"/>Destinatarios Detectados ({teachersToNotify.length})
+                              </Label>
+                              <div className="bg-slate-50 p-5 rounded-3xl border-2 border-dashed border-slate-200 flex flex-wrap gap-2">
                                  {teachersToNotify.length > 0 ? teachersToNotify.map(t => (
-                                    <Badge key={t.name} variant="outline" className={cn("bg-white border-primary/10 text-[10px] font-bold py-1", !t.email && "border-destructive/30 text-destructive")}>
-                                        {t.name} {!t.email && " (Sin Email)"}
+                                    <Badge key={t.name} variant="outline" className={cn("bg-white border-slate-200 text-[10px] font-black uppercase tracking-tighter py-1.5 px-3 rounded-lg shadow-sm", !t.email && "border-destructive/30 text-destructive bg-destructive/5")}>
+                                        {t.name} {!t.email && " (SIN EMAIL)"}
                                     </Badge>
-                                 )) : <p className="text-xs text-muted-foreground italic w-full text-center py-2">Define fechas para detectar profesores.</p>}
+                                 )) : <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest w-full text-center py-4 opacity-40">Define fechas para detectar profesores automáticamente</p>}
                               </div>
                           </div>
                         </div>
                     </div>
                   </ScrollArea>
-                  <AlertDialogFooter className="pt-6 border-t gap-2">
-                    <AlertDialogCancel className="rounded-xl font-bold">Cerrar</AlertDialogCancel>
-                    <Button variant="outline" onClick={handleCopyToClipboard} className="rounded-xl font-bold h-11"><Copy className="mr-2 h-4 w-4"/>Copiar Enlace</Button>
-                    <Button onClick={() => { const link = generateMailtoLink(); if (link) window.location.href = link; }} className="rounded-xl font-black h-11 px-8 shadow-xl shadow-primary/20"><Mail className="mr-2 h-4 w-4" />Abrir Correo</Button>
+                  <AlertDialogFooter className="pt-8 border-t gap-3 flex flex-col sm:flex-row">
+                    <AlertDialogCancel className="rounded-2xl font-black h-12 uppercase tracking-widest text-[10px]">Cerrar</AlertDialogCancel>
+                    <Button variant="outline" onClick={handleCopyToClipboard} className="rounded-2xl font-black h-12 uppercase tracking-widest text-[10px] border-primary/20 text-primary hover:bg-primary/5">
+                      <Copy className="mr-2 h-4 w-4"/>Copiar Enlace
+                    </Button>
+                    <Button onClick={() => { const link = generateMailtoLink(); if (link) window.location.href = link; }} className="rounded-2xl font-black h-12 uppercase tracking-widest text-[10px] px-8 shadow-xl shadow-primary/20">
+                      <Mail className="mr-2 h-4 w-4" />Abrir Correo Corporativo
+                    </Button>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
            </div>
            
-            <div className="overflow-x-auto pb-4 -mx-2 sm:mx-0">
-                <div className="grid grid-cols-6 gap-4 min-w-[800px]">
+            <div className="overflow-x-auto pb-6 -mx-2 sm:mx-0">
+                <div className="grid grid-cols-[80px_repeat(5,1fr)] gap-6 min-w-[900px] relative">
+                    {/* Time Column vertical line */}
+                    <div className="absolute left-[40px] top-[100px] bottom-[20px] w-px bg-slate-200/60 z-0" />
+                    
                     <div />
-                     {DAYS.map(day => (
-                        <div key={day} className="bg-white/80 p-4 rounded-2xl shadow-sm border border-primary/5 flex items-center justify-between group/day">
-                            <span className="font-black text-primary text-sm tracking-tight">{DAY_MAP[day]}</span>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg opacity-0 group-hover/day:opacity-100 transition-all hover:bg-primary/10 text-primary" onClick={() => handleCopyTeachersForDay(day)}>
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="font-bold">Copiar Profesores</TooltipContent>
-                            </Tooltip>
-                        </div>
-                    ))}
+                     {DAYS.map(day => {
+                        const firstSubjectInDay = Object.values(scheduleByDayAndSlot[day]).find(s => s !== null);
+                        const dayColor = firstSubjectInDay ? getSubjectColor(firstSubjectInDay.name) : { dayAccent: 'bg-slate-300' };
+                        return (
+                          <div key={day} className="space-y-3 group/day">
+                              <div className={cn("h-1.5 w-full rounded-full opacity-40 group-hover/day:opacity-100 transition-opacity", dayColor.dayAccent)} />
+                              <div className="bg-transparent px-2 flex items-center justify-between">
+                                  <span className="font-black text-primary text-sm tracking-widest uppercase">{day}</span>
+                                  <Tooltip>
+                                      <TooltipTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg opacity-0 group-hover/day:opacity-100 transition-all hover:bg-primary/5 text-primary/40 hover:text-primary" onClick={() => handleCopyTeachersForDay(day)}>
+                                              <Copy className="h-3.5 w-3.5" />
+                                          </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="font-bold">Copiar Profesores</TooltipContent>
+                                  </Tooltip>
+                              </div>
+                          </div>
+                        )
+                    })}
 
                     {TIME_SLOTS.map((slot, slotIndex) => (
                         <React.Fragment key={slot.start}>
-                            <div className="flex items-center justify-center pr-2">
-                                 <Badge variant="outline" className="bg-white shadow-sm border-primary/10 text-primary font-mono text-[11px] h-8 px-3 rounded-xl flex items-center gap-2">
+                            <div className="flex flex-col items-center justify-center pt-2 relative z-10">
+                                 <div className="h-3 w-3 rounded-full bg-white border-2 border-slate-300 mb-2 shadow-sm" />
+                                 <Badge variant="outline" className="bg-white shadow-md border-none text-primary font-black text-[11px] h-9 px-3 rounded-xl flex items-center gap-2 tabular-nums">
                                     <Clock className="h-3 w-3 opacity-40" />
                                     {slot.start}
                                 </Badge>
                             </div>
                             {DAYS.map(day => {
                                 const subject = scheduleByDayAndSlot[day][slotIndex];
-                                if (!subject) return <div key={`${day}-${slot.start}`} className="min-h-[100px] rounded-2xl border border-dashed border-muted-foreground/10" />;
+                                if (!subject) return <div key={`${day}-${slot.start}`} className="min-h-[120px] rounded-[2rem] border border-dashed border-slate-200/60 bg-slate-100/20" />;
+                                
+                                const color = getSubjectColor(subject.name);
                                 
                                 return (
-                                    <Card key={`${day}-${slot.start}`} className="relative min-h-[100px] rounded-2xl border-none shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden group/card bg-white">
-                                        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary/20 group-hover/card:bg-primary transition-colors" />
-                                        <div className="p-4 space-y-3">
-                                            <h4 className="font-black text-[13px] leading-tight text-foreground tracking-tight group-hover/card:text-primary transition-colors">
+                                    <Card 
+                                      key={`${day}-${slot.start}`} 
+                                      className={cn(
+                                        "relative min-h-[120px] rounded-[2rem] border-none shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden group/card cursor-default transform hover:-translate-y-1 active:scale-95",
+                                        color.bg
+                                      )}
+                                    >
+                                        <div className={cn("absolute left-0 top-0 bottom-0 w-2 transition-all duration-500 group-hover/card:w-3", color.accent)} />
+                                        <div className="p-5 space-y-4">
+                                            <h4 className={cn("font-black text-[13px] leading-tight tracking-tight uppercase transition-colors duration-500", color.text)}>
                                                 {subject.name}
                                             </h4>
                                             
-                                            <div className="space-y-1.5">
+                                            <div className="space-y-2">
                                                 {subject.professorName && (
-                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground group-hover/card:text-foreground transition-colors">
-                                                        <UserIcon className="h-3 w-3 text-primary/40" />
+                                                    <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-tighter opacity-60 group-hover/card:opacity-100 transition-opacity">
+                                                        <UserIcon className={cn("h-3.5 w-3.5", color.icon)} />
                                                         <button 
-                                                            className="hover:underline hover:text-primary truncate max-w-[100px] text-left"
-                                                            onClick={() => handleProfessorClick(subject.professorName!)}
+                                                            className="hover:underline hover:text-primary truncate max-w-[120px] text-left"
+                                                            onClick={(e) => { e.stopPropagation(); handleProfessorClick(subject.professorName!); }}
                                                         >
                                                             {subject.professorName}
                                                         </button>
                                                     </div>
                                                 )}
-                                                <div className="flex items-center gap-2 text-[10px] font-black text-muted-foreground/50 uppercase tracking-tighter">
-                                                    <BookOpen className="h-3 w-3" />
-                                                    Grupo: {subject.group}
+                                                <div className="flex items-center gap-2.5 text-[10px] font-black opacity-40 uppercase tracking-[0.1em] group-hover/card:opacity-80 transition-opacity">
+                                                    <BookOpen className={cn("h-3.5 w-3.5", color.icon)} />
+                                                    GRUPO: {subject.group}
                                                 </div>
                                             </div>
+                                        </div>
+                                        <div className="absolute right-[-10px] bottom-[-10px] opacity-5 group-hover/card:opacity-10 transition-opacity transform group-hover/card:rotate-12 duration-700">
+                                          <Zap size={60} className={color.text} />
                                         </div>
                                     </Card>
                                 );
@@ -429,6 +467,22 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                         </React.Fragment>
                     ))}
                 </div>
+            </div>
+            
+            <div className="px-4 py-6 bg-white/40 rounded-3xl border border-white/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-primary/10 rounded-2xl">
+                  <Info className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-xs font-bold text-muted-foreground leading-relaxed">
+                  Las materias de <span className="text-primary">Tecmilenio</span> se organizan automáticamente para maximizar tu productividad.
+                  <br className="hidden sm:block" />
+                  Usa el botón de notificaciones para gestionar avisos masivos a tus profesores.
+                </div>
+              </div>
+              <Badge variant="outline" className="rounded-xl border-primary/20 text-primary font-black px-4 py-1 bg-white">
+                Ciclo Académico 2026
+              </Badge>
             </div>
       </div>
     </TooltipProvider>
