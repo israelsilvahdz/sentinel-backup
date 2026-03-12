@@ -42,7 +42,7 @@ import {
   Loader2, PlusCircle, Trash2, ClipboardList, ShieldCheck, 
   AlertCircle, Filter, Calendar, CheckCircle2, Clock, PlayCircle, LogIn, Sparkles,
   ChevronDown, ChevronUp, MessageSquare, Send, Edit3, User, ArrowUp, ArrowDown, History, GripVertical, UserCog, ListFilter,
-  Link2, Zap
+  Link2, Zap, Briefcase, Search, X, GraduationCap, Power, PowerOff
 } from 'lucide-react';
 import { StudentSearchPopover } from './BitacoraPanel';
 import { format, isToday } from 'date-fns';
@@ -51,6 +51,7 @@ import { cn } from '@/lib/utils';
 import { Timestamp } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
+import { Switch } from '../ui/switch';
 
 const PRIORITY_MAP: Record<TaskPriority, { label: string, color: string, weight: number }> = {
   urgent: { label: 'Urgente', color: 'bg-red-600 text-white', weight: 4 },
@@ -66,7 +67,7 @@ const STATUS_MAP: Record<TaskStatus, { label: string, icon: React.ReactNode, col
 };
 
 export function TeamWorkPanel() {
-  const { leaders, tutors } = useDashboardFilters();
+  const { leaders, tutors, setActiveView, setContextualStudentIds } = useDashboardFilters();
   const [currentTeam, setCurrentWorkTeam] = useState<WorkTeam | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [tasks, setTasks] = useState<WorkTask[]>([]);
@@ -74,7 +75,7 @@ export function TeamWorkPanel() {
   const [authCode, setAuthCode] = useState('');
   
   // View Control
-  const [activeTab, setActiveTab] = useState<'pending' | 'route'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'cases' | 'route'>('pending');
   
   // Dialog States
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -82,8 +83,8 @@ export function TeamWorkPanel() {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
   
-  // Drag and Drop state
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  // Search
+  const [studentSearch, setStudentSearch] = useState('');
 
   // Filters
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
@@ -96,6 +97,7 @@ export function TeamWorkPanel() {
     priority: TaskPriority, 
     linkedStudents: { id: string, name: string }[],
     dueDate: string,
+    isCase: boolean,
     parentId?: string,
     parentTitle?: string
   }>({
@@ -103,7 +105,8 @@ export function TeamWorkPanel() {
     description: '',
     priority: 'medium',
     linkedStudents: [],
-    dueDate: ''
+    dueDate: '',
+    isCase: false
   });
 
   const { toast } = useToast();
@@ -214,6 +217,8 @@ export function TeamWorkPanel() {
         priority: taskForm.priority,
         linkedStudents: taskForm.linkedStudents,
         dueDate: parsedDueDate,
+        isCase: taskForm.isCase,
+        isCaseActive: taskForm.isCase ? true : undefined,
         parentId: taskForm.parentId || null,
         parentTitle: taskForm.parentTitle || null
       };
@@ -242,7 +247,7 @@ export function TeamWorkPanel() {
   };
 
   const resetForm = () => {
-    setTaskForm({ title: '', description: '', priority: 'medium', linkedStudents: [], dueDate: '', parentId: undefined, parentTitle: '' });
+    setTaskForm({ title: '', description: '', priority: 'medium', linkedStudents: [], dueDate: '', isCase: false, parentId: undefined, parentTitle: '' });
     setEditingTask(null);
   };
 
@@ -254,6 +259,7 @@ export function TeamWorkPanel() {
       priority: task.priority,
       linkedStudents: task.linkedStudents,
       dueDate: task.dueDate ? format(task.dueDate.toDate(), 'yyyy-MM-dd') : '',
+      isCase: !!task.isCase,
       parentId: task.parentId,
       parentTitle: task.parentTitle
     });
@@ -268,6 +274,7 @@ export function TeamWorkPanel() {
       priority: parentTask.priority,
       linkedStudents: parentTask.linkedStudents,
       dueDate: '',
+      isCase: false,
       parentId: parentTask.id,
       parentTitle: parentTask.title
     });
@@ -289,6 +296,32 @@ export function TeamWorkPanel() {
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error al actualizar estado' });
     }
+  };
+
+  const handleToggleCase = async (taskId: string, isCase: boolean) => {
+    try {
+      const updates: any = { isCase, isCaseActive: isCase ? true : null };
+      await updateWorkTask(taskId, updates);
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+      toast({ title: isCase ? 'Marcado como Caso' : 'Regresado a Pendientes' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error al actualizar' });
+    }
+  };
+
+  const handleToggleCaseActive = async (taskId: string, isCaseActive: boolean) => {
+    try {
+      await updateWorkTask(taskId, { isCaseActive });
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, isCaseActive } : t));
+      toast({ title: isCaseActive ? 'Caso activado' : 'Caso inactivado' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error al actualizar' });
+    }
+  };
+
+  const handleGoToStudent = (studentId: string) => {
+    setContextualStudentIds(new Set([studentId]));
+    setActiveView('students');
   };
 
   const routeTasks = useMemo(() => {
@@ -389,12 +422,14 @@ export function TeamWorkPanel() {
     });
   };
 
-  const pendingTabTasks = useMemo(() => {
-    return tasks
+  const applyBaseFilters = (list: WorkTask[]) => {
+    return list
       .filter(t => {
-        if (statusFilter === 'all' && !t.parentId) return t.status !== 'done';
-        if (statusFilter === 'all' && t.parentId) return false;
-        return t.status === statusFilter;
+        if (!studentSearch) return true;
+        return t.linkedStudents.some(s => 
+          s.name.toLowerCase().includes(studentSearch.toLowerCase()) || 
+          s.id.toLowerCase().includes(studentSearch.toLowerCase())
+        );
       })
       .filter(t => (priorityFilter === 'all' || t.priority === priorityFilter))
       .sort((a, b) => {
@@ -402,7 +437,21 @@ export function TeamWorkPanel() {
         if (priorityDiff !== 0) return priorityDiff;
         return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
       });
-  }, [tasks, priorityFilter, statusFilter]);
+  };
+
+  const pendingTabTasks = useMemo(() => {
+    const list = tasks.filter(t => {
+      if (statusFilter === 'all' && !t.parentId) return t.status !== 'done' && !t.isCase;
+      if (statusFilter === 'all' && t.parentId) return false;
+      return t.status === statusFilter && !t.isCase;
+    });
+    return applyBaseFilters(list);
+  }, [tasks, priorityFilter, statusFilter, studentSearch]);
+
+  const caseTabTasks = useMemo(() => {
+    const list = tasks.filter(t => t.isCase && t.status !== 'done');
+    return applyBaseFilters(list);
+  }, [tasks, priorityFilter, studentSearch]);
 
   const completedTodayTasks = useMemo(() => {
     return tasks
@@ -518,77 +567,59 @@ export function TeamWorkPanel() {
       </header>
 
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto h-12 p-1 bg-white/50 backdrop-blur-sm border rounded-2xl shadow-sm mb-10">
-          <TabsTrigger value="pending" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all duration-300">
-            <Clock className="h-4 w-4" /> Centro de Pendientes
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-white/20 text-inherit border-none">{tasks.filter(t => t.status !== 'done' && !t.parentId).length}</Badge>
+        <TabsList className="grid w-full grid-cols-3 max-w-xl mx-auto h-12 p-1 bg-white/50 backdrop-blur-sm border rounded-2xl shadow-sm mb-10">
+          <TabsTrigger value="pending" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all">
+            <Clock className="h-4 w-4" /> Pendientes
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-white/20 text-inherit border-none">{tasks.filter(t => t.status !== 'done' && !t.parentId && !t.isCase).length}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="route" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all duration-300">
-            <PlayCircle className="h-4 w-4" /> Ruta de Hoy
+          <TabsTrigger value="cases" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all">
+            <Briefcase className="h-4 w-4" /> Casos
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-white/20 text-inherit border-none">{tasks.filter(t => t.isCase && t.status !== 'done').length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="route" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white transition-all">
+            <PlayCircle className="h-4 w-4" /> Ruta
             <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-white/20 text-inherit border-none">{routeTasks.length}</Badge>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center justify-between gap-4 flex-wrap bg-white/50 backdrop-blur-sm border-none shadow-sm p-4 rounded-2xl">
-            <div className="flex items-center gap-6 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-muted/50 rounded-lg"><Filter className="h-3.5 w-3.5 text-muted-foreground" /></div>
-                <span className="text-xs font-black uppercase tracking-tighter opacity-60">Prioridad:</span>
-                <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
-                  <SelectTrigger className="w-[120px] h-8 text-xs font-bold border-none bg-muted/30 rounded-lg"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="urgent">Urgente</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="medium">Media</SelectItem>
-                    <SelectItem value="low">Baja</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-muted/50 rounded-lg"><ListFilter className="h-3.5 w-3.5 text-muted-foreground" /></div>
-                <span className="text-xs font-black uppercase tracking-tighter opacity-60">Estado:</span>
-                <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
-                  <SelectTrigger className="w-[140px] h-8 text-xs font-bold border-none bg-muted/30 rounded-lg"><SelectValue /></SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="all">Activos</SelectItem>
-                    <SelectItem value="todo">Pendientes</SelectItem>
-                    <SelectItem value="in-progress">En Ruta</SelectItem>
-                    <SelectItem value="done">Completados</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button onClick={() => setIsTaskDialogOpen(true)} className="rounded-xl font-bold h-9 shadow-lg">
-              <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Pendiente
-            </Button>
-          </div>
-
+          <WorkToolbar 
+            priorityFilter={priorityFilter} setPriorityFilter={setPriorityFilter}
+            statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+            studentSearch={studentSearch} setStudentSearch={setStudentSearch}
+            onNewClick={() => setIsTaskDialogOpen(true)}
+          />
           <div className="grid grid-cols-1 gap-4">
             {pendingTabTasks.length > 0 ? pendingTabTasks.map(task => (
               <TaskCard 
-                key={task.id} 
-                task={task} 
-                allTasks={tasks} 
-                onEdit={handleEditTask} 
-                onAddDerivedTask={handleAddDerivedTask}
-                onStatusChange={handleStatusChange} 
-                onToggleExpand={toggleExpand}
-                isExpanded={expandedTasks.has(task.id)}
-                newComment={newCommentText[task.id] || ''}
-                onCommentChange={(text) => setNewCommentText({...newCommentText, [task.id]: text})}
-                onAddComment={() => handleAddComment(task.id)}
-                onDelete={() => deleteWorkTask(task.id).then(() => loadTasks(currentTeam.id))}
-                currentAuthor={currentUser}
+                key={task.id} task={task} allTasks={tasks} onEdit={handleEditTask} onAddDerivedTask={handleAddDerivedTask}
+                onStatusChange={handleStatusChange} onToggleCase={handleToggleCase} onToggleCaseActive={handleToggleCaseActive}
+                onToggleExpand={toggleExpand} isExpanded={expandedTasks.has(task.id)} newComment={newCommentText[task.id] || ''}
+                onCommentChange={(text) => setNewCommentText({...newCommentText, [task.id]: text})} onAddComment={() => handleAddComment(task.id)}
+                onDelete={() => deleteWorkTask(task.id).then(() => loadTasks(currentTeam.id))} currentAuthor={currentUser}
+                onGoToStudent={handleGoToStudent}
               />
-            )) : (
-              <div className="text-center py-24 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10">
-                <AlertCircle className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-                <h3 className="text-xl font-bold opacity-60">Centro de mando vacío</h3>
-                <p className="text-muted-foreground text-sm max-w-xs mx-auto">No hay tareas que coincidan con tus filtros. Puedes crear un nuevo pendiente arriba.</p>
-              </div>
-            )}
+            )) : <EmptyState message="No hay pendientes para mostrar." onAction={() => setIsTaskDialogOpen(true)} actionLabel="Nuevo Pendiente" />}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="cases" className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+          <WorkToolbar 
+            priorityFilter={priorityFilter} setPriorityFilter={setPriorityFilter}
+            studentSearch={studentSearch} setStudentSearch={setStudentSearch}
+            onNewClick={() => { setTaskForm({...taskForm, isCase: true}); setIsTaskDialogOpen(true); }}
+          />
+          <div className="grid grid-cols-1 gap-4">
+            {caseTabTasks.length > 0 ? caseTabTasks.map(task => (
+              <TaskCard 
+                key={task.id} task={task} allTasks={tasks} onEdit={handleEditTask} onAddDerivedTask={handleAddDerivedTask}
+                onStatusChange={handleStatusChange} onToggleCase={handleToggleCase} onToggleCaseActive={handleToggleCaseActive}
+                onToggleExpand={toggleExpand} isExpanded={expandedTasks.has(task.id)} newComment={newCommentText[task.id] || ''}
+                onCommentChange={(text) => setNewCommentText({...newCommentText, [task.id]: text})} onAddComment={() => handleAddComment(task.id)}
+                onDelete={() => deleteWorkTask(task.id).then(() => loadTasks(currentTeam.id))} currentAuthor={currentUser}
+                onGoToStudent={handleGoToStudent}
+              />
+            )) : <EmptyState message="No hay casos registrados aún." onAction={() => { setTaskForm({...taskForm, isCase: true}); setIsTaskDialogOpen(true); }} actionLabel="Crear un Caso" />}
           </div>
         </TabsContent>
 
@@ -744,6 +775,14 @@ export function TeamWorkPanel() {
                 <Input type="date" value={taskForm.dueDate} onChange={e => setTaskForm({...taskForm, dueDate: e.target.value})} className="rounded-xl h-11 border-muted-foreground/20 font-bold" />
               </div>
             </div>
+            
+            <div className="flex items-center space-x-3 bg-muted/20 p-3 rounded-xl border border-dashed border-primary/20">
+              <Switch id="is-case-switch" checked={taskForm.isCase} onCheckedChange={(v) => setTaskForm({...taskForm, isCase: v})} />
+              <Label htmlFor="is-case-switch" className="flex items-center gap-2 cursor-pointer font-bold text-sm">
+                <Briefcase className="h-4 w-4 text-primary" /> Marcar como "Caso" (Seguimiento largo plazo)
+              </Label>
+            </div>
+
             <div className="space-y-2">
               <Label className="text-xs font-black uppercase opacity-60 tracking-tighter">Vincular Alumnos (Opcional)</Label>
               <StudentSearchPopover onStudentSelect={(s) => {
@@ -786,22 +825,89 @@ export function TeamWorkPanel() {
   );
 }
 
+function WorkToolbar({ 
+  priorityFilter, setPriorityFilter, statusFilter, setStatusFilter, studentSearch, setStudentSearch, onNewClick 
+}: any) {
+  return (
+    <div className="flex items-center justify-between gap-4 flex-wrap bg-white/50 backdrop-blur-sm border-none shadow-sm p-4 rounded-2xl">
+      <div className="flex items-center gap-6 flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-muted/50 rounded-lg"><Filter className="h-3.5 w-3.5 text-muted-foreground" /></div>
+          <span className="text-xs font-black uppercase tracking-tighter opacity-60">Prioridad:</span>
+          <Select value={priorityFilter} onValueChange={(v: any) => setPriorityFilter(v)}>
+            <SelectTrigger className="w-[120px] h-8 text-xs font-bold border-none bg-muted/30 rounded-lg"><SelectValue /></SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="urgent">Urgente</SelectItem>
+              <SelectItem value="high">Alta</SelectItem>
+              <SelectItem value="medium">Media</SelectItem>
+              <SelectItem value="low">Baja</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {statusFilter && (
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-muted/50 rounded-lg"><ListFilter className="h-3.5 w-3.5 text-muted-foreground" /></div>
+            <span className="text-xs font-black uppercase tracking-tighter opacity-60">Estado:</span>
+            <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs font-bold border-none bg-muted/30 rounded-lg"><SelectValue /></SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">Activos</SelectItem>
+                <SelectItem value="todo">Pendientes</SelectItem>
+                <SelectItem value="in-progress">En Ruta</SelectItem>
+                <SelectItem value="done">Completados</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="relative group/search-box">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-50 group-focus-within/search-box:text-primary transition-colors" />
+          <Input 
+            value={studentSearch} 
+            onChange={e => setStudentSearch(e.target.value)} 
+            placeholder="Buscar por alumno..." 
+            className="h-8 pl-9 w-[200px] text-xs font-bold border-none bg-muted/30 rounded-lg transition-all focus:w-[250px]"
+          />
+          {studentSearch && <button onClick={() => setStudentSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive"><X size={12}/></button>}
+        </div>
+      </div>
+      <Button onClick={onNewClick} className="rounded-xl font-bold h-9 shadow-lg">
+        <PlusCircle className="mr-2 h-4 w-4" /> Nueva Entrada
+      </Button>
+    </div>
+  );
+}
+
+function EmptyState({ message, onAction, actionLabel }: any) {
+  return (
+    <div className="text-center py-24 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10">
+      <AlertCircle className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+      <h3 className="text-xl font-bold opacity-60">Lista vacía</h3>
+      <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6">{message}</p>
+      {onAction && <Button variant="outline" onClick={onAction} className="rounded-xl font-bold">{actionLabel}</Button>}
+    </div>
+  );
+}
+
 function TaskCard({ 
-  task, allTasks, onEdit, onAddDerivedTask, onStatusChange, onToggleExpand, isExpanded, 
-  newComment, onCommentChange, onAddComment, onDelete, currentAuthor
+  task, allTasks, onEdit, onAddDerivedTask, onStatusChange, onToggleCase, onToggleCaseActive, onToggleExpand, isExpanded, 
+  newComment, onCommentChange, onAddComment, onDelete, currentAuthor, onGoToStudent
 }: { 
   task: WorkTask, 
   allTasks: WorkTask[],
   onEdit: (t: WorkTask) => void, 
   onAddDerivedTask: (t: WorkTask) => void,
   onStatusChange: (id: string, s: TaskStatus) => void,
+  onToggleCase: (id: string, isCase: boolean) => void,
+  onToggleCaseActive: (id: string, active: boolean) => void,
   onToggleExpand: (id: string) => void,
   isExpanded: boolean,
   newComment: string,
   onCommentChange: (val: string) => void,
   onAddComment: () => void,
   onDelete: () => void,
-  currentAuthor: string
+  currentAuthor: string,
+  onGoToStudent: (id: string) => void
 }) {
   const priorityInfo = PRIORITY_MAP[task.priority];
   const statusInfo = STATUS_MAP[task.status];
@@ -820,6 +926,7 @@ function TaskCard({
       task.priority === 'high' ? 'border-l-orange-500' :
       task.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-blue-500',
       isDueToday && task.status !== 'done' && "ring-2 ring-primary/20 scale-[1.01]",
+      task.isCase && !task.isCaseActive && "grayscale opacity-50",
       task.parentId && "ml-10 bg-white/40 border-dashed"
     )}>
       <div 
@@ -835,12 +942,19 @@ function TaskCard({
             className="h-5 w-5 rounded-md border-2 border-primary/20 data-[state=checked]:bg-primary"
           />
           <div className="space-y-1.5">
-            <h3 className={cn(
-              "text-lg font-bold leading-tight tracking-tight", 
-              task.status === 'done' && 'line-through text-muted-foreground'
-            )}>
-              {task.title}
-            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className={cn(
+                "text-lg font-bold leading-tight tracking-tight", 
+                task.status === 'done' && 'line-through text-muted-foreground'
+              )}>
+                {task.title}
+              </h3>
+              {task.isCase && (
+                <Badge variant={task.isCaseActive ? "default" : "outline"} className={cn("text-[8px] h-4 font-black uppercase tracking-widest", task.isCaseActive ? "bg-primary" : "text-muted-foreground")}>
+                  {task.isCaseActive ? "Caso Activo" : "Caso Inactivo"}
+                </Badge>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <Badge className={cn("text-[9px] px-2 h-4 font-black uppercase tracking-tighter", priorityInfo.color)}>
                 {priorityInfo.label}
@@ -879,6 +993,22 @@ function TaskCard({
           )}
           
           <div className="flex items-center gap-1 opacity-0 group-hover/main-card:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+            <Button 
+              variant="ghost" size="icon" className={cn("h-8 w-8 rounded-lg", task.isCase ? "text-primary bg-primary/5" : "text-muted-foreground")}
+              onClick={() => onToggleCase(task.id, !task.isCase)} title={task.isCase ? "Remover de Casos" : "Convertir en Caso"}
+            >
+              <Briefcase className="h-4 w-4" />
+            </Button>
+            
+            {task.isCase && (
+              <Button 
+                variant="ghost" size="icon" className={cn("h-8 w-8 rounded-lg", task.isCaseActive ? "text-green-600 bg-green-50" : "text-destructive bg-destructive/5")}
+                onClick={() => onToggleCaseActive(task.id, !task.isCaseActive)} title={task.isCaseActive ? "Inactivar Caso" : "Activar Caso"}
+              >
+                {task.isCaseActive ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
+              </Button>
+            )}
+
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/5 text-muted-foreground hover:text-primary" onClick={() => onEdit(task)}>
               <Edit3 className="h-4 w-4" />
             </Button>
@@ -926,11 +1056,16 @@ function TaskCard({
               {task.linkedStudents.length > 0 && (
                 <div className="space-y-3">
                   <Label className="text-[10px] uppercase text-muted-foreground tracking-widest font-black flex items-center gap-2 opacity-60">
-                    <User className="h-3 w-3" /> Alumnos Vinculados
+                    <User className="h-3 w-3" /> Alumnos Vinculados (Clic para ir al expediente)
                   </Label>
                   <div className="flex flex-wrap gap-2">
                     {task.linkedStudents.map(ls => (
-                      <Badge key={ls.id} variant="secondary" className="bg-white text-primary border border-primary/10 hover:bg-primary/5 transition-all py-1.5 pl-3 pr-2 gap-3 rounded-xl shadow-sm">
+                      <Badge 
+                        key={ls.id} variant="secondary" 
+                        className="bg-white text-primary border border-primary/10 hover:bg-primary/5 transition-all py-1.5 pl-3 pr-2 gap-3 rounded-xl shadow-sm cursor-pointer group/ls"
+                        onClick={(e) => { e.stopPropagation(); onGoToStudent(ls.id); }}
+                      >
+                        <GraduationCap className="h-3 w-3 text-primary/40 group-hover/ls:text-primary transition-colors" />
                         <span className="font-bold text-xs">{ls.name}</span>
                         <span className="opacity-40 font-mono text-[9px] bg-primary/5 px-1.5 py-0.5 rounded uppercase tracking-tighter">ID: {ls.id}</span>
                       </Badge>

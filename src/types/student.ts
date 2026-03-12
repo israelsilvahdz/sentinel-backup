@@ -243,6 +243,8 @@ export interface WorkTask {
   completedAt?: any; // Firestore Timestamp
   comments?: WorkTaskComment[];
   order?: number; // Para el orden en la ruta diaria
+  isCase?: boolean;
+  isCaseActive?: boolean;
 }
 
 export type CareerType = 'in-campus' | 'external' | 'other-campus';
