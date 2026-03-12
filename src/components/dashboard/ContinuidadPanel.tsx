@@ -206,29 +206,32 @@ export function ContinuidadPanel() {
         const yaEligioNormalizado = (survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
         const yaEligioUniNormalizado = (survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
+        // STRICT RULE: All analytical filters (except 'inscribed') must exclude inscribed students
+        if (selectedKpi !== 'inscribed' && s.isInscribed) return false;
+
         switch(selectedKpi) {
           case 'inscribed': return s.isInscribed;
           case 'pending': return !s.isInscribed;
-          case 'pending-survey': return !s.isInscribed && !local?.encuestaEleccionReciente;
+          case 'pending-survey': return !local?.encuestaEleccionReciente;
           case 'indeciso': 
-          case 'career-no': return !s.isInscribed && yaEligioNormalizado.includes('no');
-          case 'career-yes': return !s.isInscribed && yaEligioNormalizado.includes('si');
-          case 'uni-no': return !s.isInscribed && yaEligioUniNormalizado.includes('no');
-          case 'uni-yes': return !s.isInscribed && yaEligioUniNormalizado.includes('si');
-          case 'sos': return !s.isInscribed && local?.vocationalDiagnosis && local.vocationalDiagnosis.urgencyLevel >= 8;
-          case 'meta-tm': return !s.isInscribed && (survey?.universidadElegida || '').toLowerCase().includes('tecmilenio');
-          case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
-          case 'fake': return !s.isInscribed && local?.alertaFalsaInscripcion;
+          case 'career-no': return yaEligioNormalizado.includes('no');
+          case 'career-yes': return yaEligioNormalizado.includes('si');
+          case 'uni-no': return yaEligioUniNormalizado.includes('no');
+          case 'uni-yes': return yaEligioUniNormalizado.includes('si');
+          case 'sos': return local?.vocationalDiagnosis && local.vocationalDiagnosis.urgencyLevel >= 8;
+          case 'meta-tm': return (survey?.universidadElegida || '').toLowerCase().includes('tecmilenio');
+          case 'risk': return s.average >= 90 && s.status.toLowerCase().includes('descartado');
+          case 'fake': return local?.alertaFalsaInscripcion;
           default: 
             if (selectedKpi.startsWith('career:')) {
               const careerName = selectedKpi.replace('career:', '');
-              return !s.isInscribed && (survey?.carreraElegida === careerName || survey?.carreraElegida?.includes(careerName));
+              return survey?.carreraElegida === careerName || survey?.carreraElegida?.includes(careerName);
             }
             if (selectedKpi.startsWith('uni:')) {
               const uniName = selectedKpi.replace('uni:', '');
-              return !s.isInscribed && (survey?.universidadElegida === uniName || survey?.universidadElegida?.includes(uniName));
+              return survey?.universidadElegida === uniName || survey?.universidadElegida?.includes(uniName);
             }
-            return true;
+            return false;
         }
       });
     }
@@ -709,7 +712,7 @@ export function ContinuidadPanel() {
                 <PieChart className="h-5 w-5 text-primary" />
                 <div className="flex flex-col">
                   <CardTitle className="text-base font-black">Decisión de Carrera vs Universidad</CardTitle>
-                  <CardDescription className="text-[10px] uppercase tracking-widest font-bold opacity-60">Población No Inscrita ({stats.surveyRespondersCount} encuestados)</CardDescription>
+                  <CardDescription className="text-[10px] uppercase tracking-widest font-bold opacity-60">Población No Inscrita (${stats.surveyRespondersCount} encuestados)</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="h-[300px] flex gap-4 pt-6">

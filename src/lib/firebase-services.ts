@@ -621,17 +621,18 @@ export const bulkUpdateCareerSurvey = async (
         isIndeciso: !choseCareer
       };
 
-      // STRICT ALERT TRIGGER:
+      // ULTRA STRICT ALERT TRIGGER:
       // Only trigger if:
       // 1. Declared Tecmilenio.
       // 2. Official status is NOT inscribed.
-      // 3. AND the student EXPLICITLY declared they are already enrolled ("inscrito" or "inscrita").
-      // 4. AND stage is NOT "ninguno" or "informes".
+      // 3. AND the stage is EXACTLY one of the final enrollment markers.
       const surveyStage = (survey.etapaProceso || '').toLowerCase().trim();
-      const declaresEnrolledStrict = surveyStage === 'inscrito' || surveyStage === 'inscrita' || surveyStage === 'declara inscrito';
-      const isLowInterestStage = surveyStage.includes('ninguno') || surveyStage.includes('informes');
+      const isFinalEnrollmentStage = 
+        surveyStage === 'inscrito' || 
+        surveyStage === 'inscrita' || 
+        surveyStage === 'declara inscrito';
 
-      if (isTecmilenio && !isOfficialInscribed && declaresEnrolledStrict && !isLowInterestStage) {
+      if (isTecmilenio && !isOfficialInscribed && isFinalEnrollmentStage) {
         updateData.alertaFalsaInscripcion = true;
       } else {
         updateData.alertaFalsaInscripcion = false;
