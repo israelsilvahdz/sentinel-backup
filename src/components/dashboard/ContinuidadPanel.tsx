@@ -223,13 +223,19 @@ export function ContinuidadPanel() {
           case 'risk': return s.average >= 90 && s.status.toLowerCase().includes('descartado');
           case 'fake': return local?.alertaFalsaInscripcion;
           default: 
-            if (selectedKpi.startsWith('career:')) {
-              const careerName = selectedKpi.replace('career:', '');
-              return survey?.carreraElegida === careerName || survey?.carreraElegida?.includes(careerName);
+            if (selectedKpi.startsWith('career-sure:')) {
+              const careerName = selectedKpi.replace('career-sure:', '');
+              const hasDecided = yaEligioNormalizado.includes('si');
+              return hasDecided && (survey?.carreraElegida === careerName || survey?.carreraElegida?.split(';').map(c => c.trim()).includes(careerName));
+            }
+            if (selectedKpi.startsWith('career-unsure:')) {
+              const careerName = selectedKpi.replace('career-unsure:', '');
+              const hasDecided = yaEligioNormalizado.includes('si');
+              return !hasDecided && (survey?.carreraElegida === careerName || survey?.carreraElegida?.split(';').map(c => c.trim()).includes(careerName));
             }
             if (selectedKpi.startsWith('uni:')) {
               const uniName = selectedKpi.replace('uni:', '');
-              return survey?.universidadElegida === uniName || survey?.universidadElegida?.includes(uniName);
+              return survey?.universidadElegida === uniName || survey?.universidadElegida?.split(';').map(u => u.trim()).includes(uniName);
             }
             return false;
         }
@@ -801,7 +807,7 @@ export function ContinuidadPanel() {
                       <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 'bold' }} angle={-45} textAnchor="end" height={80} interval={0} axisLine={false} tickLine={false} />
                       <YAxis hide />
                       <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                      <Bar dataKey="value" fill="#17594A" radius={[10, 10, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer" barSize={30}>
+                      <Bar dataKey="value" fill="#17594A" radius={[10, 10, 0, 0]} onClick={(data) => handleKpiClick(`career-sure:${data.name}`)} className="cursor-pointer" barSize={30}>
                         <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
                         {stats.careerSureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                       </Bar>
@@ -828,7 +834,7 @@ export function ContinuidadPanel() {
                     <XAxis dataKey="name" tick={{ fontSize: 9, fontWeight: 'bold' }} angle={-45} textAnchor="end" height={80} interval={0} axisLine={false} tickLine={false} />
                     <YAxis hide />
                     <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '16px', border: 'none' }} />
-                    <Bar dataKey="value" fill="#F59E0B" radius={[10, 10, 0, 0]} onClick={(data) => handleKpiClick(`career:${data.name}`)} className="cursor-pointer" barSize={30}>
+                    <Bar dataKey="value" fill="#F59E0B" radius={[10, 10, 0, 0]} onClick={(data) => handleKpiClick(`career-unsure:${data.name}`)} className="cursor-pointer" barSize={30}>
                       <LabelList dataKey="value" position="top" className="fill-foreground font-black text-xs" />
                       {stats.careerUnsureReport.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                     </Bar>
@@ -1014,13 +1020,13 @@ function ContinuityCard({
   onAddComment: (id: string, text: string, author: string) => void,
   onJumpToStudent: () => void
 }) {
-  const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const vocational = localStatus?.vocationalDiagnosis;
   const survey = localStatus?.encuestaEleccionReciente;
   const hasDecided = (survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
   
+  const isHighValueRisk = !student.isInscribed && student.average >= 90 && student.status.toLowerCase().includes('descartado');
   const isSOS = !student.isInscribed && vocational && vocational.urgencyLevel >= 8;
-  const isIndeciso = !student.isInscribed && (localStatus?.isIndeciso || !hasDecided);
+  const isIndeciso = !student.isInscribed && !hasDecided;
   const hasFalseInscribedAlert = localStatus?.alertaFalsaInscripcion;
   
   const universityRankingArray = useMemo(() => vocational?.universityRanking ? vocational.universityRanking.split(/[;,]/).filter(Boolean).map(u => u.trim()) : [], [vocational]);
