@@ -82,6 +82,7 @@ export function TeamWorkPanel() {
   const [editingTask, setEditingTask] = useState<WorkTask | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   
   // Search
   const [studentSearch, setStudentSearch] = useState('');
