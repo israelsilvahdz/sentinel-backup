@@ -15,7 +15,8 @@ import {
   ChevronDown, ChevronUp, BarChart3, Send, UserCog, History, HelpCircle,
   AlertTriangle, Sparkles, GraduationCap as CapIcon, X, CheckCircle2, Trophy, ListOrdered,
   Landmark, FileJson, PlusCircle, Calendar as CalendarIcon, Briefcase,
-  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart, ClipboardList, Printer, FileText
+  UserX, Loader2, Trash2, Globe, Save, ArrowUpRight, Group, FileWarning, PieChart, ClipboardList, Printer, FileText,
+  Building2, GraduationCap, MapPin, Star
 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -206,7 +207,6 @@ export function ContinuidadPanel() {
         const yaEligioNormalizado = (survey?.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
         const yaEligioUniNormalizado = (survey?.yaEligioUniversidad || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-        // STRICT RULE: All analytical filters (except 'inscribed') must exclude inscribed students
         if (selectedKpi !== 'inscribed' && s.isInscribed) return false;
 
         switch(selectedKpi) {
@@ -541,7 +541,6 @@ export function ContinuidadPanel() {
           <div class="kpi-grid">${kpisHtml}</div>
 
           <div class="analitica-grid">
-            <!-- Donuts -->
             <div class="chart-card">
               <div class="chart-header">
                 <div class="chart-title">Decisión de Carrera vs Universidad</div>
@@ -569,7 +568,6 @@ export function ContinuidadPanel() {
               </div>
             </div>
 
-            <!-- Uni Horiz Bars -->
             <div class="chart-card">
               <div class="chart-header">
                 <div class="chart-title">Top Universidades Destino (No Inscritos)</div>
@@ -579,7 +577,6 @@ export function ContinuidadPanel() {
               </div>
             </div>
 
-            <!-- Career Vertical Bars (Sure) -->
             <div class="chart-card">
               <div class="chart-header">
                 <div class="chart-title">Top Carreras Elegidas (Decisión Única)</div>
@@ -588,7 +585,6 @@ export function ContinuidadPanel() {
               ${generateBarRows(stats.careerSureReport, maxCareerSure, '', true)}
             </div>
 
-            <!-- Career Vertical Bars (Unsure) -->
             <div class="chart-card">
               <div class="chart-header">
                 <div class="chart-title">Top Carreras Contempladas (Indecisos)</div>
@@ -651,6 +647,36 @@ export function ContinuidadPanel() {
       </div>
     );
   }
+
+  const kpiLabels: Record<string, string> = {
+    'all': 'Todos los Alumnos',
+    'inscribed': 'Inscritos Oficiales',
+    'pending': 'Prospectos No Inscritos',
+    'pending-survey': 'Pendientes de Encuesta',
+    'fake': 'Falsa Inscripción Detectada',
+    'sos': 'Casos Urgentes SOS',
+    'indeciso': 'Alumnos Indecisos',
+    'career-no': 'Indecisos de Carrera',
+    'career-yes': 'Decididos de Carrera',
+    'uni-no': 'Sin Universidad Definida',
+    'uni-yes': 'Con Universidad Definida',
+    'meta-tm': 'Meta Tecmilenio (No Inscritos)',
+    'risk': 'Alumnos con Riesgo de Fuga'
+  };
+
+  const getKpiTitle = () => {
+    if (!selectedKpi) return null;
+    if (selectedKpi.includes(':')) {
+      const [type, value] = selectedKpi.split(':');
+      return { 
+        type: type === 'uni' ? 'Universidad Destino' : (type.includes('sure') ? 'Decisión Única' : 'Contemplada'),
+        value 
+      };
+    }
+    return { type: 'Filtro Activo', value: kpiLabels[selectedKpi] || selectedKpi };
+  };
+
+  const activeKpi = getKpiTitle();
 
   return (
     <div className="p-4 md:p-8 space-y-8 pb-20">
@@ -872,14 +898,35 @@ export function ContinuidadPanel() {
                 {statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            {selectedKpi && (
-              <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="text-destructive h-10">
-                <X className="mr-2 h-4 w-4" /> Limpiar: {selectedKpi.includes(':') ? selectedKpi.split(':')[1] : (selectedKpi === 'career-yes' ? 'Decididos' : (selectedKpi === 'career-no' ? 'Indecisos' : selectedKpi))}
-              </Button>
-            )}
           </div>
+
+          {activeKpi && (
+            <div className="relative overflow-hidden bg-gradient-to-r from-primary/10 to-primary/5 p-6 rounded-3xl border border-primary/10 shadow-inner flex flex-col sm:flex-row justify-between items-center gap-4 animate-in slide-in-from-top-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-white shadow-sm flex items-center justify-center">
+                  <Star className="h-6 w-6 text-primary fill-primary/20" />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-primary/60">{activeKpi.type}</p>
+                  <h2 className="text-2xl font-black text-primary tracking-tight">{activeKpi.value}</h2>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <Badge variant="outline" className="bg-white/50 border-primary/20 text-primary font-black px-4 py-1.5 rounded-full shadow-sm">
+                  {filteredStudents.length} Alumnos Encontrados
+                </Badge>
+                <Button variant="ghost" onClick={() => setSelectedKpi(null)} className="h-10 text-destructive hover:bg-destructive/5 font-bold gap-2">
+                  <X className="h-4 w-4" /> Limpiar Filtro Analítico
+                </Button>
+              </div>
+              <div className="absolute right-[-20px] bottom-[-20px] opacity-[0.03] pointer-events-none">
+                <TrendingUp className="h-40 w-40" />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
-            {filteredStudents.map(student => (
+            {filteredStudents.length > 0 ? filteredStudents.map(student => (
               <ContinuityCard 
                 key={student.id} 
                 student={student} 
@@ -893,7 +940,12 @@ export function ContinuidadPanel() {
                 onAddComment={handleAddComment}
                 onJumpToStudent={() => handleJumpToStudent(student.id)}
               />
-            ))}
+            )) : (
+              <div className="py-20 text-center bg-white/30 rounded-3xl border-2 border-dashed border-muted">
+                <Search className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">No se encontraron prospectos para esta búsqueda o segmento.</p>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -1042,91 +1094,109 @@ function ContinuityCard({
 
   return (
     <TooltipProvider>
-    <Card className={cn("transition-all border-l-4 shadow-sm hover:shadow-md rounded-2xl overflow-hidden", student.isInscribed ? "border-l-green-500" : "border-l-muted", (isHighValueRisk || isSOS || hasFalseInscribedAlert) && "ring-2 ring-red-500/50", isIndeciso && "border-l-purple-500 bg-purple-50/5")}>
-      <div className="p-4 flex flex-col cursor-pointer hover:bg-muted/5" onClick={onToggle}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 flex-1">
-            <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-white shadow-inner", student.isInscribed ? "bg-green-600" : "bg-muted-foreground/40")}>
-              {student.isInscribed ? <CapIcon className="h-5 w-5" /> : student.id.substring(0, 2)}
+    <Card className={cn(
+      "transition-all duration-300 border-l-4 shadow-sm hover:shadow-xl rounded-2xl overflow-hidden", 
+      student.isInscribed ? "border-l-green-500 bg-green-50/5" : "border-l-muted", 
+      (isHighValueRisk || isSOS || hasFalseInscribedAlert) && "ring-2 ring-red-500/50", 
+      isIndeciso && "border-l-purple-500 bg-purple-50/5",
+      isExpanded && "shadow-2xl ring-1 ring-primary/5"
+    )}>
+      <div className="p-5 flex flex-col cursor-pointer group/card" onClick={onToggle}>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-5 flex-1 overflow-hidden">
+            <div className={cn(
+              "h-12 w-12 rounded-2xl flex items-center justify-center font-black text-white shadow-inner shrink-0 transition-transform duration-500 group-hover/card:scale-110", 
+              student.isInscribed ? "bg-green-600" : "bg-muted-foreground/20"
+            )}>
+              {student.isInscribed ? <CapIcon className="h-6 w-6" /> : student.id.substring(0, 2)}
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold flex items-center gap-2 flex-wrap text-sm sm:text-base tracking-tight">
+            <div className="space-y-1 overflow-hidden">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h3 className="font-black text-base tracking-tight truncate group-hover/card:text-primary transition-colors">
                   {student.name}
-                  {hasFalseInscribedAlert && (
-                    <TooltipUI>
-                      <TooltipTrigger asChild>
-                        <Badge variant="destructive" className="animate-pulse flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" /> FALSA INSCRIPCIÓN
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs font-bold">Diferencia entre encuesta y base operativa.</TooltipContent>
-                    </TooltipUI>
-                  )}
-                  {isSOS && <Badge variant="destructive" className="animate-pulse flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> URGENTE SOS</Badge>}
-                  {isHighValueRisk && <Badge variant="destructive">Alerta Fuga</Badge>}
-                  {student.isInscribed && <Badge className="bg-green-100 text-green-800 border-green-200">Inscrito</Badge>}
-                  {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200"><HelpCircle className="h-3 w-3 mr-1" />Indeciso</Badge>}
-                  {!student.isInscribed && tecmilenioRank !== null && (
-                    <Badge variant={tecmilenioRank === 1 ? 'default' : 'outline'} className={cn(tecmilenioRank === 1 ? "bg-primary" : "text-orange-600 border-orange-200 bg-orange-50")}>
-                      {tecmilenioRank === 1 ? <Trophy className="h-3 w-3 mr-1" /> : <TrendingUp className="h-3 w-3 mr-1" />}
-                      Opción {tecmilenioRank}
-                    </Badge>
-                  )}
                 </h3>
-                <TooltipUI>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-primary hover:bg-primary/5" onClick={(e) => { e.stopPropagation(); onJumpToStudent(); }}>
-                      <ArrowUpRight className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="font-bold">Ver Expediente Académico</TooltipContent>
-                </TooltipUI>
+                {survey?.universidadElegida && (
+                  <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 gap-1.5 h-6 font-black uppercase text-[10px] tracking-tighter">
+                    <Building2 className="h-3 w-3" /> {survey.universidadElegida}
+                  </Badge>
+                )}
+                {hasFalseInscribedAlert && (
+                  <Badge variant="destructive" className="animate-pulse gap-1.5 h-6 font-black uppercase text-[10px] tracking-tighter">
+                    <AlertTriangle className="h-3 w-3" /> FALSA INSCRIPCIÓN
+                  </Badge>
+                )}
+                {isSOS && <Badge variant="destructive" className="animate-pulse gap-1.5 h-6 font-black uppercase text-[10px] tracking-tighter"><AlertTriangle className="h-3 w-3" /> SOS</Badge>}
+                {student.isInscribed && <Badge className="bg-green-600 text-white font-black h-6 uppercase text-[10px] tracking-tighter shadow-sm">Inscrito</Badge>}
+                {isIndeciso && <Badge className="bg-purple-100 text-purple-800 border-purple-200 gap-1.5 h-6 font-black uppercase text-[10px] tracking-tighter"><HelpCircle className="h-3 w-3" />Indeciso</Badge>}
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 font-semibold text-primary"><Users className="h-3 w-3" /> {student.advisor}</span>
-                <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {student.cycle}</span>
-                <span className="flex items-center gap-1 font-mono font-bold text-foreground"><Group className="h-3 w-3 text-muted-foreground" /> {student.group || 'Sin Grupo'}</span>
-                <span className="font-mono">{student.id}</span>
-                <span className="font-bold">Promedio: {student.average}</span>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-muted-foreground font-bold">
+                <span className="flex items-center gap-1.5 text-primary"><Users className="h-3.5 w-3.5" /> {student.advisor}</span>
+                <span className="flex items-center gap-1.5"><Group className="h-3.5 w-3.5 text-muted-foreground/60" /> {student.group || 'Sin Grupo'}</span>
+                {survey?.carreraElegida && (
+                  <span className="flex items-center gap-1.5 text-foreground/80 bg-muted px-2 py-0.5 rounded-lg"><GraduationCap className="h-3.5 w-3.5" /> {survey.carreraElegida}</span>
+                )}
+                <span className="font-mono text-muted-foreground/60">{student.id}</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="hidden lg:inline-flex rounded-lg border-muted-foreground/20 text-muted-foreground">{student.status}</Badge>
-            {isExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="hidden lg:flex flex-col items-end mr-4">
+              <span className="text-[9px] font-black uppercase opacity-40 leading-none mb-1">Promedio</span>
+              <span className="text-xl font-black text-primary leading-none tabular-nums">{student.average}</span>
+            </div>
+            <TooltipUI>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-primary hover:bg-primary/5 border border-transparent hover:border-primary/10 transition-all" onClick={(e) => { e.stopPropagation(); onJumpToStudent(); }}>
+                  <ArrowUpRight className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="font-bold">Ver Expediente Completo</TooltipContent>
+            </TooltipUI>
+            <div className={cn(
+              "p-2 rounded-xl transition-all duration-300",
+              isExpanded ? "bg-primary/10 text-primary rotate-180" : "bg-muted text-muted-foreground"
+            )}>
+              <ChevronDown className="h-5 w-5" />
+            </div>
           </div>
         </div>
       </div>
       {isExpanded && (
-        <CardContent className="border-t bg-muted/5 pt-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
+        <CardContent className="border-t bg-muted/5 pt-8 space-y-8 animate-in slide-in-from-top-4 duration-500">
           {survey && (
-            <div className="space-y-3">
-              <Label className="text-xs uppercase font-black text-emerald-700 flex items-center gap-2">
+            <div className="space-y-4">
+              <Label className="text-[10px] uppercase font-black text-emerald-700 flex items-center gap-2 opacity-70 tracking-widest">
                 <MessageSquare className="h-4 w-4" /> Último Estatus Declarado (Encuesta Reciente)
               </Label>
-              <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">
-                    {hasDecided ? 'Carrera Elegida' : 'Carreras Contempladas'}
+              <div className="bg-white border border-emerald-100 p-6 rounded-3xl shadow-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="space-y-1.5">
+                  <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">
+                    {hasDecided ? 'Decisión Única' : 'Carreras Contempladas'}
                   </p>
-                  <p className="text-sm font-bold text-emerald-900">{survey.carreraElegida || 'Sin especificar'}</p>
+                  <div className="flex items-start gap-2">
+                    <div className="p-1.5 bg-emerald-50 rounded-lg shrink-0"><GraduationCap className="h-4 w-4 text-emerald-600" /></div>
+                    <p className="text-sm font-black text-emerald-950 leading-tight">{survey.carreraElegida || 'Sin especificar'}</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">
-                    {survey.yaEligioUniversidad === 'Sí' ? 'Universidad Elegida' : 'Universidades Contempladas'}
+                <div className="space-y-1.5">
+                  <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">
+                    {survey.yaEligioUniversidad === 'Sí' ? 'Universidad Destino' : 'Universidades en Mira'}
                   </p>
-                  <p className="text-sm font-bold text-emerald-900">{survey.universidadElegida || 'Sin especificar'}</p>
+                  <div className="flex items-start gap-2">
+                    <div className="p-1.5 bg-blue-50 rounded-lg shrink-0"><Building2 className="h-4 w-4 text-blue-600" /></div>
+                    <p className="text-sm font-black text-blue-950 leading-tight">{survey.universidadElegida || 'Sin especificar'}</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Etapa del Proceso</p>
-                  <Badge variant="outline" className="bg-white border-emerald-200 text-emerald-700 font-bold uppercase text-[9px]">{survey.etapaProceso}</Badge>
+                <div className="space-y-1.5">
+                  <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">Etapa de Admisión</p>
+                  <Badge variant="outline" className="bg-emerald-50 border-emerald-200 text-emerald-700 font-black uppercase text-[10px] h-7 px-4 rounded-xl shadow-sm">{survey.etapaProceso}</Badge>
                 </div>
                 {survey.fechaEntregaResultados && (
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black uppercase text-emerald-600/60 tracking-widest">Fecha Resultados</p>
-                    <div className="flex items-center gap-1.5 text-emerald-900 font-bold text-xs">
-                      <CalendarIcon className="h-3 w-3" /> {survey.fechaEntregaResultados}
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">Fecha de Resultados</p>
+                    <div className="flex items-center gap-2 text-emerald-900 font-black text-xs">
+                      <div className="p-1.5 bg-emerald-50 rounded-lg"><CalendarIcon className="h-4 w-4 text-emerald-600" /></div>
+                      {survey.fechaEntregaResultados}
                     </div>
                   </div>
                 )}
@@ -1134,16 +1204,47 @@ function ContinuityCard({
             </div>
           )}
           
-          <div className="pt-6 border-t space-y-4">
-            <Label className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2"><History className="h-4 w-4" /> Bitácora de Seguimiento Sentinel</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <ScrollArea className="h-[200px] pr-4">
-                <div className="space-y-3">{localStatus?.comments?.length ? [...localStatus.comments].reverse().map(c => <div key={c.id} className="bg-background p-3 rounded-lg border shadow-sm text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold text-primary">{c.author}</span><span className="text-[10px] text-muted-foreground">{format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}</span></div><p className="whitespace-pre-wrap">{c.text}</p></div>) : <p className="text-xs text-muted-foreground italic text-center py-10">Sin comentarios.</p>}</div>
+          <div className="pt-8 border-t space-y-4">
+            <Label className="text-[10px] uppercase font-black text-muted-foreground flex items-center gap-2 opacity-70 tracking-widest">
+              <History className="h-4 w-4" /> Bitácora Estratégica de Seguimiento
+            </Label>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <ScrollArea className="h-[250px] pr-4">
+                <div className="space-y-4">
+                  {localStatus?.comments?.length ? [...localStatus.comments].reverse().map(c => (
+                    <div key={c.id} className="bg-white p-4 rounded-2xl border border-muted shadow-sm space-y-2 relative group/comment">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-black text-primary uppercase">
+                            {c.author.substring(0, 1)}
+                          </div>
+                          <span className="font-black text-xs text-primary">{c.author}</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-muted-foreground opacity-50">{format(c.toDate ? c.toDate() : c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}</span>
+                      </div>
+                      <p className="text-sm font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">{c.text}</p>
+                    </div>
+                  )) : (
+                    <div className="py-12 text-center bg-white/50 rounded-2xl border border-dashed">
+                      <MessageSquare className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2" />
+                      <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest opacity-40">Sin notas registradas</p>
+                    </div>
+                  )}
+                </div>
               </ScrollArea>
-              <div className="space-y-3 bg-background p-4 rounded-xl border">
-                <Select value={author} onValueChange={setAuthor}><SelectTrigger className="h-8 text-xs rounded-lg"><SelectValue placeholder="¿Quién firma?" /></SelectTrigger><SelectContent className="rounded-xl">{signatoryOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent></Select>
-                <Textarea value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Detalles de la interacción..." className="min-h-[100px] text-sm rounded-xl resize-none" />
-                <div className="flex justify-end"><Button size="sm" className="rounded-xl font-bold" onClick={() => { if (!author || !commentText.trim()) return; onAddComment(student.id, commentText, author); setCommentText(''); }} disabled={!commentText.trim() || !author}><Send className="h-4 w-4 mr-2" /> Guardar Nota</Button></div>
+              <div className="space-y-4 bg-white p-6 rounded-3xl border shadow-xl flex flex-col justify-between">
+                <div className="space-y-4">
+                  <Select value={author} onValueChange={setAuthor}>
+                    <SelectTrigger className="h-10 text-xs font-bold rounded-xl bg-muted/30 border-none shadow-inner"><SelectValue placeholder="¿Quién realiza el seguimiento?" /></SelectTrigger>
+                    <SelectContent className="rounded-xl">{signatoryOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Textarea value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="Registra acuerdos, miedos del alumno o próximos pasos..." className="min-h-[120px] text-sm rounded-2xl resize-none border-muted focus:ring-primary/20" />
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button className="rounded-xl font-black h-11 px-8 shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]" onClick={() => { if (!author || !commentText.trim()) return; onAddComment(student.id, commentText, author); setCommentText(''); }} disabled={!commentText.trim() || !author}>
+                    <Send className="h-4 w-4 mr-2" /> Guardar Nota Estratégica
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
