@@ -218,15 +218,15 @@ export function ContinuidadPanel() {
           case 'sos': return !s.isInscribed && local?.vocationalDiagnosis && local.vocationalDiagnosis.urgencyLevel >= 8;
           case 'meta-tm': return !s.isInscribed && (survey?.universidadElegida || '').toLowerCase().includes('tecmilenio');
           case 'risk': return !s.isInscribed && s.average >= 90 && s.status.toLowerCase().includes('descartado');
-          case 'fake': return local?.alertaFalsaInscripcion;
+          case 'fake': return !s.isInscribed && local?.alertaFalsaInscripcion;
           default: 
             if (selectedKpi.startsWith('career:')) {
               const careerName = selectedKpi.replace('career:', '');
-              return survey?.carreraElegida === careerName || survey?.carreraElegida?.includes(careerName);
+              return !s.isInscribed && (survey?.carreraElegida === careerName || survey?.carreraElegida?.includes(careerName));
             }
             if (selectedKpi.startsWith('uni:')) {
               const uniName = selectedKpi.replace('uni:', '');
-              return survey?.universidadElegida === uniName || survey?.universidadElegida?.includes(uniName);
+              return !s.isInscribed && (survey?.universidadElegida === uniName || survey?.universidadElegida?.includes(uniName));
             }
             return true;
         }
@@ -259,7 +259,7 @@ export function ContinuidadPanel() {
       const survey = local?.encuestaEleccionReciente;
 
       if (!s.isInscribed && !survey) surveyPendingCount++;
-      if (local?.alertaFalsaInscripcion) fakeInscribedCount++;
+      if (!s.isInscribed && local?.alertaFalsaInscripcion) fakeInscribedCount++;
       
       if (!s.isInscribed && survey) {
         const hasDecided = (survey.yaEligioCarrera || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes('si');
