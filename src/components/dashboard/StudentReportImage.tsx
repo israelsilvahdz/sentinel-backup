@@ -1,19 +1,19 @@
-
-
 "use client";
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { type Student, type SubjectSummary } from "@/types/student";
+import { type Student, type Subject } from "@/types/student";
 import { getRisk, RiskLevel, isWithoutRight } from '@/lib/dataProcessor';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
+import { getActivityList } from '@/lib/ponderaciones';
+import { useDashboardFilters } from './DashboardClient';
 
 
 interface StudentReportImageProps {
   student: Student;
-  subjects: SubjectSummary[] | undefined;
+  subjects: Subject[] | undefined;
 }
 
 function RiskCellSimple({ value, limit }: { value: number; limit: number; }) {
@@ -37,6 +37,8 @@ function RiskCellSimple({ value, limit }: { value: number; limit: number; }) {
 
 export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReportImageProps>(
   ({ student, subjects }, ref) => {
+    const { weightingSchemes } = useDashboardFilters();
+
     return (
       <div ref={ref} className="bg-white p-6 rounded-lg border-2 border-primary" style={{ width: '800px', fontFamily: "'Inter', sans-serif" }}>
         <div className="text-center mb-4">
@@ -48,44 +50,78 @@ export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReport
                  <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[350px] font-bold">Materia</TableHead>
+                            <TableHead className="w-[300px] font-bold">Materia</TableHead>
                             <TableHead className="text-center font-bold">Faltas (Límite)</TableHead>
                             <TableHead className="text-center font-bold">Tareas NE (Límite)</TableHead>
-                            <TableHead className="text-right font-bold">Calif. Final / Estado</TableHead>
+                            <TableHead className="text-right font-bold">Puntos / Potencial</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {(subjects || []).map((subject) => (
-                            <TableRow key={subject.id}>
-                                <TableCell className="font-medium">{subject.name}</TableCell>
-                                <TableCell className="text-center">
-                                  <div className="inline-block">
-                                    <RiskCellSimple value={subject.absences} limit={subject.absenceLimit} />
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                   <div className="inline-block">
-                                    <RiskCellSimple value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right font-mono font-bold">
-                                    {isWithoutRight(subject) ? (
-                                      <Badge variant="destructive" className="text-base">SD</Badge>
-                                    ) : (
-                                      <span className="text-primary">{(subject.grade || 0).toFixed(2)}</span>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                        {(subjects || []).map((subject) => {
+                            const activityList = getActivityList(subject, weightingSchemes);
+                            let totalEarnedPoints = 0;
+                            let maxPossiblePoints = 0;
+
+                            if (activityList.length > 0) {
+                                activityList.forEach(item => {
+                                    const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+                                    if (isGraded) {
+                                        const score = Number(item.score) || 0;
+                                        totalEarnedPoints += (score / 100) * item.weight;
+                                        maxPossiblePoints += item.weight;
+                                    }
+                                });
+                            }
+
+                            const maxPotentialGrade = 100 - (maxPossiblePoints - totalEarnedPoints);
+
+                            return (
+                                <TableRow key={subject.id}>
+                                    <TableCell className="font-medium">
+                                        <div className="text-sm">{subject.name}</div>
+                                        <div className="text-[10px] text-muted-foreground">Grupo: {subject.group}</div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="inline-block">
+                                        <RiskCellSimple value={subject.absences} limit={subject.absenceLimit} />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                       <div className="inline-block">
+                                        <RiskCellSimple value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {isWithoutRight(subject) ? (
+                                          <Badge variant="destructive" className="text-xs font-black">SD</Badge>
+                                        ) : maxPossiblePoints > 0 ? (
+                                          <div className="flex flex-col items-end">
+                                            <span className="text-primary font-mono font-bold text-sm">
+                                                {totalEarnedPoints.toFixed(1)}/{maxPossiblePoints.toFixed(0)}
+                                            </span>
+                                            <div className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1">
+                                                Máx: <span className="text-foreground">{maxPotentialGrade.toFixed(1)}</span>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <span className="text-muted-foreground text-xs">N/D</span>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </CardContent>
         </Card>
+        <div className="mt-4 text-center">
+            <p className="text-[10px] text-muted-foreground italic">
+                * Potencial: Calificación máxima si se obtiene 100 en todas las actividades restantes.
+            </p>
+        </div>
       </div>
     );
   }
 );
 
 StudentReportImage.displayName = 'StudentReportImage';
-
-

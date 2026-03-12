@@ -31,11 +31,15 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
     const reportRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     
-    const subjectSummaries = subjects?.map(s => ({
-        id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-        missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-        grade: s.grade, finalGrade: s.finalGrade, group: s.group,
-    }));
+    const subjectSummaries = subjects?.map(s => {
+        const activityList = getActivityList(s, []); // This might be tricky since we need schemes here too for accuracy
+        // For simplicity in the summary type, we'll rely on the parent component's logic if possible
+        return {
+            id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
+            missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
+            grade: s.grade, finalGrade: s.finalGrade, group: s.group,
+        }
+    });
 
     const handleDownload = async () => {
         if (!reportRef.current) return;
@@ -63,7 +67,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
             </DialogHeader>
             <div className="py-4 overflow-x-auto bg-muted/20 rounded-md">
                 <div className="min-w-[800px] flex justify-center p-4">
-                    <StudentReportImage ref={reportRef} student={student} subjects={subjectSummaries} />
+                    <StudentReportImage ref={reportRef} student={student} subjects={subjects} />
                 </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -188,6 +192,8 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                           }
                       });
                     }
+
+                    const maxPotentialGrade = 100 - (maxPossiblePoints - totalEarnedPoints);
                     
                     return (
                     <React.Fragment key={subject.id}>
@@ -247,25 +253,35 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                                   <RiskCell value={subject.missedAssignments} limit={subject.missedAssignmentLimit} />
                               </div>
                           </TableCell>
-                          <TableCell className="text-right font-mono font-bold text-primary px-2 sm:px-4 text-xs sm:text-sm">
-                                {isWithoutRight(subject) ? (
-                                <Badge variant="destructive" className="h-5 px-1 sm:px-2">SD</Badge>
-                                ) : activityList.length > 0 && maxPossiblePoints > 0 ? (
-                                <TooltipProvider>
-                                    <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span className="cursor-help">{`${totalEarnedPoints.toFixed(1)}/${maxPossiblePoints.toFixed(0)}`}</span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p className="text-xs">
-                                        Puntos acumulados / Puntos posibles hasta ahora
-                                        </p>
-                                    </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                                ) : (
-                                <Badge variant="secondary" className="h-5 px-1 sm:px-2 text-[10px]">N/D</Badge>
-                                )}
+                          <TableCell className="text-right px-2 sm:px-4">
+                                <div className="flex flex-col items-end">
+                                    {isWithoutRight(subject) ? (
+                                        <Badge variant="destructive" className="h-5 px-1 sm:px-2 font-black uppercase text-[10px]">Sin Derecho</Badge>
+                                    ) : activityList.length > 0 && maxPossiblePoints > 0 ? (
+                                        <>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="cursor-help font-mono font-black text-primary text-xs sm:text-sm">
+                                                            {`${totalEarnedPoints.toFixed(1)}/${maxPossiblePoints.toFixed(0)}`}
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="font-bold">
+                                                        <p className="text-xs">Puntos acumulados / Puntos posibles a la fecha</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-tighter">Potencial:</span>
+                                                <Badge variant="outline" className="h-4 px-1 text-[9px] font-black border-primary/20 text-primary bg-primary/5">
+                                                    {maxPotentialGrade.toFixed(1)}
+                                                </Badge>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <Badge variant="secondary" className="h-5 px-1 sm:px-2 text-[10px] font-black uppercase">N/D</Badge>
+                                    )}
+                                </div>
                           </TableCell>
                       </TableRow>
                       {openSubject === subject.id && (
