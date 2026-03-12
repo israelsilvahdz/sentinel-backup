@@ -219,7 +219,7 @@ export function TeamWorkPanel() {
         linkedStudents: taskForm.linkedStudents,
         dueDate: parsedDueDate,
         isCase: taskForm.isCase,
-        isCaseActive: taskForm.isCase ? true : undefined,
+        isCaseActive: taskForm.isCase ? true : null, // Fixed: use null instead of undefined for Firestore
         parentId: taskForm.parentId || null,
         parentTitle: taskForm.parentTitle || null
       };
