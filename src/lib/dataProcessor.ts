@@ -1,15 +1,12 @@
 
-
-import { type Student, type Subject, type SubjectSummary } from '@/types/student';
+import { type Student, type Subject, type SubjectSummary, type WeightingScheme } from '@/types/student';
+import { getActivityList } from './ponderaciones';
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'at_limit' | 'sd';
 export type CaseStatus = 'lost' | 'urgent' | 'observation' | 'ok';
 
 /**
  * Calcula el nivel de riesgo para un valor y su límite.
- * @param value El valor actual (ej. número de faltas).
- * @param limit El límite permitido.
- * @returns El nivel de riesgo ('low', 'medium', 'high', 'at_limit', 'sd') y el porcentaje de riesgo.
  */
 export function getRisk(value: number, limit: number): { risk: number; level: RiskLevel } {
   if (limit <= 0) return { risk: value > 0 ? 1 : 0, level: value > 0 ? 'sd' : 'low' };
@@ -36,18 +33,48 @@ export function getRisk(value: number, limit: number): { risk: number; level: Ri
 
 /**
  * Checks if a subject is failed due to absences or missed assignments.
- * @param subject The subject summary object.
- * @returns True if the student is without right to pass the subject.
  */
 export function isWithoutRight(subject: SubjectSummary | Subject): boolean {
   return subject.absences > subject.absenceLimit || subject.missedAssignments > subject.missedAssignmentLimit;
 }
 
 /**
+ * Calcula el potencial de una materia.
+ */
+export function calculateSubjectPotential(subject: Subject, schemes: WeightingScheme[]): number {
+    const activityList = getActivityList(subject, schemes);
+    if (activityList.length === 0) return 100;
+
+    let totalEarnedPoints = 0;
+    let maxPossiblePoints = 0;
+
+    activityList.forEach(item => {
+        const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+        if (isGraded) {
+            const score = Number(item.score) || 0;
+            totalEarnedPoints += (score / 100) * item.weight;
+            maxPossiblePoints += item.weight;
+        }
+    });
+
+    return 100 - (maxPossiblePoints - totalEarnedPoints);
+}
+
+/**
+ * Filtra alumnos que tienen al menos una materia con un potencial por debajo de un umbral.
+ */
+export function findPotentialRiskCases(students: Student[], schemes: WeightingScheme[], threshold: number): Student[] {
+    return students.filter(student => {
+        if (!student.subjects || student.subjects.length === 0) return false;
+        return student.subjects.some(subject => {
+            const potential = calculateSubjectPotential(subject, schemes);
+            return potential < threshold;
+        });
+    });
+}
+
+/**
  * Calcula el riesgo general de un estudiante basado en sus materias.
- * @param student El objeto del estudiante.
- * @param subjects Un array con las materias (o resúmenes de materias) del estudiante.
- * @returns El nivel de riesgo general y flags para cada nivel.
  */
 export function getStudentOverallRisk(student: Student, subjects: (Subject | SubjectSummary)[]) {
   let hasSD = false;
@@ -73,11 +100,8 @@ export function getStudentOverallRisk(student: Student, subjects: (Subject | Sub
   return { overallRisk, hasSD, hasAtLimit, hasHighRisk, hasMediumRisk };
 }
 
-
 /**
  * Calcula los KPIs (Key Performance Indicators) para una lista de estudiantes.
- * @param students Array de estudiantes con sus resúmenes de materias cargados.
- * @returns El conteo de alumnos en riesgo crítico y en observación.
  */
 export function calculateKpis(students: Student[]) {
     let criticalRiskCount = 0;
@@ -96,7 +120,6 @@ export function calculateKpis(students: Student[]) {
 
     return { criticalRiskCount, observationCount };
 }
-
 
 /**
  * Criterio: Alumnos que superaron el límite de faltas y/o NE (Sin Derecho).
@@ -159,7 +182,7 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
         return student.subjectSummaries.some(subject => {
             const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
             const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
-            return absenceRisk.level === 'medium' || assignmentRisk.level === 'medium';
+            return absenceRisk.level === 'medium' || absenceRisk.level === 'medium';
         });
     });
 }
@@ -186,25 +209,17 @@ export function findAtLimitAssignmentsCases(students: Student[]): Student[] {
 
 /**
  * Criterio: Alumnos con derecho a examen extraordinario.
- * Calificación final entre 50 y 69 y sin "DA" (Deshonestidad Académica).
  */
 export function findExtraordinaryCases(students: Student[]): Student[] {
   return students.filter(student => {
     if (!student.subjectSummaries) return false;
-
-    // Primero, verificar que el alumno no tenga ninguna materia con "DA".
     const hasAcademicDishonesty = student.subjects?.some(s => s.finalGradeReason?.toUpperCase() === 'DA');
-    if (hasAcademicDishonesty) {
-      return false;
-    }
+    if (hasAcademicDishonesty) return false;
 
-    // Luego, verificar si tiene al menos una materia con calificación para extraordinario.
-    const isEligible = student.subjectSummaries.some(subject => {
+    return student.subjectSummaries.some(subject => {
       if (subject.finalGrade === null) return false;
       return subject.finalGrade >= 50 && subject.finalGrade <= 69;
     });
-
-    return isEligible;
   });
 }
 
@@ -214,18 +229,11 @@ export function findExtraordinaryCases(students: Student[]): Student[] {
 export function findRiskCasesBySubject(students: Student[], subjectName: string, riskType: 'absences' | 'missedAssignments'): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
-
         const relevantSubject = student.subjectSummaries.find(s => s.name === subjectName);
         if (!relevantSubject) return false;
-
-        if (riskType === 'absences') {
-            return relevantSubject.absences > 0;
-        } else { // missedAssignments
-            return relevantSubject.missedAssignments > 0;
-        }
+        return riskType === 'absences' ? relevantSubject.absences > 0 : relevantSubject.missedAssignments > 0;
     });
 }
-
 
 /**
  * Criterio: Alumnos con materias cuya calificacion es "SC" (sin calificar).

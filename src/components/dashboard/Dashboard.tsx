@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo } from 'react';
@@ -18,7 +19,9 @@ import {
   Zap,
   TrendingUp,
   Target,
-  ArrowRight
+  ArrowRight,
+  TrendingDown,
+  XCircle
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -31,7 +34,8 @@ import {
   findSDAbsencesCases, 
   findSDAssignmentsCases, 
   findAtLimitAbsencesCases, 
-  findAtLimitAssignmentsCases 
+  findAtLimitAssignmentsCases,
+  findPotentialRiskCases
 } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
 import { cn } from '@/lib/utils';
@@ -115,14 +119,15 @@ function SubModuleCard({ title, description, icon: Icon, color, value, onClick }
 }
 
 export function Dashboard() {
-  const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue } = useDashboardFilters();
+  const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue, weightingSchemes } = useDashboardFilters();
 
   const metrics = useMemo(() => {
     if (isLoading || !hasData) {
         return { 
             urgentCases: [], atLimitAbsencesCases: [], atLimitAssignmentsCases: [], 
             incompleteGradeCases: [], sdAbsencesCases: [], sdAssignmentsCases: [],
-            onlineRiskMundo: [], onlineRiskVida: [], scByProfessor: [], observationCases: []
+            onlineRiskMundo: [], onlineRiskVida: [], scByProfessor: [], observationCases: [],
+            lowPotentialCases: [], veryLowPotentialCases: []
         };
     }
     const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
@@ -146,6 +151,9 @@ export function Dashboard() {
     const riskMundo = findRiskCasesBySubject(studentSource, 'El mundo contemporáneo', 'missedAssignments');
     const riskVida = findRiskCasesBySubject(studentSource, 'Ciencias de la Vida', 'missedAssignments');
     
+    const lowPotential = findPotentialRiskCases(studentSource, weightingSchemes, 70);
+    const veryLowPotential = findPotentialRiskCases(studentSource, weightingSchemes, 50);
+
     const professorPendingActivities = new Map<string, Set<string>>();
     studentSource.forEach(student => {
         student.subjects?.forEach(subject => {
@@ -179,8 +187,10 @@ export function Dashboard() {
       onlineRiskMundo: riskMundo,
       onlineRiskVida: riskVida,
       scByProfessor: professorChartData,
+      lowPotentialCases: lowPotential,
+      veryLowPotentialCases: veryLowPotential
     };
-  }, [filteredStudents, allStudents, isLoading, hasData]);
+  }, [filteredStudents, allStudents, isLoading, hasData, weightingSchemes]);
 
   const handleCaseClick = (caseType: any) => {
     setCaseType(caseType);
@@ -289,6 +299,22 @@ export function Dashboard() {
                 <h2 className="text-sm font-bold uppercase tracking-widest">Focos de Atención</h2>
               </div>
               <div className="grid grid-cols-1 gap-4">
+                <SubModuleCard 
+                  title="Potencial < 70"
+                  description="Incluso con 100 en lo restante, no aprueban."
+                  icon={TrendingDown}
+                  color="bg-red-600"
+                  value={metrics.lowPotentialCases.length}
+                  onClick={() => handleCaseClick('low-potential')}
+                />
+                <SubModuleCard 
+                  title="Potencial < 50"
+                  description="Sin derecho ni a extraordinario."
+                  icon={XCircle}
+                  color="bg-black"
+                  value={metrics.veryLowPotentialCases.length}
+                  onClick={() => handleCaseClick('very-low-potential')}
+                />
                 <SubModuleCard 
                   title="Casos Críticos"
                   description="Riesgo alto en una o más materias."

@@ -40,13 +40,13 @@ import { Badge } from '@/components/ui/badge';
 import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme, ContinuityStudent, ContinuityCatalog } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases } from '@/lib/dataProcessor';
+import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases, findPotentialRiskCases } from '@/lib/dataProcessor';
 import { getContact, getTeamTasks, getProfessorContacts, getTeams, getWeightingSchemes } from '@/lib/firebase-services';
 import { xorCipher } from '@/lib/utils';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
-export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments';
+export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments' | 'low-potential' | 'very-low-potential';
 export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'team-work' | 'continuidad';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
@@ -560,6 +560,8 @@ export function DashboardClient() {
             const sdIds = new Set(findSDAbsencesCases(students).map(s => s.id));
             return findAtLimitAssignmentsCases(students).filter(s => !sdIds.has(s.id));
         }
+        if(caseType === 'low-potential') return findPotentialRiskCases(students, weightingSchemes, 70);
+        if(caseType === 'very-low-potential') return findPotentialRiskCases(students, weightingSchemes, 50);
 
         const sdIds = new Set([...findSDAbsencesCases(students), ...findSDAssignmentsCases(students)].map(s => s.id));
         const atLimitIds = new Set([...findAtLimitAbsencesCases(students), ...findAtLimitAssignmentsCases(students)].map(s => s.id));
@@ -579,7 +581,7 @@ export function DashboardClient() {
     }
 
     return students;
-  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, latestComparison, groupId, contextualStudentIds]);
+  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, latestComparison, groupId, contextualStudentIds, weightingSchemes]);
   
   const loadStudentSubjectsWrapper = async (studentId: string): Promise<Subject[]> => {
     const student = allStudentsMap.get(studentId);

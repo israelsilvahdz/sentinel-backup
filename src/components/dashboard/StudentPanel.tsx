@@ -941,6 +941,8 @@ export function StudentPanel() {
     'sd-assignments': 'Alumnos Sin Derecho por Tareas (NE)',
     'at-limit-absences': 'Alumnos al Límite por Faltas',
     'at-limit-assignments': 'Alumnos al Límite por Tareas (NE)',
+    'low-potential': 'Potencial menor a 70',
+    'very-low-potential': 'Potencial menor a 50 (Sin Extra)',
   };
 
   const getPanelTitle = () => {
