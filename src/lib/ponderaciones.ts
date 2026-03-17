@@ -1,4 +1,3 @@
-
 import type { Subject, WeightingScheme } from "@/types/student";
 
 // Helper to find the matching scheme for a subject

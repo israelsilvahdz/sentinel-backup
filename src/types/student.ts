@@ -252,3 +252,14 @@ export interface CareerOption {
   name: string;
   type: CareerType;
 }
+
+export interface WeightingScheme {
+  id?: string;
+  name: string;
+  activities: {
+    name: string;
+    weight: number;
+    label?: string;
+  }[];
+  subjectNames: string[];
+}
