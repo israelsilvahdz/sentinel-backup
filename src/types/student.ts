@@ -263,3 +263,20 @@ export interface WeightingScheme {
   }[];
   subjectNames: string[];
 }
+
+export type ActiveView = 
+  | 'welcome' 
+  | 'dashboard' 
+  | 'students' 
+  | 'weighting-schemes' 
+  | 'unclassified' 
+  | 'map-planner' 
+  | 'change-stats' 
+  | 'teams-management' 
+  | 'academic-committee' 
+  | 'professor-schedule' 
+  | 'oferta-academica' 
+  | 'irregular-students' 
+  | 'team-work' 
+  | 'continuidad'
+  | 'subject-planning';

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -30,14 +29,15 @@ import { OfertaAcademicaPanel } from './OfertaAcademicaPanel';
 import { IrregularStudentsPanel } from './IrregularStudentsPanel';
 import { TeamWorkPanel } from './TeamWorkPanel';
 import { ContinuidadPanel } from './ContinuidadPanel';
+import { SubjectPlanningPanel } from './SubjectPlanningPanel';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
 
-import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme, ContinuityStudent, ContinuityCatalog } from '@/types/student';
+import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme, ContinuityStudent, ContinuityCatalog, ActiveView } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases, findPotentialRiskCases, findPotentialRangeCases, findRequiredScoreRangeCases } from '@/lib/dataProcessor';
@@ -47,7 +47,6 @@ import { xorCipher } from '@/lib/utils';
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments' | 'low-potential' | 'very-low-potential' | 'pot-70-75' | 'pot-76-80' | 'pot-81-85' | 'req-100' | 'req-90' | 'req-80' | 'req-70';
-export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'team-work' | 'continuidad';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 
@@ -257,7 +256,7 @@ export function DashboardClient() {
               if (storedOferta) {
                   try {
                       const decrypted = xorCipher(storedOferta, storedKey);
-                      setOfertaAcademica(JSON.parse(decrypted));
+                      setAllStudents(JSON.parse(decrypted));
                   } catch (e) {
                       console.error("Fallo al desencriptar oferta:", e);
                   }
@@ -666,6 +665,7 @@ export function DashboardClient() {
         case 'irregular-students': return <IrregularStudentsPanel />;
         case 'team-work': return <TeamWorkPanel />;
         case 'continuidad': return <ContinuidadPanel />;
+        case 'subject-planning': return <SubjectPlanningPanel />;
         default: return <WelcomeDashboard />;
     }
   }
@@ -744,6 +744,12 @@ export function DashboardClient() {
                   <p className="text-[10px] font-black uppercase tracking-widest text-white/40 group-data-[collapsible=icon]:hidden group-data-[collapsible=icon]:group-hover:block">Planeación y Gestión</p>
                 </div>
 
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Planeación de Oferta" isActive={activeView === 'subject-planning'} onClick={() => handleSetActiveView('subject-planning')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
+                    <ListChecks />
+                    <span className="font-bold tracking-tight">Planeación de Oferta</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
                     <Contact />

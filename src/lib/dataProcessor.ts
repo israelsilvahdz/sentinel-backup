@@ -1,4 +1,3 @@
-
 import { type Student, type Subject, type SubjectSummary, type WeightingScheme } from '@/types/student';
 import { getActivityList } from './ponderaciones';
 
@@ -42,8 +41,6 @@ export function isWithoutRight(subject: SubjectSummary | Subject): boolean {
  * Calcula el potencial de una materia.
  */
 export function calculateSubjectPotential(subject: Subject | SubjectSummary, schemes: WeightingScheme[]): number {
-    // SubjectSummary doesn't have activities, so we use its grade as current earned points
-    // This is a simplification for cases where full subject isn't loaded
     if ('activities' in subject) {
         const activityList = getActivityList(subject as Subject, schemes);
         if (activityList.length === 0) return 100;
@@ -62,7 +59,6 @@ export function calculateSubjectPotential(subject: Subject | SubjectSummary, sch
 
         return 100 - (maxPossiblePoints - totalEarnedPoints);
     } else {
-        // Fallback for summaries: we can only estimate or return current grade if it's considered "final"
         return subject.grade || 0;
     }
 }
@@ -73,13 +69,10 @@ export function calculateSubjectPotential(subject: Subject | SubjectSummary, sch
 export function getCriticalSubjectsList(student: Student, schemes: WeightingScheme[]): { name: string, reason: 'sd' | 'low-potential' }[] {
     const subjects = student.subjects || [];
     const summaries = student.subjectSummaries || [];
-    
-    // We prefer full subjects if available
     const source = subjects.length > 0 ? subjects : summaries;
 
     return source.map(s => {
         const isSD = isWithoutRight(s);
-        // Potential check only works if we have full subjects and schemes
         let isLowPotential = false;
         if ('activities' in s) {
             isLowPotential = calculateSubjectPotential(s as Subject, schemes) < 70;
@@ -122,8 +115,56 @@ export function calculateRequiredScore(subject: Subject, schemes: WeightingSchem
 }
 
 /**
- * Filtra alumnos por rango de potencial.
+ * Agrupa los riesgos por materia para planeación de oferta.
  */
+export function aggregateRiskBySubject(students: Student[], schemes: WeightingScheme[]) {
+  const subjectMap: Record<string, {
+    name: string;
+    failedCount: number; // SD or Potential < 70
+    atRiskCount: number; // Potential 70-75
+    failedStudents: { id: string, name: string, reason: string }[];
+    atRiskStudents: { id: string, name: string, potential: number }[];
+  }> = {};
+
+  students.forEach(student => {
+    const subjects = student.subjects || [];
+    subjects.forEach(subject => {
+      if (!subjectMap[subject.name]) {
+        subjectMap[subject.name] = {
+          name: subject.name,
+          failedCount: 0,
+          atRiskCount: 0,
+          failedStudents: [],
+          atRiskStudents: []
+        };
+      }
+
+      const potential = calculateSubjectPotential(subject, schemes);
+      const isSD = isWithoutRight(subject);
+
+      if (isSD || potential < 70) {
+        subjectMap[subject.name].failedCount++;
+        subjectMap[subject.name].failedStudents.push({
+          id: student.id,
+          name: student.name,
+          reason: isSD ? 'Sin Derecho (SD)' : `Reprobado (Potencial ${potential.toFixed(1)})`
+        });
+      } else if (potential >= 70 && potential <= 75) {
+        subjectMap[subject.name].atRiskCount++;
+        subjectMap[subject.name].atRiskStudents.push({
+          id: student.id,
+          name: student.name,
+          potential
+        });
+      }
+    });
+  });
+
+  return Object.values(subjectMap)
+    .filter(s => s.failedCount > 0 || s.atRiskCount > 0)
+    .sort((a, b) => (b.failedCount + b.atRiskCount) - (a.failedCount + a.atRiskCount));
+}
+
 export function findPotentialRangeCases(students: Student[], schemes: WeightingScheme[], min: number, max: number): Student[] {
     return students.filter(student => {
         const source = student.subjects || [];
@@ -135,9 +176,6 @@ export function findPotentialRangeCases(students: Student[], schemes: WeightingS
     });
 }
 
-/**
- * Filtra alumnos por puntaje requerido para aprobar.
- */
 export function findRequiredScoreRangeCases(students: Student[], schemes: WeightingScheme[], minReq: number, maxReq: number): Student[] {
     return students.filter(student => {
         const source = student.subjects || [];
@@ -149,9 +187,6 @@ export function findRequiredScoreRangeCases(students: Student[], schemes: Weight
     });
 }
 
-/**
- * Filtra alumnos que tienen al menos una materia con un potencial por debajo de un umbral.
- */
 export function findPotentialRiskCases(students: Student[], schemes: WeightingScheme[], threshold: number): Student[] {
     return students.filter(student => {
         const source = student.subjects || [];
@@ -163,9 +198,6 @@ export function findPotentialRiskCases(students: Student[], schemes: WeightingSc
     });
 }
 
-/**
- * Calcula el riesgo general de un estudiante basado en sus materias.
- */
 export function getStudentOverallRisk(student: Student, subjects: (Subject | SubjectSummary)[]) {
   let hasSD = false;
   let hasAtLimit = false;
@@ -190,9 +222,6 @@ export function getStudentOverallRisk(student: Student, subjects: (Subject | Sub
   return { overallRisk, hasSD, hasAtLimit, hasHighRisk, hasMediumRisk };
 }
 
-/**
- * Calcula los KPIs (Key Performance Indicators) para una lista de estudiantes.
- */
 export function calculateKpis(students: Student[]) {
     let criticalRiskCount = 0;
     let observationCount = 0;
@@ -211,9 +240,6 @@ export function calculateKpis(students: Student[]) {
     return { criticalRiskCount, observationCount };
 }
 
-/**
- * Criterio: Alumnos que superaron el límite de faltas y/o NE (Sin Derecho).
- */
 export function findLostCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
@@ -223,9 +249,6 @@ export function findLostCases(students: Student[]): Student[] {
     });
 }
 
-/**
- * Criterio: Alumnos que superaron el límite de faltas (Sin Derecho por Faltas).
- */
 export function findSDAbsencesCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
@@ -235,9 +258,6 @@ export function findSDAbsencesCases(students: Student[]): Student[] {
     });
 }
 
-/**
- * Criterio: Alumnos que superaron el límite de NE (Sin Derecho por Tareas).
- */
 export function findSDAssignmentsCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
@@ -247,9 +267,6 @@ export function findSDAssignmentsCases(students: Student[]): Student[] {
     });
 }
 
-/**
- * Criterio: Alumnos con >= 80% de faltas/NE en alguna materia (y no son casos perdidos o al límite).
- */
 export function findUrgentCases(students: Student[], excludedIds: Set<string>): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries || excludedIds.has(student.id)) return false;
@@ -262,9 +279,6 @@ export function findUrgentCases(students: Student[], excludedIds: Set<string>): 
     });
 }
 
-/**
- * Criterio: Alumnos con >= 50% de faltas/NE en alguna materia (y no son urgentes, perdidos o al límite).
- */
 export function findObservationCases(students: Student[], excludedIds: Set<string>): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries || excludedIds.has(student.id)) return false;
@@ -277,9 +291,6 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
     });
 }
 
-/**
- * Criterio: Alumnos que alcanzaron exactamente el 100% del límite de faltas.
- */
 export function findAtLimitAbsencesCases(students: Student[]): Student[] {
   return students.filter(student => {
     if (!student.subjectSummaries) return false;
@@ -287,9 +298,6 @@ export function findAtLimitAbsencesCases(students: Student[]): Student[] {
   });
 }
 
-/**
- * Criterio: Alumnos que alcanzaron exactamente el 100% del límite de Tareas (NE).
- */
 export function findAtLimitAssignmentsCases(students: Student[]): Student[] {
   return students.filter(student => {
     if (!student.subjectSummaries) return false;
@@ -297,9 +305,6 @@ export function findAtLimitAssignmentsCases(students: Student[]): Student[] {
   });
 }
 
-/**
- * Criterio: Alumnos con derecho a examen extraordinario.
- */
 export function findExtraordinaryCases(students: Student[]): Student[] {
   return students.filter(student => {
     if (!student.subjectSummaries) return false;
@@ -313,9 +318,6 @@ export function findExtraordinaryCases(students: Student[]): Student[] {
   });
 }
 
-/**
- * Criterio: Alumnos con riesgo > 0% en una materia y categoría específicas.
- */
 export function findRiskCasesBySubject(students: Student[], subjectName: string, riskType: 'absences' | 'missedAssignments'): Student[] {
     return students.filter(student => {
         if (!student.subjectSummaries) return false;
@@ -325,9 +327,6 @@ export function findRiskCasesBySubject(students: Student[], subjectName: string,
     });
 }
 
-/**
- * Criterio: Alumnos con materias cuya calificacion es "SC" (sin calificar).
- */
 export function findIncompleteGradeCases(students: Student[]): Student[] {
     return students.filter(student => {
         if (!student.subjects) return false;
