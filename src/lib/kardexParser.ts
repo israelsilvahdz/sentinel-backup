@@ -10,7 +10,7 @@ export interface IrregularStudent {
   progressPercentage: number;
   currentTerm: number;
   isIrregular: boolean;
-  pendingSubjects: { name: string; term: number }[];
+  pendingSubjects: { name: string; term: number; isTaking: boolean }[];
 }
 
 const KARDEX_COLUMNS = {
@@ -18,9 +18,10 @@ const KARDEX_COLUMNS = {
   STUDENT_NAME: ['Nombre', 'Nombre del alumno', 'Nombre completo'],
   SUBJECT_NAME: ['Nombre de materia', 'Nombre de la materia', 'Nombre Materia', 'Materia', 'Nombre de la asignatura', 'Materia Descripcion'],
   GRADE: ['Calificación', 'Calificacion', 'Calif', 'Nota', 'Calificacion Final', 'Estatus', 'Estatus de la materia'],
+  CURRENT_TETRA: ['Tetra', 'Tetramestre Actual', 'Periodo Actual', 'Grado'],
 };
 
-// Mapeo de normalización incluyendo bilingüe
+// Mapeo de normalización incluyendo bilingüe y nombres cortos del Kardex
 const SUBJECT_NORM_MAP: Record<string, string> = {
     // Matemáticas
     'matematicas i lenguaje de la ciencia': 'Matemáticas I: lenguaje de la ciencia',
@@ -66,6 +67,7 @@ const SUBJECT_NORM_MAP: Record<string, string> = {
 };
 
 function normalizeString(str: string): string {
+    if (!str) return '';
     return str.toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
@@ -76,7 +78,19 @@ function normalizeString(str: string): string {
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
     const clean = normalizeString(name);
-    return SUBJECT_NORM_MAP[clean] || name;
+    // Intentar match exacto en el mapa
+    if (SUBJECT_NORM_MAP[clean]) return SUBJECT_NORM_MAP[clean];
+    
+    // Si no hay match exacto, buscar si alguna materia del currículum está contenida o contiene el nombre
+    for (const term of curriculum) {
+        for (const course of term.courses) {
+            const courseNorm = normalizeString(course.name);
+            if (clean === courseNorm || (clean.length > 8 && courseNorm.includes(clean)) || (courseNorm.length > 8 && clean.includes(courseNorm))) {
+                return course.name;
+            }
+        }
+    }
+    return name;
 }
 
 export async function parseKardexExcel(file: File): Promise<IrregularStudent[] | null> {
@@ -108,13 +122,23 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             if (index !== -1) colMap[key] = index;
         });
 
-        // Default columns if not found
+        // Columnas por defecto basadas en tu descripción (A=0, B=1, G=6, H=7)
         if (colMap.STUDENT_ID === undefined) colMap.STUDENT_ID = 0; 
         if (colMap.STUDENT_NAME === undefined) colMap.STUDENT_NAME = 1; 
         if (colMap.SUBJECT_NAME === undefined) colMap.SUBJECT_NAME = 6; 
         if (colMap.GRADE === undefined) colMap.GRADE = 7; 
+        // El tetra suele estar en una columna como la D o similar, intentamos buscarla
+        if (colMap.CURRENT_TETRA === undefined) {
+            const tetraIdx = headers.findIndex(h => h.includes('tetra'));
+            if (tetraIdx !== -1) colMap.CURRENT_TETRA = tetraIdx;
+        }
 
-        const studentsData = new Map<string, { name: string, subjects: Set<string>, latestTerm: number }>();
+        const studentsData = new Map<string, { 
+            name: string, 
+            approved: Set<string>, 
+            taking: Set<string>, 
+            currentTerm: number 
+        }>();
 
         for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i];
@@ -127,47 +151,59 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             const subjectRaw = String(row[colMap.SUBJECT_NAME] || '').trim();
             const subjectNormalized = normalizeSubjectName(subjectRaw);
             const grade = row[colMap.GRADE];
+            const tetraVal = colMap.CURRENT_TETRA !== undefined ? row[colMap.CURRENT_TETRA] : null;
 
+            if (!studentsData.has(id)) {
+                let term = 1;
+                if (tetraVal) {
+                    const parsedTerm = parseInt(String(tetraVal).replace(/\D/g, ''));
+                    if (!isNaN(parsedTerm)) term = parsedTerm;
+                }
+                studentsData.set(id, { name, approved: new Set(), taking: new Set(), currentTerm: term });
+            }
+
+            const currentStudent = studentsData.get(id)!;
             const gradeStr = String(grade || '').toUpperCase();
+            
             const isApproved = grade !== null && gradeStr !== '' && 
                              (
                                (!isNaN(parseFloat(gradeStr)) && parseFloat(gradeStr) >= 70) || 
-                               ['AC', 'CU', 'APROBADO', 'ACREDITADO', 'EQUIV'].some(v => gradeStr.includes(v))
+                               ['AC', 'CU', 'APROBADO', 'ACREDITADO', 'EQUIV'].some(v => gradeStr.includes(v) && v !== 'CU')
                              );
+            
+            const isCurrentlyTaking = gradeStr === 'CU';
 
             if (isApproved) {
-                if (!studentsData.has(id)) {
-                    studentsData.set(id, { name, subjects: new Set(), latestTerm: 1 });
-                }
-                studentsData.get(id)!.subjects.add(normalizeString(subjectNormalized));
+                currentStudent.approved.add(subjectNormalized);
+            } else if (isCurrentlyTaking) {
+                currentStudent.taking.add(subjectNormalized);
             }
         }
 
         const irregularStudents: IrregularStudent[] = [];
 
         studentsData.forEach((data, id) => {
-            const pending: { name: string; term: number }[] = [];
+            const pending: { name: string; term: number; isTaking: boolean }[] = [];
             let completedCount = 0;
 
             ALL_REQUIRED_SUBJECTS.forEach(req => {
-                const reqNormalized = normalizeString(req.name);
-                const isFound = Array.from(data.subjects).some(s => {
-                    const sNorm = normalizeString(normalizeSubjectName(s));
-                    return sNorm === reqNormalized || (sNorm.length > 10 && reqNormalized.includes(sNorm)) || (reqNormalized.length > 10 && sNorm.includes(reqNormalized));
-                });
+                const isApproved = data.approved.has(req.name);
+                const isTaking = data.taking.has(req.name);
 
-                if (isFound) completedCount++;
-                else pending.push(req);
+                if (isApproved) {
+                    completedCount++;
+                } else {
+                    // Si no está aprobada, es pendiente. Guardamos si la está cursando.
+                    pending.push({ name: req.name, term: req.term, isTaking });
+                }
             });
 
-            // Lógica para identificar tetramestre actual:
-            // Basado en el número de materias aprobadas (asumiendo 7 por tetra)
-            // Si tiene 7 aprobadas, está terminando 1ero o en 2do.
-            const estimatedTerm = Math.min(6, Math.floor(completedCount / 7) + 1);
-            
-            // Un alumno es irregular si le falta alguna materia de un tetramestre anterior al estimado
-            const hasLegacyDebt = pending.some(p => p.term < estimatedTerm);
-            const isIrregular = hasLegacyDebt || (completedCount % 7 !== 0 && estimatedTerm < 6);
+            // Lógica de irregularidad mejorada:
+            // 1. Debe materias de tetras pasados que no está cursando ni aprobó.
+            // 2. Le faltan materias en el tetra actual que no está cursando ni aprobó.
+            const hasPastDebt = pending.some(p => p.term < data.currentTerm && !p.isTaking);
+            const isIncompleteCurrent = pending.some(p => p.term === data.currentTerm && !p.isTaking);
+            const isIrregular = hasPastDebt || isIncompleteCurrent;
 
             irregularStudents.push({
                 id,
@@ -175,7 +211,7 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
                 completedCount,
                 totalRequired: ALL_REQUIRED_SUBJECTS.length,
                 progressPercentage: Math.round((completedCount / ALL_REQUIRED_SUBJECTS.length) * 100),
-                currentTerm: estimatedTerm,
+                currentTerm: data.currentTerm,
                 isIrregular,
                 pendingSubjects: pending
             });

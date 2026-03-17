@@ -9,7 +9,7 @@ import { parseKardexExcel, type IrregularStudent } from '@/lib/kardexParser';
 import { Badge } from '@/components/ui/badge';
 import { 
   AlertCircle, CheckCircle2, FileUp, UserCheck, UserX, 
-  GraduationCap, Search, TrendingUp, Info, ListChecks, Loader2, AlertTriangle, Filter
+  GraduationCap, Search, TrendingUp, Info, ListChecks, Loader2, AlertTriangle, Filter, BookOpen, Clock
 } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/accordion';
 import { Progress } from '../ui/progress';
@@ -60,14 +60,21 @@ export function IrregularStudentsPanel() {
 
     const filteredStudents = useMemo(() => {
         return students.filter(s => {
-            // 1. Filtro de búsqueda interna
+            // 1. Filtro de búsqueda interna (nombre o matrícula)
             const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                  s.id.toLowerCase().includes(searchTerm.toLowerCase());
             if (!matchesSearch) return false;
 
-            // 2. Filtros globales del banner
+            // 2. Filtros globales del banner (Líder, Tutor, Grupo)
             if (selectedValue) {
-                const studentDaily = allStudentsMap.get(s.id);
+                // Realizar búsqueda cruzada de ID (con o sin T)
+                const id = s.id.trim().toUpperCase();
+                const idWithoutT = id.startsWith('T') ? id.substring(1) : id;
+                
+                const studentDaily = allStudentsMap.get(id) || 
+                                   allStudentsMap.get(idWithoutT) || 
+                                   allStudentsMap.get(`T${idWithoutT}`);
+                
                 if (!studentDaily) return false;
 
                 if (filterType === 'leader') return studentDaily.leader === selectedValue;
@@ -111,7 +118,7 @@ export function IrregularStudentsPanel() {
                         />
                         {selectedValue && (
                             <Badge className="bg-white/20 text-white border-none justify-center gap-2 py-1.5 rounded-xl">
-                                <Filter className="h-3 w-3" /> Filtrado por {filterType}: {selectedValue}
+                                <Filter className="h-3 w-3" /> Filtrado por {filterType === 'leader' ? 'Líder' : filterType === 'tutor' ? 'Tutor' : 'Grupo'}: {selectedValue}
                             </Badge>
                         )}
                     </div>
@@ -242,20 +249,30 @@ export function IrregularStudentsPanel() {
                                                             {student.pendingSubjects.filter(p => p.term <= student.currentTerm).map((subject, index) => (
                                                                 <div key={index} className={cn(
                                                                     "flex items-center justify-between p-3 rounded-xl border transition-all",
-                                                                    subject.term < student.currentTerm ? "bg-red-50/50 border-red-100" : "bg-muted/30 border-transparent"
+                                                                    subject.term < student.currentTerm && !subject.isTaking ? "bg-red-50/50 border-red-100" : "bg-muted/30 border-transparent",
+                                                                    subject.isTaking && "bg-blue-50/50 border-blue-100"
                                                                 )}>
                                                                     <div className="flex items-center gap-3">
-                                                                        {subject.term < student.currentTerm && <AlertCircle className="h-3.5 w-3.5 text-red-500" />}
-                                                                        <span className={cn("text-xs font-bold", subject.term < student.currentTerm ? "text-red-700" : "text-foreground/80")}>
+                                                                        {subject.term < student.currentTerm && !subject.isTaking && <AlertCircle className="h-3.5 w-3.5 text-red-500" />}
+                                                                        {subject.isTaking && <Clock className="h-3.5 w-3.5 text-blue-500" />}
+                                                                        <span className={cn(
+                                                                            "text-xs font-bold", 
+                                                                            subject.term < student.currentTerm && !subject.isTaking ? "text-red-700" : 
+                                                                            subject.isTaking ? "text-blue-700" : "text-foreground/80"
+                                                                        )}>
                                                                             {subject.name}
                                                                         </span>
                                                                     </div>
-                                                                    <Badge variant="secondary" className={cn(
-                                                                        "text-[9px] font-black uppercase border-none",
-                                                                        subject.term < student.currentTerm ? "bg-red-100 text-red-700" : "bg-primary/5 text-primary"
-                                                                    )}>
-                                                                        {subject.term < student.currentTerm ? `Adeudo ${subject.term}°` : `${subject.term}° Tetra`}
-                                                                    </Badge>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {subject.isTaking && <Badge className="bg-blue-600 text-white text-[8px] font-black uppercase h-5">Cursando</Badge>}
+                                                                        <Badge variant="secondary" className={cn(
+                                                                            "text-[9px] font-black uppercase border-none",
+                                                                            subject.term < student.currentTerm && !subject.isTaking ? "bg-red-100 text-red-700" : 
+                                                                            subject.isTaking ? "bg-blue-100 text-blue-700" : "bg-primary/5 text-primary"
+                                                                        )}>
+                                                                            {subject.term < student.currentTerm ? `Adeudo ${subject.term}°` : `${subject.term}° Tetra`}
+                                                                        </Badge>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -282,7 +299,7 @@ export function IrregularStudentsPanel() {
                                                         <div className="pt-2 border-t flex items-center gap-2">
                                                             <Info className="h-3.5 w-3.5 text-primary opacity-60" />
                                                             <p className="text-[10px] text-muted-foreground italic leading-tight">
-                                                                El estatus "Irregular" se activa por adeudos de periodos previos o carga incompleta en el periodo actual.
+                                                                El estatus "Regular" se asigna si el alumno no tiene adeudos históricos y cursa sus 7 materias del periodo actual.
                                                             </p>
                                                         </div>
                                                     </div>
