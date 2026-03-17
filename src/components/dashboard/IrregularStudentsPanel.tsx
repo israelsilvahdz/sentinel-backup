@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useCallback } from 'react';
@@ -9,11 +8,12 @@ import { parseKardexExcel, type IrregularStudent } from '@/lib/kardexParser';
 import { Badge } from '@/components/ui/badge';
 import { 
   AlertCircle, CheckCircle2, FileUp, UserCheck, UserX, 
-  GraduationCap, BookOpen, Search, TrendingUp, Info, ListChecks 
+  GraduationCap, BookOpen, Search, TrendingUp, Info, ListChecks, Loader2 
 } from 'lucide-react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/accordion';
 import { Progress } from '../ui/progress';
 import { Input } from '../ui/input';
+import { cn } from '@/lib/utils';
 
 export function IrregularStudentsPanel() {
     const { toast } = useToast();
@@ -72,7 +72,7 @@ export function IrregularStudentsPanel() {
             <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-emerald-900 p-8 md:p-10 text-white shadow-2xl">
                 <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
                     <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-2 border border-white/10">
+                        <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-2 border border-white/10 shadow-inner">
                             <GraduationCap className="h-3 w-3" /> Auditoría de Graduación 2026
                         </div>
                         <h1 className="text-4xl font-black tracking-tight">Análisis de Alumnos Irregulares</h1>
@@ -93,7 +93,7 @@ export function IrregularStudentsPanel() {
             </header>
 
             {analysisDone && stats && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-500">
                     <Card className="border-none shadow-sm bg-primary/5">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-xs font-black uppercase text-primary tracking-widest">Total Analizados</CardTitle>
@@ -142,7 +142,12 @@ export function IrregularStudentsPanel() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {!analysisDone ? (
+                    {isProcessing ? (
+                        <div className="py-32 flex flex-col items-center justify-center space-y-4">
+                            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                            <p className="text-sm font-bold uppercase tracking-widest text-primary/60">Procesando Kardex Masivo...</p>
+                        </div>
+                    ) : !analysisDone ? (
                          <div className="text-center py-32 space-y-4">
                             <div className="mx-auto bg-muted p-6 rounded-full w-fit">
                                 <AlertCircle className="h-12 w-12 text-muted-foreground/40" />
@@ -190,8 +195,8 @@ export function IrregularStudentsPanel() {
                                                 </div>
                                             </div>
                                         </AccordionTrigger>
-                                        <AccordionContent className="px-6 pb-6 pt-2">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <AccordionContent className="px-6 pb-6 pt-2 border-t border-muted/30">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
                                                 <div className="space-y-4">
                                                     <h4 className='text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2'>
                                                         <ListChecks className="h-3 w-3" /> Detalle de Materias Faltantes
