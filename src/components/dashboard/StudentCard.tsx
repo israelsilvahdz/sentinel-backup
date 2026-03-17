@@ -4,9 +4,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2, User as UserIcon, Calendar, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2, User as UserIcon, Calendar, CheckCircle2, AlertCircle } from 'lucide-react';
 import { type Student, type SubjectSummary, type Team, type Change, type Subject } from "@/types/student";
-import { getStudentOverallRisk, type RiskLevel, getRisk } from '@/lib/dataProcessor';
+import { getStudentOverallRisk, type RiskLevel, getRisk, getCriticalSubjectsList } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
@@ -102,6 +102,10 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
     return studentTeam?.name;
   }, [teams, student.id]);
 
+  const criticalSubjects = useMemo(() => {
+    return getCriticalSubjectsList(student, weightingSchemes);
+  }, [student, weightingSchemes]);
+
   const hasChanges = changes && changes.length > 0;
 
   const initials = useMemo(() => {
@@ -112,11 +116,9 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
   const formatWhatsAppNumber = (phone: string): string => {
     if (!phone) return '';
     const trimmed = phone.trim();
-    // If it starts with +, it's an international number with LADA already
     if (trimmed.startsWith('+')) {
         return trimmed.replace(/\D/g, '');
     }
-    // Default: local number, apply Mexican LADA (52)
     const clean = trimmed.replace(/\D/g, '');
     return `52${clean.slice(-10)}`;
   };
@@ -382,9 +384,32 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
                         )}
                         {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <MatriculaCopy studentId={student.id} />
-                        <span className="text-[10px] font-black uppercase text-muted-foreground/50 tracking-widest hidden sm:inline">Líder: {student.leader}</span>
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-3">
+                            <MatriculaCopy studentId={student.id} />
+                            <span className="text-[10px] font-black uppercase text-muted-foreground/50 tracking-widest hidden sm:inline">Líder: {student.leader}</span>
+                        </div>
+                        
+                        {/* Materias en Riesgo / Reprobadas Resumen */}
+                        {!isOpen && criticalSubjects.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 items-center mt-1 animate-in fade-in duration-500">
+                                <span className="text-[9px] font-black text-destructive uppercase tracking-tighter flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" /> Materias Críticas:
+                                </span>
+                                {criticalSubjects.map((sub, idx) => (
+                                    <Badge 
+                                        key={idx} 
+                                        variant="secondary" 
+                                        className={cn(
+                                            "text-[8px] h-4 px-1.5 font-bold border-none uppercase tracking-tighter",
+                                            sub.reason === 'sd' ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+                                        )}
+                                    >
+                                        {sub.name} {sub.reason === 'sd' ? '(SD)' : ''}
+                                    </Badge>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

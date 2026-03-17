@@ -41,23 +41,54 @@ export function isWithoutRight(subject: SubjectSummary | Subject): boolean {
 /**
  * Calcula el potencial de una materia.
  */
-export function calculateSubjectPotential(subject: Subject, schemes: WeightingScheme[]): number {
-    const activityList = getActivityList(subject, schemes);
-    if (activityList.length === 0) return 100;
+export function calculateSubjectPotential(subject: Subject | SubjectSummary, schemes: WeightingScheme[]): number {
+    // SubjectSummary doesn't have activities, so we use its grade as current earned points
+    // This is a simplification for cases where full subject isn't loaded
+    if ('activities' in subject) {
+        const activityList = getActivityList(subject as Subject, schemes);
+        if (activityList.length === 0) return 100;
 
-    let totalEarnedPoints = 0;
-    let maxPossiblePoints = 0;
+        let totalEarnedPoints = 0;
+        let maxPossiblePoints = 0;
 
-    activityList.forEach(item => {
-        const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
-        if (isGraded) {
-            const score = Number(item.score) || 0;
-            totalEarnedPoints += (score / 100) * item.weight;
-            maxPossiblePoints += item.weight;
+        activityList.forEach(item => {
+            const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+            if (isGraded) {
+                const score = Number(item.score) || 0;
+                totalEarnedPoints += (score / 100) * item.weight;
+                maxPossiblePoints += item.weight;
+            }
+        });
+
+        return 100 - (maxPossiblePoints - totalEarnedPoints);
+    } else {
+        // Fallback for summaries: we can only estimate or return current grade if it's considered "final"
+        return subject.grade || 0;
+    }
+}
+
+/**
+ * Obtiene la lista de materias en estado crítico (SD o Potencial < 70) para un alumno.
+ */
+export function getCriticalSubjectsList(student: Student, schemes: WeightingScheme[]): { name: string, reason: 'sd' | 'low-potential' }[] {
+    const subjects = student.subjects || [];
+    const summaries = student.subjectSummaries || [];
+    
+    // We prefer full subjects if available
+    const source = subjects.length > 0 ? subjects : summaries;
+
+    return source.map(s => {
+        const isSD = isWithoutRight(s);
+        // Potential check only works if we have full subjects and schemes
+        let isLowPotential = false;
+        if ('activities' in s) {
+            isLowPotential = calculateSubjectPotential(s as Subject, schemes) < 70;
         }
-    });
 
-    return 100 - (maxPossiblePoints - totalEarnedPoints);
+        if (isSD) return { name: s.name, reason: 'sd' as const };
+        if (isLowPotential) return { name: s.name, reason: 'low-potential' as const };
+        return null;
+    }).filter((item): item is { name: string, reason: 'sd' | 'low-potential' } => item !== null);
 }
 
 /**
@@ -95,8 +126,9 @@ export function calculateRequiredScore(subject: Subject, schemes: WeightingSchem
  */
 export function findPotentialRangeCases(students: Student[], schemes: WeightingScheme[], min: number, max: number): Student[] {
     return students.filter(student => {
-        if (!student.subjects || student.subjects.length === 0) return false;
-        return student.subjects.some(subject => {
+        const source = student.subjects || [];
+        if (source.length === 0) return false;
+        return source.some(subject => {
             const potential = calculateSubjectPotential(subject, schemes);
             return potential >= min && potential <= max;
         });
@@ -108,8 +140,9 @@ export function findPotentialRangeCases(students: Student[], schemes: WeightingS
  */
 export function findRequiredScoreRangeCases(students: Student[], schemes: WeightingScheme[], minReq: number, maxReq: number): Student[] {
     return students.filter(student => {
-        if (!student.subjects || student.subjects.length === 0) return false;
-        return student.subjects.some(subject => {
+        const source = student.subjects || [];
+        if (source.length === 0) return false;
+        return source.some(subject => {
             const req = calculateRequiredScore(subject, schemes);
             return req >= minReq && req <= maxReq;
         });
@@ -121,8 +154,9 @@ export function findRequiredScoreRangeCases(students: Student[], schemes: Weight
  */
 export function findPotentialRiskCases(students: Student[], schemes: WeightingScheme[], threshold: number): Student[] {
     return students.filter(student => {
-        if (!student.subjects || student.subjects.length === 0) return false;
-        return student.subjects.some(subject => {
+        const source = student.subjects || [];
+        if (source.length === 0) return false;
+        return source.some(subject => {
             const potential = calculateSubjectPotential(subject, schemes);
             return potential < threshold;
         });
