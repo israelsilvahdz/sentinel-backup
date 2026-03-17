@@ -11,56 +11,76 @@ export interface IrregularStudent {
   pendingSubjects: { name: string; term: number }[];
 }
 
-interface KardexEntry {
-  studentId: string;
-  studentName: string;
-  subjectName: string;
-  grade: string | number | null;
-}
-
 const KARDEX_COLUMNS = {
-  STUDENT_ID: ['Matrícula', 'Matricula', 'ID'],
-  STUDENT_NAME: ['Nombre', 'Nombre del alumno'],
-  SUBJECT_NAME: ['Nombre Materia', 'Materia', 'Nombre de la materia'],
-  GRADE: ['Calificación', 'Calif', 'Nota'],
+  STUDENT_ID: ['Matrícula', 'Matricula', 'ID', 'Numero de matricula'],
+  STUDENT_NAME: ['Nombre', 'Nombre del alumno', 'Nombre completo'],
+  SUBJECT_NAME: ['Nombre Materia', 'Materia', 'Nombre de la asignatura', 'Materia Descripcion'],
+  GRADE: ['Calificación', 'Calif', 'Nota', 'Calificacion Final', 'Estatus', 'Estatus de la materia'],
 };
 
-// Mapeo robusto de normalización para asegurar coincidencia con curriculum.ts
+// Mapeo exhaustivo de normalización para asegurar coincidencia con curriculum.ts
 const SUBJECT_NORM_MAP: Record<string, string> = {
-    'matematicas iii: periodicidad y repeticion': 'Matemáticas III: regularidad y repetición',
-    'matematicas iii: regularidad y repeticion': 'Matemáticas III: regularidad y repetición',
-    'matematicas i: lenguaje de la ciencia': 'Matemáticas I: lenguaje de la ciencia',
-    'matematicas ii: pensamiento matematico': 'Matemáticas II: pensamiento matemático',
-    'antropologia: cultura y consciencia social': 'Antropología',
+    'matematicas i': 'Matemáticas I: lenguaje de la ciencia',
+    'matematicas i lenguaje de la ciencia': 'Matemáticas I: lenguaje de la ciencia',
+    'matematicas ii': 'Matemáticas II: pensamiento matemático',
+    'matematicas ii pensamiento matematico': 'Matemáticas II: pensamiento matemático',
+    'matematicas iii': 'Matemáticas III: regularidad y repetición',
+    'matematicas iii regularidad y repeticion': 'Matemáticas III: regularidad y repetición',
+    'matematicas iii periodicidad y repeticion': 'Matemáticas III: regularidad y repetición',
+    'matematicas iv': 'Matemáticas IV: modelos matemáticos',
+    'matematicas iv modelos matematicos': 'Matemáticas IV: modelos matemáticos',
+    'el ser humano en sociedad': 'El ser humano en sociedad',
+    'lectura y redaccion': 'Lectura y Redacción',
+    'ecologia y geografia': 'Ecología y Geografía',
+    'tecnologias de la informacion i': 'Tecnologías de la Información I',
+    'habilidades y valores i': 'Habilidades y valores I: bienestar',
+    'habilidades y valores i bienestar': 'Habilidades y valores I: bienestar',
+    'historia de mexico': 'Historia de México',
+    'comunicacion integral': 'Comunicación Integral',
+    'transformacion de la materia': 'Transformación de la materia',
+    'tecnologias de la informacion ii': 'Tecnologías de la Información II',
+    'habilidades y valores ii': 'Habilidades y valores II: pensamiento crítico',
+    'habilidades y valores ii pensamiento critico': 'Habilidades y valores II: pensamiento crítico',
+    'mexico contemporaneo': 'México Contemporáneo',
+    'los grandes escritores universales': 'Los grandes escritores universales',
+    'el carbono y sus componentes': 'El carbono y sus componentes',
+    'conceptos y dilemas eticos': 'Conceptos y dilemas éticos',
+    'habilidades y valores iii': 'Habilidades y valores III: ser creativo',
+    'habilidades y valores iii ser creativo': 'Habilidades y valores III: ser creativo',
     'antropologia': 'Antropología',
     'ciencias de la vida': 'Ciencias de la Vida',
+    'habilidades y valores iv': 'Habilidades y valores IV: plan de vida y carrera',
+    'habilidades y valores iv plan de vida y carrera': 'Habilidades y valores IV: plan de vida y carrera',
+    'calculo diferencial': 'Cálculo Diferencial',
+    'materia y energia i': 'Materia y energía I',
+    'materia y energia ii': 'Materia y energía II',
     'el mundo contemporaneo': 'El mundo contemporáneo',
-    'historia de mexico': 'Historia de México',
-    'mexico contemporaneo': 'México Contemporáneo',
+    'cuidado del cuerpo humano': 'Cuidado del cuerpo humano',
+    'habilidades y valores v': 'Habilidades y valores V: lenguaje',
+    'habilidades y valores v lenguaje': 'Habilidades y valores V: lenguaje',
+    'calculo integral': 'Cálculo Integral',
     'mexico en el siglo xxi': 'México en el siglo XXI',
-    'tecnologias de la informacion i': 'Tecnologías de la Información I',
-    'tecnologias de la informacion ii': 'Tecnologías de la Información II',
-    'habilidades y valores i: bienestar': 'Habilidades y valores I: bienestar',
-    'habilidades y valores ii: pensamiento critico': 'Habilidades y valores II: pensamiento crítico',
-    'habilidades y valores iii: ser creativo': 'Habilidades y valores III: ser creativo',
-    'habilidades y valores iv: plan de vida y carrera': 'Habilidades y valores IV: plan de vida y carrera',
-    'habilidades y valores v: lenguaje': 'Habilidades y valores V: lenguaje',
-    'habilidades y valores vi: toma de decisiones': 'Habilidades y valores VI: toma de decisiones',
+    'pensamiento filosofico': 'Pensamiento Filosófico',
+    'habilidades y valores vi': 'Habilidades y valores VI: toma de decisiones',
+    'habilidades y valores vi toma de decisiones': 'Habilidades y valores VI: toma de decisiones',
 };
+
+function normalizeString(str: string): string {
+    return str.toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim();
+}
 
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
-    const clean = name.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9\s:]/g, '')
-        .trim();
-    
+    const clean = normalizeString(name);
     return SUBJECT_NORM_MAP[clean] || name;
 }
 
 function normalizeHeader(header: string): string {
-    return header.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+    return normalizeString(header || '');
 }
 
 const ALL_REQUIRED_SUBJECTS = curriculum.flatMap((term, idx) => 
@@ -105,16 +125,21 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             if (!id) continue;
 
             const name = String(row[colMap.STUDENT_NAME] || id).trim();
-            const subject = normalizeSubjectName(String(row[colMap.SUBJECT_NAME] || '').trim());
+            const subjectRaw = String(row[colMap.SUBJECT_NAME] || '').trim();
+            const subjectNormalized = normalizeSubjectName(subjectRaw);
             const grade = row[colMap.GRADE];
 
-            // Consideramos materia "completada" si tiene calificación aprobatoria o estatus de acreditado
-            const isApproved = grade !== null && String(grade).trim() !== '' && 
-                             (parseFloat(String(grade)) >= 70 || ['AC', 'CU', '70', '80', '90', '100'].some(v => String(grade).toUpperCase().includes(v)));
+            // Lógica de aprobación flexible: números >= 70 o palabras clave de éxito
+            const gradeStr = String(grade || '').toUpperCase();
+            const isApproved = grade !== null && gradeStr !== '' && 
+                             (
+                               (!isNaN(parseFloat(gradeStr)) && parseFloat(gradeStr) >= 70) || 
+                               ['AC', 'CU', 'APROBADO', 'ACREDITADO', 'APROBADA'].some(v => gradeStr.includes(v))
+                             );
 
             if (isApproved) {
                 if (!studentsData.has(id)) studentsData.set(id, { name, subjects: new Set() });
-                studentsData.get(id)!.subjects.add(subject);
+                studentsData.get(id)!.subjects.add(subjectNormalized);
             }
         }
 
@@ -125,10 +150,16 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             let completedCount = 0;
 
             ALL_REQUIRED_SUBJECTS.forEach(req => {
-                const isFound = Array.from(data.subjects).some(s => 
-                    s.toLowerCase() === req.name.toLowerCase() || 
-                    normalizeSubjectName(s) === normalizeSubjectName(req.name)
-                );
+                const reqNormalized = normalizeString(req.name);
+                
+                // Comprobación robusta: coincidencia exacta normalizada o mapeada
+                const isFound = Array.from(data.subjects).some(s => {
+                    const sNorm = normalizeString(s);
+                    return sNorm === reqNormalized || 
+                           normalizeString(normalizeSubjectName(s)) === reqNormalized ||
+                           (sNorm.length > 5 && reqNormalized.includes(sNorm)) ||
+                           (reqNormalized.length > 5 && sNorm.includes(reqNormalized));
+                });
 
                 if (isFound) {
                     completedCount++;
