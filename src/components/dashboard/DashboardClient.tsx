@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
@@ -32,7 +33,7 @@ import { ContinuidadPanel } from './ContinuidadPanel';
 import { SubjectPlanningPanel } from './SubjectPlanningPanel';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks, GraduationCap } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -748,6 +749,12 @@ export function DashboardClient() {
                    <SidebarMenuButton tooltip="Planeación de Oferta" isActive={activeView === 'subject-planning'} onClick={() => handleSetActiveView('subject-planning')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
                     <ListChecks />
                     <span className="font-bold tracking-tight">Planeación de Oferta</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                   <SidebarMenuButton tooltip="Analizador de Egreso" isActive={activeView === 'irregular-students'} onClick={() => handleSetActiveView('irregular-students')} className="h-11 px-4 transition-all duration-300 data-[active=true]:shadow-[0_8px_20px_-4px_rgba(0,0,0,0.3)] rounded-xl group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
+                    <GraduationCap />
+                    <span className="font-bold tracking-tight">Analizador de Egreso</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
