@@ -88,6 +88,11 @@ const SUBJECT_NORM_MAP: Record<string, string> = {
     // Tecnología
     'tecnologias de la informacion i': 'Tecnologías de la Información I',
     'tecnologias de la informacion ii': 'Tecnologías de la Información II',
+    
+    // Optativas
+    'optativa de modulo de formación': 'Optativa de módulo de formación',
+    'optativa formación': 'Optativa de módulo de formación',
+    'formacion': 'Optativa de módulo de formación'
 };
 
 function normalizeString(str: string): string {
@@ -109,13 +114,13 @@ function normalizeHeader(header: string): string {
     return normalizeString(header || '');
 }
 
-const ALL_REQUIRED_SUBJECTS = curriculum.flatMap((term, idx) => 
-    term.courses
-        .filter(c => !c.isPlaceholder && !c.isFlexible)
-        .map(c => ({ name: c.name, term: idx + 1 }))
-);
-
 export async function parseKardexExcel(file: File): Promise<IrregularStudent[] | null> {
+  const ALL_REQUIRED_SUBJECTS = curriculum.flatMap((term, idx) => 
+    term.courses
+        .filter(c => !c.isPlaceholder) // No longer filters flexible, only placeholders
+        .map(c => ({ name: c.name, term: idx + 1 }))
+  );
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -128,7 +133,6 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        // Obtenemos los datos crudos incluyendo el encabezado
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
 
         if (jsonData.length < 2) {
@@ -136,7 +140,6 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             return resolve(null);
         }
         
-        // Identificar índices de columnas por encabezado
         const headers: string[] = jsonData[0].map((h: any) => normalizeHeader(String(h || '')));
         const colMap: Record<string, number> = {};
 
@@ -145,34 +148,31 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             if (index !== -1) {
                 colMap[key] = index;
             } else {
-                // Búsqueda parcial si la exacta falla
                 const partialIndex = headers.findIndex(h => synonyms.some(s => h.includes(normalizeHeader(s))));
                 if (partialIndex !== -1) colMap[key] = partialIndex;
             }
         });
 
-        // Si no se encuentran por nombre, intentar por posición fija según descripción del usuario (A, B, G, H)
-        if (colMap.STUDENT_ID === undefined) colMap.STUDENT_ID = 0; // Columna A
-        if (colMap.STUDENT_NAME === undefined) colMap.STUDENT_NAME = 1; // Columna B
-        if (colMap.SUBJECT_NAME === undefined) colMap.SUBJECT_NAME = 6; // Columna G
-        if (colMap.GRADE === undefined) colMap.GRADE = 7; // Columna H
+        // Default Column Mapping (A, B, G, H)
+        if (colMap.STUDENT_ID === undefined) colMap.STUDENT_ID = 0; 
+        if (colMap.STUDENT_NAME === undefined) colMap.STUDENT_NAME = 1; 
+        if (colMap.SUBJECT_NAME === undefined) colMap.SUBJECT_NAME = 6; 
+        if (colMap.GRADE === undefined) colMap.GRADE = 7; 
 
         const studentsData = new Map<string, { name: string, subjects: Set<string> }>();
 
-        // Empezamos desde la fila 1 (la 0 es el encabezado)
         for (let i = 1; i < jsonData.length; i++) {
             const row = jsonData[i];
             if (!row || row.length === 0) continue;
 
             const id = String(row[colMap.STUDENT_ID] || '').trim();
-            if (!id || id.toLowerCase() === 'matricula') continue; // Evitar procesar encabezados repetidos
+            if (!id || id.toLowerCase() === 'matricula') continue;
 
             const name = String(row[colMap.STUDENT_NAME] || id).trim();
             const subjectRaw = String(row[colMap.SUBJECT_NAME] || '').trim();
             const subjectNormalized = normalizeSubjectName(subjectRaw);
             const grade = row[colMap.GRADE];
 
-            // Lógica de aprobación flexible
             const gradeStr = String(grade || '').toUpperCase();
             const isApproved = grade !== null && gradeStr !== '' && 
                              (
@@ -197,7 +197,6 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             ALL_REQUIRED_SUBJECTS.forEach(req => {
                 const reqNormalized = normalizeString(req.name);
                 
-                // Comprobación de coincidencia
                 const isFound = Array.from(data.subjects).some(s => {
                     return s === reqNormalized || 
                            normalizeString(normalizeSubjectName(s)) === reqNormalized ||
@@ -223,7 +222,6 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             });
         });
 
-        // Ordenar: primero los que tienen más materias pendientes
         resolve(irregularStudents.sort((a,b) => b.pendingSubjects.length - a.pendingSubjects.length));
 
       } catch (error) {
