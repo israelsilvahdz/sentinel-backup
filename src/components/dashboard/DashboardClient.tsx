@@ -40,13 +40,13 @@ import { Badge } from '@/components/ui/badge';
 import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme, ContinuityStudent, ContinuityCatalog } from '@/types/student';
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
-import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases, findPotentialRiskCases } from '@/lib/dataProcessor';
+import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases, findPotentialRiskCases, findPotentialRangeCases, findRequiredScoreRangeCases } from '@/lib/dataProcessor';
 import { getContact, getTeamTasks, getProfessorContacts, getTeams, getWeightingSchemes } from '@/lib/firebase-services';
 import { xorCipher } from '@/lib/utils';
 
 
 type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
-export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments' | 'low-potential' | 'very-low-potential';
+export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments' | 'low-potential' | 'very-low-potential' | 'pot-70-75' | 'pot-76-80' | 'pot-81-85' | 'req-100' | 'req-90' | 'req-80' | 'req-70';
 export type ActiveView = 'welcome' | 'dashboard' | 'students' | 'weighting-schemes' | 'unclassified' | 'map-planner' | 'change-stats' | 'teams-management' | 'academic-committee' | 'professor-schedule' | 'oferta-academica' | 'irregular-students' | 'team-work' | 'continuidad';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
@@ -562,6 +562,17 @@ export function DashboardClient() {
         }
         if(caseType === 'low-potential') return findPotentialRiskCases(students, weightingSchemes, 70);
         if(caseType === 'very-low-potential') return findPotentialRiskCases(students, weightingSchemes, 50);
+        
+        // Nuevos casos de rango de potencial
+        if(caseType === 'pot-70-75') return findPotentialRangeCases(students, weightingSchemes, 70, 75);
+        if(caseType === 'pot-76-80') return findPotentialRangeCases(students, weightingSchemes, 76, 80);
+        if(caseType === 'pot-81-85') return findPotentialRangeCases(students, weightingSchemes, 81, 85);
+
+        // Nuevos casos de esfuerzo requerido
+        if(caseType === 'req-100') return findRequiredScoreRangeCases(students, weightingSchemes, 100, Infinity);
+        if(caseType === 'req-90') return findRequiredScoreRangeCases(students, weightingSchemes, 90, 99.99);
+        if(caseType === 'req-80') return findRequiredScoreRangeCases(students, weightingSchemes, 80, 89.99);
+        if(caseType === 'req-70') return findRequiredScoreRangeCases(students, weightingSchemes, 70, 79.99);
 
         const sdIds = new Set([...findSDAbsencesCases(students), ...findSDAssignmentsCases(students)].map(s => s.id));
         const atLimitIds = new Set([...findAtLimitAbsencesCases(students), ...findAtLimitAssignmentsCases(students)].map(s => s.id));

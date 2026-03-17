@@ -61,6 +61,62 @@ export function calculateSubjectPotential(subject: Subject, schemes: WeightingSc
 }
 
 /**
+ * Calcula el puntaje promedio requerido en las actividades restantes para alcanzar una meta.
+ */
+export function calculateRequiredScore(subject: Subject, schemes: WeightingScheme[], target: number = 70): number {
+    const activityList = getActivityList(subject, schemes);
+    if (activityList.length === 0) return 0;
+
+    let earnedPoints = 0;
+    let totalPossibleAtDate = 0;
+
+    activityList.forEach(item => {
+        const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+        if (isGraded) {
+            const score = Number(item.score) || 0;
+            earnedPoints += (score / 100) * item.weight;
+            totalPossibleAtDate += item.weight;
+        }
+    });
+
+    const pointsRemaining = 100 - totalPossibleAtDate;
+    if (pointsRemaining <= 0) {
+        return earnedPoints >= target ? 0 : Infinity;
+    }
+
+    const pointsNeeded = target - earnedPoints;
+    if (pointsNeeded <= 0) return 0;
+
+    return (pointsNeeded / pointsRemaining) * 100;
+}
+
+/**
+ * Filtra alumnos por rango de potencial.
+ */
+export function findPotentialRangeCases(students: Student[], schemes: WeightingScheme[], min: number, max: number): Student[] {
+    return students.filter(student => {
+        if (!student.subjects || student.subjects.length === 0) return false;
+        return student.subjects.some(subject => {
+            const potential = calculateSubjectPotential(subject, schemes);
+            return potential >= min && potential <= max;
+        });
+    });
+}
+
+/**
+ * Filtra alumnos por puntaje requerido para aprobar.
+ */
+export function findRequiredScoreRangeCases(students: Student[], schemes: WeightingScheme[], minReq: number, maxReq: number): Student[] {
+    return students.filter(student => {
+        if (!student.subjects || student.subjects.length === 0) return false;
+        return student.subjects.some(subject => {
+            const req = calculateRequiredScore(subject, schemes);
+            return req >= minReq && req <= maxReq;
+        });
+    });
+}
+
+/**
  * Filtra alumnos que tienen al menos una materia con un potencial por debajo de un umbral.
  */
 export function findPotentialRiskCases(students: Student[], schemes: WeightingScheme[], threshold: number): Student[] {

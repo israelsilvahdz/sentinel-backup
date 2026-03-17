@@ -424,7 +424,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
                     <body>
                         <button class="no-print" onclick="window.print()">Imprimir</button>
                         <h1>Lista de Alumnos</h1>
-                        <p>Generado el ${format(new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })} - Total: ${students.length} alumnos</p>
+                        <p>Generado el ${format(new Date(), "d 'de' LLLL", { locale: es })} - Total: ${students.length} alumnos</p>
                         <table>${tableContent}</table>
                     </body>
                 </html>
@@ -943,6 +943,13 @@ export function StudentPanel() {
     'at-limit-assignments': 'Alumnos al Límite por Tareas (NE)',
     'low-potential': 'Potencial menor a 70',
     'very-low-potential': 'Potencial menor a 50 (Sin Extra)',
+    'pot-70-75': 'Potencial Zona de Alerta (70-75)',
+    'pot-76-80': 'Potencial Zona Seguimiento (76-80)',
+    'pot-81-85': 'Potencial Zona Estable (81-85)',
+    'req-100': 'Esfuerzo Heroico (Requieren promedio de 100)',
+    'req-90': 'Esfuerzo Alto (Requieren promedio de 90+)',
+    'req-80': 'Esfuerzo Notable (Requieren promedio de 80+)',
+    'req-70': 'Esfuerzo Estándar (Requieren promedio de 70+)',
   };
 
   const getPanelTitle = () => {

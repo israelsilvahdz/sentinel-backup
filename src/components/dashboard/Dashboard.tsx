@@ -4,8 +4,6 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RiskFocusChart } from './RiskFocusChart';
-import { RiskDistributionChart } from './RiskDistributionChart';
 import { 
   AlertCircle, 
   BellRing, 
@@ -19,47 +17,37 @@ import {
   Zap,
   TrendingUp,
   Target,
-  ArrowRight,
   TrendingDown,
-  XCircle
+  XCircle,
+  Percent,
+  BrainCircuit,
+  Calculator,
+  Flame,
+  ArrowUpRight
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import { 
   findUrgentCases, 
   findObservationCases, 
-  findExtraordinaryCases, 
   findIncompleteGradeCases, 
   findRiskCasesBySubject, 
   findSDAbsencesCases, 
   findSDAssignmentsCases, 
   findAtLimitAbsencesCases, 
   findAtLimitAssignmentsCases,
-  findPotentialRiskCases
+  findPotentialRiskCases,
+  findPotentialRangeCases,
+  findRequiredScoreRangeCases,
+  calculateRequiredScore
 } from '@/lib/dataProcessor';
 import { useDashboardFilters } from './DashboardClient';
 import { cn } from '@/lib/utils';
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="rounded-lg border bg-background p-2 shadow-sm">
-          <p className="font-bold text-base">{label}</p>
-          <p className="text-sm" style={{ color: payload[0].fill }}>
-            Actividades SC: {data.value}
-          </p>
-        </div>
-      );
-    }
-    return null;
-};
 
 interface DashboardKpiProps {
   title: string;
   value: number;
   description: string;
-  color: 'red' | 'orange' | 'blue' | 'emerald';
+  color: 'red' | 'orange' | 'blue' | 'emerald' | 'purple' | 'black';
   icon: any;
   onClick: () => void;
 }
@@ -70,6 +58,8 @@ function ModernKpiCard({ title, value, description, color, icon: Icon, onClick }
     orange: "border-l-orange-500 bg-orange-50/50 hover:bg-orange-50 text-orange-600",
     blue: "border-l-blue-500 bg-blue-50/50 hover:bg-blue-50 text-blue-600",
     emerald: "border-l-emerald-500 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-600",
+    purple: "border-l-purple-500 bg-purple-50/50 hover:bg-purple-50 text-purple-600",
+    black: "border-l-slate-900 bg-slate-900/5 hover:bg-slate-900/10 text-slate-900",
   };
 
   return (
@@ -127,11 +117,24 @@ export function Dashboard() {
             urgentCases: [], atLimitAbsencesCases: [], atLimitAssignmentsCases: [], 
             incompleteGradeCases: [], sdAbsencesCases: [], sdAssignmentsCases: [],
             onlineRiskMundo: [], onlineRiskVida: [], scByProfessor: [], observationCases: [],
-            lowPotentialCases: [], veryLowPotentialCases: []
+            lowPotentialCases: [], veryLowPotentialCases: [],
+            pot7075: [], pot7680: [], pot8185: [],
+            req100: [], req90: [], req80: [], req70: []
         };
     }
     const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
     
+    // Potencial ranges
+    const pot7075 = findPotentialRangeCases(studentSource, weightingSchemes, 70, 75.99);
+    const pot7680 = findPotentialRangeCases(studentSource, weightingSchemes, 76, 80.99);
+    const pot8185 = findPotentialRangeCases(studentSource, weightingSchemes, 81, 85.99);
+
+    // Effort Required
+    const req100 = findRequiredScoreRangeCases(studentSource, weightingSchemes, 100, Infinity);
+    const req90 = findRequiredScoreRangeCases(studentSource, weightingSchemes, 90, 99.99);
+    const req80 = findRequiredScoreRangeCases(studentSource, weightingSchemes, 80, 89.99);
+    const req70 = findRequiredScoreRangeCases(studentSource, weightingSchemes, 70, 79.99);
+
     const sdAbsences = findSDAbsencesCases(studentSource);
     const sdAssignments = findSDAssignmentsCases(studentSource);
     const sdIds = new Set([...sdAbsences.map(s => s.id), ...sdAssignments.map(s => s.id)]);
@@ -154,28 +157,6 @@ export function Dashboard() {
     const lowPotential = findPotentialRiskCases(studentSource, weightingSchemes, 70);
     const veryLowPotential = findPotentialRiskCases(studentSource, weightingSchemes, 50);
 
-    const professorPendingActivities = new Map<string, Set<string>>();
-    studentSource.forEach(student => {
-        student.subjects?.forEach(subject => {
-            if (!subject.professorName) return;
-            for (const activityKey in subject.activities) {
-                if (subject.activities[activityKey] === 'SC') {
-                    if (!professorPendingActivities.has(subject.professorName)) {
-                        professorPendingActivities.set(subject.professorName, new Set());
-                    }
-                    const uniqueActivityIdentifier = `${subject.professorName}-${subject.name}-${activityKey}`;
-                    professorPendingActivities.get(subject.professorName)!.add(uniqueActivityIdentifier);
-                }
-            }
-        });
-    });
-    
-    const professorChartData = Array.from(professorPendingActivities.entries())
-        .map(([name, activities]) => ({ name, value: activities.size }))
-        .filter(item => item.value > 0)
-        .sort((a,b) => b.value - a.value)
-        .slice(0,10);
-
     return {
       urgentCases: uc,
       observationCases: oc,
@@ -186,9 +167,10 @@ export function Dashboard() {
       sdAssignmentsCases: sdAssignments,
       onlineRiskMundo: riskMundo,
       onlineRiskVida: riskVida,
-      scByProfessor: professorChartData,
       lowPotentialCases: lowPotential,
-      veryLowPotentialCases: veryLowPotential
+      veryLowPotentialCases: veryLowPotential,
+      pot7075, pot7680, pot8185,
+      req100, req90, req80, req70
     };
   }, [filteredStudents, allStudents, isLoading, hasData, weightingSchemes]);
 
@@ -202,13 +184,6 @@ export function Dashboard() {
     setFilterType('subject');
     setSelectedValue(subjectName);
   }
-
-  const handleProfessorClick = (professorName: string) => {
-    setCaseType(null);
-    setFilterType('professor');
-    setSelectedValue(professorName);
-    setActiveView('students');
-  };
 
   if (isLoading) {
     return (
@@ -239,8 +214,8 @@ export function Dashboard() {
                 <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-3">
                   <Zap className="h-3 w-3" /> Resumen de Rendimiento
                 </div>
-                <h1 className="text-3xl font-black tracking-tight">Progreso Estudiantil</h1>
-                <p className="text-emerald-50/70 text-sm mt-1">Análisis profundo de riesgos, asistencia y actividades académicas.</p>
+                <h1 className="text-3xl font-black tracking-tight">Análisis Predictivo Académico</h1>
+                <p className="text-emerald-50/70 text-sm mt-1">Identificación temprana de riesgos y esfuerzo requerido para aprobar.</p>
               </div>
               <div className="flex gap-4">
                 <Button variant="secondary" className="font-bold shadow-lg" onClick={() => setActiveView('change-stats')}>
@@ -253,169 +228,94 @@ export function Dashboard() {
 
           <section className="space-y-6">
             <div className="flex items-center gap-2 px-2 text-muted-foreground">
-              <Target className="h-4 w-4" />
-              <h2 className="text-sm font-bold uppercase tracking-widest">Alertas de Estado (Sin Derecho y Límites)</h2>
+              <Target className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-black uppercase tracking-[0.2em]">Estados Críticos (Sin Derecho y Límites)</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <ModernKpiCard 
-                  title="SD por Faltas" 
-                  value={metrics.sdAbsencesCases.length} 
-                  description="Alumnos que perdieron derecho." 
-                  color="red" 
-                  icon={UserX} 
-                  onClick={() => handleCaseClick('sd-absences')} 
-                />
-                <ModernKpiCard 
-                  title="SD por Tareas (NE)" 
-                  value={metrics.sdAssignmentsCases.length} 
-                  description="Alumnos sin derecho por NE." 
-                  color="red" 
-                  icon={UserX} 
-                  onClick={() => handleCaseClick('sd-assignments')} 
-                />
-                <ModernKpiCard 
-                  title="Al Límite - Faltas" 
-                  value={metrics.atLimitAbsencesCases.length} 
-                  description="A una falta de perder derecho." 
-                  color="orange" 
-                  icon={AlertTriangle} 
-                  onClick={() => handleCaseClick('at-limit-absences')} 
-                />
-                <ModernKpiCard 
-                  title="Al Límite - NE" 
-                  value={metrics.atLimitAssignmentsCases.length} 
-                  description="A una tarea de perder derecho." 
-                  color="orange" 
-                  icon={AlertTriangle} 
-                  onClick={() => handleCaseClick('at-limit-assignments')} 
-                />
+                <ModernKpiCard title="SD por Faltas" value={metrics.sdAbsencesCases.length} description="Han perdido el derecho oficial." color="red" icon={UserX} onClick={() => handleCaseClick('sd-absences')} />
+                <ModernKpiCard title="SD por Tareas (NE)" value={metrics.sdAssignmentsCases.length} description="Sin derecho por falta de tareas." color="red" icon={UserX} onClick={() => handleCaseClick('sd-assignments')} />
+                <ModernKpiCard title="Al Límite - Faltas" value={metrics.atLimitAbsencesCases.length} description="A una falta de perder derecho." color="orange" icon={AlertTriangle} onClick={() => handleCaseClick('at-limit-absences')} />
+                <ModernKpiCard title="Al Límite - NE" value={metrics.atLimitAssignmentsCases.length} description="A una tarea de perder derecho." color="orange" icon={AlertTriangle} onClick={() => handleCaseClick('at-limit-assignments')} />
             </div>
           </section>
 
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 space-y-6">
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1 space-y-8">
               <div className="flex items-center gap-2 px-2 text-muted-foreground">
-                <AlertCircle className="h-4 w-4" />
-                <h2 className="text-sm font-bold uppercase tracking-widest">Focos de Atención</h2>
+                <BrainCircuit className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-black uppercase tracking-[0.2em]">Focos de Atención</h2>
               </div>
               <div className="grid grid-cols-1 gap-4">
-                <SubModuleCard 
-                  title="Potencial < 70"
-                  description="Incluso con 100 en lo restante, no aprueban."
-                  icon={TrendingDown}
-                  color="bg-red-600"
-                  value={metrics.lowPotentialCases.length}
-                  onClick={() => handleCaseClick('low-potential')}
-                />
-                <SubModuleCard 
-                  title="Potencial < 50"
-                  description="Sin derecho ni a extraordinario."
-                  icon={XCircle}
-                  color="bg-black"
-                  value={metrics.veryLowPotentialCases.length}
-                  onClick={() => handleCaseClick('very-low-potential')}
-                />
-                <SubModuleCard 
-                  title="Casos Críticos"
-                  description="Riesgo alto en una o más materias."
-                  icon={BellRing}
-                  color="bg-red-500"
-                  value={metrics.urgentCases.length}
-                  onClick={() => handleCaseClick('urgent')}
-                />
-                <SubModuleCard 
-                  title="En Observación"
-                  description="Alumnos con riesgo preventivo."
-                  icon={Users}
-                  color="bg-blue-500"
-                  value={metrics.observationCases.length}
-                  onClick={() => handleCaseClick('observation')}
-                />
-                <SubModuleCard 
-                  title="Incompletos (SC)"
-                  description="Actividades sin calificar registradas."
-                  icon={FileText}
-                  color="bg-emerald-500"
-                  value={metrics.incompleteGradeCases.length}
-                  onClick={() => handleCaseClick('incompleteGrade')}
-                />
+                <SubModuleCard title="Potencial < 70" description="Incluso con 100 en lo restante, no aprueban." icon={TrendingDown} color="bg-red-600" value={metrics.lowPotentialCases.length} onClick={() => handleCaseClick('low-potential')} />
+                <SubModuleCard title="Potencial < 50" description="Sin derecho ni a extraordinario." icon={XCircle} color="bg-black" value={metrics.veryLowPotentialCases.length} onClick={() => handleCaseClick('very-low-potential')} />
+                <SubModuleCard title="Casos Críticos (Risk %)" description="Riesgo alto en una o más materias." icon={BellRing} color="bg-orange-500" value={metrics.urgentCases.length} onClick={() => handleCaseClick('urgent')} />
+                <SubModuleCard title="Incompletos (SC)" description="Actividades sin calificar detectadas." icon={FileText} color="bg-emerald-500" value={metrics.incompleteGradeCases.length} onClick={() => handleCaseClick('incompleteGrade')} />
               </div>
               <div className="space-y-4 pt-4 border-t">
-                <h3 className="text-xs font-bold text-muted-foreground uppercase px-2">Riesgo en Materias Online (NE)</h3>
-                <SubModuleCard 
-                  title="El Mundo Contemporáneo"
-                  description="Alumnos con tareas pendientes."
-                  icon={BookX}
-                  color="bg-amber-500"
-                  value={metrics.onlineRiskMundo.length}
-                  onClick={() => handleSubjectRiskClick('El mundo contemporáneo')}
-                />
-                <SubModuleCard 
-                  title="Ciencias de la Vida"
-                  description="Alumnos con tareas pendientes."
-                  icon={BookX}
-                  color="bg-amber-500"
-                  value={metrics.onlineRiskVida.length}
-                  onClick={() => handleSubjectRiskClick('Ciencias de la Vida')}
-                />
+                <h3 className="text-xs font-black text-muted-foreground uppercase px-2 tracking-widest">Riesgo en Materias Online (NE)</h3>
+                <SubModuleCard title="El Mundo Contemporáneo" description="Alumnos con tareas pendientes." icon={BookX} color="bg-amber-500" value={metrics.onlineRiskMundo.length} onClick={() => handleSubjectRiskClick('El mundo contemporáneo')} />
+                <SubModuleCard title="Ciencias de la Vida" description="Alumnos con tareas pendientes." icon={BookX} color="bg-amber-500" value={metrics.onlineRiskVida.length} onClick={() => handleSubjectRiskClick('Ciencias de la Vida')} />
               </div>
             </div>
 
             <div className="lg:col-span-2 space-y-8">
-              <div className="flex items-center gap-2 px-2 text-muted-foreground">
-                <Zap className="h-4 w-4" />
-                <h2 className="text-sm font-bold uppercase tracking-widest">Analíticos Visuales</h2>
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 px-2 text-muted-foreground">
+                  <Calculator className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-black uppercase tracking-[0.2em]">Distribución de Potencial Preventivo</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <ModernKpiCard title="Zona de Alerta (70-75)" value={metrics.pot7075.length} description="Margen mínimo de aprobación." color="red" icon={Percent} onClick={() => handleCaseClick('pot-70-75')} />
+                  <ModernKpiCard title="Zona Seguimiento (76-80)" value={metrics.pot7680.length} description="Potencial estable pero vulnerable." color="orange" icon={Percent} onClick={() => handleCaseClick('pot-76-80')} />
+                  <ModernKpiCard title="Zona Estable (81-85)" value={metrics.pot8185.length} description="Buen desempeño académico." color="blue" icon={Percent} onClick={() => handleCaseClick('pot-81-85')} />
+                </div>
               </div>
-              <div className="grid gap-8">
-                <RiskDistributionChart students={filteredStudents.length > 0 ? filteredStudents : allStudents} />
-                <RiskFocusChart students={filteredStudents.length > 0 ? filteredStudents : allStudents} />
+
+              <div className="space-y-6 pt-4">
+                <div className="flex items-center gap-2 px-2 text-muted-foreground">
+                  <Flame className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-black uppercase tracking-[0.2em]">Nivel de Esfuerzo Requerido (Para pasar con 70)</h2>
+                </div>
+                <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm overflow-hidden rounded-3xl">
+                  <CardHeader className="pb-2">
+                    <CardDescription className="text-xs font-medium">Promedio mínimo que el alumno debe obtener en las actividades restantes para alcanzar el 70.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between p-4 bg-red-100/50 rounded-2xl border border-red-200 group cursor-pointer transition-all hover:shadow-md" onClick={() => handleCaseClick('req-100')}>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase text-red-700 tracking-wider">Esfuerzo Heroico (Req. 100)</p>
+                          <p className="text-xs text-red-600 font-medium opacity-70">No puede fallar en absolutamente nada.</p>
+                        </div>
+                        <div className="text-2xl font-black text-red-700 flex items-center gap-2">{metrics.req100.length} <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" /></div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-orange-100/50 rounded-2xl border border-orange-200 group cursor-pointer transition-all hover:shadow-md" onClick={() => handleCaseClick('req-90')}>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase text-orange-700 tracking-wider">Esfuerzo Alto (Req. 90+)</p>
+                          <p className="text-xs text-orange-600 font-medium opacity-70">Requiere excelencia en lo restante.</p>
+                        </div>
+                        <div className="text-2xl font-black text-orange-700 flex items-center gap-2">{metrics.req90.length} <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" /></div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-yellow-100/50 rounded-2xl border border-yellow-200 group cursor-pointer transition-all hover:shadow-md" onClick={() => handleCaseClick('req-80')}>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase text-yellow-700 tracking-wider">Esfuerzo Notable (Req. 80+)</p>
+                          <p className="text-xs text-yellow-600 font-medium opacity-70">Debe subir su promedio actual.</p>
+                        </div>
+                        <div className="text-2xl font-black text-yellow-700 flex items-center gap-2">{metrics.req80.length} <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" /></div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-blue-100/50 rounded-2xl border border-blue-200 group cursor-pointer transition-all hover:shadow-md" onClick={() => handleCaseClick('req-70')}>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black uppercase text-blue-700 tracking-wider">Esfuerzo Estándar (Req. 70+)</p>
+                          <p className="text-xs text-blue-600 font-medium opacity-70">Basta con mantener un nivel aprobatorio.</p>
+                        </div>
+                        <div className="text-2xl font-black text-blue-700 flex items-center gap-2">{metrics.req70.length} <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" /></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </section>
-
-          <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm overflow-hidden rounded-3xl">
-            <CardHeader className="bg-gradient-to-r from-emerald-50 to-transparent p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-xl font-black text-emerald-900">
-                    <UserSquare className="h-6 w-6 text-primary" />
-                    Top 10 Profesores con Actividades 'SC'
-                  </CardTitle>
-                  <CardDescription className="text-xs mt-1">
-                    Actividades únicas sin calificar por materia. Haz clic en una barra para ver detalles.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="h-[350px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={metrics.scByProfessor} layout="vertical" margin={{ left: 150, right: 30 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} strokeOpacity={0.1} />
-                        <XAxis type="number" allowDecimals={false} hide />
-                        <YAxis 
-                          type="category" 
-                          dataKey="name" 
-                          width={150} 
-                          tick={{ fontSize: 11, fontWeight: 'bold' }} 
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(16, 185, 129, 0.05)' }} />
-                        <Bar 
-                          dataKey="value" 
-                          name="Actividades SC" 
-                          fill="hsl(var(--primary))" 
-                          radius={[0, 10, 10, 0]}
-                          onClick={(data) => handleProfessorClick(data.name)} 
-                          className="cursor-pointer"
-                          barSize={20}
-                        />
-                    </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
         </>
       )}
     </div>
