@@ -18,7 +18,7 @@ const KARDEX_COLUMNS = {
   STUDENT_NAME: ['Nombre', 'Nombre del alumno', 'Nombre completo'],
   SUBJECT_NAME: ['Nombre de materia', 'Nombre de la materia', 'Nombre Materia', 'Materia', 'Nombre de la asignatura', 'Materia Descripcion'],
   GRADE: ['Calificación', 'Calificacion', 'Calif', 'Nota', 'Calificacion Final', 'Estatus', 'Estatus de la materia'],
-  CURRENT_TETRA: ['Tetra', 'Tetramestre Actual', 'Periodo Actual', 'Grado'],
+  CURRENT_TETRA: ['Tetra', 'Tetramestre Actual', 'Periodo Actual', 'Grado', 'Semestre'],
 };
 
 // Mapeo de normalización incluyendo bilingüe y nombres cortos del Kardex
@@ -78,10 +78,8 @@ function normalizeString(str: string): string {
 function normalizeSubjectName(name: string): string {
     if (!name) return '';
     const clean = normalizeString(name);
-    // Intentar match exacto en el mapa
     if (SUBJECT_NORM_MAP[clean]) return SUBJECT_NORM_MAP[clean];
     
-    // Si no hay match exacto, buscar si alguna materia del currículum está contenida o contiene el nombre
     for (const term of curriculum) {
         for (const course of term.courses) {
             const courseNorm = normalizeString(course.name);
@@ -122,16 +120,11 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             if (index !== -1) colMap[key] = index;
         });
 
-        // Columnas por defecto basadas en tu descripción (A=0, B=1, G=6, H=7)
+        // Fallbacks inteligentes para columnas comunes si el mapeo falla
         if (colMap.STUDENT_ID === undefined) colMap.STUDENT_ID = 0; 
         if (colMap.STUDENT_NAME === undefined) colMap.STUDENT_NAME = 1; 
         if (colMap.SUBJECT_NAME === undefined) colMap.SUBJECT_NAME = 6; 
         if (colMap.GRADE === undefined) colMap.GRADE = 7; 
-        // El tetra suele estar en una columna como la D o similar, intentamos buscarla
-        if (colMap.CURRENT_TETRA === undefined) {
-            const tetraIdx = headers.findIndex(h => h.includes('tetra'));
-            if (tetraIdx !== -1) colMap.CURRENT_TETRA = tetraIdx;
-        }
 
         const studentsData = new Map<string, { 
             name: string, 
@@ -151,24 +144,34 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
             const subjectRaw = String(row[colMap.SUBJECT_NAME] || '').trim();
             const subjectNormalized = normalizeSubjectName(subjectRaw);
             const grade = row[colMap.GRADE];
-            const tetraVal = colMap.CURRENT_TETRA !== undefined ? row[colMap.CURRENT_TETRA] : null;
+            
+            // Detección mejorada de tetramestre: si hay columna, buscar el valor máximo para el alumno
+            let rowTetra = 1;
+            if (colMap.CURRENT_TETRA !== undefined) {
+                const val = row[colMap.CURRENT_TETRA];
+                if (val) {
+                    const parsed = parseInt(String(val).replace(/\D/g, ''));
+                    if (!isNaN(parsed)) rowTetra = parsed;
+                }
+            }
 
             if (!studentsData.has(id)) {
-                let term = 1;
-                if (tetraVal) {
-                    const parsedTerm = parseInt(String(tetraVal).replace(/\D/g, ''));
-                    if (!isNaN(parsedTerm)) term = parsedTerm;
-                }
-                studentsData.set(id, { name, approved: new Set(), taking: new Set(), currentTerm: term });
+                studentsData.set(id, { name, approved: new Set(), taking: new Set(), currentTerm: rowTetra });
             }
 
             const currentStudent = studentsData.get(id)!;
+            
+            // Actualizar tetramestre si encontramos uno mayor
+            if (rowTetra > currentStudent.currentTerm) {
+                currentStudent.currentTerm = rowTetra;
+            }
+
             const gradeStr = String(grade || '').toUpperCase();
             
             const isApproved = grade !== null && gradeStr !== '' && 
                              (
                                (!isNaN(parseFloat(gradeStr)) && parseFloat(gradeStr) >= 70) || 
-                               ['AC', 'CU', 'APROBADO', 'ACREDITADO', 'EQUIV'].some(v => gradeStr.includes(v) && v !== 'CU')
+                               ['AC', 'APROBADO', 'ACREDITADO', 'EQUIV'].some(v => gradeStr.includes(v))
                              );
             
             const isCurrentlyTaking = gradeStr === 'CU';
@@ -193,14 +196,10 @@ export async function parseKardexExcel(file: File): Promise<IrregularStudent[] |
                 if (isApproved) {
                     completedCount++;
                 } else {
-                    // Si no está aprobada, es pendiente. Guardamos si la está cursando.
                     pending.push({ name: req.name, term: req.term, isTaking });
                 }
             });
 
-            // Lógica de irregularidad mejorada:
-            // 1. Debe materias de tetras pasados que no está cursando ni aprobó.
-            // 2. Le faltan materias en el tetra actual que no está cursando ni aprobó.
             const hasPastDebt = pending.some(p => p.term < data.currentTerm && !p.isTaking);
             const isIncompleteCurrent = pending.some(p => p.term === data.currentTerm && !p.isTaking);
             const isIrregular = hasPastDebt || isIncompleteCurrent;

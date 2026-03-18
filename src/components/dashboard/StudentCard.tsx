@@ -4,9 +4,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2, User as UserIcon, Calendar, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileText, Award, Copy, Check, ClipboardCopy, Send, Users, RefreshCw, Loader2, User as UserIcon, Calendar, CheckCircle2, AlertCircle, TrendingDown } from 'lucide-react';
 import { type Student, type SubjectSummary, type Team, type Change, type Subject } from "@/types/student";
-import { getStudentOverallRisk, type RiskLevel, getRisk, getCriticalSubjectsList } from '@/lib/dataProcessor';
+import { getStudentOverallRisk, type RiskLevel, getRisk, getCriticalSubjectsList, calculateSubjectPotential } from '@/lib/dataProcessor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from '../ui/button';
 import { useDashboardFilters } from './DashboardClient';
@@ -21,6 +21,7 @@ import { es } from 'date-fns/locale';
 import { getActivityList } from '@/lib/ponderaciones';
 import { cn } from '@/lib/utils';
 import * as htmlToImage from 'html-to-image';
+import { RiskCell } from './StudentCardShared';
 
 
 interface StudentCardProps {
@@ -90,7 +91,7 @@ function MatriculaCopy({ studentId }: { studentId: string }) {
 
 export function StudentCard({ student, teams, changes, startOpen = false, isDialog = false, isSelected = false, onSelectionChange = () => {} }: StudentCardProps) {
   const [isOpen, setIsOpen] = useState(startOpen);
-  const { studentContacts, toast, loadStudentSubjects, weightingSchemes, fetchStudentContact } = useDashboardFilters();
+  const { studentContacts, toast, loadStudentSubjects, weightingSchemes, fetchStudentContact, filterType, selectedValue } = useDashboardFilters();
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isNotifying, setIsNotifying] = useState<'student' | 'parent' | false>(false);
   
@@ -105,6 +106,14 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
   const criticalSubjects = useMemo(() => {
     return getCriticalSubjectsList(student, weightingSchemes);
   }, [student, weightingSchemes]);
+
+  // Información específica de la materia si hay un filtro de materia activo
+  const filteredSubjectInfo = useMemo(() => {
+    if (filterType === 'subject' && selectedValue && student.subjectSummaries) {
+        return student.subjectSummaries.find(s => s.name === selectedValue);
+    }
+    return null;
+  }, [filterType, selectedValue, student.subjectSummaries]);
 
   const hasChanges = changes && changes.length > 0;
 
@@ -390,8 +399,20 @@ export function StudentCard({ student, teams, changes, startOpen = false, isDial
                             <span className="text-[10px] font-black uppercase text-muted-foreground/50 tracking-widest hidden sm:inline">Líder: {student.leader}</span>
                         </div>
                         
-                        {/* Materias en Riesgo / Reprobadas Resumen */}
-                        {!isOpen && criticalSubjects.length > 0 && (
+                        {/* Estatus específico de materia filtrada */}
+                        {filteredSubjectInfo && (
+                            <div className="flex items-center gap-4 bg-primary/5 p-2 px-3 rounded-xl border border-primary/10 animate-in fade-in zoom-in-95 duration-500 w-fit mt-1">
+                                <span className="text-[10px] font-black text-primary uppercase tracking-tighter whitespace-nowrap">Status {filteredSubjectInfo.name}:</span>
+                                <div className="flex items-center gap-2">
+                                    <RiskCell value={filteredSubjectInfo.absences} limit={filteredSubjectInfo.absenceLimit} />
+                                    <RiskCell value={filteredSubjectInfo.missedAssignments} limit={filteredSubjectInfo.missedAssignmentLimit} />
+                                    <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black h-6 text-[10px] px-2">Potencial: {calculateSubjectPotential(filteredSubjectInfo, weightingSchemes).toFixed(1)}</Badge>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Materias en Riesgo / Reprobadas Resumen (Solo si no hay filtro de materia para no saturar) */}
+                        {!isOpen && !filteredSubjectInfo && criticalSubjects.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 items-center mt-1 animate-in fade-in duration-500">
                                 <span className="text-[9px] font-black text-destructive uppercase tracking-tighter flex items-center gap-1">
                                     <AlertCircle className="h-3 w-3" /> Materias Críticas:
