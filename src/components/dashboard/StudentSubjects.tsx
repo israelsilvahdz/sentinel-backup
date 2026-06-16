@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Minus, Plus, Phone, Camera, User as UserIcon, Download, Sparkles, ChevronRight, ChevronDown } from 'lucide-react';
+import { Minus, Plus, Phone, Camera, User as UserIcon, Download, Sparkles, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
 import { type Student, type Subject, type ContinuityLocalStatus } from "@/types/student";
 import { getActivityList } from '@/lib/ponderaciones';
 import { isWithoutRight } from '@/lib/dataProcessor';
@@ -14,7 +15,7 @@ import { StudentSchedule } from './StudentSchedule';
 import { StudentProfessorsSchedule } from './StudentProfessorsSchedule';
 import { StudentContactInfo } from './StudentContactInfo';
 import { ActivityBreakdown } from './ActivityBreakdown';
-import { GradesTable } from './GradesTable';
+import { GradesProtagonistTable } from './GradesProtagonistTable'; // Use the new table
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -30,7 +31,7 @@ import { cn } from '@/lib/utils';
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const { toast } = useDashboardFilters();
+    const { toast, weightingSchemes } = useDashboardFilters();
 
     const handleDownload = async () => {
         if (!reportRef.current) return;
@@ -58,7 +59,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
             </DialogHeader>
             <div className="py-4 overflow-x-auto bg-muted/20 rounded-2xl">
                 <div className="min-w-[800px] flex justify-center p-4">
-                    <StudentReportImage ref={reportRef} student={student} subjects={subjects} />
+                    <StudentReportImage ref={reportRef} student={student} subjects={subjects} weightingSchemes={weightingSchemes} />
                 </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -145,7 +146,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
         </div>
         
         <TabsContent value="materias" className="mt-6">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto px-4 sm:px-6">
               <Table className="min-w-[600px]">
                   <TableHeader>
                       <TableRow className="hover:bg-transparent border-none">
@@ -284,11 +285,10 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
           </div>
         </TabsContent>
         
-        <TabsContent value="calificaciones" className="mt-6">
-          <div className="overflow-x-auto bg-white p-4 rounded-3xl shadow-inner border border-muted/20">
-            <GradesTable subjects={subjects} />
-          </div>
+        <TabsContent value="calificaciones" className="mt-6 px-4 sm:px-6">
+          <GradesProtagonistTable subjects={subjects} />
         </TabsContent>
+
         <TabsContent value="horario" className="mt-6">
           <StudentSchedule subjects={subjects} studentName={student.name} planType={planType} professorContacts={professorContacts} />
         </TabsContent>

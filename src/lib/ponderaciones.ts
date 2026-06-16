@@ -6,66 +6,67 @@ function findSchemeForSubject(subjectName: string, schemes: WeightingScheme[]): 
 }
 
 /**
- * Gets the specific score for an activity by name or label, avoiding index-shifting bugs.
- * @param subject The subject object containing all activities found in Excel.
- * @param activity The activity definition from the Weighting Scheme.
+ * Gets the specific score for an activity by name or label, strictly following the A1, A2, A3... pattern.
  */
 export function getActivityScore(subject: Subject, activity: { name: string; label?: string }): number | string | null {
     const nameUpper = activity.name.toUpperCase();
     const labelUpper = (activity.label || '').toUpperCase();
     const activities = subject.activities || {};
 
-    // 1. Priority: Match by Label (Intermedio or Final) using special keys from parser
-    if (labelUpper.includes('INTERMEDIO') || labelUpper.includes('PARCIAL')) {
-        if (activities['EXAMEN_INTERMEDIO'] !== undefined && activities['EXAMEN_INTERMEDIO'] !== '') return activities['EXAMEN_INTERMEDIO'];
-    }
-    if (labelUpper.includes('FINAL')) {
-        if (activities['EXAMEN_FINAL'] !== undefined && activities['EXAMEN_FINAL'] !== '') return activities['EXAMEN_FINAL'];
-    }
-
-    // 2. Secondary: Match "Actividad X" to "AX" column
+    // 1. STRICT MAPPING: If name is "Actividad X", MUST use column "AX"
     const actMatch = nameUpper.match(/ACTIVIDAD\s*(\d+)/);
     if (actMatch) {
         const key = `A${actMatch[1]}`;
         if (activities[key] !== undefined && activities[key] !== '') return activities[key];
     }
 
-    // 3. Fallback: Direct key match
-    if (activities[activity.name] !== undefined && activities[activity.name] !== '') return activities[activity.name];
-    if (activity.label && activities[activity.label] !== undefined && activities[activity.label] !== '') return activities[activity.label];
+    // 2. EXAM MAPPING: If label contains "FINAL", use EXAMEN_FINAL column
+    if (labelUpper.includes('FINAL') || nameUpper.includes('FINAL')) {
+        if (activities['EXAMEN_FINAL'] !== undefined && activities['EXAMEN_FINAL'] !== '') return activities['EXAMEN_FINAL'];
+    }
 
-    // Return 'SC' if column exists but is empty, or null if it doesn't seem to exist for this subject
+    // 3. INTERMEDIATE MAPPING: Only if not an "Actividad X" and has intermediate label
+    if (labelUpper.includes('INTERMEDIO') || labelUpper.includes('PARCIAL')) {
+        if (activities['EXAMEN_INTERMEDIO'] !== undefined && activities['EXAMEN_INTERMEDIO'] !== '') return activities['EXAMEN_INTERMEDIO'];
+    }
+
+    // 4. Fallback: Direct key match
+    if (activities[activity.name] !== undefined && activities[activity.name] !== '') return activities[activity.name];
+    
     return 'SC';
 }
 
 /**
  * Calculates the final grade for a subject based on a list of available weighting schemes.
+ * This should match the "Ponderado" column in Excel if schemes are correct.
  */
 export function calculateFinalGrade(subject: Subject, schemes: WeightingScheme[]): number {
     const scheme = findSchemeForSubject(subject.name, schemes);
     if (!scheme) {
-        return NaN; 
+        return subject.grade || 0; // Fallback to provided grade
     }
 
-    let totalScore = 0;
+    let totalEarnedPoints = 0;
 
     scheme.activities.forEach((activity) => {
         const rawScore = getActivityScore(subject, activity);
         
-        // Treat 'SC', 'NE', or empty/null as 0 for sum calculation if we want current progress.
+        // NE (No Entregó) counts as 0 points earned.
+        // SC (Sin Calificar) counts as 0 points earned for current total.
         const score = (rawScore === null || typeof rawScore === 'string' && (rawScore.toUpperCase() === 'SC' || rawScore.toUpperCase() === 'NE' || rawScore.trim() === '')) ? 0 : Number(rawScore);
         
         if (!isNaN(score)) {
-            totalScore += (score / 100) * activity.weight;
+            totalEarnedPoints += (score / 100) * activity.weight;
         }
     });
 
-    return totalScore;
+    return totalEarnedPoints;
 }
 
 
 /**
  * Gets a list of activities with their scores and weights for a specific subject.
+ * Guaranteed to follow the scheme's intended order.
  */
 export function getActivityList(subject: Subject, schemes: WeightingScheme[]): { name: string; score: number | string; weight: number; label?: string; }[] {
     const scheme = findSchemeForSubject(subject.name, schemes);

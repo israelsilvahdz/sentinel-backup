@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye, Zap, Filter, ListChecks } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye, Zap, Filter, ListChecks, FileText } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
@@ -26,13 +26,12 @@ import type { DateRange } from 'react-day-picker';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
 import { cn } from '@/lib/utils';
-import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { StudentReportImage } from './StudentReportImage';
-import { StudentGradesReportImage } from './StudentGradesReportImage';
 import { ScrollArea } from '../ui/scroll-area';
-import { getStudentOverallRisk, type RiskLevel } from '@/lib/dataProcessor';
 import { Progress } from '../ui/progress';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -493,6 +492,7 @@ interface MailerDialogProps {
 function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: MailerDialogProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+    const { weightingSchemes } = useDashboardFilters(); // Get schemes here
     const { toast } = useToast();
     const [dialogContent, setDialogContent] = useState<React.ReactNode>(null);
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -510,63 +510,41 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
         setSelectedStudent(student);
 
         const subjects = await loadStudentSubjects(student.id);
-        const subjectSummaries = subjects.map(s => ({
-            id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-            missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-            grade: s.grade, finalGrade: s.finalGrade, group: s.group,
-        }));
         
         const ReportComponent = () => {
             const innerRef = useRef<HTMLDivElement>(null);
             const [isExporting, setIsExporting] = useState(false);
 
-            const handleCopy = () => {
-                if (innerRef.current) {
-                    htmlToImage.toPng(innerRef.current, { pixelRatio: 2 })
-                        .then(dataUrl => fetch(dataUrl))
-                        .then(res => res.blob())
-                        .then(blob => {
-                            navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-                            toast({ title: "Reporte Copiado", description: `El reporte de ${student.name} está en tu portapapeles.` });
-                        })
-                        .catch(err => {
-                             toast({ variant: "destructive", title: "Error al Copiar", description: "No se pudo procesar la imagen para copiar." });
-                             console.error(err);
-                        });
+            const handleDownloadPdf = async () => {
+              if (innerRef.current) {
+                setIsExporting(true);
+                try {
+                  const canvas = await html2canvas(innerRef.current, { scale: 2, useCORS: true, logging: false });
+                  const imgData = canvas.toDataURL('image/png');
+                  const pdf = new jsPDF('p', 'mm', 'a4');
+                  const pdfWidth = pdf.internal.pageSize.getWidth();
+                  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                  pdf.save(`Reporte_${student.name.replace(/\s+/g, '_')}.pdf`);
+                  toast({ title: "PDF Descargado", description: "El reporte se ha guardado en tu dispositivo." });
+                } catch (err) {
+                  toast({ variant: "destructive", title: "Error", description: "No se pudo generar el PDF." });
+                } finally {
+                  setIsExporting(false);
                 }
-            };
-
-            const handleDownload = async () => {
-                if (innerRef.current) {
-                    setIsExporting(true);
-                    try {
-                        const dataUrl = await htmlToImage.toPng(innerRef.current, { pixelRatio: 2 });
-                        const link = document.createElement('a');
-                        link.download = `Reporte_${student.name.replace(/\s+/g, '_')}.png`;
-                        link.href = dataUrl;
-                        link.click();
-                        toast({ title: "Reporte Descargado", description: "La imagen se ha guardado en tu dispositivo." });
-                    } catch (err) {
-                        toast({ variant: "destructive", title: "Error", description: "No se pudo descargar la imagen." });
-                    } finally {
-                        setIsExporting(false);
-                    }
-                }
+              }
             };
 
             return (
                 <div>
                      <div className="overflow-x-auto bg-muted/20 p-2 rounded-md">
                         <div ref={innerRef} className="min-w-[800px]">
-                            <StudentReportImage student={student} subjects={subjectSummaries} />
+                            <StudentReportImage student={student} subjects={subjects} weightingSchemes={weightingSchemes} />
                         </div>
                     </div>
                     <DialogFooter className="mt-4 gap-2">
-                        <Button variant="outline" onClick={handleDownload} disabled={isExporting} className="rounded-xl font-bold">
-                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Descargar
-                        </Button>
-                        <Button onClick={handleCopy} className="rounded-xl font-bold">
-                            <ClipboardCopy className="mr-2 h-4 w-4" /> Copiar Imagen
+                        <Button variant="outline" onClick={handleDownloadPdf} disabled={isExporting} className="rounded-xl font-bold">
+                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />} Descargar PDF
                         </Button>
                     </DialogFooter>
                 </div>
@@ -577,7 +555,7 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
             <DialogContent className="max-w-4xl rounded-3xl">
                 <DialogHeader>
                     <DialogTitle>Reporte de {student.name}</DialogTitle>
-                    <DialogDescription>Copia la imagen o descárgala para enviarla por correo o mensaje.</DialogDescription>
+                    <DialogDescription>Descarga el reporte académico oficial en PDF.</DialogDescription>
                 </DialogHeader>
                 <ReportComponent />
             </DialogContent>
@@ -660,6 +638,7 @@ export function StudentPanel() {
     filterType,
     loadStudentSubjects,
     professorContacts,
+    weightingSchemes,
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -672,6 +651,7 @@ export function StudentPanel() {
   const [isMailerOpen, setIsMailerOpen] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState('');
+  const workerContainerRef = useRef<HTMLDivElement>(null);
 
 
   const { toast } = useToast();
@@ -829,89 +809,103 @@ export function StudentPanel() {
         if (selectedStudents.size === 0) return;
         
         const studentArray = Array.from(selectedStudents);
-        setDownloadStatus(`Iniciando generación de ${studentArray.length} reportes...`);
-        setDownloadProgress(0);
+        setDownloadStatus(`Iniciando generación de ${studentArray.length} reportes PDF...`);
+        setDownloadProgress(1);
 
         const { createRoot } = await import('react-dom/client');
         const zip = new JSZip();
 
-        const renderToBlob = async (Component: any): Promise<Blob | null> => {
-            const node = document.createElement('div');
-            node.style.position = 'fixed';
-            node.style.top = '-9999px';
-            node.style.left = '0px';
-            node.style.width = '800px'; 
-            document.body.appendChild(node);
-            const root = createRoot(node);
-            const ref = React.createRef<HTMLDivElement>();
-            
-            return new Promise((resolve) => {
-                root.render(<Component ref={ref} />);
-                setTimeout(async () => {
-                    if (ref.current) {
-                        try {
-                            const blob = await htmlToImage.toBlob(ref.current, { pixelRatio: 1.5 });
-                            resolve(blob);
-                        } catch (err) {
-                            console.error(`Failed to generate image`, err);
-                            resolve(null);
-                        } finally {
-                            root.unmount();
-                            if (document.body.contains(node)) {
-                                document.body.removeChild(node);
-                            }
-                        }
-                    } else {
-                        resolve(null);
-                    }
-                }, 800); 
-            });
-        };
+        if (!workerContainerRef.current) return;
+        const container = workerContainerRef.current;
+        const root = createRoot(container);
 
         let totalCompleted = 0;
+        let failedCount = 0;
         
-        for (const studentId of studentArray) {
-            const student = allStudentsMap.get(studentId);
-            if (student) {
-                setDownloadStatus(`Procesando: ${student.name} (${totalCompleted + 1}/${studentArray.length})`);
-                
-                const subjects = await loadStudentSubjects(student.id);
-                const subjectSummaries = subjects.map(s => ({
-                    id: s.id, name: s.name, absences: s.absences, absenceLimit: s.absenceLimit,
-                    missedAssignments: s.missedAssignments, missedAssignmentLimit: s.missedAssignmentLimit,
-                    grade: s.grade, finalGrade: s.finalGrade, group: s.group,
-                }));
+        const CHUNK_SIZE = 1; // Un solo PDF a la vez para máxima estabilidad
 
-                const reportBlob = await renderToBlob(React.forwardRef<HTMLDivElement>((props, ref) => <StudentReportImage ref={ref} student={student} subjects={subjectSummaries} />));
-                
-                const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                if (reportBlob) {
-                    zip.file(`${sanitizedName}_reporte.png`, reportBlob);
-                }
+        const processStudent = async (studentId: string): Promise<void> => {
+            const student = allStudentsMap.get(studentId);
+            if (!student) return;
+
+            try {
+                const subjects = await loadStudentSubjects(student.id);
+
+                return new Promise((resolve) => {
+                    // Renderizar en el contenedor visible pero desplazado
+                    root.render(<StudentReportImage student={student} subjects={subjects} weightingSchemes={weightingSchemes} />);
+                    
+                    // Esperar más tiempo para asegurar que las fuentes e imágenes estén listas
+                    setTimeout(async () => {
+                        try {
+                            const canvas = await html2canvas(container, { 
+                                scale: 2, // Mayor calidad
+                                useCORS: true,
+                                allowTaint: true,
+                                scrollX: 0,
+                                scrollY: 0,
+                                windowWidth: 800,
+                                windowHeight: 1100,
+                                backgroundColor: '#ffffff'
+                            });
+                            
+                            const imgData = canvas.toDataURL('image/png', 1.0);
+                            const pdf = new jsPDF('p', 'mm', 'a4');
+                            const pdfWidth = pdf.internal.pageSize.getWidth();
+                            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                            
+                            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                            
+                            const pdfBlob = pdf.output('blob');
+                            const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
+                            zip.file(`${sanitizedName}_reporte.pdf`, pdfBlob);
+
+                        } catch (err) {
+                            console.error(`Error generating PDF for ${student.name}:`, err);
+                            failedCount++;
+                        }
+                        
+                        totalCompleted++;
+                        setDownloadStatus(`Procesando PDFs: ${totalCompleted}/${studentArray.length}`);
+                        setDownloadProgress((totalCompleted / studentArray.length) * 100);
+                        resolve();
+                    }, 800); 
+                });
+            } catch (err) {
+                console.error(`Critical failure for ${studentId}:`, err);
+                totalCompleted++;
+                failedCount++;
             }
-            totalCompleted++;
-            setDownloadProgress((totalCompleted / studentArray.length) * 100);
-            
-            await new Promise(r => setTimeout(r, 100));
+        };
+
+        for (let i = 0; i < studentArray.length; i += CHUNK_SIZE) {
+            const id = studentArray[i];
+            await processStudent(id);
         }
 
-        setDownloadStatus(`Comprimiendo archivo...`);
-        const zipContent = await zip.generateAsync({ type: "blob" });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(zipContent);
-        link.download = `Reportes_Sentinel_${format(new Date(), 'yyyyMMdd_HHmm')}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        setDownloadStatus(`Empaquetando ${totalCompleted - failedCount} PDFs...`);
+        
+        try {
+            const zipContent = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(zipContent);
+            link.download = `Reportes_PDF_Sentinel_${format(new Date(), 'yyyyMMdd_HHmm')}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-        toast({
-            title: "Descarga Exitosa",
-            description: `Se han generado ${totalCompleted} reportes correctamente.`,
-        });
-
-        setDownloadStatus('');
-        setDownloadProgress(0);
-        setSelectedStudents(new Set());
+            toast({
+                title: "Descarga Exitosa",
+                description: `Se han generado los PDFs correctamente.`,
+            });
+        } catch (err) {
+            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el ZIP." });
+        } finally {
+            root.unmount();
+            setDownloadStatus('');
+            setDownloadProgress(0);
+            setSelectedStudents(new Set());
+        }
     };
 
 
@@ -1094,7 +1088,7 @@ export function StudentPanel() {
                         disabled={selectedStudents.size === 0 || downloadProgress > 0}
                     >
                         {downloadProgress > 0 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="md:mr-2 h-4 w-4" />}
-                         Descargar ZIP ({selectedStudents.size})
+                         Descargar ZIP (PDFs)
                     </Button>
                 </div>
             </div>
@@ -1106,7 +1100,7 @@ export function StudentPanel() {
                         <div className="flex justify-between items-end">
                             <div>
                                 <p className="text-xl font-black text-primary tracking-tight">{downloadStatus}</p>
-                                <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mt-1">Renderizando motores de imagen de alta resolución...</p>
+                                <p className="text-[10px] font-black uppercase text-primary/60 tracking-widest mt-1">Generando documentos vectoriales de alta precisión...</p>
                             </div>
                             <span className="text-3xl font-black tabular-nums text-primary">{Math.round(downloadProgress)}%</span>
                         </div>
@@ -1151,6 +1145,13 @@ export function StudentPanel() {
         </section>
       )}
       <MailerDialog open={isMailerOpen} onOpenChange={setIsMailerOpen} students={studentsForMailer} loadStudentSubjects={loadStudentSubjects} />
+      
+      {/* Hidden but ACTIVE container for ZIP worker rendering */}
+      <div 
+        ref={workerContainerRef} 
+        className="fixed top-0 left-0 -z-50 pointer-events-none opacity-100 visible" 
+        style={{ width: '800px', transform: 'translateX(-2000px)' }} 
+      />
     </div>
   );
 }

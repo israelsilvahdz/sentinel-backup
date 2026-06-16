@@ -279,4 +279,6 @@ export type ActiveView =
   | 'irregular-students' 
   | 'team-work' 
   | 'continuidad'
-  | 'subject-planning';
+  | 'subject-planning'
+  | 'subject-tracking'
+  | 'exam-candidates'; // Added new view
