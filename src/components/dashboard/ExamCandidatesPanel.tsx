@@ -29,6 +29,18 @@ export function ExamCandidatesPanel() {
   const [anomalyFilter, setAnomalyFilter] = useState<'all' | 'individual' | 'group'>('all');
   const { toast } = useToast();
 
+  const toggleSubjectExclusion = (subjectName: string) => {
+    setExcludedSubjectNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(subjectName)) {
+        next.delete(subjectName);
+      } else {
+        next.add(subjectName);
+      }
+      return next;
+    });
+  };
+
   // Pre-calculate max points for each group in the entire school to detect anomalies
   const groupMaxPointsMap = useMemo(() => {
     const map = new Map<string, number>(); // key: "SubjectName|Group" -> maxEvaluatedPoints

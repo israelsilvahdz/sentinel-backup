@@ -286,7 +286,7 @@ export function findObservationCases(students: Student[], excludedIds: Set<strin
         return student.subjectSummaries.some(subject => {
             const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
             const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
-            return absenceRisk.level === 'medium' || absenceRisk.level === 'medium';
+            return absenceRisk.level === 'medium' || assignmentRisk.level === 'medium';
         });
     });
 }

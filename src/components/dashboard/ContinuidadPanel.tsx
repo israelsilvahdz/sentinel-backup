@@ -1312,7 +1312,7 @@ function ContinuityCard({
                           </div>
                           <span className="font-black text-xs text-primary">{c.author}</span>
                         </div>
-                        <span className="text-[10px] font-bold text-muted-foreground opacity-50">{format(c.toDate ? c.toDate() : c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground opacity-50">{format(c.createdAt.toDate(), 'dd MMM, HH:mm', { locale: es })}</span>
                       </div>
                       <p className="text-sm font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">{c.text}</p>
                     </div>

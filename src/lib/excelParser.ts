@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
-import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team, CareerChoiceSurvey } from '@/types/student';
-import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams } from './firebase-services';
+import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team, CareerChoiceSurvey, StudentLifeProfile } from '@/types/student';
+import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams, bulkAddOrUpdateStudentLifeProfiles } from './firebase-services';
 import type { StudentData, Subject } from '@/types/student';
 import { generateKeyFromData } from './utils';
 
@@ -38,6 +38,14 @@ function normalizeSubjectName(name: string): string {
     return name;
 }
 
+function normalizeStudentIdFromSurveyValue(value: string): string {
+    const normalized = String(value || '').trim().toUpperCase();
+    const match = normalized.match(/^AL(\d{8})@/i) || normalized.match(/^AL(\d{8})$/i);
+    if (match) return `T${match[1]}`;
+    if (/^T\d{8}$/i.test(normalized)) return normalized;
+    return '';
+}
+
 // --- CONFIGURACIÓN DE COLUMNAS ---
 
 const COL_SYNONYMS = {
@@ -60,6 +68,8 @@ const COL_SYNONYMS = {
     FINAL_GRADE: ['CALIFICACION FINAL ACTUAL', 'CALIFICACION FINAL', 'FINAL'],
     START_TIME: ['INICIO', 'HORA INICIO', 'START'],
     END_TIME: ['FIN', 'HORA FIN', 'END'],
+    BUILDING: ['EDIFICIO', 'BUILDING', 'CAMPUS'],
+    ROOM: ['SALON', 'AULA', 'ROOM', 'AULA/SALON', 'NO. AULA', 'NUMERO DE AULA'],
     DAYS: {
         LUN: ['LUN', 'LUNES', 'L'],
         MAR: ['MAR', 'MARTES', 'M'],
@@ -80,9 +90,9 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             const jsonData: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
             if (jsonData.length < 2) return resolve(null);
 
-            const headers = jsonData[0].map((h: any) => normalizeHeader(String(h)));
+            const headers = jsonData[0].map((h: unknown) => normalizeHeader(String(h)));
             const headerMap: Record<string, number> = {};
-            headers.forEach((h, i) => headerMap[h] = i);
+            headers.forEach((h: string, i: number) => headerMap[h] = i);
             const getIdx = (names: string[]) => findColumnIndex(headerMap, headers, names);
 
             const studentData: StudentData = {};
@@ -116,7 +126,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
 
                 // Actividades A1, A2...
                 const activities: Record<string, number | string> = {};
-                headers.forEach((h, i) => {
+                headers.forEach((h: string, i: number) => {
                     if (/^A\d+$/.test(h)) {
                         const v = row[i];
                         if (v === 0 || v === '0') activities[h] = 0;
@@ -129,6 +139,8 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                     id: getVal(COL_SYNONYMS.CRN), key: getVal(COL_SYNONYMS.SUBJ_KEY),
                     name: normalizeSubjectName(getVal(COL_SYNONYMS.SUBJ_NAME)),
                     group: getVal(COL_SYNONYMS.GROUP), professorName: getVal(COL_SYNONYMS.PROFESSOR),
+                    building: getVal(COL_SYNONYMS.BUILDING),
+                    room: getVal(COL_SYNONYMS.ROOM),
                     statusDescription: getVal(COL_SYNONYMS.STATUS),
                     absences: parseInt(getVal(COL_SYNONYMS.ABS) || '0', 10),
                     absenceLimit: parseInt(getVal(COL_SYNONYMS.ABS_LIM) || '1', 10),
@@ -136,6 +148,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                     missedAssignmentLimit: parseInt(getVal(COL_SYNONYMS.NE_LIM) || '1', 10),
                     grade: parseFloat(getVal(COL_SYNONYMS.GRADE) || '0'),
                     finalGrade: (row[getIdx(COL_SYNONYMS.FINAL_GRADE)!] === 0) ? 0 : (parseFloat(getVal(COL_SYNONYMS.FINAL_GRADE)) || null),
+                    finalGradeReason: null,
                     activities,
                     schedule: { days: scheduleDays, startTime: getVal(COL_SYNONYMS.START_TIME), endTime: getVal(COL_SYNONYMS.END_TIME) }
                 });
@@ -153,9 +166,9 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: 'array' });
             const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
-            const headers = json[0].map((h: any) => normalizeHeader(String(h)));
+            const headers = json[0].map((h: unknown) => normalizeHeader(String(h)));
             const headerMap: Record<string, number> = {};
-            headers.forEach((h, i) => headerMap[h] = i);
+            headers.forEach((h: string, i: number) => headerMap[h] = i);
             const contacts: Record<string, StudentContact> = {};
             for (const row of json.slice(1)) {
                 const id = String(row[headerMap['MATRICULA']] || row[headerMap['ID']] || '').trim();
@@ -182,9 +195,9 @@ export async function parseProfessorDirectoryExcel(file: File): Promise<Record<s
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: 'array' });
             const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
-            const headers = json[0].map((h: any) => normalizeHeader(String(h)));
+            const headers = json[0].map((h: unknown) => normalizeHeader(String(h)));
             const headerMap: Record<string, number> = {};
-            headers.forEach((h, i) => headerMap[h] = i);
+            headers.forEach((h: string, i: number) => headerMap[h] = i);
             const contacts: Record<string, ProfessorContact> = {};
             const nameIdx = findColumnIndex(headerMap, headers, ['NOMBRE DEL PROFESOR', 'NOMBRE']);
             const emailIdx = findColumnIndex(headerMap, headers, ['CORREO', 'EMAIL']);
@@ -210,9 +223,9 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: 'array' });
             const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
-            const headers = json[0].map((h: any) => normalizeHeader(String(h)));
+            const headers = json[0].map((h: unknown) => normalizeHeader(String(h)));
             const headerMap: Record<string, number> = {};
-            headers.forEach((h, i) => headerMap[h] = i);
+            headers.forEach((h: string, i: number) => headerMap[h] = i);
             const studentNameToIdMap = new Map<string, string>();
             allStudentsMap.forEach(student => { studentNameToIdMap.set(student.name.toUpperCase(), student.id); });
             const teamsToUpdate: Record<string, Team> = {};
@@ -222,11 +235,56 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
                 const studentId = studentNameToIdMap.get(name.toUpperCase());
                 if (name && sport && studentId) {
                     if (!teamsToUpdate[sport]) teamsToUpdate[sport] = { id: sport, name: sport, type: 'deportivo', members: [] };
-                    teamsToUpdate[sport].members.push({ id: studentId, name });
+                    teamsToUpdate[sport]?.members.push({ id: studentId, name });
                 }
             }
             if (Object.keys(teamsToUpdate).length > 0) await bulkAddOrUpdateTeams(Object.values(teamsToUpdate));
             resolve();
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+export async function parseStudentLifeSurveyExcel(file: File): Promise<Record<string, StudentLifeProfile> | null> {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = e.target?.result;
+            const workbook = XLSX.read(data, { type: 'array' });
+            const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
+            if (json.length < 2) return resolve(null);
+
+            const headers = json[0].map((h: unknown) => normalizeHeader(String(h)));
+            const headerMap: Record<string, number> = {};
+            headers.forEach((h: string, i: number) => headerMap[h] = i);
+
+            const emailIdx = findColumnIndex(headerMap, headers, ['CORREO ELECTRONICO', 'EMAIL', 'CORREO']);
+            const groupIdx = findColumnIndex(headerMap, headers, ['GRUPO']);
+            const purposeIdx = findColumnIndex(headerMap, headers, ['CUAL ES TU PROPOSITO DE VIDA', 'PROPOSITO DE VIDA']);
+            const societyIdx = findColumnIndex(headerMap, headers, ['A QUE SOCIEDAD PERTENECES', 'SOCIEDAD']);
+
+            if (emailIdx === undefined || purposeIdx === undefined || societyIdx === undefined) {
+                return resolve(null);
+            }
+
+            const profiles: Record<string, StudentLifeProfile> = {};
+
+            for (const row of json.slice(1)) {
+                const email = String(row[emailIdx] || '').trim();
+                const studentId = normalizeStudentIdFromSurveyValue(email);
+                if (!studentId) continue;
+
+                profiles[studentId] = {
+                    studentId,
+                    email,
+                    group: groupIdx !== undefined ? String(row[groupIdx] || '').trim() : '',
+                    purpose: String(row[purposeIdx] || '').trim(),
+                    society: String(row[societyIdx] || '').trim(),
+                };
+            }
+
+            await bulkAddOrUpdateStudentLifeProfiles(profiles);
+            resolve(profiles);
         };
         reader.readAsArrayBuffer(file);
     });
@@ -240,9 +298,9 @@ export async function parseOfertaAcademicaExcel(file: File): Promise<OfertaAcade
             const workbook = XLSX.read(data, { type: 'array' });
             const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
             if (json.length < 2) return resolve(null);
-            const headers = json[0].map((h: any) => normalizeHeader(String(h)));
+            const headers = json[0].map((h: unknown) => normalizeHeader(String(h)));
             const headerMap: Record<string, number> = {};
-            headers.forEach((h, i) => headerMap[h] = i);
+            headers.forEach((h: string, i: number) => headerMap[h] = i);
             const getVal = (row: any[], names: string[]) => {
                 const idx = findColumnIndex(headerMap, headers, names);
                 return idx !== undefined ? String(row[idx] || '').trim() : '';

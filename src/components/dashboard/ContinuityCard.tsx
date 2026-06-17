@@ -15,7 +15,7 @@ import { TooltipProvider, Tooltip as TooltipUI, TooltipTrigger, TooltipContent }
 import { 
   Users, BookOpen, MessageSquare, GraduationCap, ChevronDown, ChevronUp, 
   ArrowUpRight, Group, CheckCircle2, History, Send, Search, MinusCircle, 
-  AlertTriangle, Trophy, TrendingUp, Calendar as CalendarIcon, Clock
+  AlertTriangle, Trophy, TrendingUp, Calendar as CalendarIcon, Clock, HelpCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';

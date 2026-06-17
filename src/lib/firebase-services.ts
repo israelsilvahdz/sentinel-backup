@@ -18,7 +18,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
-import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo, CareerOption, CareerChoiceSurvey } from '@/types/student';
+import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo, CareerOption, CareerChoiceSurvey, StudentLifeProfile } from '@/types/student';
 
 const db = getFirestore(getFirebaseApp());
 const TEAM_TASKS_COLLECTION = 'teamTasks';
@@ -30,6 +30,7 @@ const WEIGHTING_SCHEMES_COLLECTION = 'weightingSchemes';
 const CONTINUITY_STATUS_COLLECTION = 'continuityStatus';
 const CAREER_CATALOG_COLLECTION = 'careerCatalog';
 const PRIORITY_CASES_COLLECTION = 'priorityCases'; // Nueva colección
+const STUDENT_LIFE_PROFILES_COLLECTION = 'studentLifeProfiles';
 
 
 /**
@@ -447,7 +448,7 @@ export const bulkUpdateCareerSurvey = async (surveys: Record<string, CareerChoic
       const officialStatus = officialStatuses[studentId] || '';
       const isTecmilenio = (survey.universidadElegida || '').toLowerCase().includes('tecmilenio');
       const isOfficialInscribed = officialStatus.toLowerCase().includes('inscrit');
-      const choseCareer = (survey.yaEligioCareer || survey.yaEligioCarrera || '').toLowerCase().trim().includes('si');
+      const choseCareer = (survey.yaEligioCarrera || '').toLowerCase().trim().includes('si');
       const updateData: any = { encuestaEleccionReciente: survey, lastSurveyUpdate: Timestamp.now(), isIndeciso: !choseCareer };
       const surveyStage = (survey.etapaProceso || '').toLowerCase().trim();
       const isFinalEnrollmentStage = surveyStage === 'inscrito' || surveyStage === 'inscrita' || surveyStage === 'declara inscrito';
@@ -456,4 +457,42 @@ export const bulkUpdateCareerSurvey = async (surveys: Record<string, CareerChoic
     });
     await batch.commit();
   } catch (error) { throw error; }
+};
+
+export const bulkAddOrUpdateStudentLifeProfiles = async (profiles: Record<string, StudentLifeProfile>): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    Object.values(profiles).forEach(profile => {
+      const docRef = doc(db, STUDENT_LIFE_PROFILES_COLLECTION, profile.studentId);
+      batch.set(docRef, { ...profile, updatedAt: Timestamp.now() }, { merge: true });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Error al guardar perfiles de vida en lote:", error);
+    throw new Error("No se pudieron guardar los perfiles de vida.");
+  }
+};
+
+export const addOrUpdateStudentLifeProfile = async (profile: StudentLifeProfile): Promise<void> => {
+  try {
+    const docRef = doc(db, STUDENT_LIFE_PROFILES_COLLECTION, profile.studentId);
+    await setDoc(docRef, { ...profile, updatedAt: Timestamp.now() }, { merge: true });
+  } catch (error) {
+    console.error("Error al guardar perfil de vida:", error);
+    throw new Error("No se pudo guardar el perfil de vida.");
+  }
+};
+
+export const getStudentLifeProfiles = async (): Promise<Record<string, StudentLifeProfile>> => {
+  try {
+    const snapshot = await getDocs(collection(db, STUDENT_LIFE_PROFILES_COLLECTION));
+    const profiles: Record<string, StudentLifeProfile> = {};
+    snapshot.forEach(docSnap => {
+      profiles[docSnap.id] = docSnap.data() as StudentLifeProfile;
+    });
+    return profiles;
+  } catch (error) {
+    console.error("Error al obtener perfiles de vida:", error);
+    return {};
+  }
 };

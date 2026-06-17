@@ -49,20 +49,31 @@ export function parseCsv(csvText: string): StudentData | null {
         studentData[studentId] = {
           id: studentId,
           name: studentName,
+          leader: '',
+          tutor: '',
+          isGraduationCandidate: false,
           subjects: [],
         };
       }
       
       const subject: Subject = {
+        id: `${studentId}-${row[colIndices[COLUMNS.SUBJECT_NAME]] || ''}`,
+        key: row[colIndices[COLUMNS.SUBJECT_NAME]] || '',
         name: row[colIndices[COLUMNS.SUBJECT_NAME]],
+        group: '',
+        professorName: '',
+        statusDescription: '',
         absences: parseInt(row[colIndices[COLUMNS.ABSENCES]], 10) || 0,
         absenceLimit: parseInt(row[colIndices[COLUMNS.ABSENCE_LIMIT]], 10) || 1, // Avoid division by zero
         missedAssignments: parseInt(row[colIndices[COLUMNS.MISSED_ASSIGNMENTS]], 10) || 0,
         missedAssignmentLimit: parseInt(row[colIndices[COLUMNS.MISSED_ASSIGNMENT_LIMIT]], 10) || 1, // Avoid division by zero
         grade: parseFloat(row[colIndices[COLUMNS.GRADE]]) || 0,
+        finalGrade: null,
+        finalGradeReason: null,
+        activities: {},
       };
 
-      studentData[studentId].subjects.push(subject);
+      studentData[studentId].subjects?.push(subject);
     });
 
     return studentData;

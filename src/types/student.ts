@@ -3,6 +3,8 @@ export interface Subject {
   key: string; // Clave de materia
   name: string;
   group: string;
+  building?: string;
+  room?: string;
   professorName: string;
   statusDescription: string;
   absences: number;
@@ -42,6 +44,15 @@ export interface Student {
   subjects?: Subject[]; // Full subjects, loaded on demand
   subjectSummaries?: SubjectSummary[]; // Summaries for dashboard performance
   sport?: string; // e.g., 'FUTBOL', 'DEBATE'
+}
+
+export interface StudentLifeProfile {
+  studentId: string;
+  email: string;
+  society: string;
+  purpose: string;
+  group?: string;
+  updatedAt?: any;
 }
 
 export type StudentData = Record<string, Student>;

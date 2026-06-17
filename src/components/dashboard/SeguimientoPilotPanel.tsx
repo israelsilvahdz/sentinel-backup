@@ -8,7 +8,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDashboardFilters } from './DashboardClient';
 import { useToast } from '@/hooks/use-toast';
-import { addSeguimientoEntry } from '@/lib/firebase-services';
 import type { TeamTask } from '@/types/student';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

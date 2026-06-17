@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye, Zap, Filter, ListChecks, FileText } from 'lucide-react';
+import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye, Zap, Filter, ListChecks, FileText, FileSpreadsheet, Sparkles } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
 import { Button } from '../ui/button';
@@ -13,7 +13,7 @@ import type { Student, StudentContact, Subject, Team, SubjectSummary } from '@/t
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { FileUpload } from './FileUpload';
-import { parseDirectoryExcel, parseAthletesExcel } from '@/lib/excelParser';
+import { parseDirectoryExcel, parseAthletesExcel, parseStudentLifeSurveyExcel } from '@/lib/excelParser';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '../ui/checkbox';
 import { Label } from '../ui/label';
@@ -32,6 +32,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Progress } from '../ui/progress';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import * as XLSX from 'xlsx';
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -42,6 +43,108 @@ const DATE_FNS_DAY_TO_KEY: Record<number, string> = {
     4: 'JUE',
     5: 'VIER',
 };
+
+type ProfessorContactMap = Record<string, { name: string; email: string }>;
+type AbsenceMode = 'full-day' | 'partial';
+type AffectedClass = {
+    key: string;
+    day: string;
+    subjectName: string;
+    group: string;
+    time: string;
+    professorName: string;
+    email: string | null;
+};
+
+function normalizeProfessorLookupId(name: string): string {
+    return name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+}
+
+function resolveProfessorEmail(professorName: string, contacts: ProfessorContactMap): string | null {
+    const directCandidates = [
+        professorName.toLowerCase().replace(/\s+/g, ''),
+        normalizeProfessorLookupId(professorName),
+    ];
+
+    for (const candidate of directCandidates) {
+        const directMatch = contacts[candidate];
+        if (directMatch?.email) return directMatch.email;
+    }
+
+    const normalizedTarget = normalizeProfessorLookupId(professorName);
+    const fallbackMatch = Object.values(contacts).find(contact =>
+        normalizeProfessorLookupId(contact.name || '') === normalizedTarget
+    );
+
+    return fallbackMatch?.email || null;
+}
+
+function getAffectedDaysFromRange(dateRange: DateRange | undefined): Set<string> {
+    const affectedDays = new Set<string>();
+    if (!dateRange?.from) return affectedDays;
+
+    const start = dateRange.from;
+    const end = dateRange.to || start;
+    let currentDate = start;
+
+    while (currentDate <= end) {
+        const dayOfWeek = currentDate.getDay();
+        if (DATE_FNS_DAY_TO_KEY[dayOfWeek]) {
+            affectedDays.add(DATE_FNS_DAY_TO_KEY[dayOfWeek]);
+        }
+        currentDate = new Date(currentDate.valueOf() + 86400000);
+    }
+
+    return affectedDays;
+}
+
+function isSingleDayRange(dateRange: DateRange | undefined): boolean {
+    return !!dateRange?.from && (!dateRange.to || dateRange.from.toDateString() === dateRange.to.toDateString());
+}
+
+function normalizeSpreadsheetHeader(header: unknown): string {
+    return String(header || '')
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toUpperCase();
+}
+
+function findStudentIdColumnIndex(headers: unknown[]): number {
+    const normalizedHeaders = headers.map(normalizeSpreadsheetHeader);
+    const exactMatches = ['MATRICULA', 'ID', 'ALUMNO'];
+
+    for (const candidate of exactMatches) {
+        const exactIndex = normalizedHeaders.findIndex(header => header === candidate);
+        if (exactIndex !== -1) return exactIndex;
+    }
+
+    const partialIndex = normalizedHeaders.findIndex(header =>
+        header.includes('MATRICULA') || header.includes('ID') || header.includes('ALUMNO')
+    );
+
+    return partialIndex;
+}
+
+function findStudentNameColumnIndex(headers: unknown[]): number {
+    const normalizedHeaders = headers.map(normalizeSpreadsheetHeader);
+    const exactMatches = ['NOMBRE DEL ALUMNO', 'NOMBRE ALUMNO', 'NOMBRE', 'NAME'];
+
+    for (const candidate of exactMatches) {
+        const exactIndex = normalizedHeaders.findIndex(header => header === candidate);
+        if (exactIndex !== -1) return exactIndex;
+    }
+
+    const partialIndex = normalizedHeaders.findIndex(header =>
+        header.includes('NOMBRE') || header.includes('NAME')
+    );
+
+    return partialIndex;
+}
 
 
 const onlineFlexSubjects = new Set(
@@ -59,6 +162,9 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
     const [reason, setReason] = useState("Competencia Deportiva");
     const [notes, setNotes] = useState("");
     const [teachers, setTeachers] = useState<{name: string, email: string | null}[]>([]);
+    const [affectedClasses, setAffectedClasses] = useState<AffectedClass[]>([]);
+    const [selectedClassKeys, setSelectedClassKeys] = useState<string[]>([]);
+    const [absenceMode, setAbsenceMode] = useState<AbsenceMode>('full-day');
     const [filterByLeader, setFilterByLeader] = useState(false);
 
     const sportList = useMemo(() => Array.from(new Set(teams.map(team => team.name))), [teams]);
@@ -317,6 +423,396 @@ function AthleteNotificationDialog({ students, teams, filterType, selectedLeader
     );
 }
 
+function AthleteNotificationDialogV2({ students, teams, filterType, selectedLeader }: { students: Student[], teams: Team[], filterType: string | null, selectedLeader: string | null }) {
+    const { loadStudentSubjects, professorContacts } = useDashboardFilters();
+    const { toast } = useToast();
+    const [selectedSport, setSelectedSport] = useState<string>('all');
+    const [dateRange, setDateRange] = useState<DateRange | undefined>();
+    const [reason, setReason] = useState("Competencia Deportiva");
+    const [notes, setNotes] = useState("");
+    const [absenceMode, setAbsenceMode] = useState<AbsenceMode>('full-day');
+    const [teachers, setTeachers] = useState<{ name: string; email: string | null }[]>([]);
+    const [affectedClasses, setAffectedClasses] = useState<AffectedClass[]>([]);
+    const [selectedClassKeys, setSelectedClassKeys] = useState<string[]>([]);
+    const [filterByLeader, setFilterByLeader] = useState(false);
+
+    const sportList = useMemo(() => Array.from(new Set(teams.map(team => team.name))), [teams]);
+
+    const filteredAthletes = useMemo(() => {
+        let tempAthletes = students;
+        if (filterByLeader && selectedLeader) {
+            tempAthletes = tempAthletes.filter(s => s.leader === selectedLeader);
+        }
+        if (selectedSport === 'all') return tempAthletes;
+
+        return tempAthletes.filter(s =>
+            teams.some(team => team.name === selectedSport && Array.isArray(team.members) && team.members.some(member => member.id === s.id))
+        );
+    }, [students, teams, selectedSport, filterByLeader, selectedLeader]);
+
+    useEffect(() => {
+        const findTeachersAndClasses = async () => {
+            if (!dateRange?.from || filteredAthletes.length === 0) {
+                setTeachers([]);
+                setAffectedClasses([]);
+                setSelectedClassKeys([]);
+                return;
+            }
+
+            const affectedDays = getAffectedDaysFromRange(dateRange);
+            const uniqueTeachers = new Map<string, { name: string; email: string | null }>();
+            const classesMap = new Map<string, AffectedClass>();
+
+            for (const student of filteredAthletes) {
+                const studentSubjects = await loadStudentSubjects(student.id);
+
+                studentSubjects.forEach(subject => {
+                    if (!subject.professorName || !subject.schedule?.days?.length) return;
+
+                    const matchingDays = subject.schedule.days.filter(day => affectedDays.has(day));
+                    if (matchingDays.length === 0) return;
+
+                    const email = resolveProfessorEmail(subject.professorName, professorContacts as ProfessorContactMap);
+                    if (!uniqueTeachers.has(subject.professorName)) {
+                        uniqueTeachers.set(subject.professorName, { name: subject.professorName, email });
+                    }
+
+                    matchingDays.forEach(day => {
+                        const time = subject.schedule?.startTime
+                            ? `${subject.schedule.startTime}${subject.schedule.endTime ? ` - ${subject.schedule.endTime}` : ''}`
+                            : 'Horario no definido';
+                        const classKey = [day, time, subject.name, subject.group, subject.professorName].join('||');
+
+                        if (!classesMap.has(classKey)) {
+                            classesMap.set(classKey, {
+                                key: classKey,
+                                day,
+                                subjectName: subject.name,
+                                group: subject.group,
+                                time,
+                                professorName: subject.professorName,
+                                email,
+                            });
+                        }
+                    });
+                });
+            }
+
+            setTeachers(Array.from(uniqueTeachers.values()).sort((a, b) => a.name.localeCompare(b.name)));
+            setAffectedClasses(
+                Array.from(classesMap.values()).sort((a, b) =>
+                    `${a.day}-${a.time}-${a.subjectName}`.localeCompare(`${b.day}-${b.time}-${b.subjectName}`)
+                )
+            );
+            setSelectedClassKeys(previous => previous.filter(key => classesMap.has(key)));
+        };
+
+        findTeachersAndClasses();
+    }, [dateRange, filteredAthletes, loadStudentSubjects, professorContacts]);
+
+    useEffect(() => {
+        if (absenceMode !== 'partial') return;
+
+        if (!isSingleDayRange(dateRange)) {
+            setSelectedClassKeys([]);
+            return;
+        }
+
+        setSelectedClassKeys(previous => {
+            if (previous.length > 0) {
+                return previous.filter(key => affectedClasses.some(item => item.key === key));
+            }
+            return affectedClasses.map(item => item.key);
+        });
+    }, [absenceMode, dateRange, affectedClasses]);
+
+    const selectedPartialClasses = useMemo(
+        () => affectedClasses.filter(item => selectedClassKeys.includes(item.key)),
+        [affectedClasses, selectedClassKeys]
+    );
+
+    const selectedTeachers = useMemo(() => {
+        if (absenceMode === 'full-day') return teachers;
+
+        const partialTeachers = new Map<string, { name: string; email: string | null }>();
+        selectedPartialClasses.forEach(item => {
+            if (!partialTeachers.has(item.professorName)) {
+                partialTeachers.set(item.professorName, { name: item.professorName, email: item.email });
+            }
+        });
+        return Array.from(partialTeachers.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [absenceMode, teachers, selectedPartialClasses]);
+
+    const generateEmailContent = () => {
+        if (!dateRange?.from || selectedTeachers.length === 0) {
+            toast({ variant: "destructive", title: "Faltan datos", description: "Selecciona un deporte, un rango de fechas y asegÃºrate de que haya profesores." });
+            return null;
+        }
+
+        if (absenceMode === 'partial' && !isSingleDayRange(dateRange)) {
+            toast({
+                variant: "destructive",
+                title: "Ausencia parcializada",
+                description: "Para una ausencia parcializada selecciona solo un dÃ­a.",
+            });
+            return null;
+        }
+
+        if (absenceMode === 'partial' && selectedPartialClasses.length === 0) {
+            toast({
+                variant: "destructive",
+                title: "Selecciona clases",
+                description: "Marca al menos una clase para la ausencia parcializada.",
+            });
+            return null;
+        }
+
+        let dateText;
+        if (dateRange.to && dateRange.from.getTime() !== dateRange.to.getTime()) {
+            dateText = `del ${format(dateRange.from, "d 'de' LLLL", { locale: es })} al ${format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })}`;
+        } else {
+            dateText = `el dÃ­a ${format(dateRange.from, "EEEE, d 'de' LLLL 'de' yyyy", { locale: es })}`;
+        }
+
+        const sortedAthletes = [...filteredAthletes].sort((a, b) => a.name.localeCompare(b.name));
+        const studentsListText = sortedAthletes.map(s => s.name).join(', ');
+        const classSummaryText = selectedPartialClasses
+            .map(item => `${item.day} ${item.time} - ${item.subjectName} (${item.group}) con ${item.professorName}`)
+            .join('\n');
+        const classSummaryHtml = selectedPartialClasses.length > 0
+            ? `
+                <div style="margin-top: 16px;">
+                    <p style="font-family: sans-serif; font-size: 12px; font-weight: 700; margin-bottom: 8px;">Clases afectadas</p>
+                    <ul style="font-family: sans-serif; font-size: 12px; padding-left: 18px; margin: 0;">
+                        ${selectedPartialClasses.map(item => `<li>${item.day} ${item.time} - ${item.subjectName} (${item.group}) con ${item.professorName}</li>`).join('')}
+                    </ul>
+                </div>
+            `
+            : '';
+
+        const studentsTableRows = sortedAthletes.map(student => {
+            const regularGroups = Array.from(
+                new Set(
+                    student.subjectSummaries
+                        ?.filter(sub => sub.group && !sub.group.startsWith('10') && !sub.group.toUpperCase().startsWith('F') && !onlineFlexSubjects.has(sub.name))
+                        .map(sub => sub.group) || []
+                )
+            ).join(', ');
+
+            return `
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${student.name}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${student.id}</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">${regularGroups}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const studentsTableHtml = `
+            <table style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 12px;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Nombre Completo</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">MatrÃ­cula</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background-color: #f2f2f2;">Grupos Regulares</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${studentsTableRows}
+                </tbody>
+            </table>
+            ${classSummaryHtml}
+        `;
+
+        const recipientsWithEmail = selectedTeachers.filter(teacher => teacher.email);
+        const recipientsWithoutEmail = selectedTeachers.filter(teacher => !teacher.email);
+        const recipients = recipientsWithEmail.map(teacher => teacher.email).join(',');
+        const subject = `NotificaciÃ³n de Ausencia ${absenceMode === 'partial' ? 'Parcializada ' : ''}por ${reason}`.replace(/\s+/g, ' ').trim();
+        const absenceText = absenceMode === 'partial'
+            ? `solo se ausentarÃ¡n de las clases seleccionadas ${dateText}`
+            : `se ausentarÃ¡n por motivo de "${reason}" ${dateText}`;
+        const mailtoBody = `Estimados profesores,\n\nLes notifico que los siguientes alumnos ${absenceText}.\n\nAlumnos: ${studentsListText}.\n\n${absenceMode === 'partial' ? `Clases afectadas:\n${classSummaryText}\n\n` : ''}${notes ? `Notas adicionales: ${notes}\n\n` : ''}Si desean una tabla mÃ¡s detallada con matrÃ­culas y grupos, pueden reemplazar la lista de alumnos pegando la tabla que se ha copiado al portapapeles.\n\nSaludos cordiales,`;
+
+        return { recipients, subject, bodyHtml: studentsTableHtml, mailtoBody, recipientsWithoutEmail };
+    };
+
+    const handleCopyToClipboard = async () => {
+        const content = generateEmailContent();
+        if (!content) return;
+
+        try {
+            const blob = new Blob([content.bodyHtml], { type: 'text/html' });
+            const data = [new ClipboardItem({ [blob.type]: blob })];
+            await navigator.clipboard.write(data);
+            toast({
+                title: "Tabla Copiada",
+                description: "La tabla con los alumnos estÃ¡ en tu portapapeles. PÃ©gala en tu correo para un mejor formato."
+            });
+        } catch (err) {
+            console.error('Failed to copy HTML table: ', err);
+            toast({
+                variant: 'destructive',
+                title: "Error al Copiar",
+                description: "Tu navegador no es compatible para copiar tablas. Usa el botÃ³n de abrir correo."
+            });
+        }
+    };
+
+    const handleOpenMail = async () => {
+        const content = generateEmailContent();
+        if (!content) return;
+        const { recipients, subject, mailtoBody, recipientsWithoutEmail } = content;
+
+        if (recipientsWithoutEmail.length > 0) {
+            const namesToCopy = recipientsWithoutEmail.map(teacher => teacher.name).join('\n');
+            try {
+                await navigator.clipboard.writeText(namesToCopy);
+                toast({
+                    title: "Nombres Copiados",
+                    description: `Se copiaron los nombres de ${recipientsWithoutEmail.length} profesores sin correo para que los busques manualmente.`,
+                });
+            } catch (err) {
+                console.error("Failed to copy names:", err);
+                toast({
+                    variant: 'destructive',
+                    title: "Error al copiar nombres",
+                    description: "No se pudieron copiar los nombres de los profesores."
+                });
+            }
+        }
+
+        window.open(`mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailtoBody)}`, '_blank');
+    };
+
+    return (
+        <DialogContent className="sm:max-w-3xl rounded-3xl">
+            <DialogHeader>
+                <DialogTitle>Notificar Ausencia de Atletas</DialogTitle>
+                <DialogDescription>
+                    Genera un correo para notificar a los profesores sobre la ausencia de los atletas seleccionados.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div className="flex flex-col items-center space-y-4">
+                    <div className="w-full space-y-2">
+                        <Label htmlFor="sport-select-v2" className="font-semibold">1. Selecciona el Deporte</Label>
+                        <Select value={selectedSport} onValueChange={setSelectedSport}>
+                            <SelectTrigger id="sport-select-v2" className="rounded-xl">
+                                <SelectValue placeholder="Seleccionar deporte..." />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                                <SelectItem value="all">Todos los deportes</SelectItem>
+                                {sportList.map(sport => <SelectItem key={sport} value={sport}>{sport}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        {filterType === 'leader' && selectedLeader && (
+                            <div className="flex items-center space-x-2 pt-2">
+                                <Checkbox id="filter-by-leader-v2" checked={filterByLeader} onCheckedChange={(checked) => setFilterByLeader(!!checked)} />
+                                <Label htmlFor="filter-by-leader-v2">Filtrar solo por mi lÃ­der seleccionado ({selectedLeader})</Label>
+                            </div>
+                        )}
+                        <p className="text-sm text-muted-foreground pt-2">
+                            <span className="font-bold text-primary">{filteredAthletes.length}</span> alumno(s) seleccionado(s).
+                        </p>
+                    </div>
+                    <Label className="font-semibold pt-4">2. Selecciona el rango de fechas</Label>
+                    <Calendar
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        locale={es}
+                        classNames={{
+                            day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90",
+                            day_range_start: "day-range-start rounded-l-xl",
+                            day_range_end: "day-range-end rounded-r-xl",
+                            day_range_middle: "bg-primary/10 text-primary",
+                        }}
+                    />
+                </div>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="reason-v2">3. Motivo</Label>
+                        <RadioGroup id="reason-v2" value={reason} onValueChange={setReason} className="mt-2">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="Competencia Deportiva" id="r1-v2" /><Label htmlFor="r1-v2">Competencia Deportiva</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="Otro" id="r2-v2" /><Label htmlFor="r2-v2">Otro (especificar en notas)</Label></div>
+                        </RadioGroup>
+                    </div>
+                    <div>
+                        <Label className="font-semibold">4. Tipo de Ausencia</Label>
+                        <RadioGroup value={absenceMode} onValueChange={(value) => setAbsenceMode(value as AbsenceMode)} className="mt-2">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="full-day" id="full-day-v2" /><Label htmlFor="full-day-v2">DÃ­a completo</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="partial" id="partial-v2" /><Label htmlFor="partial-v2">Ausencia parcializada</Label></div>
+                        </RadioGroup>
+                        {absenceMode === 'partial' && !isSingleDayRange(dateRange) && (
+                            <p className="mt-2 text-xs text-amber-700">La ausencia parcializada funciona con un solo dÃ­a seleccionado.</p>
+                        )}
+                    </div>
+                    {absenceMode === 'partial' && isSingleDayRange(dateRange) && (
+                        <div>
+                            <Label className="font-semibold">5. Clases afectadas</Label>
+                            <Card className="mt-2 p-3 bg-muted/30 border-none rounded-xl max-h-48 overflow-y-auto">
+                                {affectedClasses.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {affectedClasses.map(item => (
+                                            <label key={item.key} className="flex items-start gap-3 rounded-xl px-2 py-2 hover:bg-white/70">
+                                                <Checkbox
+                                                    checked={selectedClassKeys.includes(item.key)}
+                                                    onCheckedChange={(checked) => {
+                                                        setSelectedClassKeys(previous =>
+                                                            checked
+                                                                ? [...previous, item.key]
+                                                                : previous.filter(key => key !== item.key)
+                                                        );
+                                                    }}
+                                                />
+                                                <div className="space-y-1 text-sm">
+                                                    <p className="font-semibold text-foreground">{item.day} {item.time}</p>
+                                                    <p className="text-muted-foreground">{item.subjectName} ({item.group})</p>
+                                                    <p className="text-xs text-muted-foreground">{item.professorName}{item.email ? ` • ${item.email}` : ' • Sin correo'}</p>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground text-center py-4 italic">No se encontraron clases para ese dÃ­a.</p>
+                                )}
+                            </Card>
+                        </div>
+                    )}
+                    <div>
+                        <Label htmlFor="notes-v2">6. Notas Adicionales (Opcional)</Label>
+                        <Textarea id="notes-v2" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. El torneo es en la ciudad de..." className="rounded-xl" />
+                    </div>
+                    <div>
+                        <Label className="font-semibold">7. Profesores a Notificar</Label>
+                        <Card className="mt-2 p-3 bg-muted/30 border-none rounded-xl max-h-48 overflow-y-auto">
+                            {selectedTeachers.length > 0 ? (
+                                <ul className="text-sm list-disc list-inside space-y-1">
+                                    {selectedTeachers.map(teacher => (
+                                        <li key={teacher.name} className="text-muted-foreground"><span className="text-foreground font-medium">{teacher.name}</span> {teacher.email ? <span className="text-[11px]">{teacher.email}</span> : <span className="text-destructive text-[10px] font-black uppercase">(Sin correo)</span>}</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-xs text-muted-foreground text-center py-4 italic">Selecciona un deporte y fecha para ver los profesores.</p>
+                            )}
+                        </Card>
+                    </div>
+                    <DialogFooter className="pt-4 gap-2">
+                        <Button variant="outline" onClick={handleCopyToClipboard} className="rounded-xl font-bold">
+                            <ClipboardCopy className="mr-2 h-4 w-4" />
+                            Copiar Tabla
+                        </Button>
+                        <Button onClick={handleOpenMail} className="rounded-xl font-bold">
+                            <Mail className="mr-2 h-4 w-4" />
+                            Abrir Correo
+                        </Button>
+                    </DialogFooter>
+                </div>
+            </div>
+        </DialogContent>
+    );
+}
+
 interface PrintOptions {
   includeId: boolean;
   includeName: boolean;
@@ -340,7 +836,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
     });
 
     const handlePrint = () => {
-        const headers: { key: keyof PrintOptions; label: string }[] = [
+        const headers = [
             ...(options.includeId ? [{ key: 'includeId', label: 'Matrícula' }] : []),
             ...(options.includeName ? [{ key: 'includeName', label: 'Nombre Completo' }] : []),
             ...(options.includeLeader ? [{ key: 'includeLeader', label: 'Líder' }] : []),
@@ -348,7 +844,7 @@ function PrintListDialog({ students, contacts }: { students: Student[], contacts
             ...(options.includeOnlineFlexGroups ? [{ key: 'includeOnlineFlexGroups', label: 'Grupos Online/Flex' }] : []),
             ...(options.includeStudentPhone ? [{ key: 'includeStudentPhone', label: 'Teléfono Alumno' }] : []),
             ...(options.includeParentPhones ? [{ key: 'includeParentPhones', label: 'Teléfonos Padres/Tutores' }] : []),
-        ];
+        ] as Array<{ key: keyof PrintOptions; label: string }>;
 
         let tableContent = `
             <thead>
@@ -627,6 +1123,7 @@ export function StudentPanel() {
     contextualStudentIds,
     studentContacts,
     setStudentContacts,
+    setStudentLifeProfiles,
     teams,
     hasData, 
     isLoading, 
@@ -647,11 +1144,15 @@ export function StudentPanel() {
   const [athletesFile, setAthletesFile] = useState<File | null>(null);
   const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
   const [isProcessingAthletes, setIsProcessingAthletes] = useState(false);
+  const [isProcessingContactMerge, setIsProcessingContactMerge] = useState(false);
+  const [isProcessingLifeSurvey, setIsProcessingLifeSurvey] = useState(false);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [isMailerOpen, setIsMailerOpen] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState('');
   const workerContainerRef = useRef<HTMLDivElement>(null);
+  const contactMergeInputRef = useRef<HTMLInputElement>(null);
+  const lifeSurveyInputRef = useRef<HTMLInputElement>(null);
 
 
   const { toast } = useToast();
@@ -713,6 +1214,34 @@ export function StudentPanel() {
       setAthletesFile(null);
     }
   }, [allStudentsMap, toast]);
+
+  const handleLifeSurveyUpload = useCallback(async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setIsProcessingLifeSurvey(true);
+    try {
+      const profiles = await parseStudentLifeSurveyExcel(file);
+      if (!profiles) {
+        throw new Error('No encontré las columnas de correo, propósito de vida y sociedad en el archivo.');
+      }
+
+      setStudentLifeProfiles(prev => ({ ...prev, ...profiles }));
+      toast({
+        title: 'Perfiles simbólicos cargados',
+        description: `Se cruzaron ${Object.keys(profiles).length} respuestas de propósito de vida y sociedad.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al cargar propósito de vida',
+        description: error.message || 'No se pudo procesar el archivo del cuestionario.',
+      });
+    } finally {
+      setIsProcessingLifeSurvey(false);
+    }
+  }, [setStudentLifeProfiles, toast]);
 
   const athleteStudents = useMemo(() => allStudents.filter(s => teams.some(team => Array.isArray(team.members) && team.members.some(member => member.id === s.id))), [allStudents, teams]);
 
@@ -781,6 +1310,234 @@ export function StudentPanel() {
             description: `Se ha copiado la información de ${filteredStudents.length} alumnos.`,
         });
         setTimeout(() => setIsCopied(false), 2500);
+    });
+  };
+
+  const handleExportPhoneMergeExcel = () => {
+    if (filteredStudents.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No hay alumnos que exportar',
+        description: 'Necesitas tener alumnos visibles en la lista para generar el cruce.',
+      });
+      return;
+    }
+
+    const rows = filteredStudents.map(student => {
+      const contact = studentContacts[student.id];
+      const regularGroups = Array.from(
+        new Set(
+          student.subjectSummaries
+            ?.filter(sub => sub.group && !sub.group.startsWith('10') && !sub.group.toUpperCase().startsWith('F') && !onlineFlexSubjects.has(sub.name))
+            .map(sub => sub.group) || []
+        )
+      ).join(', ');
+
+      return {
+        'Matrícula': student.id,
+        'Nombre del Alumno': student.name,
+        'Líder': student.leader || '',
+        'Tutor': student.tutor || '',
+        'Grupos Regulares': regularGroups,
+        'Teléfono Alumno': contact?.studentPhone || '',
+        'Correo Alumno': contact?.studentEmail || '',
+        'Nombre Papá': contact?.dadName || '',
+        'Teléfono Papá': contact?.dadPhone || '',
+        'Correo Papá': contact?.dadEmail || '',
+        'Nombre Mamá': contact?.momName || '',
+        'Teléfono Mamá': contact?.momPhone || '',
+        'Correo Mamá': contact?.momEmail || '',
+        'SEDENA': contact?.sedena || '',
+        'Grupo Directorio': contact?.group || '',
+        'ID Mentoría': contact?.mentoringId || '',
+        'Tiene Datos': contact ? 'Sí' : 'No',
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Cruce Telefonos');
+    XLSX.writeFile(workbook, `Cruce_Telefonos_Sentinel_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+
+    const rowsWithContacts = rows.filter(row =>
+      row['Teléfono Alumno'] || row['Teléfono Papá'] || row['Teléfono Mamá']
+    ).length;
+
+    toast({
+      title: 'Excel generado',
+      description: `Se exportaron ${rows.length} alumnos y ${rowsWithContacts} ya traen teléfonos en el cruce.`,
+    });
+  };
+
+  const handleContactExcelMigration = useCallback(async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+
+    setIsProcessingContactMerge(true);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        throw new Error('El archivo no contiene hojas para procesar.');
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, { header: 1, defval: '' });
+
+      if (rows.length === 0) {
+        throw new Error('El archivo estÃ¡ vacÃ­o.');
+      }
+
+      const headerRow = rows[0];
+      const studentIdIndex = findStudentIdColumnIndex(headerRow);
+      const studentNameIndex = findStudentNameColumnIndex(headerRow);
+
+      if (studentIdIndex === -1) {
+        throw new Error('No encontrÃ© una columna de matrÃ­cula o ID en la primera fila.');
+      }
+
+      const contactHeaders = [
+        'Telefono Alumno',
+        'Correo Alumno',
+        'Nombre Papa',
+        'Telefono Papa',
+        'Correo Papa',
+        'Nombre Mama',
+        'Telefono Mama',
+        'Correo Mama',
+        'SEDENA',
+        'Grupo Directorio',
+        'ID Mentoria',
+        'Tiene Datos',
+      ];
+
+      const migratedRows = rows.map((row, rowIndex) => {
+        const insertAt = studentNameIndex !== -1 ? studentNameIndex + 1 : row.length;
+
+        if (rowIndex === 0) {
+          return [
+            ...row.slice(0, insertAt),
+            ...contactHeaders,
+            ...row.slice(insertAt),
+          ];
+        }
+
+        const normalizedStudentId = String(row[studentIdIndex] || '').trim();
+        const contact = studentContacts[normalizedStudentId];
+        const contactValues = [
+          contact?.studentPhone || '',
+          contact?.studentEmail || '',
+          contact?.dadName || '',
+          contact?.dadPhone || '',
+          contact?.dadEmail || '',
+          contact?.momName || '',
+          contact?.momPhone || '',
+          contact?.momEmail || '',
+          contact?.sedena || '',
+          contact?.group || '',
+          contact?.mentoringId || '',
+          contact ? 'Si' : 'No',
+        ];
+
+        return [
+          ...row.slice(0, insertAt),
+          ...contactValues,
+          ...row.slice(insertAt),
+        ];
+      });
+
+      workbook.Sheets[firstSheetName] = XLSX.utils.aoa_to_sheet(migratedRows);
+
+      const outputName = file.name.replace(/\.xlsx?$/i, '') + '_con_contactos.xlsx';
+      XLSX.writeFile(workbook, outputName);
+
+      const matchedRows = migratedRows.slice(1).filter(row => row[row.length - 1] === 'Si').length;
+
+      toast({
+        title: 'Archivo migrado',
+        description: `Se devolviÃ³ el mismo Excel con contactos. Coincidieron ${matchedRows} filas con el directorio.`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al migrar el Excel',
+        description: error.message || 'No se pudo completar el cruce de contactos.',
+      });
+    } finally {
+      setIsProcessingContactMerge(false);
+    }
+  }, [studentContacts, toast]);
+
+  const handleOpenContactMergePicker = () => {
+    if (isProcessingContactMerge) return;
+    contactMergeInputRef.current?.click();
+  };
+
+  const handleOpenLifeSurveyPicker = () => {
+    if (isProcessingLifeSurvey) return;
+    lifeSurveyInputRef.current?.click();
+  };
+
+  const handleExportIntegratedMonitoring = () => {
+    if (allStudents.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No hay monitoreo cargado',
+        description: 'Carga al menos un reporte antes de exportar el monitoreo integrado.',
+      });
+      return;
+    }
+
+    const rows = allStudents.flatMap(student => {
+      const contact = studentContacts[student.id];
+      const subjects = student.subjects || [];
+
+      return subjects.map(subject => ({
+        'Matricula': student.id,
+        'Nombre del Alumno': student.name,
+        'Lider': student.leader || '',
+        'Tutor': student.tutor || '',
+        'CRN': subject.id,
+        'Clave Materia': subject.key,
+        'Nombre de la Materia': subject.name,
+        'Grupo': subject.group,
+        'Profesor': subject.professorName,
+        'Estatus': subject.statusDescription,
+        'Faltas': subject.absences,
+        'Limite Faltas': subject.absenceLimit,
+        'NE': subject.missedAssignments,
+        'Limite NE': subject.missedAssignmentLimit,
+        'Ponderado': subject.grade,
+        'Calificacion Final': subject.finalGrade ?? '',
+        'Dias': subject.schedule?.days.join(', ') || '',
+        'Inicio': subject.schedule?.startTime || '',
+        'Fin': subject.schedule?.endTime || '',
+        'Telefono Alumno': contact?.studentPhone || '',
+        'Correo Alumno': contact?.studentEmail || '',
+        'Nombre Papa': contact?.dadName || '',
+        'Telefono Papa': contact?.dadPhone || '',
+        'Correo Papa': contact?.dadEmail || '',
+        'Nombre Mama': contact?.momName || '',
+        'Telefono Mama': contact?.momPhone || '',
+        'Correo Mama': contact?.momEmail || '',
+        'SEDENA': contact?.sedena || '',
+        'Grupo Directorio': contact?.group || '',
+        'ID Mentoria': contact?.mentoringId || '',
+      }));
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Monitoreo Integrado');
+    XLSX.writeFile(workbook, `Monitoreo_Integrado_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+
+    toast({
+      title: 'Monitoreo exportado',
+      description: `Se generó un Excel integrado con ${rows.length} filas de materias.`,
     });
   };
 
@@ -922,7 +1679,7 @@ export function StudentPanel() {
     );
   }
 
-  const caseTypeMap = {
+  const caseTypeMap: Partial<Record<import('./DashboardClient').CaseType, string>> = {
     lost: 'Casos Perdidos',
     urgent: 'Casos Críticos',
     observation: 'Alumnos en Observación',
@@ -985,6 +1742,28 @@ export function StudentPanel() {
                     )}
                 </p>
             </div>
+            <input
+              ref={contactMergeInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                handleContactExcelMigration(file);
+                event.currentTarget.value = '';
+              }}
+            />
+            <input
+              ref={lifeSurveyInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                handleLifeSurveyUpload(file);
+                event.currentTarget.value = '';
+              }}
+            />
              <div className="flex items-center gap-3 flex-wrap bg-white/10 backdrop-blur-xl p-3 rounded-2xl border border-white/10 shadow-2xl">
                 <div className="flex items-center gap-2 border-r border-white/10 pr-3 mr-1">
                     <TooltipProvider>
@@ -1010,7 +1789,7 @@ export function StudentPanel() {
                               <Mail className="h-4 w-4 text-emerald-300"/> Notificar Ausencia
                           </Button>
                       </DialogTrigger>
-                      <AthleteNotificationDialog students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
+                      <AthleteNotificationDialogV2 students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
                   </Dialog>
                   <Dialog>
                       <DialogTrigger asChild>
@@ -1034,6 +1813,44 @@ export function StudentPanel() {
                           </TooltipContent>
                       </Tooltip>
                   </TooltipProvider>
+                  )}
+                  {hasData && (
+                    <Button
+                      variant="secondary"
+                      onClick={handleOpenLifeSurveyPicker}
+                      size="sm"
+                      disabled={isProcessingLifeSurvey}
+                      className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4"
+                    >
+                      {isProcessingLifeSurvey ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 text-emerald-300" />
+                      )}
+                      {isProcessingLifeSurvey ? 'Cruzando propósito...' : 'Cargar Propósito de Vida'}
+                    </Button>
+                  )}
+                  {hasData && (
+                    <Button
+                      variant="secondary"
+                      onClick={handleOpenContactMergePicker}
+                      size="sm"
+                      disabled={isProcessingContactMerge}
+                      className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4"
+                    >
+                      {isProcessingContactMerge ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />
+                      ) : (
+                        <FileSpreadsheet className="h-4 w-4 text-emerald-300" />
+                      )}
+                      {isProcessingContactMerge ? 'Migrando...' : 'Migrar Contactos'}
+                    </Button>
+                  )}
+                  {hasData && (
+                    <Button variant="secondary" onClick={handleExportIntegratedMonitoring} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
+                      <Download className="h-4 w-4 text-emerald-300" />
+                      Exportar Integrado
+                    </Button>
                   )}
                 </div>
             </div>
