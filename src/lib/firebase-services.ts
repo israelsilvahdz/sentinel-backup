@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { getFirebaseApp } from './firebase-client';
 import type { TeamTask, StudentContact, ProfessorContact, Team, Student, Change, WeightingScheme, ContinuityComment, ContinuityLocalStatus, VocationalDiagnosis, RiasecDiagnosis, ContinuityTrackingInfo, CareerOption, CareerChoiceSurvey, StudentLifeProfile } from '@/types/student';
+import type { CaseData, Step } from '@/lib/templates';
 
 const db = getFirestore(getFirebaseApp());
 const TEAM_TASKS_COLLECTION = 'teamTasks';
@@ -31,6 +32,30 @@ const CONTINUITY_STATUS_COLLECTION = 'continuityStatus';
 const CAREER_CATALOG_COLLECTION = 'careerCatalog';
 const PRIORITY_CASES_COLLECTION = 'priorityCases'; // Nueva colección
 const STUDENT_LIFE_PROFILES_COLLECTION = 'studentLifeProfiles';
+const ACADEMIC_COMMITTEE_CASES_COLLECTION = 'academicCommitteeCases';
+const ACADEMIC_COMMITTEE_USERS_COLLECTION = 'academicCommitteeUsers';
+
+type AcademicCommitteeCaseDraft = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  expediente: string;
+  activeStep: Step;
+  createdAt: string;
+  updatedAt: string;
+  ownerLeaderKey?: string;
+  ownerLeaderName?: string;
+  data: CaseData;
+};
+
+export type AcademicCommitteeAccessUser = {
+  leaderKey: string;
+  leaderName: string;
+  displayName: string;
+  passwordHash: string;
+  createdAt?: any;
+  updatedAt?: any;
+};
 
 
 /**
@@ -494,5 +519,95 @@ export const getStudentLifeProfiles = async (): Promise<Record<string, StudentLi
   } catch (error) {
     console.error("Error al obtener perfiles de vida:", error);
     return {};
+  }
+};
+
+const serializeAcademicCommitteeCase = (caseDraft: AcademicCommitteeCaseDraft) => ({
+  ...caseDraft,
+  data: {
+    ...caseDraft.data,
+    FECHA_REPORTE: caseDraft.data.FECHA_REPORTE instanceof Date ? caseDraft.data.FECHA_REPORTE.toISOString() : caseDraft.data.FECHA_REPORTE || null,
+    FECHA_ACTUAL: caseDraft.data.FECHA_ACTUAL instanceof Date ? caseDraft.data.FECHA_ACTUAL.toISOString() : caseDraft.data.FECHA_ACTUAL || null,
+    FECHA_SESION: caseDraft.data.FECHA_SESION instanceof Date ? caseDraft.data.FECHA_SESION.toISOString() : caseDraft.data.FECHA_SESION || null,
+    FECHA_NOTIFICACION_EFECTIVA: caseDraft.data.FECHA_NOTIFICACION_EFECTIVA instanceof Date ? caseDraft.data.FECHA_NOTIFICACION_EFECTIVA.toISOString() : caseDraft.data.FECHA_NOTIFICACION_EFECTIVA || null,
+    FECHA_RESOLUCION: caseDraft.data.FECHA_RESOLUCION instanceof Date ? caseDraft.data.FECHA_RESOLUCION.toISOString() : caseDraft.data.FECHA_RESOLUCION || null,
+  },
+  syncedAt: Timestamp.now(),
+});
+
+const deserializeAcademicCommitteeCase = (raw: any): AcademicCommitteeCaseDraft => ({
+  id: raw.id,
+  studentId: raw.studentId || '',
+  studentName: raw.studentName || 'Caso sin alumno',
+  expediente: raw.expediente || '',
+  activeStep: raw.activeStep as Step,
+  createdAt: raw.createdAt || new Date().toISOString(),
+  updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString(),
+  ownerLeaderKey: raw.ownerLeaderKey || '',
+  ownerLeaderName: raw.ownerLeaderName || '',
+  data: raw.data as CaseData,
+});
+
+export const registerAcademicCommitteeUser = async (user: AcademicCommitteeAccessUser): Promise<void> => {
+  try {
+    const docRef = doc(db, ACADEMIC_COMMITTEE_USERS_COLLECTION, user.leaderKey);
+    const existing = await getDoc(docRef);
+    if (existing.exists()) {
+      throw new Error("Ya existe un acceso registrado para este lider.");
+    }
+    await setDoc(docRef, { ...user, createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
+  } catch (error) {
+    console.error("Error al registrar usuario de comite:", error);
+    throw error;
+  }
+};
+
+export const getAcademicCommitteeUser = async (leaderKey: string): Promise<AcademicCommitteeAccessUser | null> => {
+  try {
+    const docRef = doc(db, ACADEMIC_COMMITTEE_USERS_COLLECTION, leaderKey);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return null;
+    return docSnap.data() as AcademicCommitteeAccessUser;
+  } catch (error) {
+    console.error("Error al obtener usuario de comite:", error);
+    return null;
+  }
+};
+
+export const saveAcademicCommitteeCases = async (cases: AcademicCommitteeCaseDraft[], leaderKey: string, leaderName: string): Promise<void> => {
+  try {
+    const batch = writeBatch(db);
+    cases.forEach((caseDraft) => {
+      const docRef = doc(db, ACADEMIC_COMMITTEE_CASES_COLLECTION, caseDraft.id);
+      batch.set(
+        docRef,
+        serializeAcademicCommitteeCase({
+          ...caseDraft,
+          ownerLeaderKey: leaderKey,
+          ownerLeaderName: leaderName,
+        }),
+        { merge: true }
+      );
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Error al guardar expedientes de comite:", error);
+    throw new Error("No se pudieron guardar los expedientes de comite en la nube.");
+  }
+};
+
+export const getAcademicCommitteeCases = async (leaderKey: string): Promise<AcademicCommitteeCaseDraft[]> => {
+  try {
+    const casesQuery = query(
+      collection(db, ACADEMIC_COMMITTEE_CASES_COLLECTION),
+      where('ownerLeaderKey', '==', leaderKey)
+    );
+    const snapshot = await getDocs(casesQuery);
+    return snapshot.docs
+      .map((docSnap) => deserializeAcademicCommitteeCase(docSnap.data()))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  } catch (error) {
+    console.error("Error al obtener expedientes de comite:", error);
+    return [];
   }
 };

@@ -71,12 +71,12 @@ Como Presidente del Comité`
 
 En ${data.LUGAR || '{{LUGAR}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
 
-Sr (a) {{NOMBRE_TUTOR}}
-{{PARENTESCO_TUTOR}} de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
+Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}
+${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
 
 ${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}, con fundamento en el artículo 153 del Reglamento Escolar de Preparatoria de Universidad Tecmilenio (“Reglamento”) se le notifica a usted a través del presente escrito, sobre la integración de un Comité Disciplinario derivado de reporte en donde se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matricula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} constituye una falta de disciplina prevista en el Reglamento.
 
-El motivo que da lugar a la integración del Comité es un reporte de fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, en el cual expresa que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}, presuntamente incurrió en ${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}.
+El motivo que da lugar a la integración del Comité es un reporte de fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, en el cual expresa que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}, presuntamente incurrió en ${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}. Dada la naturaleza del acto y con el fin de salvaguardar la integridad de la comunidad estudiantil, se turna el caso al Comité para su debido análisis y para que se determinen las acciones y medidas correspondientes.
 
 Lo anterior se considera como una falta de disciplina en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS_PRESUNTOS}}'} del Reglamento por lo que se le informa de la integración del Comité Disciplinario, el cual atenderá y dará solución al asunto antes mencionado, lo anterior, no sin antes informarle de su derecho de presentar pruebas o todo aquello que a su derecho o de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} convenga con el objetivo de probar su dicho dentro del plazo de 3 días hábiles contados a partir del día siguiente que le es notificado la presente vía electrónica.
 
@@ -91,12 +91,12 @@ Como Presidente del Comité`;
 
 En ${data.LUGAR || '{{LUGAR}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
 
-Sr (a) {{NOMBRE_TUTOR}}
-Padre de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
+Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}
+${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
 
 ${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}, con fundamento en el artículo 153 del Reglamento Escolar de Preparatoria de Universidad Tecmilenio (“Reglamento”) se le notifica a usted a través del presente escrito, sobre la integración de un Comité Disciplinario derivado de reporte en donde se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matricula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} constituye una falta de disciplina prevista en el Reglamento.
 
-El motivo que da lugar a la integración del Comité es un reporte con fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, en el cual expresa que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}, presuntamente incurrió en ${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}.
+El motivo que da lugar a la integración del Comité es un reporte con fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, en el cual expresa que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}, presuntamente incurrió en ${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}. Dada la naturaleza del acto y con el fin de salvaguardar la integridad de la comunidad estudiantil, se turna el caso al Comité para su debido análisis y para que se determinen las acciones y medidas correspondientes.
 
 Lo anterior se considera como una falta de disciplina en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS_PRESUNTOS}}'} del Reglamento por lo que se le informa de la integración del Comité Disciplinario, el cual atenderá y dará solución al asunto antes mencionado, lo anterior, no sin antes informarle de su derecho de presentar pruebas o todo aquello que a su derecho o de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} convenga con el objetivo de probar su dicho dentro del plazo de 3 días hábiles contados a partir del día siguiente que le es notificado la presente vía electrónica.
 
@@ -163,7 +163,7 @@ ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}`
 EXPEDIENTE N° ${data.NUMERO_EXPEDIENTE || '{{NUMERO_EXPEDIENTE}}'}
 En ${data.LUGAR || '{{LUGAR}}'} a ${data.FECHA_RESOLUCION ? format(data.FECHA_RESOLUCION, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_RESOLUCION}}'}
 
-Sr (a) {{NOMBRE_TUTOR}}, {{PARENTESCO_TUTOR}} de
+Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}, ${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de
 ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'}
 
 Se procede a notificarle de manera electrónica la resolución del Comité Disciplinario que se adjunta al presente correo electrónico.

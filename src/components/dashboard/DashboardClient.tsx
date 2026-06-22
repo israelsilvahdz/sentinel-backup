@@ -20,7 +20,7 @@ import { FileUpload } from './FileUpload';
 import { DashboardFilters } from './DashboardFilters';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks, GraduationCap, BookText, FileQuestion, Flag, CloudDownload, Link2 } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks, GraduationCap, BookText, FileQuestion, Flag, CloudDownload, Link2, Gavel } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -38,6 +38,26 @@ export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'ch
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
 export type { ActiveView } from '@/types/student';
+
+const VALID_VIEWS: ActiveView[] = [
+  'welcome',
+  'dashboard',
+  'students',
+  'weighting-schemes',
+  'unclassified',
+  'map-planner',
+  'change-stats',
+  'teams-management',
+  'academic-committee',
+  'professor-schedule',
+  'oferta-academica',
+  'irregular-students',
+  'team-work',
+  'continuidad',
+  'subject-planning',
+  'subject-tracking',
+  'exam-candidates',
+];
 
 function PanelLoading() {
   return (
@@ -57,7 +77,7 @@ const PonderacionesDashboard = dynamic(() => import('./PonderacionesDashboard').
 const UnclassifiedSubjectsPanel = dynamic(() => import('./UnclassifiedSubjectsPanel').then((mod) => mod.UnclassifiedSubjectsPanel), { loading: () => <PanelLoading /> });
 const MapPlanner = dynamic(() => import('./MapPlanner').then((mod) => mod.MapPlanner), { loading: () => <PanelLoading /> });
 const TeamsManagementPanel = dynamic(() => import('./TeamsManagementPanel').then((mod) => mod.TeamsManagementPanel), { loading: () => <PanelLoading /> });
-const AcademicCommitteePanel = dynamic(() => import('./AcademicCommitteePanel').then((mod) => mod.AcademicCommitteePanel), { loading: () => <PanelLoading /> });
+const AcademicCommitteePanel = dynamic(() => import('./AcademicCommitteePanelV3').then((mod) => mod.AcademicCommitteePanel), { loading: () => <PanelLoading /> });
 const ProfessorSchedulePanel = dynamic(() => import('./ProfessorSchedulePanel').then((mod) => mod.ProfessorSchedulePanel), { loading: () => <PanelLoading /> });
 const OfertaAcademicaPanel = dynamic(() => import('./OfertaAcademicaPanel').then((mod) => mod.OfertaAcademicaPanel), { loading: () => <PanelLoading /> });
 const IrregularStudentsPanel = dynamic(() => import('./IrregularStudentsPanel').then((mod) => mod.IrregularStudentsPanel), { loading: () => <PanelLoading /> });
@@ -309,7 +329,9 @@ export function DashboardClient() {
           const storedFileName = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME);
           if (storedFileName) setCurrentFileName(storedFileName);
           const storedActiveView = localStorage.getItem(LOCAL_STORAGE_KEYS.ACTIVE_VIEW);
-          if (storedActiveView) setActiveView(storedActiveView as ActiveView);
+          if (storedActiveView && VALID_VIEWS.includes(storedActiveView as ActiveView)) {
+            setActiveView(storedActiveView as ActiveView);
+          }
           
           // CARGAR CONTACTOS (Prioridad: localStorage con clave estática)
           const cachedContacts = localStorage.getItem(LOCAL_STORAGE_KEYS.CONTACTS);
@@ -599,7 +621,7 @@ export function DashboardClient() {
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <SidebarProvider defaultOpen={false}>
+      <SidebarProvider defaultOpen={true}>
         <Sidebar className="border-none bg-primary shadow-2xl">
           <SidebarHeader className="bg-primary/50 backdrop-blur-md">
              <div className="flex min-w-0 items-center gap-3 px-4 py-6 transition-all duration-300 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
@@ -633,6 +655,9 @@ export function DashboardClient() {
                   <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><Users /><span className="font-bold">Panel de Alumnos</span></SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Comites" isActive={activeView === 'academic-committee'} onClick={() => handleSetActiveView('academic-committee')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><Gavel /><span className="font-bold">Comites</span></SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Seguimiento por Materia" isActive={activeView === 'subject-tracking'} onClick={() => handleSetActiveView('subject-tracking')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><BookText /><span className="font-bold">Seguimiento por Materia</span></SidebarMenuButton>
                 </SidebarMenuItem>
                 <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-white/40">Planeación y Gestión</p></div>
@@ -660,6 +685,7 @@ export function DashboardClient() {
                 <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><HelpCircle /><span className="font-bold">Materias sin Clasificar</span></SidebarMenuButton>
                 </SidebarMenuItem>
+                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-white/40">Procesos Especiales</p></div>
                  <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Analizador de Cierre" isActive={activeView === 'exam-candidates'} onClick={() => handleSetActiveView('exam-candidates')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><FileQuestion /><span className="font-bold">Analizador de Cierre</span></SidebarMenuButton>
                 </SidebarMenuItem>
