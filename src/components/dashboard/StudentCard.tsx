@@ -452,15 +452,15 @@ export function StudentCard({
           )}
 
           <div className="flex min-w-0 flex-1 items-center gap-5">
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="relative z-10 flex shrink-0 items-center gap-3">
               <Checkbox
                 checked={isSelected}
                 onCheckedChange={(checked) => onSelectionChange(student.id, !!checked)}
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
-                  "h-5 w-5 rounded-md",
+                  "h-5 w-5 rounded-md shadow-sm",
                   hasSocietyBanner
-                    ? "border-white/40 data-[state=checked]:bg-white data-[state=checked]:text-primary"
+                    ? "border-white/70 bg-white/95 text-slate-700 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-primary"
                     : "border-primary/20 data-[state=checked]:bg-primary"
                 )}
               />
