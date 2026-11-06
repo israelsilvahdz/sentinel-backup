@@ -1,0 +1,10 @@
+{
+  "apphosting": [
+    {
+      "backendId": "sentinel-backup",
+      "rootDir": ".",
+      "alwaysDeployFromSource": true,
+      "ignore": ["node_modules", ".git", ".next", "*.log", ".env*"]
+    }
+  ]
+}

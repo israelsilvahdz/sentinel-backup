@@ -1,0 +1,342 @@
+import { type Student, type Subject, type SubjectSummary, type WeightingScheme } from '@/types/student';
+import { getActivityList } from './ponderaciones';
+
+export type RiskLevel = 'low' | 'medium' | 'high' | 'at_limit' | 'sd';
+export type CaseStatus = 'lost' | 'urgent' | 'observation' | 'ok';
+
+/**
+ * Calcula el nivel de riesgo para un valor y su límite.
+ */
+export function getRisk(value: number, limit: number): { risk: number; level: RiskLevel } {
+  if (limit <= 0) return { risk: value > 0 ? 1 : 0, level: value > 0 ? 'sd' : 'low' };
+  
+  if (value > limit) {
+    return { risk: 1, level: 'sd' };
+  }
+  if (value === limit) {
+    return { risk: 1, level: 'at_limit' };
+  }
+
+  const percentage = value / limit;
+  
+  let level: RiskLevel;
+  if (percentage >= 0.8) {
+    level = 'high';
+  } else if (percentage >= 0.5) {
+    level = 'medium';
+  } else {
+    level = 'low';
+  }
+  return { risk: percentage, level };
+}
+
+/**
+ * Checks if a subject is failed due to absences or missed assignments.
+ */
+export function isWithoutRight(subject: SubjectSummary | Subject): boolean {
+  return subject.absences > subject.absenceLimit || subject.missedAssignments > subject.missedAssignmentLimit;
+}
+
+/**
+ * Calcula el potencial de una materia.
+ */
+export function calculateSubjectPotential(subject: Subject | SubjectSummary, schemes: WeightingScheme[]): number {
+    if ('activities' in subject) {
+        const activityList = getActivityList(subject as Subject, schemes);
+        if (activityList.length === 0) return 100;
+
+        let totalEarnedPoints = 0;
+        let maxPossiblePoints = 0;
+
+        activityList.forEach(item => {
+            const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+            if (isGraded) {
+                const score = Number(item.score) || 0;
+                totalEarnedPoints += (score / 100) * item.weight;
+                maxPossiblePoints += item.weight;
+            }
+        });
+
+        return 100 - (maxPossiblePoints - totalEarnedPoints);
+    } else {
+        return subject.grade || 0;
+    }
+}
+
+/**
+ * Obtiene la lista de materias en estado crítico (SD o Potencial < 70) para un alumno.
+ */
+export function getCriticalSubjectsList(student: Student, schemes: WeightingScheme[]): { name: string, reason: 'sd' | 'low-potential' }[] {
+    const subjects = student.subjects || [];
+    const summaries = student.subjectSummaries || [];
+    const source = subjects.length > 0 ? subjects : summaries;
+
+    return source.map(s => {
+        const isSD = isWithoutRight(s);
+        let isLowPotential = false;
+        if ('activities' in s) {
+            isLowPotential = calculateSubjectPotential(s as Subject, schemes) < 70;
+        }
+
+        if (isSD) return { name: s.name, reason: 'sd' as const };
+        if (isLowPotential) return { name: s.name, reason: 'low-potential' as const };
+        return null;
+    }).filter((item): item is { name: string, reason: 'sd' | 'low-potential' } => item !== null);
+}
+
+/**
+ * Calcula el puntaje promedio requerido en las actividades restantes para alcanzar una meta.
+ */
+export function calculateRequiredScore(subject: Subject, schemes: WeightingScheme[], target: number = 70): number {
+    const activityList = getActivityList(subject, schemes);
+    if (activityList.length === 0) return 0;
+
+    let earnedPoints = 0;
+    let totalPossibleAtDate = 0;
+
+    activityList.forEach(item => {
+        const isGraded = typeof item.score === 'string' ? item.score.toUpperCase() !== 'SC' && item.score.trim() !== '' : true;
+        if (isGraded) {
+            const score = Number(item.score) || 0;
+            earnedPoints += (score / 100) * item.weight;
+            totalPossibleAtDate += item.weight;
+        }
+    });
+
+    const pointsRemaining = 100 - totalPossibleAtDate;
+    if (pointsRemaining <= 0) {
+        return earnedPoints >= target ? 0 : Infinity;
+    }
+
+    const pointsNeeded = target - earnedPoints;
+    if (pointsNeeded <= 0) return 0;
+
+    return (pointsNeeded / pointsRemaining) * 100;
+}
+
+/**
+ * Agrupa los riesgos por materia para planeación de oferta.
+ */
+export function aggregateRiskBySubject(students: Student[], schemes: WeightingScheme[]) {
+  const subjectMap: Record<string, {
+    name: string;
+    failedCount: number; // SD or Potential < 70
+    atRiskCount: number; // Potential 70-75
+    failedStudents: { id: string, name: string, reason: string }[];
+    atRiskStudents: { id: string, name: string, potential: number }[];
+  }> = {};
+
+  students.forEach(student => {
+    const subjects = student.subjects || [];
+    subjects.forEach(subject => {
+      if (!subjectMap[subject.name]) {
+        subjectMap[subject.name] = {
+          name: subject.name,
+          failedCount: 0,
+          atRiskCount: 0,
+          failedStudents: [],
+          atRiskStudents: []
+        };
+      }
+
+      const potential = calculateSubjectPotential(subject, schemes);
+      const isSD = isWithoutRight(subject);
+
+      if (isSD || potential < 70) {
+        subjectMap[subject.name].failedCount++;
+        subjectMap[subject.name].failedStudents.push({
+          id: student.id,
+          name: student.name,
+          reason: isSD ? 'Sin Derecho (SD)' : `Reprobado (Potencial ${potential.toFixed(1)})`
+        });
+      } else if (potential >= 70 && potential <= 75) {
+        subjectMap[subject.name].atRiskCount++;
+        subjectMap[subject.name].atRiskStudents.push({
+          id: student.id,
+          name: student.name,
+          potential
+        });
+      }
+    });
+  });
+
+  return Object.values(subjectMap)
+    .filter(s => s.failedCount > 0 || s.atRiskCount > 0)
+    .sort((a, b) => (b.failedCount + b.atRiskCount) - (a.failedCount + a.atRiskCount));
+}
+
+export function findPotentialRangeCases(students: Student[], schemes: WeightingScheme[], min: number, max: number): Student[] {
+    return students.filter(student => {
+        const source = student.subjects || [];
+        if (source.length === 0) return false;
+        return source.some(subject => {
+            const potential = calculateSubjectPotential(subject, schemes);
+            return potential >= min && potential <= max;
+        });
+    });
+}
+
+export function findRequiredScoreRangeCases(students: Student[], schemes: WeightingScheme[], minReq: number, maxReq: number): Student[] {
+    return students.filter(student => {
+        const source = student.subjects || [];
+        if (source.length === 0) return false;
+        return source.some(subject => {
+            const req = calculateRequiredScore(subject, schemes);
+            return req >= minReq && req <= maxReq;
+        });
+    });
+}
+
+export function findPotentialRiskCases(students: Student[], schemes: WeightingScheme[], threshold: number): Student[] {
+    return students.filter(student => {
+        const source = student.subjects || [];
+        if (source.length === 0) return false;
+        return source.some(subject => {
+            const potential = calculateSubjectPotential(subject, schemes);
+            return potential < threshold;
+        });
+    });
+}
+
+export function getStudentOverallRisk(student: Student, subjects: (Subject | SubjectSummary)[]) {
+  let hasSD = false;
+  let hasAtLimit = false;
+  let hasHighRisk = false;
+  let hasMediumRisk = false;
+  
+  if (!subjects || subjects.length === 0) {
+    return { overallRisk: 'low' as RiskLevel, hasSD: false, hasAtLimit: false, hasHighRisk: false, hasMediumRisk: false };
+  }
+
+  for (const subject of subjects) {
+    const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
+    const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
+
+    if (absenceRisk.level === 'sd' || assignmentRisk.level === 'sd') hasSD = true;
+    if (absenceRisk.level === 'at_limit' || assignmentRisk.level === 'at_limit') hasAtLimit = true;
+    if (absenceRisk.level === 'high' || assignmentRisk.level === 'high') hasHighRisk = true;
+    if (absenceRisk.level === 'medium' || assignmentRisk.level === 'medium') hasMediumRisk = true;
+  }
+
+  const overallRisk: RiskLevel = hasSD ? 'sd' : hasAtLimit ? 'at_limit' : hasHighRisk ? 'high' : hasMediumRisk ? 'medium' : 'low';
+  return { overallRisk, hasSD, hasAtLimit, hasHighRisk, hasMediumRisk };
+}
+
+export function calculateKpis(students: Student[]) {
+    let criticalRiskCount = 0;
+    let observationCount = 0;
+
+    students.forEach(student => {
+        if (student.subjectSummaries && student.subjectSummaries.length > 0) {
+          const { hasHighRisk, hasMediumRisk } = getStudentOverallRisk(student, student.subjectSummaries);
+          if (hasHighRisk) {
+              criticalRiskCount++;
+          } else if (hasMediumRisk) {
+              observationCount++;
+          }
+        }
+    });
+
+    return { criticalRiskCount, observationCount };
+}
+
+export function findLostCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        return student.subjectSummaries.some(subject => 
+            subject.absences > subject.absenceLimit || subject.missedAssignments > subject.missedAssignmentLimit
+        );
+    });
+}
+
+export function findSDAbsencesCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        return student.subjectSummaries.some(subject => 
+            subject.absences > subject.absenceLimit
+        );
+    });
+}
+
+export function findSDAssignmentsCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        return student.subjectSummaries.some(subject => 
+            subject.missedAssignments > subject.missedAssignmentLimit
+        );
+    });
+}
+
+export function findUrgentCases(students: Student[], excludedIds: Set<string>): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries || excludedIds.has(student.id)) return false;
+        
+        return student.subjectSummaries.some(subject => {
+            const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
+            const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
+            return absenceRisk.level === 'high' || assignmentRisk.level === 'high';
+        });
+    });
+}
+
+export function findObservationCases(students: Student[], excludedIds: Set<string>): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries || excludedIds.has(student.id)) return false;
+        
+        return student.subjectSummaries.some(subject => {
+            const absenceRisk = getRisk(subject.absences, subject.absenceLimit);
+            const assignmentRisk = getRisk(subject.missedAssignments, subject.missedAssignmentLimit);
+            return absenceRisk.level === 'medium' || assignmentRisk.level === 'medium';
+        });
+    });
+}
+
+export function findAtLimitAbsencesCases(students: Student[]): Student[] {
+  return students.filter(student => {
+    if (!student.subjectSummaries) return false;
+    return student.subjectSummaries.some(subject => getRisk(subject.absences, subject.absenceLimit).level === 'at_limit');
+  });
+}
+
+export function findAtLimitAssignmentsCases(students: Student[]): Student[] {
+  return students.filter(student => {
+    if (!student.subjectSummaries) return false;
+    return student.subjectSummaries.some(subject => getRisk(subject.missedAssignments, subject.missedAssignmentLimit).level === 'at_limit');
+  });
+}
+
+export function findExtraordinaryCases(students: Student[]): Student[] {
+  return students.filter(student => {
+    if (!student.subjectSummaries) return false;
+    const hasAcademicDishonesty = student.subjects?.some(s => s.finalGradeReason?.toUpperCase() === 'DA');
+    if (hasAcademicDishonesty) return false;
+
+    return student.subjectSummaries.some(subject => {
+      if (subject.finalGrade === null) return false;
+      return subject.finalGrade >= 50 && subject.finalGrade <= 69;
+    });
+  });
+}
+
+export function findRiskCasesBySubject(students: Student[], subjectName: string, riskType: 'absences' | 'missedAssignments'): Student[] {
+    return students.filter(student => {
+        if (!student.subjectSummaries) return false;
+        const relevantSubject = student.subjectSummaries.find(s => s.name === subjectName);
+        if (!relevantSubject) return false;
+        return riskType === 'absences' ? relevantSubject.absences > 0 : relevantSubject.missedAssignments > 0;
+    });
+}
+
+export function findIncompleteGradeCases(students: Student[]): Student[] {
+    return students.filter(student => {
+        if (!student.subjects) return false;
+        return student.subjects.some(subject => {
+            for (const activityKey in subject.activities) {
+                if (String(subject.activities[activityKey]).toUpperCase() === 'SC') {
+                    return true;
+                }
+            }
+            return false;
+        });
+    });
+}

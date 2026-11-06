@@ -1,0 +1,284 @@
+
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import * as z from 'zod';
+import { Document, Packer, Paragraph, TextRun, AlignmentType } from 'docx';
+
+export type Step = 'CONVOCATORIA' | 'NOTIFICACION' | 'ACUERDO' | 'RESOLUCION' | 'NOTIFICACION_RESOLUCION';
+
+export const stepKeys: Step[] = ['CONVOCATORIA', 'NOTIFICACION', 'ACUERDO', 'RESOLUCION', 'NOTIFICACION_RESOLUCION'];
+
+export const caseSchema = z.object({
+  NUMERO_EXPEDIENTE: z.string().optional(),
+  CAMPUS: z.string().optional(),
+  LUGAR: z.string().optional(),
+  FECHA_REPORTE: z.coerce.date().optional(),
+  FECHA_ACTUAL: z.coerce.date().optional(),
+  NOMBRE_REPORTANTE: z.string().optional(),
+  NOMBRE_ALUMNO: z.string().optional(),
+  MATRICULA_ALUMNO: z.string().optional(),
+  SEMESTRE_ALUMNO: z.string().optional(),
+  NOMBRE_TUTOR: z.string().optional(),
+  PARENTESCO_TUTOR: z.string().optional(),
+  DESCRIPCION_HECHOS: z.string().optional(),
+  ARTICULOS_PRESUNTOS: z.string().optional(),
+  PRESIDENTE_COMITE: z.string().optional(),
+  CARGO_PRESIDENTE: z.string().optional(),
+  LISTA_MIEMBROS_COMITE: z.string().optional(),
+  APLICA_MEDIDA_CAUTELAR: z.enum(['si', 'no']).optional(),
+  TIPO_MEDIDA_CAUTELAR: z.string().optional(),
+  DESCRIPCION_IMPLICACIONES_MEDIDA: z.string().optional(),
+  FECHA_SESION: z.coerce.date().optional(),
+  HORA_SESION: z.string().optional(),
+  FECHA_NOTIFICACION_EFECTIVA: z.coerce.date().optional(),
+  PRUEBAS_ALUMNO: z.string().optional(),
+  FECHA_RESOLUCION: z.coerce.date().optional(),
+  ARTICULOS_CONFIRMADOS: z.string().optional(),
+  TEXTO_SANCION: z.string().optional(),
+});
+
+export type CaseData = z.infer<typeof caseSchema>;
+
+
+const templatesContent: Record<Step, { title: string, template: (data: CaseData) => string }> = {
+  CONVOCATORIA: {
+    title: "1. Convocatoria",
+    template: (data) => `CONVOCATORIA A INTEGRACIÓN DE COMITÉ DISCIPLINARIO
+
+En ${data.LUGAR || '{{LUGAR PENDIENTE}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
+
+${data.PRESIDENTE_COMITE || '{{NOMBRE DEL DIRECTOR PENDIENTE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO DEL DIRECTOR PENDIENTE}}'}, con fundamento en el artículo 155, 156, 157 y 158 del Reglamento General de Alumnos de Universidad Tecmilenio (“Reglamento”), convoca a integrar un Comité Disciplinario, en virtud de haber recibido un reporte en el cual se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA PENDIENTE}}'} constituye una falta de disciplina. Los hechos que dan pie al comité es un reporte emitido por ${data.NOMBRE_REPORTANTE || '{{NOMBRE DEL REPORTANTE PENDIENTE}}'} y del cual se adjunta copia, donde se presume que ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} incurrió en las faltas de disciplina enmarcadas en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS PENDIENTES}}'} del Reglamento.
+
+Considerando que el Comité Disciplinario es la instancia competente para resolver cualquier asunto donde se presuma que la conducta de un estudiante constituye una falta de disciplina prevista en el Reglamento, se convoca a la integración del Comité Disciplinario por:
+{{LISTA_MIEMBROS_COMITE}}
+
+Lo anterior para que las personas mencionadas de forma conjunta resuelvan lo que corresponda conforme al Reglamento.
+
+Se acuerda notificar a ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA PENDIENTE}}'} conforme al artículo 159 del Reglamento y generar el expediente correspondiente, al cual le corresponde el número ${data.NUMERO_EXPEDIENTE || '{{NUMERO DE CASO PENDIENTE}}'} para integrarse en el expediente académico de ${data.NOMBRE_ALUMNO || '{{NOMBRE DEL ALUMNO PENDIENTE}}'}.
+
+Por lo expuesto, firma como encargado de presidir el comité:
+
+__________________________
+${data.PRESIDENTE_COMITE || '{{NOMBRE DEL DIRECTOR PENDIENTE}}'}
+${data.CARGO_PRESIDENTE || '{{CARGO DEL DIRECTOR PENDIENTE}}'}
+Como Presidente del Comité`
+  },
+  NOTIFICACION: {
+    title: "2. Notificación",
+    template: (data) => {
+      if (data.APLICA_MEDIDA_CAUTELAR === 'si') {
+        return `NOTIFICACIÓN DEL COMITÉ DISCIPLINARIO
+
+En ${data.LUGAR || '{{LUGAR}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
+
+Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}
+${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
+
+${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}, con fundamento en el artículo 153 del Reglamento Escolar de Preparatoria de Universidad Tecmilenio (“Reglamento”) se le notifica a usted a través del presente escrito, sobre la integración de un Comité Disciplinario derivado de reporte en donde se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matricula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} constituye una falta de disciplina prevista en el Reglamento.
+
+El motivo que da lugar a la integración del Comité es un reporte de fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, en el cual expresa que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}, presuntamente incurrió en ${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}. Dada la naturaleza del acto y con el fin de salvaguardar la integridad de la comunidad estudiantil, se turna el caso al Comité para su debido análisis y para que se determinen las acciones y medidas correspondientes.
+
+Lo anterior se considera como una falta de disciplina en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS_PRESUNTOS}}'} del Reglamento por lo que se le informa de la integración del Comité Disciplinario, el cual atenderá y dará solución al asunto antes mencionado, lo anterior, no sin antes informarle de su derecho de presentar pruebas o todo aquello que a su derecho o de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} convenga con el objetivo de probar su dicho dentro del plazo de 3 días hábiles contados a partir del día siguiente que le es notificado la presente vía electrónica.
+
+Para garantizar la integridad de los involucrados y/o para evitar que se obstaculice el procedimiento del Comité Disciplinario, con fundamento en el artículo 126 y 127 del “Reglamento” se aplica la medida cautelar ${data.TIPO_MEDIDA_CAUTELAR || '{{TIPO_MEDIDA_CAUTELAR}}'} la cual implica ${data.DESCRIPCION_IMPLICACIONES_MEDIDA || '{{DESCRIPCION_IMPLICACIONES_MEDIDA}}'} y que se mantendrá vigente hasta la notificación de la resolución del Comité Disciplinario.
+
+_________________________
+${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}
+${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}
+Como Presidente del Comité`;
+      }
+      return `NOTIFICACIÓN DEL COMITÉ DISCIPLINARIO
+
+En ${data.LUGAR || '{{LUGAR}}'} a ${format(data.FECHA_ACTUAL || new Date(), "d 'de' LLLL 'de' yyyy", { locale: es })}
+
+Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}
+${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}
+
+${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}, con fundamento en el artículo 153 del Reglamento Escolar de Preparatoria de Universidad Tecmilenio (“Reglamento”) se le notifica a usted a través del presente escrito, sobre la integración de un Comité Disciplinario derivado de reporte en donde se presume que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matricula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} constituye una falta de disciplina prevista en el Reglamento.
+
+El motivo que da lugar a la integración del Comité es un reporte con fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, en el cual expresa que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}, presuntamente incurrió en ${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}. Dada la naturaleza del acto y con el fin de salvaguardar la integridad de la comunidad estudiantil, se turna el caso al Comité para su debido análisis y para que se determinen las acciones y medidas correspondientes.
+
+Lo anterior se considera como una falta de disciplina en los artículos ${data.ARTICULOS_PRESUNTOS || '{{ARTICULOS_PRESUNTOS}}'} del Reglamento por lo que se le informa de la integración del Comité Disciplinario, el cual atenderá y dará solución al asunto antes mencionado, lo anterior, no sin antes informarle de su derecho de presentar pruebas o todo aquello que a su derecho o de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} convenga con el objetivo de probar su dicho dentro del plazo de 3 días hábiles contados a partir del día siguiente que le es notificado la presente vía electrónica.
+
+_________________________
+${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}
+${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}
+Como Presidente del Comité`;
+    }
+  },
+  ACUERDO: {
+    title: "3. Acuerdo",
+    template: (data) => `ACUERDO DE INTEGRACIÓN DE COMITÉ DISCIPLINARIO
+
+En ${data.LUGAR || '{{LUGAR}}'}
+EXPEDIENTE N° ${data.NUMERO_EXPEDIENTE || '{{NUMERO_EXPEDIENTE}}'}
+
+Siendo el día ${data.FECHA_SESION ? format(data.FECHA_SESION, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_SESION}}'} a las ${data.HORA_SESION || '{{HORA_SESION}}'} horas en la Dirección de Preparatoria de Universidad Tecmilenio Campus ${data.CAMPUS || '{{CAMPUS}}'}, queda abierto el expediente para llevar a cabo el Comité Disciplinario en relación al reporte recibido en fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, donde se menciona que la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}, con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} estudiante de ${data.SEMESTRE_ALUMNO || '{{SEMESTRE_ALUMNO}}'} de Preparatoria de UNIVERSIDAD TECMILENIO, se presume como una falta de disciplina...
+
+Por lo anterior se notificó al alumno (a) ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} y surtió efectos la misma en fecha ${data.FECHA_NOTIFICACION_EFECTIVA ? format(data.FECHA_NOTIFICACION_EFECTIVA, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_NOTIFICACION_EFECTIVA}}'}.
+
+El comité está integrado por:
+${data.LISTA_MIEMBROS_COMITE || '{{LISTA_MIEMBROS_COMITE}}'}
+
+DE LOS HECHOS QUE DAN LUGAR A ESTE COMITÉ;
+En fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}, se recibió un reporte por parte de ${data.NOMBRE_REPORTANTE || '{{NOMBRE_REPORTANTE}}'}, en el cual se indica lo siguiente:
+${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}
+
+PRUEBAS QUE PRESENTA:
+${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} presentó las siguientes pruebas y/o escrito dentro de los 3 días hábiles siguientes a la notificación.
+${data.PRUEBAS_ALUMNO || '{{PRUEBAS_ALUMNO}}'}`
+  },
+  RESOLUCION: {
+    title: "4. Resolución",
+    template: (data) => `RESOLUCIÓN DE COMITÉ DISCIPLINARIO
+
+EXPEDIENTE N° ${data.NUMERO_EXPEDIENTE || '{{NUMERO_EXPEDIENTE}}'}
+En ${data.LUGAR || '{{LUGAR}}'}
+A ${data.FECHA_RESOLUCION ? format(data.FECHA_RESOLUCION, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_RESOLUCION}}'}
+
+Por escrito de fecha ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'} los miembros de este Comité Disciplinario fueron convocados por ${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}... para resolver respecto de la conducta de ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'}...
+
+PRIMERO: Que el hecho que da pie al presente comité fue un reporte entregado el día ${data.FECHA_REPORTE ? format(data.FECHA_REPORTE, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_REPORTE}}'}.
+SEGUNDO: Que en dicho reporte se detallan las siguientes circunstancias:
+${data.DESCRIPCION_HECHOS || '{{DESCRIPCION_HECHOS}}'}
+TERCERO: Que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} presentó las siguientes pruebas y/o escrito...
+${data.PRUEBAS_ALUMNO || '{{PRUEBAS_ALUMNO}}'}
+
+Por lo que respetando los plazos y derechos conferidos a ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'}... el Comité Disciplinario ha determinado que los hechos anteriormente mencionados dan lugar a lo dispuesto por el (los) artículo (s) ${data.ARTICULOS_CONFIRMADOS || '{{ARTICULOS_CONFIRMADOS}}'} previsto(s) en El Reglamento.
+
+// (Aquí va el texto fijo de los artículos del reglamento)
+
+Por lo anterior y en base al material probatorio presentado a este Comité disciplinario... se resuelve en conjunto lo siguiente:
+PRIMERO.– Se comprueba y acredita que ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'} sí incurrió en las faltas de disciplina mencionadas en el Artículo (s) ${data.ARTICULOS_CONFIRMADOS || '{{ARTICULOS_CONFIRMADOS}}'} de El Reglamento, por lo que se le sanciona con ${data.TEXTO_SANCION || '{{TEXTO_SANCION}}'}.
+SEGUNDO: Se señala como encargado para notificar esta resolución por escrito a ${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} para su debido conocimiento a ${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}, ${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'} como presidente del Comité.
+
+___________________________
+${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}
+${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'}`
+  },
+  NOTIFICACION_RESOLUCION: {
+    title: "5. Notificación Resolución",
+    template: (data) => `NOTIFICACIÓN DE RESOLUCIÓN
+
+EXPEDIENTE N° ${data.NUMERO_EXPEDIENTE || '{{NUMERO_EXPEDIENTE}}'}
+En ${data.LUGAR || '{{LUGAR}}'} a ${data.FECHA_RESOLUCION ? format(data.FECHA_RESOLUCION, "d 'de' LLLL 'de' yyyy", { locale: es }) : '{{FECHA_RESOLUCION}}'}
+
+Sr (a) ${data.NOMBRE_TUTOR || '{{NOMBRE_TUTOR}}'}, ${data.PARENTESCO_TUTOR || '{{PARENTESCO_TUTOR}}'} de
+${data.NOMBRE_ALUMNO || '{{NOMBRE_ALUMNO}}'} con matrícula ${data.MATRICULA_ALUMNO || '{{MATRICULA_ALUMNO}}'}
+
+Se procede a notificarle de manera electrónica la resolución del Comité Disciplinario que se adjunta al presente correo electrónico.
+
+___________________________
+${data.PRESIDENTE_COMITE || '{{PRESIDENTE_COMITE}}'}
+${data.CARGO_PRESIDENTE || '{{CARGO_PRESIDENTE}}'} de Campus ${data.CAMPUS || '{{CAMPUS}}'}`
+  }
+};
+
+export const templates = templatesContent;
+
+export function generateDocument(step: Step, data: CaseData): string {
+    const populatedData = { ...data, FECHA_ACTUAL: new Date() };
+    const templateFn = templates[step].template;
+    return templateFn(populatedData);
+}
+
+export async function generateWordDocument(step: Step, data: CaseData): Promise<Blob> {
+    const text = generateDocument(step, data);
+    const lines = text.split('\n');
+    const namesToBold = [data.PRESIDENTE_COMITE, data.NOMBRE_ALUMNO, data.NOMBRE_REPORTANTE].filter(Boolean) as string[];
+
+    const paragraphs: Paragraph[] = [];
+
+    for (const line of lines) {
+        if (line.trim() === '{{LISTA_MIEMBROS_COMITE}}') {
+            const members = data.LISTA_MIEMBROS_COMITE?.split('\n') || [];
+            members.forEach(member => {
+                if (member.trim()) {
+                    paragraphs.push(new Paragraph({
+                        children: [new TextRun(member.trim())],
+                        bullet: {
+                            level: 0
+                        },
+                        alignment: AlignmentType.JUSTIFIED,
+                        spacing: { after: 120 },
+                    }));
+                }
+            });
+            continue;
+        }
+
+        const children: TextRun[] = [];
+        let remainingLine = line;
+
+        // Special handling for bolding names
+        if (namesToBold.some(name => line.includes(name))) {
+            const regex = new RegExp(`(${namesToBold.join('|')})`, 'g');
+            const parts = line.split(regex);
+            
+            parts.forEach(part => {
+                if (namesToBold.includes(part)) {
+                    children.push(new TextRun({ text: part, bold: true }));
+                } else {
+                    children.push(new TextRun(part));
+                }
+            });
+            remainingLine = '';
+        }
+
+        if (remainingLine) {
+            children.push(new TextRun(remainingLine));
+        }
+        
+        let paragraphOptions: any = {
+            children,
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 120 },
+        };
+        
+        const trimmedLine = line.trim();
+
+        if (trimmedLine.startsWith('CONVOCATORIA') || trimmedLine.startsWith('NOTIFICACIÓN') || trimmedLine.startsWith('ACUERDO') || trimmedLine.startsWith('RESOLUCIÓN')) {
+            paragraphOptions.children = [new TextRun({ text: trimmedLine, bold: true, allCaps: true })];
+            paragraphOptions.alignment = AlignmentType.CENTER;
+        } else if (trimmedLine.startsWith('En ') && (line.includes(' a '))) {
+            paragraphOptions.alignment = AlignmentType.RIGHT;
+        } else if (trimmedLine.startsWith('__________________________')) {
+            paragraphOptions.alignment = AlignmentType.CENTER;
+            paragraphOptions.spacing = { before: 240, after: 0 };
+        } else if (namesToBold.includes(trimmedLine.replace('Como Presidente del Comité', '').trim()) || trimmedLine === (data.CARGO_PRESIDENTE) || trimmedLine === "Como Presidente del Comité") {
+            paragraphOptions.alignment = AlignmentType.CENTER;
+            if(namesToBold.includes(trimmedLine.replace('Como Presidente del Comité', '').trim())) {
+                 paragraphOptions.children = [new TextRun({ text: trimmedLine, bold: true })];
+            }
+        }
+        
+        if (trimmedLine) {
+             paragraphs.push(new Paragraph(paragraphOptions));
+        } else {
+             paragraphs.push(new Paragraph({ children: [new TextRun('')] }));
+        }
+    }
+
+
+    const doc = new Document({
+        styles: {
+            default: {
+                document: {
+                    run: {
+                        font: "Calibri Light",
+                        size: 24, // 12pt
+                    },
+                },
+            },
+        },
+        sections: [{
+            properties: {},
+            children: paragraphs,
+        }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    return blob;
+}
+
+    
