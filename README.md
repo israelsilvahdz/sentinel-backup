@@ -4,7 +4,13 @@ Panel de seguimiento académico de Prepa Tecmilenio. El código usa Next.js 15, 
 
 ## Continuar desde otra computadora
 
-Lee [docs/PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md). El paquete limpio de código se genera con `scripts/Export-Sentinel.ps1`; no uses el `main` antiguo de GitHub como copia de los cambios publicados.
+Lee [docs/PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md). La versión lista para continuar está en la rama limpia `codex/portable-2026`. Clona solo esa rama:
+
+```powershell
+git clone --branch codex/portable-2026 --single-branch https://github.com/israelsilvahdz/sentinel-backup.git Sentinel
+```
+
+También existe un paquete ZIP limpio generado con `scripts/Export-Sentinel.ps1`. No uses el `main` antiguo de GitHub como copia de los cambios publicados.
 
 ## Inicio rápido en Windows
 

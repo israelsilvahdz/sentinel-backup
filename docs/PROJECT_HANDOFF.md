@@ -4,11 +4,31 @@ Actualizada el 6 de noviembre de 2026. Esta guía está escrita para abrir el pr
 
 ## 1. Obtener el código correcto
 
-En la computadora actual, `scripts/Export-Sentinel.ps1` produce un ZIP en `.handoff/`. Ese ZIP contiene el estado de código que se está publicando: fuente, logo, configuraciones, scripts y esta guía. No contiene la carpeta `.git`, `node_modules`, archivos Excel, contactos JSON, cachés ni `.env`.
+La opción recomendada es clonar la **rama limpia** `codex/portable-2026`, que tiene historial nuevo y contiene el código actualizado sin los archivos de alumnos del historial antiguo:
 
-En la otra computadora, espera a que el ZIP aparezca completo en OneDrive, extráelo en una carpeta de trabajo nueva —por ejemplo `C:\Projects\Sentinel`— y abre **esa carpeta extraída** en Codex. Evita abrir el antiguo clon de GitHub sin comprobar su versión: su rama `main` quedó atrasada respecto a lo publicado y su historial incluye un monitoreo Excel y un directorio de profesores.
+```powershell
+git clone --branch codex/portable-2026 --single-branch https://github.com/israelsilvahdz/sentinel-backup.git Sentinel
+cd Sentinel
+```
 
-El ZIP es una transferencia puntual. Para cambios posteriores, trabaja en una computadora a la vez y genera un paquete nuevo, o crea un repositorio privado nuevo a partir de esta copia limpia. No subas el historial antiguo a ese repositorio.
+Si GitHub solicita acceso, inicia sesión en esa computadora con la cuenta que puede abrir `israelsilvahdz/sentinel-backup`. No cambies a `main`: esa rama quedó atrasada y su historial incluye un monitoreo Excel y un directorio de profesores.
+
+Para continuar el trabajo en la otra computadora, usa esta rama. Después de editar y verificar:
+
+```powershell
+git status
+git add src README.md docs/PROJECT_HANDOFF.md scripts
+git commit -m "Describe el cambio"
+git push origin codex/portable-2026
+```
+
+Antes de `git add`, revisa `git status` y asegúrate de que no haya Excel, PDF, directorios ni credenciales. Para archivos de configuración nuevos, agrégalos por nombre tras revisarlos. La publicación no depende de `git push`: ejecuta el script de la sección 4 cuando quieras actualizar el sitio.
+
+Como alternativa sin Git, en la computadora actual `scripts/Export-Sentinel.ps1` produce un ZIP en `.handoff/`. Ese ZIP contiene el mismo código, logo, configuraciones, scripts y esta guía. No contiene la carpeta `.git`, `node_modules`, archivos Excel, contactos JSON, cachés ni `.env`.
+
+Si usas el ZIP, espera a que aparezca completo en OneDrive, extráelo en una carpeta de trabajo nueva —por ejemplo `C:\Projects\Sentinel`— y abre **esa carpeta extraída** en Codex. No mezcles el contenido con el clon antiguo.
+
+El ZIP es una transferencia puntual. Para cambios posteriores, usa la rama limpia o genera un paquete nuevo. Trabaja en una computadora a la vez y evita copiar el historial antiguo a otro repositorio.
 
 ## 2. Entender la aplicación
 

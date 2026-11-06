@@ -53,3 +53,10 @@ firestore-debug.log
 /.deploy-run-*/
 /.handoff-source-*/
 /.handoff/
+
+# Datos y exportaciones locales: nunca subir al código.
+*.xlsx
+*.xls
+*.csv
+*.pdf
+src/lib/*contacts.json
