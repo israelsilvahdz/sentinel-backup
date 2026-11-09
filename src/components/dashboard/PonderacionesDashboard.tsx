@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceHeader } from './WorkspaceHeader';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -6,8 +7,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDashboardFilters } from './DashboardClient';
 import type { WeightingScheme } from '@/types/student';
+import * as XLSX from 'xlsx';
+import { FileUpload } from './FileUpload';
+import { buildWeightingWorkbook, readWeightingWorkbook } from '@/lib/weighting-export';
 import { useToast } from '@/hooks/use-toast';
-import { addOrUpdateWeightingScheme, deleteWeightingScheme } from '@/lib/firebase-services';
+
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -308,10 +312,36 @@ function MultiSelectPopover({ options, selected, onChange }: { options: string[]
 
 
 export function PonderacionesDashboard() {
-  const { weightingSchemes, fetchWeightingSchemes, subjects: allSubjectNames } = useDashboardFilters();
+  const [schemeQuery, setSchemeQuery] = useState('');
+  const { weightingSchemes, setWeightingSchemes, fetchWeightingSchemes, subjects: allSubjectNames } = useDashboardFilters();
+  const visibleSchemes = useMemo(() => {
+    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const query = normalize(schemeQuery.trim());
+    return weightingSchemes.filter(scheme => normalize([scheme.name, ...scheme.subjectNames].join(' ')).includes(query));
+  }, [weightingSchemes, schemeQuery]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingScheme, setEditingScheme] = useState<WeightingScheme | undefined>(undefined);
   const { toast } = useToast();
+
+  const handleValidateFile = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const schemes = readWeightingWorkbook(XLSX.read(await file.arrayBuffer(), { type: 'array' }));
+      toast({ title: 'Formato compatible', description: schemes.length + ' bloques de ponderación reconocidos. Esta revisión no modifica los esquemas guardados.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Revisa el archivo', description: error instanceof Error ? error.message : 'No se pudo leer.' });
+    }
+  };
+
+  const handleExport = () => {
+    try {
+      const workbook = buildWeightingWorkbook(weightingSchemes, allSubjectNames);
+      XLSX.writeFile(workbook, `Ponderaciones_Sentinel_${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true });
+      toast({ title: 'Respaldo descargado', description: `${weightingSchemes.length} esquemas exportados en una sola hoja, organizados por materia.` });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'No se pudo exportar', description: error instanceof Error ? error.message : 'Intenta nuevamente.' });
+    }
+  };
 
   useEffect(() => {
     if (!isFormOpen) {
@@ -321,7 +351,8 @@ export function PonderacionesDashboard() {
 
   const handleFormSubmit = async (data: SchemeFormValues) => {
     try {
-      await addOrUpdateWeightingScheme(data as WeightingScheme);
+      const scheme = { ...data, id: data.id || crypto.randomUUID() };
+      setWeightingSchemes(previous => [...previous.filter(item => item.id !== scheme.id), scheme]);
       toast({ title: "Éxito", description: `El esquema "${data.name}" ha sido guardado.` });
       fetchWeightingSchemes();
       setIsFormOpen(false);
@@ -333,7 +364,7 @@ export function PonderacionesDashboard() {
 
   const handleDelete = async (schemeId: string, schemeName: string) => {
     try {
-        await deleteWeightingScheme(schemeId);
+        setWeightingSchemes(previous => previous.filter(scheme => scheme.id !== schemeId));
         toast({ title: "Eliminado", description: `El esquema "${schemeName}" ha sido eliminado.`});
         fetchWeightingSchemes();
     } catch (error) {
@@ -342,32 +373,35 @@ export function PonderacionesDashboard() {
   };
   
   return (
-    <div className="space-y-8 p-4 md:p-8 pt-6">
-      <header className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestor de Ponderaciones</h1>
-          <p className="text-muted-foreground">Crea y administra los esquemas de evaluación para las materias.</p>
-        </div>
+    <div className="workspace-page">
+<WorkspaceHeader eyebrow="Configuración académica" title="Gestor de ponderaciones" description="Administra los pesos de las actividades y su asignación por materia.">        <div className="flex flex-wrap gap-2">
+         <FileUpload onFileSelect={handleValidateFile} selectedFile={null} isLoading={false} label="Verificar Excel de ponderaciones" variant="outline" />
+         <Button variant="outline" onClick={handleExport} disabled={weightingSchemes.length === 0}>Descargar ponderaciones (Excel)</Button>
          <Button onClick={() => { setEditingScheme(undefined); setIsFormOpen(true); }}>
           <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevo Esquema
         </Button>
-      </header>
+        </div>
+      </WorkspaceHeader>
+      <p className="text-sm text-muted-foreground">Una sola hoja con un bloque por materia: Actividad, Etiqueta y Weight. Incluye todos los esquemas cargados; puedes copiarla al archivo base.</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {weightingSchemes.map(scheme => (
-          <Card key={scheme.id} className="flex flex-col">
+      {weightingSchemes.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center"><BookCopy className="mx-auto mb-4 h-8 w-8 text-primary" /><h2 className="text-lg font-semibold">Tus ponderaciones aparecerán aquí</h2><p className="mx-auto mt-2 max-w-md text-sm text-slate-500">Carga el archivo base con su hoja de ponderaciones o crea tu primer esquema.</p></div>}
+      {weightingSchemes.length > 0 && <div className="flex flex-wrap items-center gap-3"><Input aria-label="Buscar esquema o materia" placeholder="Buscar esquema o materia…" value={schemeQuery} onChange={event => setSchemeQuery(event.target.value)} className="h-11 max-w-md bg-white" /><span className="text-xs text-slate-500">{visibleSchemes.length} de {weightingSchemes.length} esquemas</span></div>}
+      {weightingSchemes.length > 0 && visibleSchemes.length === 0 && <p role="status" className="rounded-xl border bg-white p-6 text-sm text-slate-500">No hay esquemas que coincidan con tu búsqueda.</p>}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        {visibleSchemes.map(scheme => (
+          <Card key={scheme.id} className="flex flex-col overflow-hidden">
             <CardHeader>
               <div className="flex justify-between items-start">
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-start gap-2 text-base leading-snug">
                     <BookCopy /> {scheme.name}
                 </CardTitle>
                 <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingScheme(scheme); setIsFormOpen(true); }}>
+                    <Button aria-label={'Editar ' + scheme.name} variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingScheme(scheme); setIsFormOpen(true); }}>
                         <Edit className="h-4 w-4"/>
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                        <Button aria-label={'Eliminar ' + scheme.name} variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -386,14 +420,14 @@ export function PonderacionesDashboard() {
               </div>
             </CardHeader>
             <CardContent className="flex-grow space-y-4">
-              <div className="space-y-2 text-sm">
-                <h4 className="font-semibold mb-2">Actividades:</h4>
+              <details className="space-y-3 text-sm rounded-lg bg-slate-50 p-3">
+                <summary className="cursor-pointer font-medium text-primary focus-visible:outline-primary">Ver {scheme.activities.length} actividades</summary>
                 <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                     {scheme.activities.map((act, i) => (
                         <li key={i}><strong>{act.name}:</strong> {act.weight}% {act.label && <span className="text-blue-600 font-semibold">({act.label})</span>}</li>
                     ))}
                 </ul>
-              </div>
+              </details>
               <div className="space-y-2 pt-2">
                 <h4 className="font-semibold">Materias que usan este esquema:</h4>
                 <div className="flex flex-wrap gap-2">

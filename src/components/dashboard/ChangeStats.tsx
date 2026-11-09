@@ -1,5 +1,6 @@
 
 "use client";
+import { WorkspaceHeader } from './WorkspaceHeader';
 
 import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -332,24 +333,19 @@ ${onlineSubjectChanges.map(s => `• ${s.name}: ${s.value} NE`).join('\n')}
 };
 
     return (
-        <div className="space-y-8 p-4 md:p-8 pt-6">
-            <header className="flex items-center justify-between flex-wrap gap-4 mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Análisis de Cambios</h1>
-                    <p className="text-muted-foreground">Compara el reporte diario actual con uno anterior para detectar nuevas faltas y tareas no entregadas.</p>
-                </div>
-                {hasComparisonData && (
+        <div className="workspace-page">
+<WorkspaceHeader eyebrow="Evolución académica" title="Análisis de cambios" description="Compara dos fechas para identificar nuevas faltas, actividades pendientes y cambios de desempeño.">                {hasComparisonData && (
                     <Button onClick={handleCopySummary} variant="outline">
                         <ClipboardCopy className="mr-2 h-4 w-4" />
                         Copiar Resumen
                     </Button>
                 )}
-            </header>
+            </WorkspaceHeader>
 
             <Card>
                 <CardHeader>
                     <CardTitle>Iniciar Comparación</CardTitle>
-                    <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado. Los cambios de riesgo (Faltas y NE) se mostrarán aquí y se guardarán en el historial de la base de datos para las proyecciones.</CardDescription>
+                    <CardDescription>Al cargar un reporte anterior, éste se comparará con el reporte que ya tienes cargado. Los cambios de faltas y NE se mostrarán aquí y se conservarán en este navegador.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
                     <FileUpload onFileSelect={(file) => {

@@ -1,5 +1,6 @@
 
 "use client";
+import { WorkspaceHeader } from './WorkspaceHeader';
 
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -65,21 +66,22 @@ function ModernKpiCard({ title, value, description, color, icon: Icon, onClick }
   return (
     <Card 
       className={cn(
-        "cursor-pointer transition-all duration-300 border-none border-l-4 shadow-sm hover:shadow-md hover:-translate-y-1",
+        "cursor-pointer transition-colors duration-150 border border-l-4 shadow-none hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         colorStyles[color]
       )}
       onClick={onClick}
+      role="button" tabIndex={0} onKeyDown={(event) => { if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onClick(); } }}
     >
       <CardHeader className="pb-2 p-4">
-        <p className="text-[10px] font-black uppercase tracking-wider opacity-70">{title}</p>
+        <p className="text-sm font-semibold text-slate-700">{title}</p>
       </CardHeader>
       <CardContent className="p-4 pt-0">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-3xl font-black">{value}</div>
-            <p className="text-[10px] opacity-60 italic mt-1">{description}</p>
+            <div className="text-3xl font-semibold tabular-nums">{value}</div>
+            <p className="text-xs leading-relaxed text-slate-500 mt-2">{description}</p>
           </div>
-          <Icon className="h-8 w-8 opacity-20" />
+          <Icon className="h-6 w-6 opacity-70" />
         </div>
       </CardContent>
     </Card>
@@ -89,7 +91,7 @@ function ModernKpiCard({ title, value, description, color, icon: Icon, onClick }
 function SubModuleCard({ title, description, icon: Icon, color, value, onClick }: any) {
   return (
     <Card 
-      className="group cursor-pointer hover:shadow-lg transition-all duration-300 border-none bg-white/50 backdrop-blur-sm"
+      className="group cursor-pointer hover:border-primary/30 transition-colors border bg-white"
       onClick={onClick}
     >
       <CardContent className="p-5">
@@ -99,9 +101,9 @@ function SubModuleCard({ title, description, icon: Icon, color, value, onClick }
         <div className="flex justify-between items-start">
           <div>
             <h3 className="text-sm font-bold group-hover:text-primary transition-colors">{title}</h3>
-            <p className="text-[10px] text-muted-foreground leading-relaxed mt-1">{description}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed mt-1">{description}</p>
           </div>
-          <div className="text-xl font-black text-primary/40 group-hover:text-primary transition-colors">{value}</div>
+          <div className="text-xl font-semibold tabular-nums text-primary group-hover:text-primary transition-colors">{value}</div>
         </div>
       </CardContent>
     </Card>
@@ -194,42 +196,18 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-6 md:p-10 space-y-10 max-w-7xl mx-auto animate-in fade-in duration-700">
+    <div className="workspace-page">
       
       {!hasData ? (
-         <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-emerald-900 p-8 md:p-12 text-white shadow-2xl">
-            <div className="relative z-10 max-w-2xl">
-              <h1 className="text-4xl font-extrabold tracking-tight mb-4">Inicia el Monitoreo</h1>
-              <p className="text-emerald-50/80 text-lg leading-relaxed mb-8">
-                Sube un reporte diario en formato Excel para poblar la base de datos y visualizar el rendimiento académico.
-              </p>
-            </div>
-            <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-emerald-400/20 rounded-full blur-3xl" />
-         </header>
+<WorkspaceHeader eyebrow="Resumen académico" title="Tu monitoreo comienza aquí" description="Carga el archivo base y el monitoreo desde los botones superiores para consultar el desempeño de tus alumnos." />
       ) : (
         <>
-          <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-emerald-900 p-6 md:p-8 text-white shadow-xl">
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
-              <div>
-                <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-3">
-                  <Zap className="h-3 w-3" /> Resumen de Rendimiento
-                </div>
-                <h1 className="text-3xl font-black tracking-tight">Análisis Predictivo Académico</h1>
-                <p className="text-emerald-50/70 text-sm mt-1">Identificación temprana de riesgos y esfuerzo requerido para aprobar.</p>
-              </div>
-              <div className="flex gap-4">
-                <Button variant="secondary" className="font-bold shadow-lg" onClick={() => setActiveView('change-stats')}>
-                  <TrendingUp className="mr-2 h-4 w-4" /> Ver Tendencias
-                </Button>
-              </div>
-            </div>
-            <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
-          </header>
+<WorkspaceHeader eyebrow="Resumen académico" title="Lo que necesita atención" description="Faltas, actividades pendientes y esfuerzo requerido para aprobar."><Button variant="outline" onClick={() => setActiveView('change-stats')}><TrendingUp className="h-4 w-4" />Ver evolución</Button></WorkspaceHeader>
 
           <section className="space-y-6">
             <div className="flex items-center gap-2 px-2 text-muted-foreground">
               <Target className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-black uppercase tracking-[0.2em]">Estados Críticos (Sin Derecho y Límites)</h2>
+              <h2 className="text-sm font-semibold tracking-normal text-slate-700">Estados Críticos (Sin Derecho y Límites)</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <ModernKpiCard title="SD por Faltas" value={metrics.sdAbsencesCases.length} description="Han perdido el derecho oficial." color="red" icon={UserX} onClick={() => handleCaseClick('sd-absences')} />
@@ -243,7 +221,7 @@ export function Dashboard() {
             <div className="lg:col-span-1 space-y-8">
               <div className="flex items-center gap-2 px-2 text-muted-foreground">
                 <BrainCircuit className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-black uppercase tracking-[0.2em]">Focos de Atención</h2>
+                <h2 className="text-sm font-semibold tracking-normal text-slate-700">Focos de Atención</h2>
               </div>
               <div className="grid grid-cols-1 gap-4">
                 <SubModuleCard title="Potencial < 70" description="Incluso con 100 en lo restante, no aprueban." icon={TrendingDown} color="bg-red-600" value={metrics.lowPotentialCases.length} onClick={() => handleCaseClick('low-potential')} />
@@ -262,7 +240,7 @@ export function Dashboard() {
               <div className="space-y-6">
                 <div className="flex items-center gap-2 px-2 text-muted-foreground">
                   <Calculator className="h-4 w-4 text-primary" />
-                  <h2 className="text-sm font-black uppercase tracking-[0.2em]">Distribución de Potencial Preventivo</h2>
+                  <h2 className="text-sm font-semibold tracking-normal text-slate-700">Distribución de Potencial Preventivo</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <ModernKpiCard title="Zona de Alerta (70-75)" value={metrics.pot7075.length} description="Margen mínimo de aprobación." color="red" icon={Percent} onClick={() => handleCaseClick('pot-70-75')} />
@@ -274,7 +252,7 @@ export function Dashboard() {
               <div className="space-y-6 pt-4">
                 <div className="flex items-center gap-2 px-2 text-muted-foreground">
                   <Flame className="h-4 w-4 text-primary" />
-                  <h2 className="text-sm font-black uppercase tracking-[0.2em]">Nivel de Esfuerzo Requerido (Para pasar con 70)</h2>
+                  <h2 className="text-sm font-semibold tracking-normal text-slate-700">Nivel de Esfuerzo Requerido (Para pasar con 70)</h2>
                 </div>
                 <Card className="border-none shadow-xl bg-white/50 backdrop-blur-sm overflow-hidden rounded-3xl">
                   <CardHeader className="pb-2">

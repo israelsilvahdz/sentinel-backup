@@ -1,5 +1,6 @@
 
 "use client";
+import { WorkspaceHeader } from './WorkspaceHeader';
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,8 @@ import type { Student, Subject, SubjectSummary, WeightingScheme } from '@/types/
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { AverageComparisonBar } from './AcademicBreakdown';
+import { otherGroupsAverage, subjectAveragesFor } from '@/lib/academic-aggregates';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type ViewState = 'subjects' | 'groups' | 'students';
@@ -59,7 +62,7 @@ function RiskDistributionBar({ data }: { data: RiskCounts & { totalStudents: num
                 <div style={{ width: `${warnPct}%` }} className="bg-yellow-400" title={`Alerta (70-75): ${data.warningCount}`} />
                 <div style={{ width: `${safePct}%` }} className="bg-emerald-500" title={`Estable (>75): ${data.safeCount}`} />
             </div>
-            <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter opacity-70">
+            <div className="flex justify-between text-[11px] font-semibold">
                 <span className="text-red-700">{data.sdCount + data.criticalCount} Críticos</span>
                 <span className="text-yellow-600">{data.warningCount} Riesgo</span>
                 <span className="text-emerald-600">{data.safeCount} Bien</span>
@@ -108,22 +111,22 @@ function SubjectStudentItem({ student, subjectName, weightingSchemes, loadStuden
             <div>
                 <div className="flex justify-between items-start gap-2">
                     <p className="font-bold text-sm leading-tight truncate" title={student.name}>{student.name}</p>
-                    <Badge variant="secondary" className={cn("font-black text-xs px-2 shrink-0 border-none", textClass)}>
+                    <Badge variant="secondary" className={cn("font-semibold text-xs px-2 shrink-0 border-none", textClass)}>
                         {isSD ? 'SD' : `${pot.toFixed(1)}%`}
                     </Badge>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] font-mono font-bold text-muted-foreground bg-white/50 px-1 rounded">{student.id}</span>
-                    <span className="text-[9px] font-black uppercase text-muted-foreground/60 truncate">L: {student.leader}</span>
+                    <span className="text-[9px] font-semibold uppercase text-muted-foreground/60 truncate">L: {student.leader}</span>
                 </div>
             </div>
             
             <div className="flex items-center gap-4 text-xs font-semibold bg-white/60 p-2 rounded-lg">
                  <span className={cn("flex items-center gap-1", subject.absences > subject.absenceLimit ? "text-red-600" : "text-slate-600")}>
-                     Faltas: <span className="font-black">{subject.absences}/{subject.absenceLimit}</span>
+                     Faltas: <span className="font-semibold">{subject.absences}/{subject.absenceLimit}</span>
                  </span>
                  <span className={cn("flex items-center gap-1", subject.missedAssignments > subject.missedAssignmentLimit ? "text-red-600" : "text-slate-600")}>
-                     NE: <span className="font-black">{subject.missedAssignments}/{subject.missedAssignmentLimit}</span>
+                     NE: <span className="font-semibold">{subject.missedAssignments}/{subject.missedAssignmentLimit}</span>
                  </span>
             </div>
         </Card>
@@ -131,8 +134,8 @@ function SubjectStudentItem({ student, subjectName, weightingSchemes, loadStuden
 }
 
 
-export function SubjectTrackingPanel() {
-  const { allStudents, allStudentsMap, leaders, weightingSchemes, isLoading, loadStudentSubjects, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
+export function SubjectTrackingPanel({ embedded = false }: { embedded?: boolean }) {
+  const { allStudents, allStudentsMap, leaders, audience, weightingSchemes, isLoading, loadStudentSubjects, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
   const [selectedLeader, setSelectedLeader] = useState<string | 'all'>('all');
   const [viewState, setViewState] = useState<ViewState>('subjects');
   const [selectedSubjectName, setSelectedSubjectName] = useState<string | null>(null);
@@ -271,6 +274,16 @@ export function SubjectTrackingPanel() {
   const selectedGroupData = useMemo(() => {
     return selectedSubjectData?.groups.find(g => g.name === selectedGroupName);
   }, [selectedSubjectData, selectedGroupName]);
+  const groupGrades = useMemo(() => {
+    const values = new Map<string, { average: number | null; comparison: { average: number; count: number } | null }>();
+    if (!selectedSubjectData) return values;
+    for (const group of selectedSubjectData.groups) {
+      const average = subjectAveragesFor(filteredStudentsByLeader, 'groups', group.name).find(subject => subject.name === selectedSubjectData.name)?.average ?? null;
+      const comparison = otherGroupsAverage(filteredStudentsByLeader, 'groups', group.name, selectedSubjectData.name);
+      values.set(group.name, { average, comparison });
+    }
+    return values;
+  }, [filteredStudentsByLeader, selectedSubjectData]);
 
   const handleSubjectClick = (subjectName: string) => {
     setSelectedSubjectName(subjectName);
@@ -365,66 +378,47 @@ export function SubjectTrackingPanel() {
   }
 
   return (
-    <div className="p-6 md:p-10 space-y-8 max-w-7xl mx-auto animate-in fade-in duration-700">
-      <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-primary to-emerald-900 p-8 md:p-10 text-white shadow-2xl">
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-2 border border-white/10 shadow-inner">
-              <AlertTriangle className="h-3 w-3 text-emerald-300" /> Triage Académico
-            </div>
-            <h1 className="text-4xl font-black tracking-tight flex items-center gap-4">
-              {panelTitle}
-            </h1>
-            <p className="text-sm mt-1 flex items-center gap-2 max-w-xl opacity-80 font-medium">
-              Priorizado automáticamente. Las materias y grupos con mayor índice de reprobación y SD aparecen primero.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap bg-white/10 backdrop-blur-xl p-3 rounded-2xl border border-white/10 shadow-2xl">
-            {(viewState === 'groups' || viewState === 'students') && (
-              <Button variant="secondary" size="sm" onClick={handleBack} className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4 shadow-none">
-                <ArrowLeft className="h-4 w-4 text-emerald-300" /> Atrás
+    <div className={embedded ? 'space-y-6' : 'workspace-page'}>
+<WorkspaceHeader eyebrow="Seguimiento por materia" title={panelTitle} description="Revisa primero las materias y grupos con mayor riesgo; entra en cada uno para consultar a sus alumnos.">            {(viewState === 'groups' || viewState === 'students') && (
+              <Button variant="secondary" size="sm" onClick={handleBack} className="h-10 rounded-xl font-bold text-xs gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 shadow-none">
+                <ArrowLeft className="h-4 w-4 text-primary" /> Atrás
               </Button>
             )}
             <Select value={selectedLeader} onValueChange={setSelectedLeader}>
-              <SelectTrigger id="leader-select" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4 max-w-[200px] shadow-none">
-                <Users className="h-4 w-4 text-emerald-300" />
-                <SelectValue placeholder="Filtrar por Líder..." />
+              <SelectTrigger id="leader-select" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 max-w-[200px] shadow-none">
+                <Users className="h-4 w-4 text-primary" />
+                <SelectValue placeholder={audience === 'professional' ? 'Filtrar por mentor...' : 'Filtrar por líder...'} />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
-                <SelectItem value="all">Todos los Líderes</SelectItem>
+                <SelectItem value="all">{audience === 'professional' ? 'Todos los mentores' : 'Todos los líderes'}</SelectItem>
                 {leaders.map(leader => (
                   <SelectItem key={leader} value={leader}>{leader}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {selectedLeader !== 'all' && (
-              <Button variant="secondary" size="sm" onClick={() => setSelectedLeader('all')} className="h-10 px-3 text-[10px] font-black uppercase tracking-widest bg-white/20 hover:bg-white/30 text-white border-none rounded-full transition-all shadow-none">
+              <Button variant="secondary" size="sm" onClick={() => setSelectedLeader('all')} className="h-10 px-3 text-[10px] font-semibold uppercase tracking-widest bg-primary/5 hover:bg-primary/10 text-primary border-none rounded-full transition-all shadow-none">
                 <X className="mr-1.5 h-3.5 w-3.5"/> Quitar filtro
               </Button>
-            )}
-          </div>
-        </div>
-        <div className="absolute right-[-5%] top-[-20%] w-96 h-96 bg-white/10 rounded-full blur-[100px]" />
-        <div className="absolute left-[-5%] bottom-[-20%] w-64 h-64 bg-emerald-400/10 rounded-full blur-[80px]" />
-      </header>
+            )}</WorkspaceHeader>
 
       <section className="space-y-4">
         {filteredStudentsByLeader.length === 0 ? (
-          <div className="text-center py-32 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10 animate-in fade-in duration-1000">
+          <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
             <CheckCircle2 className="h-20 w-20 text-emerald-500/20 mx-auto mb-6" />
-            <h3 className="text-2xl font-black opacity-40">Todo despejado</h3>
+            <h3 className="text-xl font-semibold text-slate-700">Sin resultados para esta selección</h3>
             <p className="text-muted-foreground text-sm max-w-xs mx-auto font-medium">
               No hay datos para mostrar con los filtros actuales.
             </p>
           </div>
         ) : (
-          <ScrollArea className="h-[65vh] rounded-3xl border shadow-xl bg-white/60 backdrop-blur-md pb-10">
+          <ScrollArea className="h-[65vh] rounded-2xl border bg-white pb-6">
             <div className="p-4 space-y-4">
               
               {/* VISTA DE MATERIAS */}
               {viewState === 'subjects' && (
                 <>
-                  <div className="flex items-center gap-2 px-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
+                  <div className="flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
                     <AlertTriangle className="h-3 w-3" /> Ordenado por mayor % de riesgo crítico
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -438,7 +432,7 @@ export function SubjectTrackingPanel() {
                         
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex flex-col min-w-0 flex-1">
-                            <p className="font-bold text-lg leading-tight truncate">{subject.name}</p>
+                            <p className="font-semibold text-base leading-snug break-words">{subject.name}</p>
                             <p className="text-xs text-muted-foreground font-medium mt-1">
                                 {subject.groups.length} Grupos • {subject.totalStudents} Alumnos
                             </p>
@@ -446,13 +440,13 @@ export function SubjectTrackingPanel() {
                           
                           <div className="flex flex-col items-end shrink-0 gap-2">
                             <Badge variant="outline" className={cn(
-                              "font-black text-xs px-2 py-0.5 rounded-md",
+                              "font-semibold text-xs px-2 py-0.5 rounded-md",
                               subject.averagePotential !== null && subject.averagePotential >= 90 ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
                               subject.averagePotential !== null && subject.averagePotential >= 80 ? "bg-blue-100 text-blue-700 border-blue-200" :
                               subject.averagePotential !== null && subject.averagePotential >= 70 ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
                               subject.averagePotential !== null ? "bg-red-100 text-red-700 border-red-200" : ""
                             )}>
-                              {subject.averagePotential === null ? '--' : `Prom: ${subject.averagePotential.toFixed(1)}`}
+                              {subject.averagePotential === null ? '--' : `Potencial: ${subject.averagePotential.toFixed(1)}`}
                             </Badge>
                             
                             <TooltipProvider>
@@ -490,7 +484,7 @@ export function SubjectTrackingPanel() {
                        <ArrowLeft className="h-4 w-4 mr-2" /> Volver a Materias
                      </Button>
                      <div>
-                       <h3 className="font-black text-xl text-slate-800 leading-tight">{selectedSubjectData.name}</h3>
+                       <h3 className="font-semibold text-xl text-slate-800 leading-tight">{selectedSubjectData.name}</h3>
                        <p className="text-xs text-muted-foreground font-medium">Selecciona un grupo para ver a los alumnos</p>
                      </div>
                   </div>
@@ -514,13 +508,13 @@ export function SubjectTrackingPanel() {
                           
                           <div className="flex flex-col items-end gap-2">
                              <Badge variant="outline" className={cn(
-                                "font-black text-xs px-2 py-0.5 rounded-md",
+                                "font-semibold text-xs px-2 py-0.5 rounded-md",
                                 group.averagePotential !== null && group.averagePotential >= 90 ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
                                 group.averagePotential !== null && group.averagePotential >= 80 ? "bg-blue-100 text-blue-700 border-blue-200" :
                                 group.averagePotential !== null && group.averagePotential >= 70 ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
                                 group.averagePotential !== null ? "bg-red-100 text-red-700 border-red-200" : ""
                               )}>
-                                {group.averagePotential === null ? '--' : `Prom: ${group.averagePotential.toFixed(1)}`}
+                                {group.averagePotential === null ? '--' : `Potencial: ${group.averagePotential.toFixed(1)}`}
                               </Badge>
 
                               <TooltipProvider>
@@ -542,6 +536,7 @@ export function SubjectTrackingPanel() {
                         </div>
 
                         <RiskDistributionBar data={group} />
+                        <AverageComparisonBar average={groupGrades.get(group.name)?.average ?? null} comparison={groupGrades.get(group.name)?.comparison ?? null} />
 
                       </Card>
                     ))}
@@ -558,7 +553,7 @@ export function SubjectTrackingPanel() {
                        <ArrowLeft className="h-4 w-4 mr-2" /> Volver a Grupos
                      </Button>
                      <div>
-                       <h3 className="font-black text-xl text-slate-800 leading-tight">Grupo {selectedGroupData.name}</h3>
+                       <h3 className="font-semibold text-xl text-slate-800 leading-tight">Grupo {selectedGroupData.name}</h3>
                        <p className="text-xs text-muted-foreground font-medium">{selectedSubjectName} • {selectedGroupData.students.length} alumnos</p>
                      </div>
                   </div>

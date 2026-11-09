@@ -1,5 +1,6 @@
 
 "use client";
+import { WorkspaceHeader } from './WorkspaceHeader';
 
 import { useMemo } from 'react';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,7 +17,7 @@ interface StudentWithUnclassified {
 
 export function UnclassifiedSubjectsPanel() {
   // Use filteredStudents to respect the global leader filter
-  const { filteredStudents, isLoading, weightingSchemes } = useDashboardFilters();
+  const { filteredStudents, isLoading, weightingSchemes, hasData } = useDashboardFilters();
 
   const studentsWithUnclassifiedSubjects = useMemo(() => {
     if (isLoading || !filteredStudents) return [];
@@ -49,13 +50,8 @@ export function UnclassifiedSubjectsPanel() {
   }, [filteredStudents, isLoading, weightingSchemes]);
 
   return (
-    <div className="space-y-8 p-4 md:p-8 pt-6">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Materias Sin Ponderación por Alumno</h1>
-        <p className="text-muted-foreground">
-          Listado de alumnos que cursan materias sin un esquema de ponderación asignado. Usa el filtro global para ver por líder de generación.
-        </p>
-      </header>
+    <div className="workspace-page">
+<WorkspaceHeader eyebrow="Configuración académica" title="Materias sin clasificar" description="Identifica las materias que necesitan un esquema de ponderación. Puedes acotar los resultados desde Filtros." />
 
       <Card>
         <CardHeader>
@@ -93,9 +89,9 @@ export function UnclassifiedSubjectsPanel() {
           ) : (
             <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
                 <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-                <h3 className="text-xl font-semibold">¡Todo en orden!</h3>
+                <h3 className="text-xl font-semibold">{hasData ? 'Sin materias pendientes de clasificar' : 'Carga tus archivos para comenzar'}</h3>
                 <p className="text-muted-foreground mt-2">
-                    No se encontraron alumnos con materias sin clasificar para el filtro seleccionado.
+                    {hasData ? 'No se encontraron materias sin esquema para la selección actual.' : 'Usa los botones superiores para cargar la base principal y el monitoreo.'}
                 </p>
             </div>
           )}

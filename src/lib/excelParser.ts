@@ -1,6 +1,5 @@
 import * as XLSX from 'xlsx';
 import type { OfertaAcademicaItem, Student, StudentContact, ProfessorContact, Team, CareerChoiceSurvey, StudentLifeProfile } from '@/types/student';
-import { bulkAddOrUpdateContacts, bulkAddOrUpdateProfessorContacts, bulkAddOrUpdateTeams, bulkAddOrUpdateStudentLifeProfiles } from './firebase-services';
 import type { StudentData, Subject } from '@/types/student';
 import { generateKeyFromData } from './utils';
 
@@ -51,7 +50,7 @@ function normalizeStudentIdFromSurveyValue(value: string): string {
 const COL_SYNONYMS = {
     STUDENT_ID: ['MATRICULA', 'ID', 'ALUMNO'],
     STUDENT_NAME: ['NOMBRE DEL ALUMNO', 'NOMBRE ALUMNO', 'NAME'],
-    LEADER: ['LIDER'],
+    LEADER: ['MENTOR', 'LIDER'],
     TUTOR: ['TUTOR'],
     IS_GRAD: ['CAG'],
     CRN: ['CRN'],
@@ -82,9 +81,11 @@ const COL_SYNONYMS = {
 // --- PARSERS PRINCIPALES ---
 
 export async function parseExcel(file: File): Promise<StudentData | null> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const reader = new FileReader();
+        reader.onerror = () => reject(new Error('No se pudo leer el monitoreo.'));
         reader.onload = (e) => {
+          try {
             const data = e.target?.result;
             const workbook = XLSX.read(data, { type: 'array' });
             const jsonData: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: '' });
@@ -95,6 +96,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
             headers.forEach((h: string, i: number) => headerMap[h] = i);
             const getIdx = (names: string[]) => findColumnIndex(headerMap, headers, names);
 
+            if (!headers.includes('MATRICULA') || !headers.includes('NOMBRE DE LA MATERIA')) throw new Error('El archivo no es un monitoreo de alumnos.');
             const studentData: StudentData = {};
             for (const row of jsonData.slice(1)) {
                 const getVal = (names: string[]) => {
@@ -105,7 +107,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                     return v ? String(v).trim() : '';
                 };
 
-                const studentId = getVal(COL_SYNONYMS.STUDENT_ID);
+                const studentId = getVal(COL_SYNONYMS.STUDENT_ID).toUpperCase();
                 if (!studentId) continue;
 
                 if (!studentData[studentId]) {
@@ -154,6 +156,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                 });
             }
             resolve(studentData);
+          } catch (error) { reject(error); }
         };
         reader.readAsArrayBuffer(file);
     });
@@ -181,7 +184,6 @@ export async function parseDirectoryExcel(file: File): Promise<Record<string, St
                     sedena: '', group: '', mentoringId: ''
                 };
             }
-            await bulkAddOrUpdateContacts(contacts);
             resolve(contacts);
         };
         reader.readAsArrayBuffer(file);
@@ -209,7 +211,6 @@ export async function parseProfessorDirectoryExcel(file: File): Promise<Record<s
                 const id = name.toLowerCase().replace(/\s+/g, '');
                 contacts[id] = { id, name, email };
             }
-            await bulkAddOrUpdateProfessorContacts(contacts);
             resolve(contacts);
         };
         reader.readAsArrayBuffer(file);
@@ -238,7 +239,7 @@ export async function parseAthletesExcel(file: File, allStudentsMap: Map<string,
                     teamsToUpdate[sport]?.members.push({ id: studentId, name });
                 }
             }
-            if (Object.keys(teamsToUpdate).length > 0) await bulkAddOrUpdateTeams(Object.values(teamsToUpdate));
+
             resolve();
         };
         reader.readAsArrayBuffer(file);
@@ -283,7 +284,6 @@ export async function parseStudentLifeSurveyExcel(file: File): Promise<Record<st
                 };
             }
 
-            await bulkAddOrUpdateStudentLifeProfiles(profiles);
             resolve(profiles);
         };
         reader.readAsArrayBuffer(file);

@@ -1,74 +1,51 @@
 # Sentinel
 
-Proyecto web basado en Next.js y Firebase, preparado para trabajarse localmente con Codex.
+Panel de seguimiento académico de Prepa Tecmilenio. El código usa Next.js 15, React 18 y TypeScript. La aplicación se publica en Firebase App Hosting, pero los archivos de alumnos y monitoreo se procesan y conservan en el navegador del usuario.
 
-## Requisitos
+## Continuar desde otra computadora
 
-- Node.js 20 o superior
-- npm
-- Git
-
-## Instalacion
-
-1. Instala dependencias:
-
-```bash
-npm install
-```
-
-2. Crea tu archivo de entorno local a partir del ejemplo:
-
-```bash
-cp .env.example .env.local
-```
-
-En PowerShell tambien puedes usar:
+Lee [docs/PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md). La versión lista para continuar está en la rama limpia `codex/portable-2026`. Clona solo esa rama:
 
 ```powershell
-Copy-Item .env.example .env.local
+git clone --branch codex/portable-2026 --single-branch https://github.com/israelsilvahdz/sentinel-backup.git Sentinel
 ```
 
-3. Verifica o ajusta los valores de Firebase en `.env.local`.
+También existe un paquete ZIP limpio generado con `scripts/Export-Sentinel.ps1`. No uses el `main` antiguo de GitHub como copia de los cambios publicados.
 
-## Variables de entorno
+## Inicio rápido en Windows
 
-El frontend usa estas variables publicas de Firebase:
+Requiere Node.js 20 o superior y PowerShell. En la carpeta del proyecto:
 
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_DATABASE_URL`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
-
-## Desarrollo local
-
-Para iniciar el proyecto:
-
-```bash
+```powershell
+npm ci
+npm run typecheck
 npm run dev
 ```
 
-La app corre en:
+Abre <http://localhost:9002/>. Carga la base principal y un monitoreo Excel desde la barra superior. Los archivos se guardan en IndexedDB de ese navegador; la edición de plantillas de mensajes se guarda en su `localStorage`.
 
-- [http://localhost:9002](http://localhost:9002)
+## Publicar
 
-## Scripts disponibles
+El backend de producción es `sentinel-backup`, en el proyecto Firebase `tecmilenio-mdea`. Inicia sesión con una cuenta autorizada:
 
-- `npm run dev`: inicia el servidor local en el puerto 9002
-- `npm run build`: genera el build de produccion
-- `npm run start`: sirve el build de produccion
-- `npm run typecheck`: ejecuta TypeScript sin emitir archivos
+```powershell
+.\node_modules\.bin\firebase.cmd login
+.\scripts\Publish-Sentinel.ps1
+```
 
-## Flujo recomendado con Codex
+El script comprueba tipos, crea una copia temporal que **solo contiene código y recursos permitidos**, compila y despliega únicamente App Hosting. Espera el mensaje `Rollout ... complete` antes de dar la publicación por terminada.
 
-1. Clona o abre este repo localmente en Codex.
-2. Instala dependencias con `npm install`.
-3. Crea `.env.local` desde `.env.example`.
-4. Ejecuta `npm run dev`.
-5. Haz cambios, valida y luego usa Git para guardar y subir tu trabajo.
+Sitio: <https://sentinel-backup--tecmilenio-mdea.us-east4.hosted.app/>
 
-## Nota sobre TypeScript
+## Archivos principales
 
-Si `npm run typecheck` falla, es posible que existan errores previos del proyecto que no necesariamente bloquean el arranque local. Podemos corregirlos despues por partes.
+- `src/components/dashboard/DashboardClient.tsx`: navegación, carga de archivos y estado local.
+- `src/lib/principal-base.ts`: lectura del archivo base.
+- `src/lib/excelParser.ts`: lectura del monitoreo.
+- `src/lib/local-workspace.ts`: persistencia en IndexedDB.
+- `src/components/dashboard/StudentPanel.tsx`: panel de alumnos y PDFs.
+- `src/components/dashboard/AcademicPerformancePanel.tsx`: promedios y seguimiento por materia.
+- `src/lib/academic-aggregates.ts`: promedios y comparaciones.
+- `src/components/dashboard/StudentSchedule.tsx`: notificaciones individuales.
+
+No agregues archivos con datos personales, Excel, PDF ni credenciales al código o a un repositorio remoto.

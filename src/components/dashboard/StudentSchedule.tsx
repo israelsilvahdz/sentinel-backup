@@ -22,6 +22,7 @@ import { Card } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
 import { Switch } from '../ui/switch';
 import { useDashboardFilters } from './DashboardClient';
+import { describeNotificationTiming, fillNotificationTemplate, readNotificationTemplate, saveNotificationTemplate } from '@/lib/notification-templates';
 
 interface StudentScheduleProps {
   subjects: Subject[];
@@ -91,6 +92,30 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [teachersToNotify, setTeachersToNotify] = useState<{name: string, email: string | null}[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<Set<string>>(new Set());
+  const [mailTemplate, setMailTemplate] = useState(() => readNotificationTemplate('professorAbsence'));
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false);
+  const lateArrival = notificationReason === 'Llegada tarde';
+  const timing = dateRange?.from ? describeNotificationTiming(dateRange.from, dateRange.to, lateArrival) : null;
+
+  const affectedDays = useMemo(() => {
+    const days = new Set<string>();
+    if (!dateRange?.from) return days;
+    const end = dateRange.to || dateRange.from;
+    for (let cursor = new Date(dateRange.from); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      const day = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'][cursor.getDay()];
+      if (DAYS.includes(day)) days.add(day);
+    }
+    return days;
+  }, [dateRange]);
+  const availableClasses = useMemo(() => subjects.filter(subject =>
+    subject.schedule?.startTime && subject.schedule.days.some(day => affectedDays.has(day))
+  ), [subjects, affectedDays]);
+  const missingTeachers = teachersToNotify.filter(teacher => !teacher.email);
+
+  useEffect(() => {
+    const valid = new Set(availableClasses.map(subject => `${subject.id}|${subject.group}|${subject.schedule?.startTime || ''}`));
+    setSelectedClasses(previous => new Set([...previous].filter(key => valid.has(key))));
+  }, [availableClasses]);
 
   const selectedRangeLabel = useMemo(() => {
     if (!dateRange?.from) return 'Selecciona una fecha o un rango';
@@ -138,17 +163,6 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
       return;
     }
 
-    const affectedDays = new Set<string>();
-    const start = dateRange.from;
-    const end = dateRange.to || start;
-    let currentDate = start;
-
-    while (currentDate <= end) {
-      const dayKey = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'][currentDate.getDay()];
-      if (DAYS.includes(dayKey)) affectedDays.add(dayKey);
-      currentDate = new Date(currentDate.valueOf() + 86400000);
-    }
-
     const teacherMap = new Map<string, { name: string; email: string | null }>();
     subjects.forEach(subject => {
       if (!subject.professorName || !subject.schedule?.days?.some(day => affectedDays.has(day))) return;
@@ -167,17 +181,20 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
     });
 
     setTeachersToNotify(Array.from(teacherMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
-  }, [dateRange, isPartialAbsence, selectedClasses, subjects, professorContacts]);
+  }, [dateRange, affectedDays, isPartialAbsence, selectedClasses, subjects, professorContacts]);
 
   const generateMailtoLink = (): string | undefined => {
     if (!dateRange?.from || teachersToNotify.length === 0) return;
+    if ((isPartialAbsence || lateArrival) && dateRange.to && dateRange.from.toDateString() !== dateRange.to.toDateString()) return;
+    if ((isPartialAbsence || lateArrival) && selectedClasses.size === 0) return;
     const recipients = teachersToNotify.map(t => t.email).filter(Boolean).join(',');
+    if (!recipients) return;
     const startDateText = format(dateRange.from, "EEEE, d 'de' LLLL 'de' yyyy", { locale: es });
     const endDateText = dateRange.to && dateRange.to.getTime() !== dateRange.from.getTime()
       ? format(dateRange.to, "d 'de' LLLL 'de' yyyy", { locale: es })
       : null;
     const dateText = endDateText ? `del ${startDateText} al ${endDateText}` : `el día ${startDateText}`;
-    const selectedClassSummary = subjects
+    const selectedClassSummary = availableClasses
       .filter(subject => {
         if (!isPartialAbsence) return false;
         const classKey = `${subject.id}|${subject.group}|${subject.schedule?.startTime || ''}`;
@@ -185,8 +202,19 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
       })
       .map(subject => `- ${subject.name} (${subject.group}) ${subject.schedule?.startTime || ''}`)
       .join('\n');
-    const body = `Estimados profesores,\n\nNotifico que el alumno ${studentName} se ausentará por ${notificationReason} ${dateText}.\n\n${isPartialAbsence && selectedClassSummary ? `Clases afectadas:\n${selectedClassSummary}\n\n` : ''}${customNotes ? `Notas adicionales: ${customNotes}\n\n` : ''}${hasProof ? 'El alumno cuenta con comprobante.\n\n' : ''}Saludos.`;
-    return `mailto:${recipients}?subject=Notificación de Ausencia&body=${encodeURIComponent(body)}`;
+    const fields = {
+      alumno: studentName,
+      tipo: lateArrival ? 'llegada tarde' : 'ausencia',
+      accion: describeNotificationTiming(dateRange.from, dateRange.to, lateArrival).action,
+      fechas: dateText,
+      motivo: notificationReason === 'Motivo personal importante' ? ' por un asunto personal importante' : notificationReason === 'Motivo personal' ? ' por motivos personales' : notificationReason === 'Ausencia' || lateArrival ? '' : ` por ${notificationReason.toLowerCase()}`,
+      clases: isPartialAbsence && selectedClassSummary ? `Clases afectadas:\n${selectedClassSummary}\n\n` : '',
+      notas: customNotes ? `Información adicional: ${customNotes}\n\n` : '',
+      comprobante: hasProof ? 'Se cuenta con comprobante.\n\n' : '',
+    };
+    const body = fillNotificationTemplate(mailTemplate.body, fields);
+    const subject = fillNotificationTemplate(mailTemplate.subject, fields);
+    return `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   return (
@@ -262,18 +290,19 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                         </div>
                         <div className="space-y-6">
                             <div className="space-y-2"><Label className="text-xs font-black uppercase opacity-60">Motivo</Label>
-                                <RadioGroup onValueChange={setNotificationReason} className="grid grid-cols-2 gap-2">
-                                    {['Ausencia', 'Enfermedad', 'Cita Médica', 'Deporte', 'Otro'].map(r => (
+                                <RadioGroup value={notificationReason} onValueChange={value => { setNotificationReason(value); if (value === 'Llegada tarde') setIsPartialAbsence(true); }} className="grid grid-cols-2 gap-2">
+                                    {['Ausencia', 'Llegada tarde', 'Enfermedad', 'Cita médica', 'Motivo personal', 'Motivo personal importante', 'Actividad de embajadores', 'Deporte', 'Otro'].map(r => (
                                         <div key={r} className="flex items-center space-x-2 border p-3 rounded-xl bg-white">
                                             <RadioGroupItem value={r} id={r} /><Label htmlFor={r} className="text-xs font-bold cursor-pointer">{r}</Label>
                                         </div>
                                     ))}
                                 </RadioGroup>
                             </div>
+                            {timing && <p className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">{timing.label}: el mensaje dirá “{timing.action}”.</p>}
                             <div className="flex flex-wrap items-center gap-4 rounded-2xl border bg-white p-4">
                                 <div className="flex items-center gap-2">
-                                    <Switch checked={isPartialAbsence} onCheckedChange={setIsPartialAbsence} />
-                                    <Label className="text-xs font-bold">Ausencia parcializada</Label>
+                                    <Switch checked={isPartialAbsence} onCheckedChange={setIsPartialAbsence} disabled={lateArrival} />
+                                    <Label className="text-xs font-bold">{lateArrival ? 'Selecciona las clases afectadas' : 'Ausencia parcializada'}</Label>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Checkbox checked={hasProof} onCheckedChange={(checked) => setHasProof(!!checked)} />
@@ -283,10 +312,10 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                             {isPartialAbsence && (
                                 <div className="space-y-2">
                                     <Label className="text-xs font-black uppercase opacity-60">Clases afectadas</Label>
+                                    {dateRange?.to && dateRange.from?.toDateString() !== dateRange.to.toDateString() && <p className="text-sm text-amber-700">Para seleccionar clases específicas, elige un solo día.</p>}
                                     <Card className="max-h-48 overflow-y-auto rounded-2xl border bg-white p-3">
                                         <div className="space-y-3">
-                                            {subjects
-                                              .filter(subject => subject.schedule?.startTime)
+                                            {availableClasses
                                               .map(subject => {
                                                 const classKey = `${subject.id}|${subject.group}|${subject.schedule?.startTime || ''}`;
                                                 return (
@@ -309,6 +338,7 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                                                   </label>
                                                 );
                                               })}
+                                            {availableClasses.length === 0 && <p className="text-sm text-muted-foreground">No hay clases registradas para la fecha seleccionada.</p>}
                                         </div>
                                     </Card>
                                 </div>
@@ -329,8 +359,23 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                                       <p className="text-sm text-muted-foreground">Selecciona fecha y, si aplica, las clases afectadas.</p>
                                     )}
                                 </Card>
+                                {missingTeachers.length > 0 && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                                  <p className="font-semibold">Falta el correo de {missingTeachers.length} profesor{missingTeachers.length === 1 ? '' : 'es'}. No aparecerán como destinatarios.</p>
+                                  <Button type="button" variant="outline" size="sm" className="mt-2" onClick={async () => {
+                                    try { await navigator.clipboard.writeText(missingTeachers.map(teacher => teacher.name).join('\n')); toast({ title: 'Nombres copiados' }); }
+                                    catch { toast({ variant: 'destructive', title: 'No se pudieron copiar los nombres' }); }
+                                  }}><Copy className="mr-2 h-4 w-4" />Copiar nombres</Button>
+                                </div>}
                             </div>
                             <Textarea placeholder="Notas adicionales..." value={customNotes} onChange={(e) => setCustomNotes(e.target.value)} className="rounded-2xl min-h-[100px]" />
+                            <div className="space-y-2">
+                              <Button type="button" variant="outline" onClick={() => setShowTemplateEditor(value => !value)}>{showTemplateEditor ? 'Ocultar mensaje' : 'Editar mensaje'}</Button>
+                              {showTemplateEditor && <div className="space-y-2 rounded-xl border bg-white p-3">
+                                <p className="text-xs text-muted-foreground">Usa {'{alumno}'}, {'{tipo}'}, {'{accion}'}, {'{fechas}'}, {'{motivo}'}, {'{clases}'}, {'{notas}'} y {'{comprobante}'}. {'{accion}'} cambia según la fecha. La plantilla se guarda en este navegador.</p>
+                                <Label>Asunto</Label><input className="w-full rounded-md border p-2 text-sm" value={mailTemplate.subject} onChange={event => { const next = { ...mailTemplate, subject: event.target.value }; setMailTemplate(next); saveNotificationTemplate('professorAbsence', next); }} />
+                                <Label>Mensaje</Label><Textarea className="min-h-48" value={mailTemplate.body} onChange={event => { const next = { ...mailTemplate, body: event.target.value }; setMailTemplate(next); saveNotificationTemplate('professorAbsence', next); }} />
+                              </div>}
+                            </div>
                         </div>
                     </div>
                   </ScrollArea>
@@ -339,7 +384,7 @@ export function StudentSchedule({ subjects, studentName, planType, professorCont
                     <Button onClick={() => {
                       const link = generateMailtoLink();
                       if (!link) {
-                        toast({ variant: 'destructive', title: 'Faltan datos', description: 'Selecciona fecha y revisa que haya profesores con correo.' });
+                        toast({ variant: 'destructive', title: 'Revisa el aviso', description: isPartialAbsence ? 'Selecciona un solo día, al menos una clase y un profesor con correo.' : 'Selecciona fecha y revisa que haya profesores con correo.' });
                         return;
                       }
                       window.open(link);

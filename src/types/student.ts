@@ -41,6 +41,11 @@ export interface Student {
   leader: string;
   tutor: string;
   isGraduationCandidate: boolean;
+  graduationPeriod?: string;
+  pendingSubjects?: string;
+  academicCode?: string;
+  planType?: string;
+  academicCodeDescription?: string;
   subjects?: Subject[]; // Full subjects, loaded on demand
   subjectSummaries?: SubjectSummary[]; // Summaries for dashboard performance
   sport?: string; // e.g., 'FUTBOL', 'DEBATE'
@@ -84,6 +89,7 @@ export interface TeamTask {
 }
 
 export interface StudentContact {
+    tutorPhone?: string;
     studentId: string;
     name: string;
     sedena: string;
@@ -275,21 +281,12 @@ export interface WeightingScheme {
   subjectNames: string[];
 }
 
-export type ActiveView = 
-  | 'welcome' 
-  | 'dashboard' 
-  | 'students' 
-  | 'weighting-schemes' 
-  | 'unclassified' 
-  | 'map-planner' 
-  | 'change-stats' 
-  | 'teams-management' 
-  | 'academic-committee' 
-  | 'professor-schedule' 
-  | 'oferta-academica' 
-  | 'irregular-students' 
-  | 'team-work' 
-  | 'continuidad'
-  | 'subject-planning'
-  | 'subject-tracking'
-  | 'exam-candidates'; // Added new view
+export type ActiveView =
+  | 'welcome'
+  | 'dashboard'
+  | 'change-stats'
+  | 'students'
+  | 'academic-performance'
+  | 'professor-schedule'
+  | 'weighting-schemes'
+  | 'unclassified';

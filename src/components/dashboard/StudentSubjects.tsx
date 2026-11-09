@@ -20,8 +20,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { StudentReportImage } from './StudentReportImage';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { RiskCell, CopyButton } from './StudentCardShared';
-import { RiasecChart } from './RiasecChart';
-import { addOrUpdateStudentLifeProfile, getContinuityLocalStatus } from '@/lib/firebase-services';
 import * as htmlToImage from 'html-to-image';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
@@ -143,7 +141,7 @@ function buildDefaultStudentEmail(studentId: string) {
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const { toast, weightingSchemes } = useDashboardFilters();
+    const { toast } = useDashboardFilters();
 
     const handleDownload = async () => {
         if (!reportRef.current) return;
@@ -170,8 +168,8 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
                 </DialogDescription>
             </DialogHeader>
             <div className="py-4 overflow-x-auto bg-muted/20 rounded-2xl">
-                <div className="min-w-[800px] flex justify-center p-4">
-                    <StudentReportImage ref={reportRef} student={student} subjects={subjects} weightingSchemes={weightingSchemes} />
+                <div className="w-max min-w-full flex justify-center p-4">
+                    <StudentReportImage ref={reportRef} student={student} subjects={subjects} />
                 </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -191,7 +189,6 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
     const [isLoading, setIsLoading] = useState(false);
     const [openSubject, setOpenSubject] = useState<string | null>(null);
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
-    const [localStatus, setLocalStatus] = useState<ContinuityLocalStatus | null>(null);
     const [isIdentityDialogOpen, setIsIdentityDialogOpen] = useState(false);
     const [isSavingIdentity, setIsSavingIdentity] = useState(false);
     const [identitySociety, setIdentitySociety] = useState('');
@@ -204,12 +201,8 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
             if (isOpen && student.id) {
                 setIsLoading(true);
                 try {
-                    const [fetchedSubjects, status] = await Promise.all([
-                        subjects.length === 0 ? loadStudentSubjects(student.id) : subjects,
-                        getContinuityLocalStatus(student.id)
-                    ]);
+                    const fetchedSubjects = await loadStudentSubjects(student.id);
                     setSubjects(fetchedSubjects);
-                    setLocalStatus(status);
                 } catch (error) {
                     console.error("Failed to load subjects for student " + student.id, error);
                 } finally {
@@ -256,7 +249,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                 group: lifeProfile?.group,
             };
 
-            await addOrUpdateStudentLifeProfile(nextProfile);
+            // Changes are persisted by the local workspace.
             setStudentLifeProfiles(prev => ({
                 ...prev,
                 [student.id]: nextProfile,
@@ -289,11 +282,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
                     <TabsTrigger value="identidad" className="text-xs sm:text-sm rounded-xl data-[state=active]:bg-white">
                       <Sparkles className="mr-1.5 h-3.5 w-3.5"/> Identidad
                     </TabsTrigger>
-                    {localStatus?.riasecDiagnosis && (
-                      <TabsTrigger value="vocacional" className="text-xs sm:text-sm text-primary font-bold rounded-xl data-[state=active]:bg-white">
-                        <Sparkles className="mr-1.5 h-3.5 w-3.5"/> Vocacional
-                      </TabsTrigger>
-                    )}
+                    
                     <TabsTrigger value="horario-profes" className="text-xs sm:text-sm rounded-xl data-[state=active]:bg-white">Profesores</TabsTrigger>
                     <TabsTrigger value="contacto" className="text-xs sm:text-sm rounded-xl data-[state=active]:bg-white"><Phone className="mr-1.5 h-3.5 w-3.5"/>Contacto</TabsTrigger>
                 </TabsList>
@@ -466,16 +455,7 @@ export function StudentSubjects({ student, isOpen }: { student: Student, isOpen:
           </div>
           <LifePurposePanel profile={lifeProfile} />
         </TabsContent>
-        <TabsContent value="vocacional" className="p-6 bg-white rounded-[2.5rem] mt-6 shadow-inner border border-muted/20">
-          {localStatus?.riasecDiagnosis ? (
-            <RiasecChart diagnosis={localStatus.riasecDiagnosis} />
-          ) : (
-            <div className="py-20 text-center">
-              <Sparkles className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
-              <p className="text-muted-foreground font-black uppercase tracking-widest text-xs opacity-40">No hay diagnóstico RIASEC en la nube</p>
-            </div>
-          )}
-        </TabsContent>
+        
         <TabsContent value="horario-profes" className="mt-6">
           <StudentProfessorsSchedule studentSubjects={subjects} studentName={student.name} />
         </TabsContent>

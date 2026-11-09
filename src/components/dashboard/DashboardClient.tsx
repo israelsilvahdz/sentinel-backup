@@ -3,7 +3,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import * as XLSX from 'xlsx';
+import { readPrincipalBase, type PrincipalBase } from '@/lib/principal-base';
+import { localWorkspace, monitoringInfo, todayKey } from '@/lib/local-workspace';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import Image from 'next/image';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { MoreHorizontal, SlidersHorizontal, CheckCircle2 } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -29,11 +35,10 @@ import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, P
 import { parseExcel, getHeaderKey } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases, findPotentialRiskCases, findPotentialRangeCases, findRequiredScoreRangeCases } from '@/lib/dataProcessor';
-import { getContact, getContacts, getTeamTasks, getProfessorContacts, getTeams, getWeightingSchemes, getPriorityCases, setPriorityCase, getStudentLifeProfiles } from '@/lib/firebase-services';
 import { xorCipher } from '@/lib/utils';
 
 
-export type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
+export type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group' | 'career';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments' | 'low-potential' | 'very-low-potential' | 'pot-70-75' | 'pot-76-80' | 'pot-81-85' | 'req-100' | 'req-90' | 'req-80' | 'req-70' | 'priority';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
@@ -45,18 +50,9 @@ const VALID_VIEWS: ActiveView[] = [
   'students',
   'weighting-schemes',
   'unclassified',
-  'map-planner',
   'change-stats',
-  'teams-management',
-  'academic-committee',
   'professor-schedule',
-  'oferta-academica',
-  'irregular-students',
-  'team-work',
-  'continuidad',
-  'subject-planning',
-  'subject-tracking',
-  'exam-candidates',
+  'academic-performance',
 ];
 
 function PanelLoading() {
@@ -75,17 +71,8 @@ const StudentPanel = dynamic(() => import('./StudentPanel').then((mod) => mod.St
 const ChangeStats = dynamic(() => import('./ChangeStats').then((mod) => mod.ChangeStats), { loading: () => <PanelLoading /> });
 const PonderacionesDashboard = dynamic(() => import('./PonderacionesDashboard').then((mod) => mod.PonderacionesDashboard), { loading: () => <PanelLoading /> });
 const UnclassifiedSubjectsPanel = dynamic(() => import('./UnclassifiedSubjectsPanel').then((mod) => mod.UnclassifiedSubjectsPanel), { loading: () => <PanelLoading /> });
-const MapPlanner = dynamic(() => import('./MapPlanner').then((mod) => mod.MapPlanner), { loading: () => <PanelLoading /> });
-const TeamsManagementPanel = dynamic(() => import('./TeamsManagementPanel').then((mod) => mod.TeamsManagementPanel), { loading: () => <PanelLoading /> });
-const AcademicCommitteePanel = dynamic(() => import('./AcademicCommitteePanelV3').then((mod) => mod.AcademicCommitteePanel), { loading: () => <PanelLoading /> });
 const ProfessorSchedulePanel = dynamic(() => import('./ProfessorSchedulePanel').then((mod) => mod.ProfessorSchedulePanel), { loading: () => <PanelLoading /> });
-const OfertaAcademicaPanel = dynamic(() => import('./OfertaAcademicaPanel').then((mod) => mod.OfertaAcademicaPanel), { loading: () => <PanelLoading /> });
-const IrregularStudentsPanel = dynamic(() => import('./IrregularStudentsPanel').then((mod) => mod.IrregularStudentsPanel), { loading: () => <PanelLoading /> });
-const TeamWorkPanel = dynamic(() => import('./TeamWorkPanel').then((mod) => mod.TeamWorkPanel), { loading: () => <PanelLoading /> });
-const ContinuidadPanel = dynamic(() => import('./ContinuidadPanel').then((mod) => mod.ContinuidadPanel), { loading: () => <PanelLoading /> });
-const SubjectPlanningPanel = dynamic(() => import('./SubjectPlanningPanel').then((mod) => mod.SubjectPlanningPanel), { loading: () => <PanelLoading /> });
-const SubjectTrackingPanel = dynamic(() => import('./SubjectTrackingPanel').then((mod) => mod.SubjectTrackingPanel), { loading: () => <PanelLoading /> });
-const ExamCandidatesPanel = dynamic(() => import('./ExamCandidatesPanel').then((mod) => mod.ExamCandidatesPanel), { loading: () => <PanelLoading /> });
+const AcademicPerformancePanel = dynamic(() => import('./AcademicPerformancePanel').then((mod) => mod.AcademicPerformancePanel), { loading: () => <PanelLoading /> });
 
 const PERSISTENCE_KEY = "sentinel_v2026_secure";
 
@@ -108,12 +95,15 @@ interface DashboardContextType {
   teamTasks: TeamTask[];
   fetchTeamTasks: () => Promise<void>;
   weightingSchemes: WeightingScheme[];
+  setWeightingSchemes: React.Dispatch<React.SetStateAction<WeightingScheme[]>>;
   fetchWeightingSchemes: () => Promise<void>;
   priorityCases: Record<string, { studentId: string, topic: string }>;
   togglePriorityCase: (studentId: string, isPriority: boolean, topic?: string) => Promise<void>;
   isLoading: boolean;
   hasData: boolean;
   leaders: string[];
+  careers: string[];
+  audience: 'prepa' | 'professional';
   tutors: string[];
   subjects: string[];
   professors: string[];
@@ -238,7 +228,14 @@ function mergeStudentLists(baseStudents: Student[], incomingStudents: Student[])
 
 export function DashboardClient() {
   const { toast } = useToast();
-  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [monitorStudents, setAllStudents] = useState<Student[]>([]);
+  const [base, setBase] = useState<PrincipalBase | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [baseLoading, setBaseLoading] = useState(false);
+  const [storageError, setStorageError] = useState('');
+  const allStudents = useMemo(() => monitorStudents.map(student => ({ ...student, ...(base?.students[student.id.trim().toUpperCase()] || {}) })), [monitorStudents, base]);
+  const audience = base?.audience || (Object.values(base?.students || {}).some(student => student.academicCode || student.academicCodeDescription) ? 'professional' : 'prepa');
   const [latestComparison, setLatestComparison] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [studentLifeProfiles, setStudentLifeProfiles] = useState<Record<string, StudentLifeProfile>>({});
@@ -269,159 +266,67 @@ export function DashboardClient() {
   
   const allStudentsMap = useMemo(() => new Map(allStudents.map(s => [s.id, s])), [allStudents]);
 
-  const syncContacts = useCallback(async () => {
-    setIsLoading(true);
-    try {
-        const allContacts = await getContacts();
-        setStudentContacts(allContacts);
-        localStorage.setItem(LOCAL_STORAGE_KEYS.CONTACTS, xorCipher(JSON.stringify(allContacts), PERSISTENCE_KEY));
-        toast({ title: "Directorio Actualizado", description: "Se han descargado los números de la base de datos." });
-    } catch (e) { toast({ variant: "destructive", title: "Error al sincronizar" }); } finally { setIsLoading(false); }
-  }, [toast]);
-
-  const fetchTeams = useCallback(async () => {
-      try { const fetchedTeams = await getTeams(); setTeams(fetchedTeams); } catch (error) { console.error(error); }
-  }, []);
-  
-  const fetchTeamTasks = useCallback(async () => {
-    try { const tasks = await getTeamTasks(); setTeamTasks(tasks); } catch (error) { console.error(error); }
-  }, []);
-
-  const fetchWeightingSchemes = useCallback(async () => {
-    try { const schemes = await getWeightingSchemes(); setWeightingSchemes(schemes); } catch (error) { console.error(error); }
-  }, []);
-
+  const syncContacts = useCallback(async () => { toast({ title: 'Directorio local', description: 'Usa Cargar archivo base para actualizarlo.' }); }, [toast]);
+  const fetchTeams = useCallback(async () => {}, []);
+  const fetchTeamTasks = useCallback(async () => {}, []);
+  const fetchWeightingSchemes = useCallback(async () => {}, []);
   const togglePriorityCase = async (studentId: string, isPriority: boolean, topic?: string) => {
-    try {
-        await setPriorityCase(studentId, isPriority, topic);
-        const updatedCases = await getPriorityCases();
-        setPriorityCases(updatedCases);
-        toast({ title: isPriority ? "Alumno marcado" : "Marcado eliminado" });
-    } catch (error) { toast({ variant: "destructive", title: "Error" }); }
+    setPriorityCases(previous => { const next = {...previous}; if (isPriority) next[studentId] = {studentId, topic: topic || ''}; else delete next[studentId]; return next; });
   };
-  
-  const fetchStudentContact = useCallback(async (studentId: string): Promise<StudentContact | null> => {
-    if (studentContacts[studentId]) return studentContacts[studentId];
-    setIsLoading(true);
-    try {
-        const contact = await getContact(studentId);
-        if (contact) { setStudentContacts(prev => ({ ...prev, [studentId]: contact })); return contact; }
-        return null;
-    } catch (error) { return null; } finally { setIsLoading(false); }
-  }, [studentContacts]);
-
+  const fetchStudentContact = useCallback(async (id: string) => studentContacts[id] || null, [studentContacts]);
 
   useEffect(() => {
-    async function loadInitialData() {
-        setIsLoading(true);
-        try {
-          const [profContactsFromDb, tasks, fetchedTeams, schemes, pCases] = await Promise.all([
-            getProfessorContacts(), getTeamTasks(), getTeams(), getWeightingSchemes(), getPriorityCases()
-          ]);
-          setProfessorContacts(profContactsFromDb); 
-          setTeams(fetchedTeams); 
-          setWeightingSchemes(schemes); 
-          setTeamTasks(tasks); 
-          setPriorityCases(pCases);
-          
-          const storedPlanType = localStorage.getItem(LOCAL_STORAGE_KEYS.PLAN_TYPE);
-          if (storedPlanType) setPlanType(storedPlanType as PlanType);
-          const storedFileName = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME);
-          if (storedFileName) setCurrentFileName(storedFileName);
-          const storedActiveView = localStorage.getItem(LOCAL_STORAGE_KEYS.ACTIVE_VIEW);
-          if (storedActiveView && VALID_VIEWS.includes(storedActiveView as ActiveView)) {
-            setActiveView(storedActiveView as ActiveView);
-          }
-          
-          // CARGAR CONTACTOS (Prioridad: localStorage con clave estática)
-          const cachedContacts = localStorage.getItem(LOCAL_STORAGE_KEYS.CONTACTS);
-          if (cachedContacts) {
-              try { 
-                  const decrypted = xorCipher(cachedContacts, PERSISTENCE_KEY);
-                  setStudentContacts(JSON.parse(decrypted)); 
-              } catch (e) { 
-                  console.warn("Fallo al desencriptar contactos, limpiando caché...");
-                  localStorage.removeItem(LOCAL_STORAGE_KEYS.CONTACTS);
-                  const allContacts = await getContacts();
-                  setStudentContacts(allContacts);
-                  localStorage.setItem(LOCAL_STORAGE_KEYS.CONTACTS, xorCipher(JSON.stringify(allContacts), PERSISTENCE_KEY));
-              }
-          } else {
-              const allContacts = await getContacts();
-              setStudentContacts(allContacts);
-              localStorage.setItem(LOCAL_STORAGE_KEYS.CONTACTS, xorCipher(JSON.stringify(allContacts), PERSISTENCE_KEY));
-          }
-
-          const cachedLifeProfiles = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENT_LIFE_PROFILES);
-          if (cachedLifeProfiles) {
-              try {
-                  const decrypted = xorCipher(cachedLifeProfiles, PERSISTENCE_KEY);
-                  setStudentLifeProfiles(JSON.parse(decrypted));
-              } catch (e) {
-                  localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENT_LIFE_PROFILES);
-                  const allProfiles = await getStudentLifeProfiles();
-                  setStudentLifeProfiles(allProfiles);
-                  localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENT_LIFE_PROFILES, xorCipher(JSON.stringify(allProfiles), PERSISTENCE_KEY));
-              }
-          } else {
-              const allProfiles = await getStudentLifeProfiles();
-              setStudentLifeProfiles(allProfiles);
-              localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENT_LIFE_PROFILES, xorCipher(JSON.stringify(allProfiles), PERSISTENCE_KEY));
-          }
-
-          const storedKey = localStorage.getItem(LOCAL_STORAGE_KEYS.DATA_KEY);
-          if (storedKey) {
-              setDataKey(storedKey);
-              const storedStudents = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
-              if (storedStudents) { 
-                  try { setAllStudents(JSON.parse(xorCipher(storedStudents, storedKey))); } catch (e) { 
-                      console.warn("Fallo al desencriptar alumnos.");
-                      localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
-                  } 
-              }
-          }
-        } catch (error) { console.error(error); } finally { setIsLoading(false); }
-    }
-    loadInitialData();
+    let cancelled = false;
+    (async () => {
+      try {
+        const saved = await localWorkspace<any>('workspace');
+        if (cancelled) return;
+        if (saved?.version === 1) {
+          setBase(saved.base || null); setAllStudents(saved.students || []); setCurrentFileName(saved.fileName || null);
+          setStudentContacts(saved.contacts || {}); setStudentLifeProfiles(saved.profiles || {}); setProfessorContacts(saved.professors || {});
+          setTeams(saved.teams || []); setWeightingSchemes(saved.schemes || []); setPriorityCases(saved.priorityCases || {});
+          setLatestComparison(saved.comparison || {});
+          const info = monitoringInfo(saved.fileName || ''); if (info) setPlanType(info.plan);
+          setEntryOpen(!saved.base || !saved.students?.length || (!!info && info.dateKey !== todayKey()));
+        } else {
+          // Recover the previous local monitoring without consulting Firebase.
+          const key = localStorage.getItem(LOCAL_STORAGE_KEYS.DATA_KEY);
+          const data = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
+          if (key && data) { setAllStudents(JSON.parse(xorCipher(data, key))); setCurrentFileName(localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME)); }
+          setEntryOpen(true);
+        }
+      } catch { setStorageError('No se pudieron recuperar los archivos guardados. Puedes cargarlos nuevamente.'); setEntryOpen(true); }
+      finally { if (!cancelled) { setHydrated(true); setIsLoading(false); } }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    try {
-        if(allStudents.length > 0 && dataKey) localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENTS, xorCipher(JSON.stringify(allStudents), dataKey));
-        if (Object.keys(studentContacts).length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEYS.CONTACTS, xorCipher(JSON.stringify(studentContacts), PERSISTENCE_KEY));
-        }
-        if (Object.keys(studentLifeProfiles).length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEYS.STUDENT_LIFE_PROFILES, xorCipher(JSON.stringify(studentLifeProfiles), PERSISTENCE_KEY));
-        }
-        if (dataKey) localStorage.setItem(LOCAL_STORAGE_KEYS.DATA_KEY, dataKey);
-        localStorage.setItem(LOCAL_STORAGE_KEYS.PLAN_TYPE, planType);
-        localStorage.setItem(LOCAL_STORAGE_KEYS.ACTIVE_VIEW, activeView);
-        if (currentFileName) localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME, currentFileName);
-    } catch(error) { console.error(error); }
-  }, [allStudents, studentContacts, studentLifeProfiles, planType, dataKey, currentFileName, activeView]);
+    if (!hydrated) return;
+    localWorkspace('workspace', { version: 1, base, students: monitorStudents, fileName: currentFileName, contacts: studentContacts, profiles: studentLifeProfiles, professors: professorContacts, teams, schemes: weightingSchemes, priorityCases, comparison: latestComparison })
+      .then(() => setStorageError('')).catch(() => setStorageError('No se pudo guardar en este navegador. No cierres la página sin conservar tus archivos originales.'));
+  }, [hydrated, base, monitorStudents, currentFileName, studentContacts, studentLifeProfiles, professorContacts, teams, weightingSchemes, priorityCases, latestComparison]);
 
-  const reportInfo = useMemo(() => {
-    if (!currentFileName) return null;
-    const dateMatch = currentFileName.match(/(\d{2})\.(\d{2})\.(\d{4}|\d{2})/);
-    let displayDate: string | null = null;
-    if (dateMatch) {
-        const day = dateMatch[1];
-        const month = dateMatch[2];
-        let year = dateMatch[3];
-        if (year.length === 2) year = `20${year}`;
-        displayDate = `${day}/${month}/${year}`;
-    }
-    return { date: displayDate, plan: planType === 'tetramestral' ? 'Tetramestral' : 'Semestral' };
-  }, [currentFileName, planType]);
+  const reportInfo = useMemo(() => monitoringInfo(currentFileName || ''), [currentFileName]);
+  const handleBaseUpload = async (file: File | null) => {
+    if (!file) return;
+    setBaseLoading(true);
+    try {
+      const parsed = readPrincipalBase(XLSX.read(await file.arrayBuffer(), { type: 'array' }), file.name);
+      setBase(parsed); setStudentContacts(parsed.contacts); setStudentLifeProfiles(parsed.profiles); setProfessorContacts(parsed.professors); setTeams(parsed.teams); setWeightingSchemes(parsed.schemes);
+      toast({ title: 'Base principal cargada', description: Object.keys(parsed.students).length + ' alumnos. La hoja temporal no se importó.' });
+    } catch (error) { toast({ variant: 'destructive', title: 'No se reemplazó la base', description: error instanceof Error ? error.message : 'Revisa el formato del archivo.' }); }
+    finally { setBaseLoading(false); }
+  };
 
   const handleSetFilterType = (type: FilterType) => {
     setFilterType(type); setSelectedValue(null); setCaseType(null); setSubjectRiskFilter(null); setGroupId(null); setContextualStudentIds(null);
   };
 
   const handleSetActiveView = (view: ActiveView) => {
+    if (!VALID_VIEWS.includes(view)) return;
     setActiveView(view);
-    if (view !== 'students' && view !== 'continuidad' && view !== 'subject-tracking') {
+    if (view !== 'students') {
       setCaseType(null); setSubjectRiskFilter(null); setGroupId(null); setContextualStudentIds(null);
     }
   }
@@ -435,8 +340,7 @@ export function DashboardClient() {
   };
   
   const handleFileUpload = useCallback((file: File | null) => {
-    setAllStudents([]); 
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.STUDENTS);
+
     setCurrentFile(file);
   }, []);
 
@@ -453,16 +357,16 @@ export function DashboardClient() {
         if (!currentFile) return;
         setIsProcessing(true); setProgress(10);
         try {
+            const info = monitoringInfo(currentFile.name);
             const newKey = await getHeaderKey(currentFile);
             setDataKey(newKey); setProgress(20);
             const studentData = await parseExcel(currentFile); setProgress(50);
-            if (!studentData) { setIsProcessing(false); setProgress(0); return; }
+            if (!studentData || !Object.keys(studentData).length) throw new Error('El archivo no contiene alumnos.');
             const processedStudents = buildProcessedStudents(studentData);
             setAllStudents(processedStudents); setCurrentFileName(currentFile.name);
-            if (currentFile.name.match(/40|50|60/)) setPlanType('semestral');
-            else setPlanType('tetramestral');
+            if (info) setPlanType(info.plan);
             setProgress(90);
-        } catch (error) { console.error(error); } finally {
+        } catch (error) { toast({ variant: 'destructive', title: 'No se reemplazó el monitoreo', description: error instanceof Error ? error.message : 'No se pudo leer el archivo.' }); } finally {
             setTimeout(() => { setIsProcessing(false); setProgress(0); setCurrentFile(null); }, 500);
         }
     };
@@ -484,6 +388,9 @@ export function DashboardClient() {
 
       setIsMerging(true);
       try {
+        const incomingInfo = monitoringInfo(mergeFile.name);
+        const currentInfo = monitoringInfo(currentFileName || '');
+        if (incomingInfo && currentInfo && (incomingInfo.dateKey !== currentInfo.dateKey || incomingInfo.period !== currentInfo.period)) throw new Error('Los monitoreos indican distintas fechas o periodos.');
         const incomingStudentData = await parseExcel(mergeFile);
         if (!incomingStudentData) {
           throw new Error('El reporte adicional no tiene el formato esperado.');
@@ -491,7 +398,7 @@ export function DashboardClient() {
 
         const incomingStudents = buildProcessedStudents(incomingStudentData);
         setAllStudents(previousStudents => mergeStudentLists(previousStudents, incomingStudents));
-        setCurrentFileName(prev => prev ? `${prev} + ${mergeFile.name}` : mergeFile.name);
+        // Keep the validated monitoring date and period.
         toast({
           title: 'Reporte fusionado',
           description: `Se agregaron los datos de ${mergeFile.name} al monitoreo actual.`,
@@ -501,7 +408,7 @@ export function DashboardClient() {
         toast({
           variant: 'destructive',
           title: 'Error al fusionar',
-          description: 'No se pudo fusionar el segundo reporte.',
+          description: error instanceof Error ? error.message : 'No se pudo fusionar el segundo reporte.',
         });
       } finally {
         setIsMerging(false);
@@ -513,6 +420,7 @@ export function DashboardClient() {
   }, [mergeFile, allStudents.length, toast]);
 
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))].sort(), [allStudents]);
+  const careers = useMemo(() => [...new Set(allStudents.map(s => s.academicCodeDescription || s.academicCode || '').filter(Boolean))].sort(), [allStudents]);
   const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))].sort(), [allStudents]);
   const subjects = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []).filter(Boolean))].sort(), [allStudents]);
   const professors = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjects?.map(sub => sub.professorName) || []).filter(Boolean))].sort(), [allStudents]);
@@ -522,7 +430,8 @@ export function DashboardClient() {
     if (contextualStudentIds) return allStudents.filter(s => contextualStudentIds.has(s.id));
     let students = allStudents;
     if (selectedValue) {
-        if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
+        if (filterType === 'leader') students = students.filter(s => selectedValue === '__unassigned__' ? !s.leader?.trim() : s.leader === selectedValue);
+        if (filterType === 'career') students = students.filter(s => (s.academicCodeDescription || s.academicCode) === selectedValue);
         if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
         if (filterType === 'professor') students = students.filter(s => s.subjects?.some(sub => sub.professorName === selectedValue));
         if (filterType === 'group') students = students.filter(s => s.subjectSummaries?.some(sub => sub.group === selectedValue));
@@ -576,10 +485,10 @@ export function DashboardClient() {
   
 
   const contextValue: DashboardContextType = useMemo(() => ({
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, studentLifeProfiles, setStudentLifeProfiles, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, weightingSchemes, fetchWeightingSchemes,
+    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, studentLifeProfiles, setStudentLifeProfiles, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, weightingSchemes, setWeightingSchemes, fetchWeightingSchemes,
     priorityCases, togglePriorityCase,
     isLoading: isLoading || isProcessing, hasData: allStudents.length > 0,
-    leaders, tutors, subjects, professors, groups, groupsForSubject: (sub) => [],
+    leaders, careers, audience, tutors, subjects, professors, groups, groupsForSubject: (sub) => [],
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
     groupId, setGroupId,
@@ -593,7 +502,7 @@ export function DashboardClient() {
     continuityStudents, setContinuityStudents,
     continuityCatalog, setContinuityCatalog, toast, syncContacts
   }), [
-    filteredStudents, allStudents, allStudentsMap, latestComparison, studentContacts, studentLifeProfiles, professorContacts, teams, teamTasks, weightingSchemes, priorityCases, isLoading, isProcessing, leaders, tutors, subjects, professors, groups, filterType, selectedValue, groupId, caseType, subjectRiskFilter, contextualStudentIds, activeView, planType, ofertaAcademica, continuityStudents, continuityCatalog, toast, syncContacts
+    filteredStudents, allStudents, allStudentsMap, latestComparison, studentContacts, studentLifeProfiles, professorContacts, teams, teamTasks, weightingSchemes, priorityCases, isLoading, isProcessing, leaders, careers, audience, tutors, subjects, professors, groups, filterType, selectedValue, groupId, caseType, subjectRiskFilter, contextualStudentIds, activeView, planType, ofertaAcademica, continuityStudents, continuityCatalog, toast, syncContacts
   ]);
 
   const renderActiveView = () => {
@@ -602,127 +511,103 @@ export function DashboardClient() {
         case 'dashboard': return <Dashboard />;
         case 'students': return <StudentPanel />;
         case 'change-stats': return <ChangeStats />;
-        case 'map-planner': return <MapPlanner />;
         case 'weighting-schemes': return <PonderacionesDashboard />;
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
-        case 'teams-management': return <TeamsManagementPanel />;
-        case 'academic-committee': return <AcademicCommitteePanel />;
-        case 'oferta-academica': return <OfertaAcademicaPanel />;
-        case 'irregular-students': return <IrregularStudentsPanel />;
-        case 'team-work': return <TeamWorkPanel />;
-        case 'continuidad': return <ContinuidadPanel />;
-        case 'subject-planning': return <SubjectPlanningPanel />;
-        case 'subject-tracking': return <SubjectTrackingPanel />;
-        case 'exam-candidates': return <ExamCandidatesPanel />;
+        case 'academic-performance': return <AcademicPerformancePanel />;
         default: return <WelcomeDashboard />;
     }
   }
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <SidebarProvider defaultOpen={true}>
-        <Sidebar className="border-none bg-primary shadow-2xl">
-          <SidebarHeader className="bg-primary/50 backdrop-blur-md">
-             <div className="flex min-w-0 items-center gap-3 px-4 py-6 transition-all duration-300 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
-                <div className="bg-white/20 p-2 rounded-xl border border-white/10 shadow-inner">
-                  <Image src="https://i.postimg.cc/bY1FrT6m/Dise-o-sin-t-tulo.png" alt="Logo" width={28} height={28} className="size-7 object-contain brightness-0 invert" />
-                </div>
-                <span className="truncate font-black text-xl tracking-[0.15em] text-white group-data-[collapsible=icon]:hidden">SENTINEL</span>
+      <SidebarProvider defaultOpen={true} style={{ '--sidebar-width': '17.5rem' } as React.CSSProperties}>
+        <Sidebar className="border-r border-[#dce6e2] bg-white">
+          <SidebarHeader className="h-auto shrink-0 border-b border-[#edf1ee] bg-white">
+             <div className="w-full min-w-0 px-4 py-4 group-data-[collapsible=icon]:px-1">
+                <img src={audience === 'professional' ? '/tecmilenio-profesional.png' : '/tecmilenio-logo.png'} alt={audience === 'professional' ? 'Tecmilenio Profesional' : 'Prepa Tecmilenio'} width={224} height={72} className="h-auto w-full object-contain group-data-[collapsible=icon]:hidden" />
+                {audience === 'professional' ? <span className="relative hidden h-10 w-10 overflow-hidden group-data-[collapsible=icon]:block"><img src="/tecmilenio-profesional.png" alt="Tecmilenio" className="absolute -left-2 -top-3 h-auto max-w-none" style={{ width: 224 }} /></span> : <span className="hidden text-center text-lg font-black text-[#ff8834] group-data-[collapsible=icon]:block">P</span>}
+                <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#00534c] group-data-[collapsible=icon]:hidden">Sentinel · Seguimiento académico</p>
              </div>
           </SidebarHeader>
-          <SidebarContent className="px-3 bg-primary/20 backdrop-blur-sm no-scrollbar">
+          <SidebarContent className="px-2 bg-white no-scrollbar">
             <SidebarGroup className="mt-4">
-              <SidebarMenu className="gap-2">
-                <div className="px-3 mb-2 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-white/40">Exploración</p></div>
+              <SidebarMenu className="gap-1">
+                <div className="px-3 mb-2 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exploración</p></div>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><Home /><span className="font-bold">Inicio</span></SidebarMenuButton>
+                  <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><Home /><span className="font-medium whitespace-normal leading-snug text-[13px]">Inicio</span></SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Resumen Académico" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><LayoutDashboard /><span className="font-bold">Resumen Académico</span></SidebarMenuButton>
+                  <SidebarMenuButton tooltip="Resumen Académico" isActive={activeView === 'dashboard'} onClick={() => handleSetActiveView('dashboard')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><LayoutDashboard /><span className="font-bold">Resumen Académico</span></SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><BarChart3 /><span className="font-bold">Análisis de Cambios</span></SidebarMenuButton>
+                  <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><BarChart3 /><span className="font-bold">Análisis de Cambios</span></SidebarMenuButton>
                 </SidebarMenuItem>
-                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-white/40">Operación</p></div>
+                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operación</p></div>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Ruta Diaria / Equipo" isActive={activeView === 'team-work'} onClick={() => handleSetActiveView('team-work')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><ClipboardList /><span className="font-bold">Ruta Diaria / Equipo</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Continuidad Vocacional" isActive={activeView === 'continuidad'} onClick={() => handleSetActiveView('continuidad')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><TrendingUp /><span className="font-bold">Continuidad</span></SidebarMenuButton>
+                  <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><Users /><span className="font-bold">Panel de Alumnos</span></SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><Users /><span className="font-bold">Panel de Alumnos</span></SidebarMenuButton>
+                  <SidebarMenuButton tooltip="Desempeño y seguimiento" isActive={activeView === 'academic-performance'} onClick={() => handleSetActiveView('academic-performance')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><BarChart3 /><span className="font-bold whitespace-normal leading-snug text-[13px]">Desempeño y seguimiento</span></SidebarMenuButton>
                 </SidebarMenuItem>
+                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Planeación y Gestión</p></div>
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="Comites" isActive={activeView === 'academic-committee'} onClick={() => handleSetActiveView('academic-committee')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><Gavel /><span className="font-bold">Comites</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Seguimiento por Materia" isActive={activeView === 'subject-tracking'} onClick={() => handleSetActiveView('subject-tracking')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><BookText /><span className="font-bold">Seguimiento por Materia</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-white/40">Planeación y Gestión</p></div>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Planeación de Oferta" isActive={activeView === 'subject-planning'} onClick={() => handleSetActiveView('subject-planning')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><ListChecks /><span className="font-bold">Planeación de Oferta</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Analizador de Egreso" isActive={activeView === 'irregular-students'} onClick={() => handleSetActiveView('irregular-students')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><GraduationCap /><span className="font-bold">Analizador de Egreso</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><Contact /><span className="font-bold">Horarios de Profesores</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Planificador de Horarios" isActive={activeView === 'oferta-academica'} onClick={() => handleSetActiveView('oferta-academica')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><BookOpen /><span className="font-bold">Planificador de Horarios</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Equipos Dep/Cult" isActive={activeView === 'teams-management'} onClick={() => handleSetActiveView('teams-management')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><Shield /><span className="font-bold">Equipos Dep/Cult</span></SidebarMenuButton>
+                   <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><Contact /><span className="font-bold">Horarios de Profesores</span></SidebarMenuButton>
                 </SidebarMenuItem>
                  <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Planificador por Mapa" isActive={activeView === 'map-planner'} onClick={() => handleSetActiveView('map-planner')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><MapIcon /><span className="font-bold">Planificador por Mapa</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Gestor de Ponderaciones" isActive={activeView === 'weighting-schemes'} onClick={() => handleSetActiveView('weighting-schemes')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><BookCopy /><span className="font-bold">Gestor de Ponderaciones</span></SidebarMenuButton>
+                   <SidebarMenuButton tooltip="Gestor de Ponderaciones" isActive={activeView === 'weighting-schemes'} onClick={() => handleSetActiveView('weighting-schemes')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><BookCopy /><span className="font-bold">Gestor de Ponderaciones</span></SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><HelpCircle /><span className="font-bold">Materias sin Clasificar</span></SidebarMenuButton>
-                </SidebarMenuItem>
-                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-white/40">Procesos Especiales</p></div>
-                 <SidebarMenuItem>
-                   <SidebarMenuButton tooltip="Analizador de Cierre" isActive={activeView === 'exam-candidates'} onClick={() => handleSetActiveView('exam-candidates')} className="h-11 px-4 text-white hover:bg-white/10 rounded-xl"><FileQuestion /><span className="font-bold">Analizador de Cierre</span></SidebarMenuButton>
+                   <SidebarMenuButton tooltip="Materias sin Clasificar" isActive={activeView === 'unclassified'} onClick={() => handleSetActiveView('unclassified')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><HelpCircle /><span className="font-bold">Materias sin Clasificar</span></SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
         </Sidebar>
         <SidebarInset>
-            <header className="sticky top-0 z-30 flex min-h-14 flex-wrap items-center justify-between gap-3 border-b bg-white/80 px-3 py-2 backdrop-blur-md sm:px-4 lg:flex-nowrap lg:px-6">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3 lg:flex-nowrap lg:gap-4">
-                    <SidebarTrigger className="text-primary" />
-                    <div className="min-w-0 flex-1">
-                      {activeView !== 'welcome' && <DashboardFilters />}
+            <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <SidebarTrigger className="text-slate-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{{welcome:'Inicio',dashboard:'Resumen académico','change-stats':'Análisis de cambios',students:'Panel de alumnos','academic-performance':'Desempeño y seguimiento','professor-schedule':'Horarios de profesores','weighting-schemes':'Gestor de ponderaciones',unclassified:'Materias sin clasificar'}[activeView]}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                      <span>{reportInfo ? reportInfo.date + ' · Periodo ' + reportInfo.period : currentFileName || 'Carga tus archivos para comenzar'}</span>
+                      {reportInfo && reportInfo.dateKey !== todayKey() && <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800" title="Estás viendo el monitoreo de otro día.">Monitoreo de otro día</span>}
                     </div>
-                    {allStudents.length > 0 && reportInfo?.date && (
-                        <div className="hidden shrink-0 sm:flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary p-2 rounded-xl bg-primary/5 border border-primary/10">
-                            <Calendar size={12} />
-                            <span>{reportInfo.date}</span>
-                            <Badge variant="secondary" className="text-[10px] px-1.5 h-4 bg-primary text-white border-none">{reportInfo.plan[0]}</Badge>
-                        </div>
-                    )}
+                  </div>
                 </div>
-                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-                    <Button variant="ghost" size="icon" onClick={syncContacts} title="Sincronizar Directorio de la Nube" className="text-primary hover:bg-primary/5">
-                        <CloudDownload className="h-4 w-4" />
-                    </Button>
-                    <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing} variant="outline" size="sm" className="h-9 rounded-xl border-primary/20" label="" icon={<FileClock className="h-4 w-4" />} />
-                    {allStudents.length > 0 && (
-                      <FileUpload onFileSelect={handleMergeFileUpload} selectedFile={mergeFile} isLoading={isMerging} variant="outline" size="sm" className="h-9 rounded-xl border-primary/20" label="" icon={<Link2 className="h-4 w-4" />} />
-                    )}
-                    <Button variant="ghost" size="icon" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => { localStorage.clear(); window.location.reload(); }}><Trash2 className="h-4 w-4" /></Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading || !hydrated} label="Cargar archivo base" variant="outline" className="h-9 min-w-0 rounded-lg border-slate-200 px-3 text-xs shadow-none" />
+                  <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing || !hydrated} label="Cargar monitoreo" icon={<FileClock className="mr-2 h-4 w-4" />} className="h-9 min-w-0 rounded-lg bg-primary px-3 text-xs text-white shadow-none hover:bg-primary/90" />
+                  {activeView !== 'welcome' && allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-slate-200 shadow-none"><SlidersHorizontal className="h-4 w-4" />Filtros{selectedValue && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}</Button></PopoverTrigger><PopoverContent align="end" className="w-[min(92vw,600px)] rounded-xl p-4"><p className="mb-3 text-sm font-semibold">Filtrar alumnos</p><DashboardFilters /></PopoverContent></Popover>}
+                  <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-slate-500" aria-label="Archivos y opciones"><MoreHorizontal className="h-5 w-5" /></Button></PopoverTrigger><PopoverContent align="end" className="w-80 max-w-[90vw] rounded-xl p-4">
+                    <p className="text-sm font-semibold text-slate-900">Archivos de trabajo</p>
+                    <div className="my-4 space-y-3 text-xs"><div><p className="mb-1 flex items-center gap-1.5 font-medium text-slate-500">{base && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}Archivo base</p><p className="break-words text-slate-800">{base?.name || 'Pendiente de cargar'}</p></div><div><p className="mb-1 flex items-center gap-1.5 font-medium text-slate-500">{monitorStudents.length > 0 && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}Monitoreo</p><p className="break-words text-slate-800">{currentFileName || 'Pendiente de cargar'}</p></div></div>
+                    <div className="space-y-1 border-t pt-3">
+                      {allStudents.length > 0 && <FileUpload onFileSelect={handleMergeFileUpload} selectedFile={mergeFile} isLoading={isMerging} label="Combinar monitoreo" variant="ghost" icon={<Link2 className="mr-2 h-4 w-4" />} className="h-9 w-full min-w-0 justify-start px-2 text-xs" />}
+                      <Button variant="ghost" className="h-9 w-full justify-start px-2 text-xs" onClick={() => window.location.reload()}><RefreshCw className="mr-2 h-4 w-4" />Recargar página</Button>
+                      <Button variant="ghost" className="h-9 w-full justify-start px-2 text-xs text-destructive hover:text-destructive" onClick={async () => { if (!window.confirm('¿Eliminar la base y el monitoreo guardados en este navegador? Los Excel originales no se borran.')) return; await localWorkspace('workspace', {version: 1}); await localWorkspace('notices', []); Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key)); window.location.reload(); }}><Trash2 className="mr-2 h-4 w-4" />Eliminar archivos guardados</Button>
+                    </div>
+                  </PopoverContent></Popover>
                 </div>
+              </div>
+              {selectedValue && activeView !== 'welcome' && <div className="flex items-center gap-2 border-t border-slate-100 px-6 py-2 text-xs text-slate-600"><SlidersHorizontal className="h-3 w-3" /><span className="min-w-0 truncate">{selectedValue === '__unassigned__' ? 'Sin mentor asignado' : selectedValue}{groupId ? ' · Grupo ' + groupId : ''}</span><Button variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={()=>{setSelectedValue(null);setGroupId(null);}}>Limpiar filtro</Button></div>}
+              {storageError && <p role="alert" className="border-t bg-red-50 px-6 py-2 text-xs text-red-700">{storageError}</p>}
             </header>
-            <div className="flex-1 min-w-0 overflow-x-hidden bg-[#F8FAFC]">{renderActiveView()}</div>
+            <div className="flex-1 min-w-0 overflow-x-hidden bg-[#f5f7f4]">{hydrated ? renderActiveView() : <PanelLoading />}</div>
+            <Dialog open={entryOpen} onOpenChange={setEntryOpen}><DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{base && monitorStudents.length ? 'Revisa la fecha de tu monitoreo' : 'Comienza con tus dos archivos'}</DialogTitle><DialogDescription>Carga la base principal y el monitoreo. Se guardan en este navegador para recuperarlos la próxima vez; solo vuelve a cargarlos cuando quieras actualizarlos.</DialogDescription></DialogHeader>
+              <div className="space-y-4"><div className="rounded-xl border p-4"><h3 className="font-semibold">1. Archivo base</h3><p className="mb-3 text-sm text-muted-foreground">Alumnos y, si están disponibles, correos de profesores y ponderaciones. Se ignora Listas (2).</p><p className="mb-2 text-xs">{base?.name || 'Sin archivo base'}</p><FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading} label="Cargar archivo base" variant="outline" /></div>
+              <div className="rounded-xl border p-4"><h3 className="font-semibold">2. Monitoreo de alumnos</h3><p className="mb-3 text-sm text-muted-foreground">Puede tener cualquier nombre. El cruce con la base se hace por matrícula.</p><p className="mb-2 text-xs">{currentFileName || 'Sin monitoreo'}</p><FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} label="Cargar monitoreo" variant="outline" /></div>
+              {monitorStudents.length > 0 && reportInfo && reportInfo.dateKey !== todayKey() && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Estás viendo el monitoreo del {reportInfo.date}, no el de hoy. Puedes continuar o cargar uno actualizado.</p>}
+              {monitorStudents.length > 0 && !reportInfo && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">El nombre de este monitoreo no indica una fecha. Puedes usarlo normalmente; verifica la fecha dentro del archivo.</p>}
+              {storageError && <p role="alert" className="text-sm text-red-700">{storageError}</p>}
+              <Button className="w-full" onClick={()=>setEntryOpen(false)} disabled={!base || !monitorStudents.length}>Continuar con estos archivos</Button></div>
+            </DialogContent></Dialog>
         </SidebarInset>
       </SidebarProvider>
     </DashboardContext.Provider>
   );
 }
+
+

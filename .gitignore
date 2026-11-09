@@ -49,3 +49,15 @@ firestore-debug.log
 .codex-dev.err.log
 .dev-server.out.log
 .dev-server.err.log
+/.deploy-stage/
+/.deploy-run-*/
+/.handoff-source-*/
+/.publish-git-*/
+/.handoff/
+
+# Datos y exportaciones locales: nunca subir al código.
+*.xlsx
+*.xls
+*.csv
+*.pdf
+src/lib/*contacts.json

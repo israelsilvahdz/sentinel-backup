@@ -13,13 +13,13 @@ import { useDashboardFilters } from './DashboardClient';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { StudentContact } from '@/types/student';
-import { addOrUpdateContact } from '@/lib/firebase-services';
 
 interface StudentContactProps {
     studentId: string;
 }
 
 const contactSchema = z.object({
+    tutorPhone: z.string().optional(),
     studentPhone: z.string().optional(),
     studentEmail: z.string().email({ message: "Correo de alumno inválido." }).optional().or(z.literal('')),
     dadName: z.string().optional(),
@@ -55,7 +55,7 @@ function ContactDetail({ icon, label, value }: { icon: React.ReactNode, label: s
 }
 
 export function StudentContactInfo({ studentId }: StudentContactProps) {
-    const { studentContacts, setStudentContacts, allStudentsMap } = useDashboardFilters();
+    const { studentContacts, setStudentContacts, allStudentsMap, audience } = useDashboardFilters();
     const [isEditing, setIsEditing] = useState(false);
     const { toast } = useToast();
     
@@ -68,14 +68,14 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
     });
 
     useEffect(() => {
-        if (contact) reset(contact);
+        if (contact) reset({ ...contact, tutorPhone: contact.tutorPhone || [...new Set([contact.dadPhone, contact.momPhone].filter(Boolean))].join(' / ') });
     }, [contact, reset]);
 
     const onSubmit = async (data: ContactFormValues) => {
         if (!student) return;
         const updatedContact: StudentContact = { ...contact, studentId, name: student.name, ...data, sedena: '', group: '', mentoringId: '' };
         try {
-            await addOrUpdateContact(updatedContact);
+            // Changes are persisted by the local workspace.
             setStudentContacts(prev => ({ ...prev, [studentId]: updatedContact }));
             toast({ title: 'Contacto Guardado', description: 'La información se ha actualizado.' });
             setIsEditing(false);
@@ -128,11 +128,11 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
                             <div className="space-y-1"><Label>Teléfono</Label><Input {...register('studentPhone')} /></div>
                             <div className="space-y-1"><Label>Correo</Label><Input {...register('studentEmail')} /></div>
                         </div>
-                        <div className="space-y-4">
+                        {audience === 'prepa' && <div className="space-y-4">
                             <h4 className="font-black text-xs uppercase tracking-widest text-primary">Información de Padres</h4>
-                            <div className="space-y-1"><Label>Papá - Teléfono</Label><Input {...register('dadPhone')} /></div>
-                            <div className="space-y-1"><Label>Mamá - Teléfono</Label><Input {...register('momPhone')} /></div>
-                        </div>
+                            <div className="space-y-1"><Label>Tel. Tutor (papá o mamá)</Label><Input {...register('tutorPhone')} /></div>
+                            <p className="text-xs text-muted-foreground">Un solo teléfono de contacto familiar, como en el archivo base.</p>
+                        </div>}
                     </form>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -141,11 +141,10 @@ export function StudentContactInfo({ studentId }: StudentContactProps) {
                             <ContactDetail icon={<Phone size={18} />} label="WhatsApp" value={contact?.studentPhone} />
                             <ContactDetail icon={<Mail size={18} />} label="Correo" value={contact?.studentEmail} />
                         </Card>
-                        <Card className="border-none shadow-none bg-white p-4 rounded-2xl">
+                        {audience === 'prepa' && <Card className="border-none shadow-none bg-white p-4 rounded-2xl">
                             <h4 className="font-black text-xs uppercase tracking-widest text-primary mb-3">Familia</h4>
-                            <ContactDetail icon={<Phone size={18} />} label="Tel. Papá" value={contact?.dadPhone} />
-                            <ContactDetail icon={<Phone size={18} />} label="Tel. Mamá" value={contact?.momPhone} />
-                        </Card>
+                            <ContactDetail icon={<Phone size={18} />} label="Tel. Tutor (papá o mamá)" value={contact?.tutorPhone || [...new Set([contact?.dadPhone, contact?.momPhone].filter(Boolean))].join(' / ')} />
+                        </Card>}
                     </div>
                 )}
             </div>

@@ -1,6 +1,7 @@
 
 
 "use client";
+import { WorkspaceHeader } from './WorkspaceHeader';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useDashboardFilters } from './DashboardClient';
@@ -12,7 +13,6 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
-import { addOrUpdateProfessorContact } from '@/lib/firebase-services';
 import { FileUpload } from './FileUpload';
 import { parseProfessorDirectoryExcel } from '@/lib/excelParser';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -225,7 +225,7 @@ export function ProfessorSchedulePanel() {
     };
     
     try {
-        await addOrUpdateProfessorContact(newContact);
+        // Changes are persisted by the local workspace.
         setProfessorContacts(prev => ({ ...prev, [selectedProfessorId]: newContact }));
         toast({ title: 'Éxito', description: 'El correo del profesor ha sido actualizado.' });
         setIsEditing(false);
@@ -235,13 +235,8 @@ export function ProfessorSchedulePanel() {
   };
 
   return (
-    <div className="space-y-8 p-4 md:p-8 pt-6">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Horarios de Profesores</h1>
-        <p className="text-muted-foreground">
-          Selecciona un profesor para ver su horario de clases, número de alumnos y gestionar su información de contacto.
-        </p>
-      </header>
+    <div className="workspace-page">
+<WorkspaceHeader eyebrow="Planeación" title="Horarios de profesores" description="Consulta clases, grupos y datos de contacto desde un solo lugar." />
 
       <Card>
         <CardHeader>

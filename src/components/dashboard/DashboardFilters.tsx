@@ -17,6 +17,8 @@ import { useMemo } from 'react';
 export function DashboardFilters() {
   const {
     leaders,
+    careers,
+    audience,
     tutors,
     subjects,
     professors,
@@ -51,6 +53,7 @@ export function DashboardFilters() {
 
   const options: string[] = {
     leader: leaders,
+    career: careers,
     tutor: tutors,
     subject: subjects,
     professor: professors,
@@ -82,11 +85,11 @@ export function DashboardFilters() {
   }
 
   const filterTypeOptions: { value: FilterType; label: string }[] = [
-    { value: 'leader', label: 'Líder' },
-    { value: 'tutor', label: 'Tutor' },
+    { value: 'leader', label: audience === 'professional' ? 'Mentor' : 'Líder' },
+    ...(audience === 'professional' ? [{ value: 'career' as const, label: 'Carrera' }] : [{ value: 'tutor' as const, label: 'Tutor' }]),
     { value: 'professor', label: 'Profesor' },
     { value: 'subject', label: 'Materia' },
-    { value: 'group', label: 'Grupo' },
+    ...(audience === 'prepa' ? [{ value: 'group' as const, label: 'Grupo' }] : []),
   ];
 
   return (
@@ -116,6 +119,7 @@ export function DashboardFilters() {
                     <SelectItem value="all">
                         {filterType === 'subject' ? 'Todas' : 'Todos'}
                     </SelectItem>
+                    {filterType === 'leader' && audience === 'professional' && <SelectItem value="__unassigned__">Sin mentor asignado</SelectItem>}
                     {options.map(option => (
                         <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))}

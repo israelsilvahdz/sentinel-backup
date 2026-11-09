@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { type Change, type Student, type StudentLifeProfile, type SubjectSummary, type Team } from "@/types/student";
 import { getStudentOverallRisk } from "@/lib/dataProcessor";
+import { describeGraduationPeriod } from '@/lib/student-base-fields';
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Button } from "../ui/button";
 import { useDashboardFilters } from "./DashboardClient";
@@ -26,9 +27,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "../ui/scroll-area";
 import { StudentSubjects } from "./StudentSubjects";
+import { SubjectRiskCircles } from './SubjectRiskCircles';
 import { Checkbox } from "../ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Input } from "../ui/input";
+import { fillNotificationTemplate, readNotificationTemplate } from '@/lib/notification-templates';
 
 interface StudentCardProps {
   student: Student;
@@ -194,7 +197,7 @@ function OverallRiskBadge({ student, subjects }: { student: Student; subjects: S
   const config: Record<string, { text: string; className: string }> = {
     medium: { text: "En observacion", className: "bg-yellow-50 text-yellow-700 border-yellow-100" },
     high: { text: "Critico", className: "bg-orange-50 text-orange-700 border-orange-100" },
-    at_limit: { text: "Al limite", className: "bg-red-50 text-red-700 border-red-100" },
+    at_limit: { text: "Al limite", className: "bg-orange-50 text-orange-700 border-orange-100" },
     sd: { text: "Sin derecho", className: "bg-red-600 text-white border-none" },
   };
 
@@ -305,6 +308,7 @@ export function StudentCard({
     toast,
     priorityCases,
     togglePriorityCase,
+    audience,
   } = useDashboardFilters();
 
   const [isPriorityModalOpen, setIsPriorityModalOpen] = useState(false);
@@ -338,11 +342,6 @@ export function StudentCard({
     let message = "";
 
     if (Object.keys(increaseChangesBySubject).length > 0) {
-      message =
-        recipient === "student"
-          ? `Hola ${firstName}, te escribo para recordarte que recientemente has tenido nuevas faltas y/o tareas no entregadas en:\n\n`
-          : `Estimados padres de ${student.name}, les notificamos un aumento en el riesgo academico de su hijo/a en:\n\n`;
-
       for (const subName in increaseChangesBySubject) {
         const info = student.subjectSummaries?.find((s) => s.name === subName);
         if (!info) continue;
@@ -351,20 +350,23 @@ export function StudentCard({
         if (increaseChangesBySubject[subName].missed) details.push(`Tareas NE: ${info.missedAssignments}/${info.missedAssignmentLimit}`);
         message += `• *${subName}*: ${details.join(" y ")}.\n`;
       }
-    } else {
-      message = `Hola, te contacto del area de Mentoria de Tecmilenio para dar seguimiento al progreso academico de ${student.name}. ¿Podemos conversar?`;
     }
-
-    return message;
+    const key = recipient === "student" ? 'studentFollowUp' : 'parentFollowUp';
+    const template = readNotificationTemplate(key);
+    return fillNotificationTemplate(template.body, {
+      alumno: student.name,
+      nombre: firstName,
+      riesgo: message ? `Se registraron cambios recientes que conviene revisar:\n${message}\n` : '',
+    });
   };
 
   const handleSend = (e: React.MouseEvent, recipient: "student" | "parent") => {
     e.stopPropagation();
     const contact = studentContacts[student.id];
-    const phoneNumber = recipient === "student" ? contact?.studentPhone : contact?.momPhone || contact?.dadPhone;
+    const phoneNumber = recipient === "student" ? contact?.studentPhone : contact?.tutorPhone || contact?.momPhone || contact?.dadPhone;
 
     if (!phoneNumber) {
-      toast({ variant: "destructive", title: "Telefono no encontrado", description: "Carga el directorio o añade el numero manualmente." });
+      toast({ variant: "destructive", title: "Teléfono no encontrado", description: recipient === "parent" ? "Falta Tel. Tutor en el archivo base para este alumno." : "Falta el celular del alumno en el archivo base." });
       return;
     }
 
@@ -390,9 +392,10 @@ export function StudentCard({
   }, [student.name]);
 
   const lifeProfile = studentLifeProfiles[student.id];
+  const graduation = describeGraduationPeriod(student.graduationPeriod || '');
   const societyStyle = getSocietyStyle(lifeProfile);
   const SocietyIcon = societyStyle.icon;
-  const hasSocietyBanner = !!lifeProfile?.society;
+  const hasSociety = !!lifeProfile?.society;
 
   if (isDialog) {
     return (
@@ -402,7 +405,7 @@ export function StudentCard({
             <div className={cn("relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br shadow-inner", societyStyle.avatarClassName)}>
               <div className={cn("absolute inset-0 opacity-90", societyStyle.glowClassName)} />
               <div className="relative z-10 flex h-full w-full items-center justify-center font-black text-lg">
-                {hasSocietyBanner ? <SocietyIcon className="h-6 w-6" /> : initials}
+                {hasSociety ? <SocietyIcon className="h-6 w-6" /> : initials}
               </div>
             </div>
             <div>
@@ -414,12 +417,17 @@ export function StudentCard({
                   </Badge>
                 )}
                 {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
+                {graduation && <span
+                  className={cn('rounded-md px-2 py-1 text-xs font-semibold', graduation.atRiskOfPeriodChange ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-600')}
+                  title={`${graduation.months} ${graduation.year} · ${graduation.plan}${graduation.atRiskOfPeriodChange ? '. Al límite: si reprueba una materia más, cambiará de periodo de graduación.' : ''}`}
+                >Graduación {graduation.raw}{graduation.atRiskOfPeriodChange ? ' · Al límite' : ''}</span>}
               </CardTitle>
               <CardDescription className="mt-0.5 flex flex-wrap items-center gap-2">
                 <MatriculaCopy studentId={student.id} />
                 <StudentNameCopy studentName={student.name} />
                 <StudentNameAndIdCopy studentName={student.name} studentId={student.id} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">• Lider: {student.leader}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">• {audience === 'professional' ? 'Mentor' : 'Líder'}: {student.leader || 'Sin asignar'}</span>
+                {audience === 'professional' && <span className="text-xs text-slate-500">{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span>}
               </CardDescription>
             </div>
           </div>
@@ -435,23 +443,10 @@ export function StudentCard({
     <Card className={cn("group/student overflow-hidden border-none shadow-sm transition-all duration-300 hover:shadow-md", isSelected ? "ring-2 ring-primary" : "", isOpen && "shadow-lg ring-1 ring-primary/5")}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <div
-          className={cn("flex cursor-pointer items-center justify-between p-4 transition-colors", hasSocietyBanner ? "relative overflow-hidden text-white" : "")}
+          className={cn("grid grid-cols-[minmax(0,1fr)_80px_auto] sm:grid-cols-[minmax(0,1fr)_128px_auto] cursor-pointer items-center gap-2 px-4 py-3 transition-colors", "")}
           onClick={() => setIsOpen(!isOpen)}
         >
-          {hasSocietyBanner && (
-            <>
-              <div className={cn("absolute inset-0", societyStyle.bannerClassName)} />
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/20 blur-2xl" />
-                <div className="absolute bottom-0 left-10 h-12 w-20 rounded-full bg-white/15 blur-xl" />
-              </div>
-              <div className="absolute inset-0 overflow-hidden opacity-80">
-                <SocietyBannerEffects society={societyStyle.label} />
-              </div>
-            </>
-          )}
-
-          <div className="flex min-w-0 flex-1 items-center gap-5">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="relative z-10 flex shrink-0 items-center gap-3">
               <Checkbox
                 checked={isSelected}
@@ -459,32 +454,20 @@ export function StudentCard({
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
                   "h-5 w-5 rounded-md shadow-sm",
-                  hasSocietyBanner
-                    ? "border-white/70 bg-white/95 text-slate-700 data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-primary"
-                    : "border-primary/20 data-[state=checked]:bg-primary"
+                  "border-primary/20 data-[state=checked]:bg-primary"
                 )}
               />
               <div className={cn("relative h-10 w-10 overflow-hidden rounded-xl bg-gradient-to-br shadow-inner", societyStyle.avatarClassName)}>
                 <div className={cn("absolute inset-0 opacity-90", societyStyle.glowClassName)} />
                 <div className="relative z-10 flex h-full w-full items-center justify-center font-black text-sm uppercase">
-                  {hasSocietyBanner ? (
-                    <>
-                      <SocietyIcon className={cn("h-5 w-5", societyStyle.label === "Fuego" ? "animate-pulse" : "")} />
-                      {societyStyle.label === "Fuego" && <span className="absolute -right-1 -top-1 text-xs animate-bounce">🔥</span>}
-                      {societyStyle.label === "Agua" && <div className="absolute inset-x-1 bottom-1 h-1.5 rounded-full bg-white/20 blur-[1px]" />}
-                      {societyStyle.label === "Aire" && <div className="absolute right-1 top-1 h-2 w-2 rounded-full bg-white/20 blur-[1px]" />}
-                      {societyStyle.label === "Tierra" && <div className="absolute bottom-1 left-1 right-1 h-1.5 rounded-full bg-black/10" />}
-                    </>
-                  ) : (
-                    <span>{initials}</span>
-                  )}
+                  {hasSociety ? <SocietyIcon className="h-5 w-5" /> : <span>{initials}</span>}
                 </div>
               </div>
             </div>
 
-            <div className="relative z-10 overflow-hidden space-y-1">
+            <div className="relative z-10 min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className={cn("max-w-[200px] truncate text-base font-bold tracking-tight sm:max-w-md", !hasSocietyBanner && isOpen ? "text-primary" : "")}>
+                <h3 className={cn("break-words text-base font-bold tracking-tight", isOpen ? "text-primary" : "")}>
                   {student.name}
                 </h3>
                 {isPriority && (
@@ -496,26 +479,26 @@ export function StudentCard({
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <MatriculaCopy studentId={student.id} inverted={hasSocietyBanner} />
-                <StudentNameCopy studentName={student.name} inverted={hasSocietyBanner} />
-                <StudentNameAndIdCopy studentName={student.name} studentId={student.id} inverted={hasSocietyBanner} />
-                <span className={cn("hidden text-[10px] font-black uppercase tracking-widest sm:inline", hasSocietyBanner ? "text-white/80" : "text-muted-foreground/50")}>
-                  Lider: {student.leader}
+                <MatriculaCopy studentId={student.id} />
+                <StudentNameCopy studentName={student.name} />
+                <StudentNameAndIdCopy studentName={student.name} studentId={student.id} />
+                <span className={cn("hidden text-[10px] font-black uppercase tracking-widest sm:inline", "text-muted-foreground/50")}>
+                  {audience === 'professional' ? 'Mentor' : 'Líder'}: {student.leader || 'Sin asignar'}
                 </span>
+                {audience === 'professional' && <span className="truncate text-xs font-medium text-teal-700" title={`${student.academicCode || ''} · ${student.planType || ''}`}>{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span>}
                 {lifeProfile?.purpose && (
-                  <span className={cn("hidden text-[10px] font-black uppercase tracking-widest md:inline", hasSocietyBanner ? "text-white/90" : societyStyle.accentTextClassName)}>
+                  <span className={cn("hidden text-[10px] font-black uppercase tracking-widest md:inline", societyStyle.accentTextClassName)}>
                     Proposito cargado
                   </span>
                 )}
-                {hasSocietyBanner && (
-                  <span className={cn("hidden text-[10px] font-black uppercase tracking-[0.2em] lg:inline", societyStyle.accentSoftClassName)}>
-                    {getSocietyDescriptor(societyStyle.label)}
-                  </span>
-                )}
+                
               </div>
             </div>
           </div>
 
+          <div className="relative z-10 min-w-0">
+            <SubjectRiskCircles student={student} />
+          </div>
           <div className="relative z-10 flex shrink-0 items-center gap-2">
             <div className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover/student:opacity-100">
               <TooltipProvider>
@@ -524,7 +507,7 @@ export function StudentCard({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={cn("h-8 w-8 rounded-lg", hasSocietyBanner ? "text-white hover:bg-white/15" : "text-emerald-600 hover:bg-emerald-50")}
+                      className={cn("h-8 w-8 rounded-lg", "text-emerald-600 hover:bg-emerald-50")}
                       onClick={(e) => handleSend(e, "student")}
                     >
                       <Send className="h-4 w-4" />
@@ -532,19 +515,19 @@ export function StudentCard({
                   </TooltipTrigger>
                   <TooltipContent className="font-bold">Notificar alumno</TooltipContent>
                 </Tooltip>
-                <Tooltip>
+                {audience === 'prepa' && <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={cn("h-8 w-8 rounded-lg", hasSocietyBanner ? "text-white hover:bg-white/15" : "text-blue-600 hover:bg-blue-50")}
+                      className={cn("h-8 w-8 rounded-lg", "text-blue-600 hover:bg-blue-50")}
                       onClick={(e) => handleSend(e, "parent")}
                     >
                       <Users className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="font-bold">Notificar padres</TooltipContent>
-                </Tooltip>
+                </Tooltip>}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -552,9 +535,7 @@ export function StudentCard({
                       size="icon"
                       className={cn(
                         "h-8 w-8 rounded-lg",
-                        hasSocietyBanner
-                          ? "text-white hover:bg-white/15"
-                          : isPriority
+                        isPriority
                             ? "bg-amber-50 text-amber-600"
                             : "text-muted-foreground hover:bg-amber-50 hover:text-amber-600"
                       )}
@@ -567,7 +548,7 @@ export function StudentCard({
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <div className={cn("rounded-full p-1 transition-colors", hasSocietyBanner ? "bg-white/15 text-white" : isOpen ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+            <div className={cn("rounded-full p-1 transition-colors", isOpen ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
               {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </div>
           </div>

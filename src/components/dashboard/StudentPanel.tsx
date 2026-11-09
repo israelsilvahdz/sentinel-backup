@@ -2,11 +2,14 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Users, Loader2, X, Search, ClipboardCopy, Check, Contact, Printer, Award, Mail, Download, Send, AlertTriangle, FileWarning, Eye, Zap, Filter, ListChecks, FileText, FileSpreadsheet, Sparkles } from 'lucide-react';
 import { useDashboardFilters } from './DashboardClient';
 import { StudentCard } from './StudentCard';
+import { SubjectFollowUpProvider } from './SubjectRiskCircles';
+import { matchesRiskFilter, riskColors, type RiskColor } from '@/lib/subject-risk';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import type { Student, StudentContact, Subject, Team, SubjectSummary } from '@/types/student';
@@ -33,6 +36,36 @@ import { Progress } from '../ui/progress';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
+import { buildStudentBaseWorkbook } from '@/lib/student-base-export';
+import { NOTIFICATION_TEMPLATES, readNotificationTemplate, saveNotificationTemplate, type NotificationTemplateKey } from '@/lib/notification-templates';
+
+function WhatsAppTemplatesDialog() {
+    const [key, setKey] = useState<'parentFollowUp' | 'studentFollowUp'>('parentFollowUp');
+    const [body, setBody] = useState(() => readNotificationTemplate('parentFollowUp').body);
+    const changeKey = (next: 'parentFollowUp' | 'studentFollowUp') => { setKey(next); setBody(readNotificationTemplate(next).body); };
+    return <Dialog>
+        <DialogTrigger asChild><Button variant="outline" size="sm">Editar mensajes de WhatsApp</Button></DialogTrigger>
+        <DialogContent className="sm:max-w-xl">
+            <DialogHeader><DialogTitle>Mensajes de seguimiento</DialogTitle><DialogDescription>Se guardan solo en este navegador. Antes de enviarlos, WhatsApp permite revisarlos y editarlos.</DialogDescription></DialogHeader>
+            <label className="text-sm">Destinatario<select className="mt-1 w-full rounded-md border p-2" value={key} onChange={event => changeKey(event.target.value as typeof key)}><option value="parentFollowUp">Tutor</option><option value="studentFollowUp">Alumno</option></select></label>
+            <p className="text-xs text-muted-foreground">Variables: {'{alumno}'} nombre completo, {'{nombre}'} primer nombre, {'{riesgo}'} cambios recientes en faltas y NE.</p>
+            <Textarea className="min-h-48" value={body} onChange={event => { const next = event.target.value; setBody(next); saveNotificationTemplate(key, { body: next }); }} />
+            <Button variant="outline" onClick={() => { const defaultBody = NOTIFICATION_TEMPLATES[key].body; setBody(defaultBody); saveNotificationTemplate(key, { body: defaultBody }); }}>Restablecer mensaje</Button>
+        </DialogContent>
+    </Dialog>;
+}
+
+async function prepareReportCapture(report: HTMLElement) {
+    await document.fonts.ready;
+    await Promise.all(Array.from(report.querySelectorAll('img')).map(image => image.decode()));
+}
+
+async function reportPngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+    const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(value => value ? resolve(value) : reject(new Error('No se pudo crear la imagen del reporte.')), 'image/png');
+    });
+    return new Uint8Array(await blob.arrayBuffer());
+}
 
 
 // JS getDay() -> 0:Dom, 1:Lun, 2:Mar, 3:Mie, 4:Jue, 5:Vie, 6:Sab
@@ -1015,8 +1048,9 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
               if (innerRef.current) {
                 setIsExporting(true);
                 try {
+                  await prepareReportCapture(innerRef.current);
                   const canvas = await html2canvas(innerRef.current, { scale: 2, useCORS: true, logging: false });
-                  const imgData = canvas.toDataURL('image/png');
+                  const imgData = await reportPngBytes(canvas);
                   const pdf = new jsPDF('p', 'mm', 'a4');
                   const pdfWidth = pdf.internal.pageSize.getWidth();
                   const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -1034,8 +1068,8 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
             return (
                 <div>
                      <div className="overflow-x-auto bg-muted/20 p-2 rounded-md">
-                        <div ref={innerRef} className="min-w-[800px]">
-                            <StudentReportImage student={student} subjects={subjects} weightingSchemes={weightingSchemes} />
+                        <div className="w-max min-w-[800px]">
+                            <StudentReportImage ref={innerRef} student={student} subjects={subjects} />
                         </div>
                     </div>
                     <DialogFooter className="mt-4 gap-2">
@@ -1124,6 +1158,7 @@ export function StudentPanel() {
     studentContacts,
     setStudentContacts,
     setStudentLifeProfiles,
+    studentLifeProfiles,
     teams,
     hasData, 
     isLoading, 
@@ -1136,9 +1171,14 @@ export function StudentPanel() {
     loadStudentSubjects,
     professorContacts,
     weightingSchemes,
+    audience,
+    setFilterType,
+    setSelectedValue,
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [riskColorFilter, setRiskColorFilter] = useState<RiskColor | 'all'>('all');
+  const [riskMetricFilter, setRiskMetricFilter] = useState<'absences' | 'ne' | 'either' | 'both'>('either');
   const [isCopied, setIsCopied] = useState(false);
   const [directoryFile, setDirectoryFile] = useState<File | null>(null);
   const [athletesFile, setAthletesFile] = useState<File | null>(null);
@@ -1246,7 +1286,7 @@ export function StudentPanel() {
   const athleteStudents = useMemo(() => allStudents.filter(s => teams.some(team => Array.isArray(team.members) && team.members.some(member => member.id === s.id))), [allStudents, teams]);
 
   const filteredStudents = useMemo(() => {
-    let students = initialFilteredStudents;
+    let students = initialFilteredStudents.filter(student => matchesRiskFilter(student, riskColorFilter, riskMetricFilter));
 
     if (!searchTerm) {
       return students;
@@ -1265,17 +1305,19 @@ export function StudentPanel() {
       if (numericFilter && studentContacts[student.id]) {
         const contact = studentContacts[student.id];
         const studentPhone = contact.studentPhone?.replace(/\D/g, '') || '';
+        const tutorPhone = contact.tutorPhone?.replace(/\D/g, '') || '';
         const dadPhone = contact.dadPhone?.replace(/\D/g, '') || '';
         const momPhone = contact.momPhone?.replace(/\D/g, '') || '';
         
         phoneMatch = studentPhone.includes(numericFilter) ||
+                     tutorPhone.includes(numericFilter) ||
                      dadPhone.includes(numericFilter) ||
                      momPhone.includes(numericFilter);
       }
       
       return nameMatch || idMatch || phoneMatch;
     });
-  }, [searchTerm, initialFilteredStudents, studentContacts]);
+  }, [searchTerm, initialFilteredStudents, studentContacts, riskColorFilter, riskMetricFilter]);
 
   const handleCopyDirectory = () => {
     if (filteredStudents.length === 0) {
@@ -1296,8 +1338,7 @@ export function StudentPanel() {
       generatedText += `**Nombre:** ${student.name}\n`;
       generatedText += `**Matrícula:** ${student.id}\n`;
       generatedText += `**Teléfono Alumno:** ${contact?.studentPhone || 'No disponible'}\n`;
-      generatedText += `**Teléfono Papá:** ${contact?.dadPhone || 'No disponible'}\n`;
-      generatedText += `**Teléfono Mamá:** ${contact?.momPhone || 'No disponible'}\n`;
+      generatedText += `**Tel. Tutor (papá o mamá):** ${contact?.tutorPhone || contact?.momPhone || contact?.dadPhone || 'No disponible'}\n`;
       generatedText += `**Correo Alumno:** ${contact?.studentEmail || 'No disponible'}\n`;
       generatedText += `**Correo Papá:** ${contact?.dadEmail || 'No disponible'}\n`;
       generatedText += `**Correo Mamá:** ${contact?.momEmail || 'No disponible'}\n\n`;
@@ -1336,17 +1377,11 @@ export function StudentPanel() {
       return {
         'Matrícula': student.id,
         'Nombre del Alumno': student.name,
-        'Líder': student.leader || '',
-        'Tutor': student.tutor || '',
-        'Grupos Regulares': regularGroups,
+        [audience === 'professional' ? 'Mentor' : 'Líder']: student.leader || '',
+        ...(audience === 'professional' ? { 'Código académico': student.academicCode || '', 'Tipo Plan': student.planType || '', 'Descripción de Código académico': student.academicCodeDescription || '' } : { 'Tutor': student.tutor || '', 'Grupos Regulares': regularGroups }),
         'Teléfono Alumno': contact?.studentPhone || '',
         'Correo Alumno': contact?.studentEmail || '',
-        'Nombre Papá': contact?.dadName || '',
-        'Teléfono Papá': contact?.dadPhone || '',
-        'Correo Papá': contact?.dadEmail || '',
-        'Nombre Mamá': contact?.momName || '',
-        'Teléfono Mamá': contact?.momPhone || '',
-        'Correo Mamá': contact?.momEmail || '',
+        ...(audience === 'prepa' ? { 'Nombre Papá': contact?.dadName || '', 'Teléfono Papá': contact?.dadPhone || '', 'Correo Papá': contact?.dadEmail || '', 'Nombre Mamá': contact?.momName || '', 'Teléfono Mamá': contact?.momPhone || '', 'Correo Mamá': contact?.momEmail || '' } : {}),
         'SEDENA': contact?.sedena || '',
         'Grupo Directorio': contact?.group || '',
         'ID Mentoría': contact?.mentoringId || '',
@@ -1482,6 +1517,16 @@ export function StudentPanel() {
     lifeSurveyInputRef.current?.click();
   };
 
+  const handleExportStudentBase = () => {
+    try {
+      const workbook = buildStudentBaseWorkbook(allStudents, studentContacts, studentLifeProfiles, teams, audience);
+      XLSX.writeFile(workbook, 'Base_Alumnos_Sentinel.xlsx', { compression: true });
+      toast({ title: 'Base de alumnos descargada', description: 'Incluye todos los alumnos cargados, sin aplicar filtros. Los campos no disponibles quedan vacíos.' });
+    } catch {
+      toast({ variant: 'destructive', title: 'No se pudo descargar la base de alumnos' });
+    }
+  };
+
   const handleExportIntegratedMonitoring = () => {
     if (allStudents.length === 0) {
       toast({
@@ -1499,8 +1544,8 @@ export function StudentPanel() {
       return subjects.map(subject => ({
         'Matricula': student.id,
         'Nombre del Alumno': student.name,
-        'Lider': student.leader || '',
-        'Tutor': student.tutor || '',
+        [audience === 'professional' ? 'Mentor' : 'Lider']: student.leader || '',
+        ...(audience === 'professional' ? { 'Código académico': student.academicCode || '', 'Tipo Plan': student.planType || '', 'Descripción de Código académico': student.academicCodeDescription || '' } : { 'Tutor': student.tutor || '' }),
         'CRN': subject.id,
         'Clave Materia': subject.key,
         'Nombre de la Materia': subject.name,
@@ -1518,12 +1563,7 @@ export function StudentPanel() {
         'Fin': subject.schedule?.endTime || '',
         'Telefono Alumno': contact?.studentPhone || '',
         'Correo Alumno': contact?.studentEmail || '',
-        'Nombre Papa': contact?.dadName || '',
-        'Telefono Papa': contact?.dadPhone || '',
-        'Correo Papa': contact?.dadEmail || '',
-        'Nombre Mama': contact?.momName || '',
-        'Telefono Mama': contact?.momPhone || '',
-        'Correo Mama': contact?.momEmail || '',
+        ...(audience === 'prepa' ? { 'Nombre Papa': contact?.dadName || '', 'Telefono Papa': contact?.dadPhone || '', 'Correo Papa': contact?.dadEmail || '', 'Nombre Mama': contact?.momName || '', 'Telefono Mama': contact?.momPhone || '', 'Correo Mama': contact?.momEmail || '' } : {}),
         'SEDENA': contact?.sedena || '',
         'Grupo Directorio': contact?.group || '',
         'ID Mentoria': contact?.mentoringId || '',
@@ -1588,25 +1628,25 @@ export function StudentPanel() {
             try {
                 const subjects = await loadStudentSubjects(student.id);
 
-                return new Promise((resolve) => {
-                    // Renderizar en el contenedor visible pero desplazado
-                    root.render(<StudentReportImage student={student} subjects={subjects} weightingSchemes={weightingSchemes} />);
-                    
-                    // Esperar más tiempo para asegurar que las fuentes e imágenes estén listas
-                    setTimeout(async () => {
+                    // Commit this student's report before capture; wait for assets rather than a fixed delay.
+                    flushSync(() => root.render(<StudentReportImage student={student} subjects={subjects} />));
                         try {
-                            const canvas = await html2canvas(container, { 
+                            const report = container.firstElementChild as HTMLElement | null;
+                            if (!report) throw new Error('No se pudo renderizar el reporte.');
+                            await prepareReportCapture(report);
+                            const canvas = await html2canvas(report, {
                                 scale: 2, // Mayor calidad
                                 useCORS: true,
+                                logging: false,
                                 allowTaint: true,
                                 scrollX: 0,
                                 scrollY: 0,
-                                windowWidth: 800,
+                                windowWidth: Math.max(800, report.scrollWidth),
                                 windowHeight: 1100,
                                 backgroundColor: '#ffffff'
                             });
                             
-                            const imgData = canvas.toDataURL('image/png', 1.0);
+                            const imgData = await reportPngBytes(canvas);
                             const pdf = new jsPDF('p', 'mm', 'a4');
                             const pdfWidth = pdf.internal.pageSize.getWidth();
                             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
@@ -1625,9 +1665,6 @@ export function StudentPanel() {
                         totalCompleted++;
                         setDownloadStatus(`Procesando PDFs: ${totalCompleted}/${studentArray.length}`);
                         setDownloadProgress((totalCompleted / studentArray.length) * 100);
-                        resolve();
-                    }, 800); 
-                });
             } catch (err) {
                 console.error(`Critical failure for ${studentId}:`, err);
                 totalCompleted++;
@@ -1650,6 +1687,7 @@ export function StudentPanel() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
 
             toast({
                 title: "Descarga Exitosa",
@@ -1705,13 +1743,13 @@ export function StudentPanel() {
 
   const getPanelTitle = () => {
     if (caseType && caseTypeMap[caseType]) {
-        return <span className="font-bold text-white">{caseTypeMap[caseType]}</span>;
+        return <span className="font-semibold text-slate-800">{caseTypeMap[caseType]}</span>;
     }
     if (subjectRiskFilter) {
         const riskTypeText = subjectRiskFilter.riskType === 'absences' ? 'Faltas' : 'Tareas (NE)';
-        return <span>Alumnos en riesgo por <span className="font-bold text-white">{riskTypeText}</span> en <span className="font-bold text-white">{subjectRiskFilter.subjectName}</span></span>;
+        return <span>Alumnos en riesgo por <span className="font-semibold text-slate-800">{riskTypeText}</span> en <span className="font-semibold text-slate-800">{subjectRiskFilter.subjectName}</span></span>;
     }
-    return <span className="text-emerald-50/80">Explora y monitorea los casos individuales de cada alumno.</span>;
+    return <span className="text-slate-500">Explora y monitorea los casos individuales de cada alumno.</span>;
   };
 
   const handleClearFilter = () => {
@@ -1723,20 +1761,20 @@ export function StudentPanel() {
 
 
   return (
-    <div className="p-6 md:p-10 space-y-10 max-w-7xl mx-auto animate-in fade-in duration-700">
-       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-emerald-900 p-8 md:p-10 text-white shadow-2xl">
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
+    <div className="workspace-page">
+       <header className="relative border-b border-slate-200 pb-6 text-slate-900">
+        <div className="relative z-10 flex flex-col items-start gap-5">
             <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mb-2 border border-white/10 shadow-inner">
-                  <Zap className="h-3 w-3 text-emerald-300" /> Gestión de Casos 2026
+                <div className="workspace-eyebrow">
+                  <Zap className="h-3 w-3 text-primary" /> Seguimiento académico
                 </div>
-                <h1 className="text-4xl font-black tracking-tight flex items-center gap-4">
+                <h1 className="workspace-title flex items-center gap-4">
                   Panel de Alumnos
                 </h1>
-                <p className="text-base mt-1 flex items-center gap-2">
+                <p className="text-base mt-1 flex flex-wrap items-center gap-2">
                     {getPanelTitle()}
                     {hasActiveFilter && (
-                        <Button variant="secondary" size="sm" onClick={handleClearFilter} className="h-7 px-3 text-[10px] font-black uppercase tracking-widest bg-white/20 hover:bg-white/30 text-white border-none rounded-full transition-all">
+                        <Button variant="secondary" size="sm" onClick={handleClearFilter} className="h-7 px-3 text-[10px] font-black uppercase tracking-widest bg-primary/5 hover:bg-primary/10 text-primary border-none rounded-full transition-all">
                           <X className="mr-1.5 h-3.5 w-3.5"/> Limpiar filtro
                         </Button>
                     )}
@@ -1764,37 +1802,25 @@ export function StudentPanel() {
                 event.currentTarget.value = '';
               }}
             />
-             <div className="flex items-center gap-3 flex-wrap bg-white/10 backdrop-blur-xl p-3 rounded-2xl border border-white/10 shadow-2xl">
-                <div className="flex items-center gap-2 border-r border-white/10 pr-3 mr-1">
+             <div className="flex w-full items-center gap-2 flex-wrap p-0">
+                <div className="flex items-center gap-2 border-r border-slate-200 pr-3 mr-1">
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <FileUpload onFileSelect={handleDirectoryUpload} selectedFile={directoryFile} isLoading={isProcessingDirectory} variant="secondary" size="icon" className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 text-white border-none" label="" icon={<Contact className="h-5 w-5" />} />
+                                <FileUpload onFileSelect={handleDirectoryUpload} selectedFile={directoryFile} isLoading={isProcessingDirectory} variant="secondary" size="sm" className="h-10 min-w-0 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200" label="Directorio" icon={<Contact className="h-5 w-5" />} />
                             </TooltipTrigger>
                             <TooltipContent className="font-bold">Cargar Directorio</TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <FileUpload onFileSelect={handleAthletesUpload} selectedFile={athletesFile} isLoading={isProcessingAthletes} variant="secondary" size="icon" className="h-10 w-10 rounded-xl bg-white/10 hover:bg-white/20 text-white border-none" label="" icon={<Award className="h-5 w-5" />} />
-                            </TooltipTrigger>
-                            <TooltipContent className="font-bold">Cargar Atletas</TooltipContent>
-                        </Tooltip>
+                        
                     </TooltipProvider>
                 </div>
                 
                 <div className="flex items-center gap-2">
+                  
                   <Dialog>
                       <DialogTrigger asChild>
-                          <Button variant="secondary" disabled={athleteStudents.length === 0} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
-                              <Mail className="h-4 w-4 text-emerald-300"/> Notificar Ausencia
-                          </Button>
-                      </DialogTrigger>
-                      <AthleteNotificationDialogV2 students={athleteStudents} teams={teams} filterType={filterType} selectedLeader={selectedValue} />
-                  </Dialog>
-                  <Dialog>
-                      <DialogTrigger asChild>
-                          <Button variant="secondary" size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
-                              <Printer className="h-4 w-4 text-emerald-300" /> Imprimir Lista
+                          <Button variant="secondary" size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4">
+                              <Printer className="h-4 w-4 text-primary" /> Imprimir Lista
                           </Button>
                       </DialogTrigger>
                       <PrintListDialog students={filteredStudents} contacts={studentContacts} />
@@ -1803,8 +1829,8 @@ export function StudentPanel() {
                   <TooltipProvider>
                       <Tooltip open={isCopied}>
                           <TooltipTrigger asChild>
-                          <Button variant="secondary" onClick={handleCopyDirectory} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
-                              {isCopied ? <Check className="text-emerald-300 h-4 w-4"/> : <ClipboardCopy className="h-4 w-4 text-emerald-300" />}
+                          <Button variant="secondary" onClick={handleCopyDirectory} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4">
+                              {isCopied ? <Check className="text-primary h-4 w-4"/> : <ClipboardCopy className="h-4 w-4 text-primary" />}
                                Copiar Directorio
                           </Button>
                           </TooltipTrigger>
@@ -1814,68 +1840,75 @@ export function StudentPanel() {
                       </Tooltip>
                   </TooltipProvider>
                   )}
-                  {hasData && (
-                    <Button
-                      variant="secondary"
-                      onClick={handleOpenLifeSurveyPicker}
-                      size="sm"
-                      disabled={isProcessingLifeSurvey}
-                      className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4"
-                    >
-                      {isProcessingLifeSurvey ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 text-emerald-300" />
-                      )}
-                      {isProcessingLifeSurvey ? 'Cruzando propósito...' : 'Cargar Propósito de Vida'}
-                    </Button>
-                  )}
+                  
                   {hasData && (
                     <Button
                       variant="secondary"
                       onClick={handleOpenContactMergePicker}
                       size="sm"
                       disabled={isProcessingContactMerge}
-                      className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4"
+                      className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4"
                     >
                       {isProcessingContactMerge ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-emerald-300" />
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
                       ) : (
-                        <FileSpreadsheet className="h-4 w-4 text-emerald-300" />
+                        <FileSpreadsheet className="h-4 w-4 text-primary" />
                       )}
                       {isProcessingContactMerge ? 'Migrando...' : 'Migrar Contactos'}
                     </Button>
                   )}
+                  <Button variant="secondary" onClick={handleExportStudentBase} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4"><Download className="h-4 w-4" /> Descargar base de alumnos</Button>
+                  {audience === 'prepa' && <WhatsAppTemplatesDialog />}
                   {hasData && (
-                    <Button variant="secondary" onClick={handleExportIntegratedMonitoring} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white/10 hover:bg-white/20 text-white border-none px-4">
-                      <Download className="h-4 w-4 text-emerald-300" />
+                    <Button variant="secondary" onClick={handleExportIntegratedMonitoring} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4">
+                      <Download className="h-4 w-4 text-primary" />
                       Exportar Integrado
                     </Button>
                   )}
                 </div>
             </div>
         </div>
-        <div className="absolute right-[-5%] top-[-20%] w-96 h-96 bg-white/10 rounded-full blur-[100px]" />
-        <div className="absolute left-[-5%] bottom-[-20%] w-64 h-64 bg-emerald-400/10 rounded-full blur-[80px]" />
       </header>
 
       {hasData && (
-        <section className="space-y-8">
-          <div className="relative group/search max-w-2xl mx-auto transform transition-all duration-500 hover:scale-[1.02]">
+        <section className="space-y-5">
+          <div className="relative group/search w-full">
             <div className="absolute left-5 top-1/2 -translate-y-1/2 h-6 w-6 text-primary/30 group-focus-within/search:text-primary transition-colors z-10">
                 <Search className="h-6 w-6" />
             </div>
             <Input
                 type="text"
                 placeholder="Busca por nombre, matrícula o teléfono..."
-                className="pl-14 h-16 w-full bg-white border-2 border-primary/5 shadow-2xl shadow-primary/10 rounded-2xl text-xl font-bold transition-all focus:border-primary/20 focus:ring-8 focus:ring-primary/5 placeholder:text-muted-foreground/30"
+                className="pl-14 h-12 w-full bg-white border border-slate-200 shadow-sm rounded-xl text-base font-medium transition-all focus:border-primary/20 focus:ring-2 focus:ring-primary/5 placeholder:text-slate-400"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
+          <div className="space-y-2 rounded-xl border bg-white px-3 py-2">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-sm font-medium">Color de riesgo
+                <select className="mt-1 block rounded-lg border bg-white p-2" value={riskColorFilter} onChange={event => setRiskColorFilter(event.target.value as RiskColor | 'all')}>
+                  <option value="all">Todos los colores</option>
+                  {Object.entries(riskColors).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-medium">Buscar en
+                <select className="mt-1 block rounded-lg border bg-white p-2" value={riskMetricFilter} onChange={event => setRiskMetricFilter(event.target.value as typeof riskMetricFilter)}>
+                  <option value="either">Faltas o NE</option><option value="absences">Solo faltas</option><option value="ne">Solo NE</option><option value="both">Faltas y NE en la misma materia</option>
+                </select>
+              </label>
+              <Button variant="ghost" onClick={() => { setRiskColorFilter('all'); setRiskMetricFilter('either'); }}>Limpiar color</Button>
+            </div>
+            <details className="text-xs text-slate-600">
+              <summary className="cursor-pointer">Guía de colores y avisos</summary>
+              <p className="py-2">Izquierda = faltas, derecha = NE. ! = aviso pendiente desde el 80%. ✓ = avisado. Pulsa una materia para registrar el aviso y consultar su fecha.</p>
+              <div className="flex flex-wrap gap-3">{Object.entries(riskColors).map(([key, value]) => <span key={key} className="flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: value.color }} />{value.label}</span>)}</div>
+            </details>
+          </div>
+           {audience === 'professional' && allStudents.some(student => !student.leader?.trim()) && <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"><span><strong>{allStudents.filter(student => !student.leader?.trim()).length} alumnos sin mentor asignado.</strong> Revisa la base principal o consulta sus materias mientras se asignan.</span><Button size="sm" variant="outline" onClick={() => { setFilterType('leader'); setSelectedValue('__unassigned__'); }}>Ver alumnos</Button></div>}
            {filteredStudents.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/60 backdrop-blur-md p-4 rounded-3xl border border-primary/10 shadow-lg sticky top-20 z-20 animate-in fade-in slide-in-from-top-4 duration-700">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm sticky top-24 z-20 animate-in fade-in slide-in-from-top-4 duration-700">
                 <div className="flex items-center gap-6">
                     <div className="flex items-center space-x-3 bg-white px-5 py-2.5 rounded-2xl border shadow-sm transition-all hover:border-primary/20">
                         <Checkbox 
@@ -1935,7 +1968,7 @@ export function StudentPanel() {
                 <div className="flex items-center gap-2 px-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">
                   <ListChecks className="h-3 w-3" /> Resultados: {filteredStudents.length} de {initialFilteredStudents.length} alumnos
                 </div>
-                <div className="grid grid-cols-1 gap-4">
+                <SubjectFollowUpProvider><div className="grid grid-cols-1 gap-4">
                     {filteredStudents.map(student => {
                       const changesForCard = latestComparison[student.id] || [];
                       return (
@@ -1950,7 +1983,7 @@ export function StudentPanel() {
                         />
                       );
                     })}
-                </div>
+                </div></SubjectFollowUpProvider>
             </div>
           ) : (
             <div className="text-center py-32 bg-white/30 rounded-3xl border-2 border-dashed border-primary/10 animate-in fade-in duration-1000">
