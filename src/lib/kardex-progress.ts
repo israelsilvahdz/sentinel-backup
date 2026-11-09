@@ -32,8 +32,8 @@ const semesterEnds: Record<string, number[]> = {
   IMT_S18: [7, 14, 20, 26, 33, 40, 42, 48],
   IIN_S18: [7, 13, 20, 26, 32, 39, 41, 48],
   LEM_S18: [7, 14, 21, 27, 34, 40, 43, 49],
-  LAE_S18: [7, 14, 21, 27, 34],
-  LCI_S18: [7, 14, 21, 27, 34],
+  LAE_S18: [7, 14, 21, 27, 34, 39],
+  LCI_S18: [7, 14, 21, 27, 34, 39],
 };
 const planTotals: Record<string, number> = { IMT_S18: 48, IIN_S18: 48, LEM_S18: 49, LAE_S18: 50, LCI_S18: 49 };
 
