@@ -287,6 +287,7 @@ export type ActiveView =
   | 'change-stats'
   | 'students'
   | 'academic-performance'
+  | 'kardex-progress'
   | 'professor-schedule'
   | 'weighting-schemes'
   | 'unclassified';

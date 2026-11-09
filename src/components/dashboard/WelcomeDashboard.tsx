@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ArrowRight, ArrowUpRight, BarChart3, CalendarDays, CircleHelp, LayoutDashboard, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, Users, UserRoundCheck, ClipboardX, CalendarX } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BarChart3, CalendarDays, CircleHelp, LayoutDashboard, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, Users, UserRoundCheck, ClipboardX, CalendarX, BookOpenCheck } from 'lucide-react';
 import { getStudentOverallRisk } from '@/lib/dataProcessor';
 import { useDashboardFilters, type ActiveView } from './DashboardClient';
 import { ScopeSwitcher } from './ScopeSwitcher';
@@ -11,6 +11,7 @@ const modules: { view: ActiveView; title: string; description: string; icon: typ
   { view: 'dashboard', title: 'Resumen académico', description: 'Prioridades, faltas y actividades pendientes.', icon: LayoutDashboard, category: 'Análisis' },
   { view: 'students', title: 'Panel de alumnos', description: 'Ficha, materias y reportes individuales.', icon: Users, category: 'Seguimiento' },
   { view: 'academic-performance', title: 'Desempeño y materias', description: 'Promedios por docente y carrera o grupo.', icon: BarChart3, category: 'Análisis' },
+  { view: 'kardex-progress', title: 'Avance del Kárdex', description: 'Plan cursado, materias en curso y pendientes.', icon: BookOpenCheck, category: 'Trayectoria' },
   { view: 'change-stats', title: 'Análisis de cambios', description: 'Qué cambió desde el monitoreo anterior.', icon: TrendingUp, category: 'Seguimiento' },
   { view: 'professor-schedule', title: 'Horarios de profesores', description: 'Clases y contactos docentes en un lugar.', icon: CalendarDays, category: 'Operación' },
   { view: 'weighting-schemes', title: 'Gestor de ponderaciones', description: 'Consulta los pesos de las actividades.', icon: SlidersHorizontal, category: 'Configuración' },
