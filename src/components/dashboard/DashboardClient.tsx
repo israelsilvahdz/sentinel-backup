@@ -538,18 +538,18 @@ export function DashboardClient() {
   return (
     <DashboardContext.Provider value={contextValue}>
       <SidebarProvider open={sidebarOpen} onOpenChange={(open) => { setSidebarPinned(open); setSidebarOpen(open); }} style={{ '--sidebar-width': '17.5rem' } as React.CSSProperties}>
-        <Sidebar className="border-r border-[#dce6e2] bg-white" onMouseEnter={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); if (!sidebarPinned) sidebarHoverTimer.current = setTimeout(() => setSidebarOpen(true), 160); }} onMouseLeave={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); if (!sidebarPinned) sidebarHoverTimer.current = setTimeout(() => setSidebarOpen(false), 180); }}>
-          <SidebarHeader className="h-auto shrink-0 border-b border-[#edf1ee] bg-white">
+        <Sidebar data-hover-open={sidebarOpen && !sidebarPinned ? 'true' : undefined} className="sentinel-sidebar border-r border-[#164e46]" onMouseEnter={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); if (!sidebarPinned) sidebarHoverTimer.current = setTimeout(() => setSidebarOpen(true), 160); }} onMouseLeave={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); if (!sidebarPinned) sidebarHoverTimer.current = setTimeout(() => setSidebarOpen(false), 180); }}>
+          <SidebarHeader className="h-auto shrink-0 border-b border-[#bfded2] bg-[#f5fbf7]">
              <div className="w-full min-w-0 px-4 py-4 group-data-[collapsible=icon]:px-1">
                 <img src={audience === 'professional' ? '/tecmilenio-profesional.png' : '/tecmilenio-logo.png'} alt={audience === 'professional' ? 'Tecmilenio Profesional' : 'Prepa Tecmilenio'} width={224} height={72} className="h-auto w-full object-contain group-data-[collapsible=icon]:hidden" />
-                {audience === 'professional' ? <span className="relative hidden h-10 w-10 overflow-hidden group-data-[collapsible=icon]:block"><img src="/tecmilenio-profesional.png" alt="Tecmilenio" className="absolute -left-2 -top-3 h-auto max-w-none" style={{ width: 224 }} /></span> : <span className="hidden text-center text-lg font-black text-[#ff8834] group-data-[collapsible=icon]:block">P</span>}
-                <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#00534c] group-data-[collapsible=icon]:hidden">Sentinel · Seguimiento académico</p>
+                {audience === 'professional' ? <span className="relative hidden h-10 w-10 overflow-hidden group-data-[collapsible=icon]:block"><img src="/tecmilenio-profesional.png" alt="Tecmilenio" className="absolute -left-2 -top-3 h-auto max-w-none" style={{ width: 224 }} /></span> : <span className="relative hidden h-10 w-10 overflow-hidden group-data-[collapsible=icon]:block"><img src="/tecmilenio-logo.png" alt="Prepa Tecmilenio" className="absolute -left-1 top-0 h-auto max-w-none" style={{ width: 224 }} /></span>}
+                <p className="mt-3 border-t border-emerald-200/70 pt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-[#17685c] group-data-[collapsible=icon]:hidden">Sentinel · Seguimiento académico</p>
              </div>
           </SidebarHeader>
-          <SidebarContent className="px-2 bg-white no-scrollbar">
+          <SidebarContent className="no-scrollbar px-2.5 py-2">
             <SidebarGroup className="mt-4">
               <SidebarMenu className="gap-1">
-                <div className="px-3 mb-2 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Exploración</p></div>
+                <div className="mb-2 px-3 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-200/65">Exploración</p></div>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Inicio" isActive={activeView === 'welcome'} onClick={() => handleSetActiveView('welcome')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><Home /><span className="font-medium whitespace-normal leading-snug text-[13px]">Inicio</span></SidebarMenuButton>
                 </SidebarMenuItem>
@@ -559,14 +559,14 @@ export function DashboardClient() {
                  <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Análisis de Cambios" isActive={activeView === 'change-stats'} onClick={() => handleSetActiveView('change-stats')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><BarChart3 /><span className="font-bold">Análisis de Cambios</span></SidebarMenuButton>
                 </SidebarMenuItem>
-                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Operación</p></div>
+                <div className="mb-2 mt-6 border-t border-white/10 px-3 pt-5 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-200/65">Operación</p></div>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Panel de Alumnos" isActive={activeView === 'students'} onClick={() => handleSetActiveView('students')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><Users /><span className="font-bold">Panel de Alumnos</span></SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Desempeño y seguimiento" isActive={activeView === 'academic-performance'} onClick={() => handleSetActiveView('academic-performance')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><BarChart3 /><span className="font-bold whitespace-normal leading-snug text-[13px]">Desempeño y seguimiento</span></SidebarMenuButton>
                 </SidebarMenuItem>
-                <div className="px-3 mb-2 mt-6 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Planeación y Gestión</p></div>
+                <div className="mb-2 mt-6 border-t border-white/10 px-3 pt-5 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-200/65">Planeación y gestión</p></div>
                 <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><Contact /><span className="font-bold">Horarios de Profesores</span></SidebarMenuButton>
                 </SidebarMenuItem>
@@ -579,9 +579,9 @@ export function DashboardClient() {
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter className="border-t border-emerald-100 bg-emerald-50/60 p-2 group-data-[collapsible=icon]:p-1">
-            <SidebarTrigger title="Contraer o expandir menú" aria-label="Contraer o expandir menú" className="h-10 w-full justify-start gap-2 rounded-xl px-3 text-emerald-900 hover:bg-emerald-100 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" />
-            <button type="button" onClick={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); setSidebarPinned(!sidebarPinned); setSidebarOpen(!sidebarPinned); }} className="rounded-lg px-3 pb-1 text-left text-xs font-medium text-emerald-900 hover:text-emerald-700 group-data-[collapsible=icon]:hidden">{sidebarPinned ? 'Soltar menú' : 'Fijar menú abierto'} · Ctrl+B</button>
+          <SidebarFooter className="border-t border-white/10 bg-[#052e2b]/65 p-2 group-data-[collapsible=icon]:p-1">
+            <SidebarTrigger title="Contraer o expandir menú" aria-label="Contraer o expandir menú" className="h-10 w-full justify-start gap-2 rounded-xl px-3 text-emerald-100 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" />
+            <button type="button" onClick={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); setSidebarPinned(!sidebarPinned); setSidebarOpen(!sidebarPinned); }} className="rounded-lg px-3 pb-1 text-left text-xs font-medium text-emerald-100 hover:text-white group-data-[collapsible=icon]:hidden">{sidebarPinned ? 'Soltar menú' : 'Fijar menú abierto'} · Ctrl+B</button>
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>

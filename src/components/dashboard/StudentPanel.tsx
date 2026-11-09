@@ -1811,71 +1811,6 @@ export function StudentPanel() {
                 event.currentTarget.value = '';
               }}
             />
-             <div className="flex w-full items-center gap-2 flex-wrap p-0">
-                <div className="flex items-center gap-2 border-r border-slate-200 pr-3 mr-1">
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <FileUpload onFileSelect={handleDirectoryUpload} selectedFile={directoryFile} isLoading={isProcessingDirectory} variant="secondary" size="sm" className="h-10 min-w-0 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200" label="Directorio" icon={<Contact className="h-5 w-5" />} />
-                            </TooltipTrigger>
-                            <TooltipContent className="font-bold">Cargar Directorio</TooltipContent>
-                        </Tooltip>
-                        
-                    </TooltipProvider>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  
-                  <Dialog>
-                      <DialogTrigger asChild>
-                          <Button variant="secondary" size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4">
-                              <Printer className="h-4 w-4 text-primary" /> Imprimir Lista
-                          </Button>
-                      </DialogTrigger>
-                      <PrintListDialog students={filteredStudents} contacts={studentContacts} />
-                  </Dialog>
-                  {hasData && (
-                  <TooltipProvider>
-                      <Tooltip open={isCopied}>
-                          <TooltipTrigger asChild>
-                          <Button variant="secondary" onClick={handleCopyDirectory} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4">
-                              {isCopied ? <Check className="text-primary h-4 w-4"/> : <ClipboardCopy className="h-4 w-4 text-primary" />}
-                               Copiar Directorio
-                          </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="font-bold">
-                              {isCopied ? '¡Copiado!' : 'Exportar a portapapeles'}
-                          </TooltipContent>
-                      </Tooltip>
-                  </TooltipProvider>
-                  )}
-                  
-                  {hasData && (
-                    <Button
-                      variant="secondary"
-                      onClick={handleOpenContactMergePicker}
-                      size="sm"
-                      disabled={isProcessingContactMerge}
-                      className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4"
-                    >
-                      {isProcessingContactMerge ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      ) : (
-                        <FileSpreadsheet className="h-4 w-4 text-primary" />
-                      )}
-                      {isProcessingContactMerge ? 'Migrando...' : 'Migrar Contactos'}
-                    </Button>
-                  )}
-                  <Button variant="secondary" onClick={handleExportStudentBase} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4"><Download className="h-4 w-4" /> Descargar base de alumnos</Button>
-                  {audience === 'prepa' && <WhatsAppTemplatesDialog />}
-                  {hasData && (
-                    <Button variant="secondary" onClick={handleExportIntegratedMonitoring} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4">
-                      <Download className="h-4 w-4 text-primary" />
-                      Exportar Integrado
-                    </Button>
-                  )}
-                </div>
-            </div>
         </div>
       </header>
 
@@ -1930,6 +1865,14 @@ export function StudentPanel() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-11 gap-2 rounded-xl border-emerald-200 bg-white px-4 font-semibold text-emerald-900 hover:bg-emerald-50">
+                                <Printer className="h-4 w-4" /> Imprimir lista
+                            </Button>
+                        </DialogTrigger>
+                        <PrintListDialog students={filteredStudents} contacts={studentContacts} />
+                    </Dialog>
                     <Button 
                         size="sm"
                         variant="secondary"

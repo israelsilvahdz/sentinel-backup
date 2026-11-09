@@ -7,33 +7,33 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 158 29% 97%;
+    --foreground: 175 37% 12%;
     
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 175 37% 12%;
     
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     
-    --primary: 175 98% 17%;
+    --primary: 174 88% 19%;
     --primary-foreground: 0 0% 98%;
     
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 155 32% 93%;
+    --secondary-foreground: 174 54% 19%;
     
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 160 22% 94%;
+    --muted-foreground: 170 13% 42%;
     
-    --accent: 175 98% 17%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 164 52% 86%;
+    --accent-foreground: 174 54% 19%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 175 98% 17%;
+    --border: 160 23% 87%;
+    --input: 160 23% 87%;
+    --ring: 169 76% 31%;
     
     --chart-1: 175 98% 17%;
     --chart-2: 175 50% 40%;
@@ -43,13 +43,13 @@
     
     --radius: 0.5rem;
     
-    --sidebar-background: 175 98% 17%;
+    --sidebar-background: 174 82% 12%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 0 0% 98%;
     --sidebar-primary-foreground: 175 98% 17%;
-    --sidebar-accent: 175 80% 25%;
+    --sidebar-accent: 170 50% 22%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 175 80% 25%;
+    --sidebar-border: 169 40% 26%;
     --sidebar-ring: 0 0% 98%;
   }
 }
@@ -94,5 +94,13 @@
 .academic-bar { transform-origin: left center; animation: academic-bar-grow 550ms cubic-bezier(.2,.7,.2,1) both; }
 .welcome-card { transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease; }
 .welcome-card:hover { transform: translateY(-3px); border-color: #a7d8c3; box-shadow: 0 18px 38px -25px rgba(0,70,53,.42); }
+.sentinel-sidebar { box-shadow: 14px 0 42px -35px rgba(0, 48, 42, .55); }
+.sentinel-sidebar [data-sidebar="sidebar"] { background: linear-gradient(165deg, #064b43 0%, #063c37 55%, #052f2c 100%); }
+.sentinel-sidebar [data-sidebar="menu-button"] { position: relative; border: 1px solid transparent; color: #d4e9e3; transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, transform 180ms ease; }
+.sentinel-sidebar [data-sidebar="menu-button"]:hover { transform: translateX(2px); border-color: rgba(190, 235, 218, .14); background: rgba(255, 255, 255, .1); color: #fff; }
+.sentinel-sidebar [data-sidebar="menu-button"][data-active="true"] { border-color: rgba(180, 239, 206, .28); background: linear-gradient(90deg, rgba(142, 231, 177, .24), rgba(142, 231, 177, .08)); color: #fff; box-shadow: inset 3px 0 #a7e8ba; }
+.sentinel-sidebar [data-sidebar="menu-button"]:focus-visible { outline: 2px solid #b7ecc7; outline-offset: 2px; }
+.group.peer[data-hover-open="true"] > div:first-child { width: var(--sidebar-width-icon); }
 @media (prefers-reduced-motion: reduce) { .academic-bar { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .welcome-card, .welcome-card:hover { transition: none; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sentinel-sidebar [data-sidebar="menu-button"] { transition: none; } .sentinel-sidebar [data-sidebar="menu-button"]:hover { transform: none; } }
