@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ArrowRight, ArrowUpRight, BarChart3, BookOpen, CalendarDays, CircleHelp, LayoutDashboard, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, Users, UserRoundCheck } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BarChart3, CalendarDays, CircleHelp, LayoutDashboard, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, Users, UserRoundCheck, ClipboardX, CalendarX } from 'lucide-react';
 import { getStudentOverallRisk } from '@/lib/dataProcessor';
 import { useDashboardFilters, type ActiveView } from './DashboardClient';
 import { ScopeSwitcher } from './ScopeSwitcher';
@@ -20,20 +20,21 @@ const modules: { view: ActiveView; title: string; description: string; icon: typ
 export function WelcomeDashboard() {
   const { setActiveView, setFilterType, setSelectedValue, allStudents, scopedStudents, audience, scopeType, scopeValue } = useDashboardFilters();
   const summary = useMemo(() => {
-    const subjects = new Set(scopedStudents.flatMap(student => (student.subjectSummaries || []).map(subject => subject.name)));
     const careers = new Set(scopedStudents.map(student => student.academicCodeDescription || student.academicCode).filter(Boolean));
+    const withAbsences = scopedStudents.filter(student => (student.subjectSummaries || []).some(subject => Number(subject.absences) > 0)).length;
+    const withNE = scopedStudents.filter(student => (student.subjectSummaries || []).some(subject => Number(subject.missedAssignments) > 0)).length;
     const atRisk = scopedStudents.filter(student => {
       const risk = getStudentOverallRisk(student, student.subjectSummaries || []);
       return risk.hasSD || risk.hasAtLimit || risk.hasHighRisk;
     }).length;
-    return { subjects: subjects.size, careers: careers.size, atRisk, unassigned: scopedStudents.filter(student => !student.leader?.trim()).length };
+    return { careers: careers.size, withAbsences, withNE, atRisk, unassigned: scopedStudents.filter(student => !student.leader?.trim()).length };
   }, [scopedStudents]);
   const role = audience === 'professional' ? 'mentor' : scopeType === 'tutor' ? 'tutor' : 'líder';
   const stats = [
     { label: 'Alumnos', value: scopedStudents.length, detail: scopeValue ? `Cartera de ${scopeValue}` : 'Monitoreo completo', icon: Users, action: () => setActiveView('students') },
-    { label: 'Materias', value: summary.subjects, detail: 'En esta vista', icon: BookOpen, action: () => setActiveView('academic-performance') },
+    { label: 'Con faltas', value: summary.withAbsences, detail: 'Alumnos con al menos una falta', icon: CalendarX, action: () => setActiveView('dashboard') },
+    { label: 'Con NE', value: summary.withNE, detail: 'Alumnos con entregas pendientes', icon: ClipboardX, action: () => setActiveView('dashboard') },
     { label: 'En riesgo', value: summary.atRisk, detail: 'Requieren atención académica', icon: ShieldCheck, action: () => setActiveView('dashboard') },
-    { label: audience === 'professional' ? 'Carreras' : 'Sin asignación', value: audience === 'professional' ? summary.careers : summary.unassigned, detail: audience === 'professional' ? 'Programas representados' : 'Alumnos sin líder', icon: audience === 'professional' ? BarChart3 : UserRoundCheck, action: () => setActiveView(audience === 'professional' ? 'academic-performance' : 'students') },
   ];
 
   return <main className="mx-auto max-w-7xl space-y-7 p-5 md:p-8">
