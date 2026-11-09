@@ -598,7 +598,7 @@ export function DashboardClient() {
                   <div>
                     <p className="text-sm font-semibold text-emerald-950">{{welcome:'Inicio',dashboard:'Resumen académico','change-stats':'Análisis de cambios',students:'Panel de alumnos','academic-performance':'Desempeño y seguimiento','kardex-progress':'Avance del Kárdex','professor-schedule':'Horarios de profesores','weighting-schemes':'Gestor de ponderaciones',unclassified:'Materias sin clasificar'}[activeView]}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-                      <span>{reportInfo ? reportInfo.date + ' · Periodo ' + reportInfo.period : currentFileName || 'Carga tus archivos para comenzar'}</span>
+                      <span>{activeView === 'kardex-progress' ? 'Lectura local del plan de estudios' : reportInfo ? reportInfo.date + ' · Periodo ' + reportInfo.period : currentFileName || 'Carga tus archivos para comenzar'}</span>
                       {reportInfo && reportInfo.dateKey !== todayKey() && <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800" title="Estás viendo el monitoreo de otro día.">Monitoreo de otro día</span>}
                     </div>
                   </div>
