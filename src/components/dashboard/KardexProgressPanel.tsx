@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { ArrowUpRight, BookOpenCheck, CheckCircle2, CircleDashed, Clock3, FileSpreadsheet, Search, ShieldAlert, UploadCloud, X } from 'lucide-react';
+import { BookOpenCheck, CheckCircle2, CircleDashed, Clock3, Search, ShieldAlert, UploadCloud, X } from 'lucide-react';
 import { localWorkspace } from '@/lib/local-workspace';
 import { kardexSummary, readKardexWorkbook, type KardexStatus, type KardexStudent } from '@/lib/kardex-progress';
 import { useDashboardFilters } from './DashboardClient';
@@ -21,6 +21,11 @@ const statusStyle: Record<KardexStatus, string> = {
   review: 'border-amber-200 bg-amber-50 text-amber-800',
 };
 type SavedKardex = { name: string; students: KardexStudent[] };
+const periodOrder = (period: string) => {
+  const year = Number(period.match(/\d{4}/)?.[0] || 0);
+  const month = /ene/i.test(period) ? 1 : /mayo|may/i.test(period) ? 5 : /jun|verano/i.test(period) ? 6 : /ago/i.test(period) ? 8 : /sep/i.test(period) ? 9 : 12;
+  return year * 12 + month;
+};
 
 export function KardexProgressPanel() {
   const { allStudentsMap, scopeValue, scopedStudents, audience } = useDashboardFilters();
@@ -73,7 +78,7 @@ export function KardexProgressPanel() {
   const periods = useMemo(() => {
     const grouped = new Map<string, number>();
     for (const course of selected?.courses || []) if (course.period && course.status !== 'pending') grouped.set(course.period, (grouped.get(course.period) || 0) + 1);
-    return [...grouped].sort((a, b) => a[0].localeCompare(b[0], 'es', { numeric: true }));
+    return [...grouped].sort((a, b) => periodOrder(a[0]) - periodOrder(b[0]) || a[0].localeCompare(b[0], 'es'));
   }, [selected]);
   const current = selected ? allStudentsMap.get(selected.id) : null;
 
