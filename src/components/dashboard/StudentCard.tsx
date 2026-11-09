@@ -308,6 +308,7 @@ export function StudentCard({
     toast,
     priorityCases,
     togglePriorityCase,
+    audience,
   } = useDashboardFilters();
 
   const [isPriorityModalOpen, setIsPriorityModalOpen] = useState(false);
@@ -425,7 +426,8 @@ export function StudentCard({
                 <MatriculaCopy studentId={student.id} />
                 <StudentNameCopy studentName={student.name} />
                 <StudentNameAndIdCopy studentName={student.name} studentId={student.id} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">• Lider: {student.leader}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">• {audience === 'professional' ? 'Mentor' : 'Líder'}: {student.leader || 'Sin asignar'}</span>
+                {audience === 'professional' && <span className="text-xs text-slate-500">{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span>}
               </CardDescription>
             </div>
           </div>
@@ -481,8 +483,9 @@ export function StudentCard({
                 <StudentNameCopy studentName={student.name} />
                 <StudentNameAndIdCopy studentName={student.name} studentId={student.id} />
                 <span className={cn("hidden text-[10px] font-black uppercase tracking-widest sm:inline", "text-muted-foreground/50")}>
-                  Lider: {student.leader}
+                  {audience === 'professional' ? 'Mentor' : 'Líder'}: {student.leader || 'Sin asignar'}
                 </span>
+                {audience === 'professional' && <span className="truncate text-xs font-medium text-teal-700" title={`${student.academicCode || ''} · ${student.planType || ''}`}>{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span>}
                 {lifeProfile?.purpose && (
                   <span className={cn("hidden text-[10px] font-black uppercase tracking-widest md:inline", societyStyle.accentTextClassName)}>
                     Proposito cargado
@@ -512,7 +515,7 @@ export function StudentCard({
                   </TooltipTrigger>
                   <TooltipContent className="font-bold">Notificar alumno</TooltipContent>
                 </Tooltip>
-                <Tooltip>
+                {audience === 'prepa' && <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
@@ -524,7 +527,7 @@ export function StudentCard({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="font-bold">Notificar padres</TooltipContent>
-                </Tooltip>
+                </Tooltip>}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

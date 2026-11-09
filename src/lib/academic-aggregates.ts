@@ -49,37 +49,39 @@ function finish(groups: Map<string, Accumulator>): AcademicAggregate[] {
   })).sort((a, b) => a.name.localeCompare(b.name, 'es'));
 }
 
-export function aggregateAcademics(students: Student[]): { byProfessor: AcademicAggregate[]; byGroup: AcademicAggregate[] } {
+export function aggregateAcademics(students: Student[]): { byProfessor: AcademicAggregate[]; byGroup: AcademicAggregate[]; byCareer: AcademicAggregate[] } {
   const professors = new Map<string, Accumulator>();
   const groups = new Map<string, Accumulator>();
+  const careers = new Map<string, Accumulator>();
   for (const student of students) {
     for (const subject of student.subjects || []) {
       addToGroup(professors, subject.professorName || 'Sin profesor asignado', student.id, subject);
       addToGroup(groups, subject.group || 'Sin grupo', student.id, subject);
+      addToGroup(careers, student.academicCodeDescription || student.academicCode || 'Sin carrera', student.id, subject);
     }
   }
-  return { byProfessor: finish(professors), byGroup: finish(groups) };
+  return { byProfessor: finish(professors), byGroup: finish(groups), byCareer: finish(careers) };
 }
 
-export function subjectAveragesFor(students: Student[], dimension: 'professors' | 'groups', name: string): AcademicAggregate[] {
+export function subjectAveragesFor(students: Student[], dimension: 'professors' | 'groups' | 'careers', name: string): AcademicAggregate[] {
   const subjects = new Map<string, Accumulator>();
   const target = comparableName(name);
   for (const student of students) {
     for (const subject of student.subjects || []) {
-      const owner = dimension === 'professors' ? subject.professorName || 'Sin profesor asignado' : subject.group || 'Sin grupo';
+      const owner = dimension === 'professors' ? subject.professorName || 'Sin profesor asignado' : dimension === 'careers' ? student.academicCodeDescription || student.academicCode || 'Sin carrera' : subject.group || 'Sin grupo';
       if (comparableName(owner) === target) addToGroup(subjects, subject.name || 'Materia sin nombre', student.id, subject);
     }
   }
   return finish(subjects);
 }
 
-export function otherGroupsAverage(students: Student[], dimension: 'professors' | 'groups', name: string, subjectName?: string): { average: number; count: number } | null {
+export function otherGroupsAverage(students: Student[], dimension: 'professors' | 'groups' | 'careers', name: string, subjectName?: string): { average: number; count: number } | null {
   const ownGroups = new Map<string, Set<string>>();
   const target = comparableName(name);
   const selectedSubject = subjectName ? comparableName(subjectName) : null;
   for (const student of students) for (const subject of student.subjects || []) {
     if (!subject.group?.trim()) continue;
-    const owner = dimension === 'professors' ? subject.professorName || 'Sin profesor asignado' : subject.group || 'Sin grupo';
+    const owner = dimension === 'professors' ? subject.professorName || 'Sin profesor asignado' : dimension === 'careers' ? student.academicCodeDescription || student.academicCode || 'Sin carrera' : subject.group || 'Sin grupo';
     const subjectKey = comparableName(subject.name);
     if (comparableName(owner) !== target || (selectedSubject && subjectKey !== selectedSubject)) continue;
     if (!ownGroups.has(subjectKey)) ownGroups.set(subjectKey, new Set());
@@ -96,4 +98,18 @@ export function otherGroupsAverage(students: Student[], dimension: 'professors' 
     if (score !== null) { sum += score; count++; }
   }
   return count ? { average: sum / count, count } : null;
+}
+
+export function careerClassmates(students: Student[], career: string, subjectName: string): { group: string; names: string[] }[] {
+  const matches = new Map<string, Set<string>>();
+  for (const student of students) {
+    if (comparableName(student.academicCodeDescription || student.academicCode || 'Sin carrera') !== comparableName(career)) continue;
+    for (const subject of student.subjects || []) {
+      if (comparableName(subject.name) !== comparableName(subjectName)) continue;
+      const group = subject.group?.trim() || 'Sin grupo';
+      if (!matches.has(group)) matches.set(group, new Set());
+      matches.get(group)!.add(student.name || student.id);
+    }
+  }
+  return [...matches].map(([group, names]) => ({ group, names: [...names].sort((a, b) => a.localeCompare(b, 'es')) }));
 }

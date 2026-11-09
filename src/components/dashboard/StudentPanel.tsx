@@ -1171,6 +1171,9 @@ export function StudentPanel() {
     loadStudentSubjects,
     professorContacts,
     weightingSchemes,
+    audience,
+    setFilterType,
+    setSelectedValue,
   } = useDashboardFilters();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -1374,17 +1377,11 @@ export function StudentPanel() {
       return {
         'Matrícula': student.id,
         'Nombre del Alumno': student.name,
-        'Líder': student.leader || '',
-        'Tutor': student.tutor || '',
-        'Grupos Regulares': regularGroups,
+        [audience === 'professional' ? 'Mentor' : 'Líder']: student.leader || '',
+        ...(audience === 'professional' ? { 'Código académico': student.academicCode || '', 'Tipo Plan': student.planType || '', 'Descripción de Código académico': student.academicCodeDescription || '' } : { 'Tutor': student.tutor || '', 'Grupos Regulares': regularGroups }),
         'Teléfono Alumno': contact?.studentPhone || '',
         'Correo Alumno': contact?.studentEmail || '',
-        'Nombre Papá': contact?.dadName || '',
-        'Teléfono Papá': contact?.dadPhone || '',
-        'Correo Papá': contact?.dadEmail || '',
-        'Nombre Mamá': contact?.momName || '',
-        'Teléfono Mamá': contact?.momPhone || '',
-        'Correo Mamá': contact?.momEmail || '',
+        ...(audience === 'prepa' ? { 'Nombre Papá': contact?.dadName || '', 'Teléfono Papá': contact?.dadPhone || '', 'Correo Papá': contact?.dadEmail || '', 'Nombre Mamá': contact?.momName || '', 'Teléfono Mamá': contact?.momPhone || '', 'Correo Mamá': contact?.momEmail || '' } : {}),
         'SEDENA': contact?.sedena || '',
         'Grupo Directorio': contact?.group || '',
         'ID Mentoría': contact?.mentoringId || '',
@@ -1522,7 +1519,7 @@ export function StudentPanel() {
 
   const handleExportStudentBase = () => {
     try {
-      const workbook = buildStudentBaseWorkbook(allStudents, studentContacts, studentLifeProfiles, teams);
+      const workbook = buildStudentBaseWorkbook(allStudents, studentContacts, studentLifeProfiles, teams, audience);
       XLSX.writeFile(workbook, 'Base_Alumnos_Sentinel.xlsx', { compression: true });
       toast({ title: 'Base de alumnos descargada', description: 'Incluye todos los alumnos cargados, sin aplicar filtros. Los campos no disponibles quedan vacíos.' });
     } catch {
@@ -1547,8 +1544,8 @@ export function StudentPanel() {
       return subjects.map(subject => ({
         'Matricula': student.id,
         'Nombre del Alumno': student.name,
-        'Lider': student.leader || '',
-        'Tutor': student.tutor || '',
+        [audience === 'professional' ? 'Mentor' : 'Lider']: student.leader || '',
+        ...(audience === 'professional' ? { 'Código académico': student.academicCode || '', 'Tipo Plan': student.planType || '', 'Descripción de Código académico': student.academicCodeDescription || '' } : { 'Tutor': student.tutor || '' }),
         'CRN': subject.id,
         'Clave Materia': subject.key,
         'Nombre de la Materia': subject.name,
@@ -1566,12 +1563,7 @@ export function StudentPanel() {
         'Fin': subject.schedule?.endTime || '',
         'Telefono Alumno': contact?.studentPhone || '',
         'Correo Alumno': contact?.studentEmail || '',
-        'Nombre Papa': contact?.dadName || '',
-        'Telefono Papa': contact?.dadPhone || '',
-        'Correo Papa': contact?.dadEmail || '',
-        'Nombre Mama': contact?.momName || '',
-        'Telefono Mama': contact?.momPhone || '',
-        'Correo Mama': contact?.momEmail || '',
+        ...(audience === 'prepa' ? { 'Nombre Papa': contact?.dadName || '', 'Telefono Papa': contact?.dadPhone || '', 'Correo Papa': contact?.dadEmail || '', 'Nombre Mama': contact?.momName || '', 'Telefono Mama': contact?.momPhone || '', 'Correo Mama': contact?.momEmail || '' } : {}),
         'SEDENA': contact?.sedena || '',
         'Grupo Directorio': contact?.group || '',
         'ID Mentoria': contact?.mentoringId || '',
@@ -1866,7 +1858,7 @@ export function StudentPanel() {
                     </Button>
                   )}
                   <Button variant="secondary" onClick={handleExportStudentBase} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4"><Download className="h-4 w-4" /> Descargar base de alumnos</Button>
-                  <WhatsAppTemplatesDialog />
+                  {audience === 'prepa' && <WhatsAppTemplatesDialog />}
                   {hasData && (
                     <Button variant="secondary" onClick={handleExportIntegratedMonitoring} size="sm" className="h-10 rounded-xl font-bold text-xs gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-4">
                       <Download className="h-4 w-4 text-primary" />
@@ -1914,6 +1906,7 @@ export function StudentPanel() {
               <div className="flex flex-wrap gap-3">{Object.entries(riskColors).map(([key, value]) => <span key={key} className="flex items-center gap-1"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: value.color }} />{value.label}</span>)}</div>
             </details>
           </div>
+           {audience === 'professional' && allStudents.some(student => !student.leader?.trim()) && <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"><span><strong>{allStudents.filter(student => !student.leader?.trim()).length} alumnos sin mentor asignado.</strong> Revisa la base principal o consulta sus materias mientras se asignan.</span><Button size="sm" variant="outline" onClick={() => { setFilterType('leader'); setSelectedValue('__unassigned__'); }}>Ver alumnos</Button></div>}
            {filteredStudents.length > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-xl border border-slate-200 shadow-sm sticky top-24 z-20 animate-in fade-in slide-in-from-top-4 duration-700">
                 <div className="flex items-center gap-6">

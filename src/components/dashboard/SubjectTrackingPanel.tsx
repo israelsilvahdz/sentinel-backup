@@ -135,7 +135,7 @@ function SubjectStudentItem({ student, subjectName, weightingSchemes, loadStuden
 
 
 export function SubjectTrackingPanel({ embedded = false }: { embedded?: boolean }) {
-  const { allStudents, allStudentsMap, leaders, weightingSchemes, isLoading, loadStudentSubjects, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
+  const { allStudents, allStudentsMap, leaders, audience, weightingSchemes, isLoading, loadStudentSubjects, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
   const [selectedLeader, setSelectedLeader] = useState<string | 'all'>('all');
   const [viewState, setViewState] = useState<ViewState>('subjects');
   const [selectedSubjectName, setSelectedSubjectName] = useState<string | null>(null);
@@ -387,10 +387,10 @@ export function SubjectTrackingPanel({ embedded = false }: { embedded?: boolean 
             <Select value={selectedLeader} onValueChange={setSelectedLeader}>
               <SelectTrigger id="leader-select" className="h-10 rounded-xl font-bold text-xs gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 max-w-[200px] shadow-none">
                 <Users className="h-4 w-4 text-primary" />
-                <SelectValue placeholder="Filtrar por Líder..." />
+                <SelectValue placeholder={audience === 'professional' ? 'Filtrar por mentor...' : 'Filtrar por líder...'} />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
-                <SelectItem value="all">Todos los Líderes</SelectItem>
+                <SelectItem value="all">{audience === 'professional' ? 'Todos los mentores' : 'Todos los líderes'}</SelectItem>
                 {leaders.map(leader => (
                   <SelectItem key={leader} value={leader}>{leader}</SelectItem>
                 ))}

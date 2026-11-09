@@ -52,6 +52,7 @@ firestore-debug.log
 /.deploy-stage/
 /.deploy-run-*/
 /.handoff-source-*/
+/.publish-git-*/
 /.handoff/
 
 # Datos y exportaciones locales: nunca subir al código.

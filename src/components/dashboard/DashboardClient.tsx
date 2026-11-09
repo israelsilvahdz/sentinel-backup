@@ -38,7 +38,7 @@ import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findOb
 import { xorCipher } from '@/lib/utils';
 
 
-export type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group';
+export type FilterType = 'leader' | 'tutor' | 'subject' | 'professor' | 'group' | 'career';
 export type CaseType = 'lost' | 'urgent' | 'observation' | 'extraordinary' | 'changes' | 'incompleteGrade' | 'newAbsences' | 'newMissedAssignments' | 'sd-absences' | 'sd-assignments' | 'at-limit-absences' | 'at-limit-assignments' | 'low-potential' | 'very-low-potential' | 'pot-70-75' | 'pot-76-80' | 'pot-81-85' | 'req-100' | 'req-90' | 'req-80' | 'req-70' | 'priority';
 export type SubjectRiskFilter = { subjectName: string; riskType: 'absences' | 'missedAssignments' };
 export type PlanType = 'semestral' | 'tetramestral';
@@ -102,6 +102,8 @@ interface DashboardContextType {
   isLoading: boolean;
   hasData: boolean;
   leaders: string[];
+  careers: string[];
+  audience: 'prepa' | 'professional';
   tutors: string[];
   subjects: string[];
   professors: string[];
@@ -232,7 +234,8 @@ export function DashboardClient() {
   const [entryOpen, setEntryOpen] = useState(false);
   const [baseLoading, setBaseLoading] = useState(false);
   const [storageError, setStorageError] = useState('');
-  const allStudents = useMemo(() => monitorStudents.map(student => ({ ...student, ...(base?.students[student.id] || {}) })), [monitorStudents, base]);
+  const allStudents = useMemo(() => monitorStudents.map(student => ({ ...student, ...(base?.students[student.id.trim().toUpperCase()] || {}) })), [monitorStudents, base]);
+  const audience = base?.audience || (Object.values(base?.students || {}).some(student => student.academicCode || student.academicCodeDescription) ? 'professional' : 'prepa');
   const [latestComparison, setLatestComparison] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
   const [studentLifeProfiles, setStudentLifeProfiles] = useState<Record<string, StudentLifeProfile>>({});
@@ -284,7 +287,7 @@ export function DashboardClient() {
           setTeams(saved.teams || []); setWeightingSchemes(saved.schemes || []); setPriorityCases(saved.priorityCases || {});
           setLatestComparison(saved.comparison || {});
           const info = monitoringInfo(saved.fileName || ''); if (info) setPlanType(info.plan);
-          setEntryOpen(!saved.base || !saved.students?.length || !info || info.dateKey !== todayKey());
+          setEntryOpen(!saved.base || !saved.students?.length || (!!info && info.dateKey !== todayKey()));
         } else {
           // Recover the previous local monitoring without consulting Firebase.
           const key = localStorage.getItem(LOCAL_STORAGE_KEYS.DATA_KEY);
@@ -355,14 +358,13 @@ export function DashboardClient() {
         setIsProcessing(true); setProgress(10);
         try {
             const info = monitoringInfo(currentFile.name);
-            if (!info) throw new Error('Nombre de monitoreo inválido. Ejemplo: MdeA al 23.09.2630.xlsx.');
             const newKey = await getHeaderKey(currentFile);
             setDataKey(newKey); setProgress(20);
             const studentData = await parseExcel(currentFile); setProgress(50);
             if (!studentData || !Object.keys(studentData).length) throw new Error('El archivo no contiene alumnos.');
             const processedStudents = buildProcessedStudents(studentData);
             setAllStudents(processedStudents); setCurrentFileName(currentFile.name);
-            setPlanType(info.plan);
+            if (info) setPlanType(info.plan);
             setProgress(90);
         } catch (error) { toast({ variant: 'destructive', title: 'No se reemplazó el monitoreo', description: error instanceof Error ? error.message : 'No se pudo leer el archivo.' }); } finally {
             setTimeout(() => { setIsProcessing(false); setProgress(0); setCurrentFile(null); }, 500);
@@ -388,7 +390,7 @@ export function DashboardClient() {
       try {
         const incomingInfo = monitoringInfo(mergeFile.name);
         const currentInfo = monitoringInfo(currentFileName || '');
-        if (!incomingInfo || !currentInfo || incomingInfo.dateKey !== currentInfo.dateKey || incomingInfo.period !== currentInfo.period) throw new Error('Solo puedes combinar monitoreos de la misma fecha y periodo.');
+        if (incomingInfo && currentInfo && (incomingInfo.dateKey !== currentInfo.dateKey || incomingInfo.period !== currentInfo.period)) throw new Error('Los monitoreos indican distintas fechas o periodos.');
         const incomingStudentData = await parseExcel(mergeFile);
         if (!incomingStudentData) {
           throw new Error('El reporte adicional no tiene el formato esperado.');
@@ -418,6 +420,7 @@ export function DashboardClient() {
   }, [mergeFile, allStudents.length, toast]);
 
   const leaders = useMemo(() => [...new Set(allStudents.map(s => s.leader).filter(Boolean))].sort(), [allStudents]);
+  const careers = useMemo(() => [...new Set(allStudents.map(s => s.academicCodeDescription || s.academicCode || '').filter(Boolean))].sort(), [allStudents]);
   const tutors = useMemo(() => [...new Set(allStudents.map(s => s.tutor).filter(Boolean))].sort(), [allStudents]);
   const subjects = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []).filter(Boolean))].sort(), [allStudents]);
   const professors = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjects?.map(sub => sub.professorName) || []).filter(Boolean))].sort(), [allStudents]);
@@ -427,7 +430,8 @@ export function DashboardClient() {
     if (contextualStudentIds) return allStudents.filter(s => contextualStudentIds.has(s.id));
     let students = allStudents;
     if (selectedValue) {
-        if (filterType === 'leader') students = students.filter(s => s.leader === selectedValue);
+        if (filterType === 'leader') students = students.filter(s => selectedValue === '__unassigned__' ? !s.leader?.trim() : s.leader === selectedValue);
+        if (filterType === 'career') students = students.filter(s => (s.academicCodeDescription || s.academicCode) === selectedValue);
         if (filterType === 'tutor') students = students.filter(s => s.tutor === selectedValue);
         if (filterType === 'professor') students = students.filter(s => s.subjects?.some(sub => sub.professorName === selectedValue));
         if (filterType === 'group') students = students.filter(s => s.subjectSummaries?.some(sub => sub.group === selectedValue));
@@ -484,7 +488,7 @@ export function DashboardClient() {
     filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, studentLifeProfiles, setStudentLifeProfiles, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, weightingSchemes, setWeightingSchemes, fetchWeightingSchemes,
     priorityCases, togglePriorityCase,
     isLoading: isLoading || isProcessing, hasData: allStudents.length > 0,
-    leaders, tutors, subjects, professors, groups, groupsForSubject: (sub) => [],
+    leaders, careers, audience, tutors, subjects, professors, groups, groupsForSubject: (sub) => [],
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
     groupId, setGroupId,
@@ -498,7 +502,7 @@ export function DashboardClient() {
     continuityStudents, setContinuityStudents,
     continuityCatalog, setContinuityCatalog, toast, syncContacts
   }), [
-    filteredStudents, allStudents, allStudentsMap, latestComparison, studentContacts, studentLifeProfiles, professorContacts, teams, teamTasks, weightingSchemes, priorityCases, isLoading, isProcessing, leaders, tutors, subjects, professors, groups, filterType, selectedValue, groupId, caseType, subjectRiskFilter, contextualStudentIds, activeView, planType, ofertaAcademica, continuityStudents, continuityCatalog, toast, syncContacts
+    filteredStudents, allStudents, allStudentsMap, latestComparison, studentContacts, studentLifeProfiles, professorContacts, teams, teamTasks, weightingSchemes, priorityCases, isLoading, isProcessing, leaders, careers, audience, tutors, subjects, professors, groups, filterType, selectedValue, groupId, caseType, subjectRiskFilter, contextualStudentIds, activeView, planType, ofertaAcademica, continuityStudents, continuityCatalog, toast, syncContacts
   ]);
 
   const renderActiveView = () => {
@@ -521,8 +525,8 @@ export function DashboardClient() {
         <Sidebar className="border-r border-[#dce6e2] bg-white">
           <SidebarHeader className="h-auto shrink-0 border-b border-[#edf1ee] bg-white">
              <div className="w-full min-w-0 px-4 py-4 group-data-[collapsible=icon]:px-1">
-                <img src="/tecmilenio-logo.png" alt="Prepa Tecmilenio" width={224} height={40} className="h-auto w-full object-contain group-data-[collapsible=icon]:hidden" />
-                <span className="hidden text-center text-lg font-black text-[#ff8834] group-data-[collapsible=icon]:block">P</span>
+                <img src={audience === 'professional' ? '/tecmilenio-profesional.png' : '/tecmilenio-logo.png'} alt={audience === 'professional' ? 'Tecmilenio Profesional' : 'Prepa Tecmilenio'} width={224} height={72} className="h-auto w-full object-contain group-data-[collapsible=icon]:hidden" />
+                {audience === 'professional' ? <span className="relative hidden h-10 w-10 overflow-hidden group-data-[collapsible=icon]:block"><img src="/tecmilenio-profesional.png" alt="Tecmilenio" className="absolute -left-2 -top-3 h-auto max-w-none" style={{ width: 224 }} /></span> : <span className="hidden text-center text-lg font-black text-[#ff8834] group-data-[collapsible=icon]:block">P</span>}
                 <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#00534c] group-data-[collapsible=icon]:hidden">Sentinel · Seguimiento académico</p>
              </div>
           </SidebarHeader>
@@ -568,7 +572,7 @@ export function DashboardClient() {
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{{welcome:'Inicio',dashboard:'Resumen académico','change-stats':'Análisis de cambios',students:'Panel de alumnos','academic-performance':'Desempeño y seguimiento','professor-schedule':'Horarios de profesores','weighting-schemes':'Gestor de ponderaciones',unclassified:'Materias sin clasificar'}[activeView]}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-                      <span>{reportInfo ? reportInfo.date + ' · Periodo ' + reportInfo.period : 'Carga tus archivos para comenzar'}</span>
+                      <span>{reportInfo ? reportInfo.date + ' · Periodo ' + reportInfo.period : currentFileName || 'Carga tus archivos para comenzar'}</span>
                       {reportInfo && reportInfo.dateKey !== todayKey() && <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800" title="Estás viendo el monitoreo de otro día.">Monitoreo de otro día</span>}
                     </div>
                   </div>
@@ -588,14 +592,15 @@ export function DashboardClient() {
                   </PopoverContent></Popover>
                 </div>
               </div>
-              {selectedValue && activeView !== 'welcome' && <div className="flex items-center gap-2 border-t border-slate-100 px-6 py-2 text-xs text-slate-600"><SlidersHorizontal className="h-3 w-3" /><span className="min-w-0 truncate">{selectedValue}{groupId ? ' · Grupo ' + groupId : ''}</span><Button variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={()=>{setSelectedValue(null);setGroupId(null);}}>Limpiar filtro</Button></div>}
+              {selectedValue && activeView !== 'welcome' && <div className="flex items-center gap-2 border-t border-slate-100 px-6 py-2 text-xs text-slate-600"><SlidersHorizontal className="h-3 w-3" /><span className="min-w-0 truncate">{selectedValue === '__unassigned__' ? 'Sin mentor asignado' : selectedValue}{groupId ? ' · Grupo ' + groupId : ''}</span><Button variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={()=>{setSelectedValue(null);setGroupId(null);}}>Limpiar filtro</Button></div>}
               {storageError && <p role="alert" className="border-t bg-red-50 px-6 py-2 text-xs text-red-700">{storageError}</p>}
             </header>
             <div className="flex-1 min-w-0 overflow-x-hidden bg-[#f5f7f4]">{hydrated ? renderActiveView() : <PanelLoading />}</div>
             <Dialog open={entryOpen} onOpenChange={setEntryOpen}><DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{base && monitorStudents.length ? 'Revisa la fecha de tu monitoreo' : 'Comienza con tus dos archivos'}</DialogTitle><DialogDescription>Carga la base principal y el monitoreo. Se guardan en este navegador para recuperarlos la próxima vez; solo vuelve a cargarlos cuando quieras actualizarlos.</DialogDescription></DialogHeader>
-              <div className="space-y-4"><div className="rounded-xl border p-4"><h3 className="font-semibold">1. Archivo base</h3><p className="mb-3 text-sm text-muted-foreground">Alumnos, correos de profesores y ponderaciones. Se ignora Listas (2).</p><p className="mb-2 text-xs">{base?.name || 'Sin archivo base'}</p><FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading} label="Cargar archivo base" variant="outline" /></div>
-              <div className="rounded-xl border p-4"><h3 className="font-semibold">2. Monitoreo de alumnos</h3><p className="mb-3 text-sm text-muted-foreground">Ejemplo: MdeA al 23.09.2630.xlsx = 23/09/2026, periodo 30.</p><p className="mb-2 text-xs">{currentFileName || 'Sin monitoreo'}</p><FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} label="Cargar monitoreo" variant="outline" /></div>
-              {monitorStudents.length > 0 && (!reportInfo || reportInfo.dateKey !== todayKey()) && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{reportInfo ? 'Estás viendo el monitoreo del ' + reportInfo.date + ', no el de hoy. Puedes continuar o cargar uno actualizado.' : 'No se pudo identificar la fecha del monitoreo guardado. Carga un archivo con la nomenclatura indicada.'}</p>}
+              <div className="space-y-4"><div className="rounded-xl border p-4"><h3 className="font-semibold">1. Archivo base</h3><p className="mb-3 text-sm text-muted-foreground">Alumnos y, si están disponibles, correos de profesores y ponderaciones. Se ignora Listas (2).</p><p className="mb-2 text-xs">{base?.name || 'Sin archivo base'}</p><FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading} label="Cargar archivo base" variant="outline" /></div>
+              <div className="rounded-xl border p-4"><h3 className="font-semibold">2. Monitoreo de alumnos</h3><p className="mb-3 text-sm text-muted-foreground">Puede tener cualquier nombre. El cruce con la base se hace por matrícula.</p><p className="mb-2 text-xs">{currentFileName || 'Sin monitoreo'}</p><FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} label="Cargar monitoreo" variant="outline" /></div>
+              {monitorStudents.length > 0 && reportInfo && reportInfo.dateKey !== todayKey() && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Estás viendo el monitoreo del {reportInfo.date}, no el de hoy. Puedes continuar o cargar uno actualizado.</p>}
+              {monitorStudents.length > 0 && !reportInfo && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">El nombre de este monitoreo no indica una fecha. Puedes usarlo normalmente; verifica la fecha dentro del archivo.</p>}
               {storageError && <p role="alert" className="text-sm text-red-700">{storageError}</p>}
               <Button className="w-full" onClick={()=>setEntryOpen(false)} disabled={!base || !monitorStudents.length}>Continuar con estos archivos</Button></div>
             </DialogContent></Dialog>

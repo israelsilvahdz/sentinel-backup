@@ -20,11 +20,11 @@ function Copy-ProjectFile([string]$relativePath) {
 
 # Lista explícita para evitar Excel, contactos, cachés, secretos e historial Git.
 @(
-  'package.json', 'package-lock.json', 'tsconfig.json', 'next.config.ts',
+  'package.json', 'package-lock.json', 'tsconfig.json', 'next.config.ts', 'tailwind.config.ts',
   'postcss.config.mjs', 'components.json', 'apphosting.yaml', '.firebaserc',
-  '.gitignore', 'README.md', 'public/tecmilenio-logo.png',
-  'docs/PROJECT_HANDOFF.md', 'tests/subject-risk.test.cjs',
-  'scripts/New-SentinelSource.ps1', 'scripts/Publish-Sentinel.ps1',
+  '.gitignore', 'README.md', 'public/tecmilenio-logo.png', 'public/tecmilenio-profesional.png',
+  'docs/PROJECT_HANDOFF.md', 'tests/subject-risk.test.cjs', 'tests/professional-import.test.cjs',
+  'scripts/New-SentinelSource.ps1', 'scripts/Publish-Sentinel.ps1', 'scripts/Publish-Via-GitHub.ps1',
   'scripts/Export-Sentinel.ps1'
 ) | ForEach-Object { Copy-ProjectFile $_ }
 
@@ -32,7 +32,7 @@ $sourceRoot = Join-Path $projectRoot 'src'
 Get-ChildItem -LiteralPath $sourceRoot -Recurse -File | Where-Object {
   $_.Extension.ToLowerInvariant() -in @('.ts', '.tsx', '.css', '.ico', '.md')
 } | ForEach-Object {
-  $relativePath = [System.IO.Path]::GetRelativePath($projectRoot, $_.FullName)
+  $relativePath = $_.FullName.Substring($projectRoot.Length + 1)
   Copy-ProjectFile $relativePath
 }
 

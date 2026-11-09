@@ -6,6 +6,7 @@ import { type Student, type Subject } from "@/types/student";
 import { getRisk, isWithoutRight } from '@/lib/dataProcessor';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
+import { useDashboardFilters } from './DashboardClient';
 
 
 interface StudentReportImageProps {
@@ -39,6 +40,7 @@ function ReportRisk({ label, value, limit }: { label: string; value: number; lim
 
 export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReportImageProps>(
   ({ student, subjects }, ref) => {
+    const { audience } = useDashboardFilters();
     
     // Read the imported columns directly: weighting schemes can omit or reorder them.
     const activityHeaders = Array.from(new Set(
@@ -54,7 +56,7 @@ export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReport
         <div className="flex justify-between items-start mb-8 border-b-2 border-slate-100 pb-6">
             <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                    <img src="/tecmilenio-logo.png" alt="Prepa Tecmilenio" width={224} height={40} className="h-10 w-56 object-contain" />
+                    <img src={audience === 'professional' ? '/tecmilenio-profesional.png' : '/tecmilenio-logo.png'} alt="Tecmilenio" width={224} height={40} className="h-10 w-56 object-contain" />
                     <div className="h-6 w-[2px] bg-slate-200"></div>
                     <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-none font-black text-[10px] uppercase tracking-[0.2em] px-3">Reporte de Desempeño</Badge>
                 </div>
@@ -62,7 +64,7 @@ export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReport
                 <div className="flex items-center gap-3 font-mono text-sm font-bold text-slate-400">
                     <span>MATRÍCULA: {student.id}</span>
                     <span className="h-1 w-1 rounded-full bg-slate-200"></span>
-                    <span>LÍDER: {student.leader}</span>
+                    <span>{audience === 'professional' ? 'MENTOR' : 'LÍDER'}: {student.leader || 'Sin asignar'}</span>
                 </div>
             </div>
             <div className="text-right">

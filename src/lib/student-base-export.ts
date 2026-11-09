@@ -2,11 +2,14 @@ import * as XLSX from 'xlsx';
 import type { Student, StudentContact, StudentLifeProfile, Team } from '@/types/student';
 import { institutionalStudentEmail } from './student-base-fields';
 
-export function buildStudentBaseWorkbook(students: Student[], contacts: Record<string, StudentContact>, profiles: Record<string, StudentLifeProfile>, teams: Team[]) {
+export function buildStudentBaseWorkbook(students: Student[], contacts: Record<string, StudentContact>, profiles: Record<string, StudentLifeProfile>, teams: Team[], audience: 'prepa' | 'professional' = 'prepa') {
   const byId = new Map(students.map(student => [student.id, student]));
   // Include directory-only students so the monitoring does not trim the master list.
   const ids = new Set([...byId.keys(), ...Object.keys(contacts), ...Object.keys(profiles)]);
-  const rows: (string | number)[][] = [[
+  const rows: (string | number)[][] = audience === 'professional' ? [[
+    'Matrícula', 'Nombre del alumno', 'Mentor', 'Código académico', 'Tipo Plan', 'Descripción de Código académico',
+    'Celular alumno', 'Correo alumno', 'Periodo de graduación', 'Materias pendientes',
+  ]] : [[
     'Matrícula', 'Nombre del alumno', 'Líder', 'Tutor',
     'Celular alumno', 'Correo alumno', 'Tel. Tutor', 'SEDENA',
     'Sociedad', 'Propósito de vida',
@@ -15,6 +18,10 @@ export function buildStudentBaseWorkbook(students: Student[], contacts: Record<s
   for (const id of ids) {
     const student = byId.get(id), contact = contacts[id], profile = profiles[id];
     const memberTeams = teams.filter(team => team.members?.some(member => member.id === id));
+    if (audience === 'professional') {
+      rows.push([id, contact?.name || student?.name || '', student?.leader || '', student?.academicCode || '', student?.planType || '', student?.academicCodeDescription || '', contact?.studentPhone || '', institutionalStudentEmail(id), student?.graduationPeriod || '', student?.pendingSubjects || '']);
+      continue;
+    }
     rows.push([
       id, contact?.name || student?.name || '', student?.leader || '', student?.tutor || '',
       contact?.studentPhone || '', institutionalStudentEmail(id),

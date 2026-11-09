@@ -12,13 +12,13 @@ const modules: {view: ActiveView; title: string; description: string}[] = [
 {view:'unclassified',title:'Materias sin clasificar',description:'Asigna esquemas a las materias pendientes.'},
 ];
 export function WelcomeDashboard() {
- const {setActiveView,allStudents}=useDashboardFilters();
+ const {setActiveView,allStudents,audience}=useDashboardFilters();
  const subjectCount = new Set(allStudents.flatMap(student => (student.subjectSummaries || []).map(subject => subject.name))).size;
  return <main className="mx-auto max-w-7xl space-y-7 p-5 md:p-8">
  <header className="relative overflow-hidden rounded-2xl border border-[#00483f] bg-[#00534c] text-white">
    <div className="grid lg:grid-cols-[1.5fr_1fr]">
      <div className="p-6 md:p-8">
-       <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/70"><span className="h-2 w-2 rounded-full bg-[#ff8834]" /> Prepa Tecmilenio · Sentinel</div>
+       <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/70"><span className="h-2 w-2 rounded-full bg-[#ff8834]" /> {audience === 'professional' ? 'Tecmilenio Profesional' : 'Prepa Tecmilenio'} · Sentinel</div>
        <h1 className="max-w-xl text-3xl font-semibold leading-tight tracking-tight text-white md:text-4xl">Tu día, en perspectiva.</h1>
        <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/75">Consulta el desempeño, identifica riesgos y registra el seguimiento de tus alumnos.</p>
        <Button onClick={()=>setActiveView('dashboard')} className="mt-6 h-10 rounded-lg bg-white px-5 text-primary hover:bg-white/90">Ver resumen académico <ArrowUpRight className="ml-3 h-4 w-4" /></Button>

@@ -50,7 +50,7 @@ function normalizeStudentIdFromSurveyValue(value: string): string {
 const COL_SYNONYMS = {
     STUDENT_ID: ['MATRICULA', 'ID', 'ALUMNO'],
     STUDENT_NAME: ['NOMBRE DEL ALUMNO', 'NOMBRE ALUMNO', 'NAME'],
-    LEADER: ['LIDER'],
+    LEADER: ['MENTOR', 'LIDER'],
     TUTOR: ['TUTOR'],
     IS_GRAD: ['CAG'],
     CRN: ['CRN'],
@@ -107,7 +107,7 @@ export async function parseExcel(file: File): Promise<StudentData | null> {
                     return v ? String(v).trim() : '';
                 };
 
-                const studentId = getVal(COL_SYNONYMS.STUDENT_ID);
+                const studentId = getVal(COL_SYNONYMS.STUDENT_ID).toUpperCase();
                 if (!studentId) continue;
 
                 if (!studentData[studentId]) {

@@ -43,6 +43,9 @@ export interface Student {
   isGraduationCandidate: boolean;
   graduationPeriod?: string;
   pendingSubjects?: string;
+  academicCode?: string;
+  planType?: string;
+  academicCodeDescription?: string;
   subjects?: Subject[]; // Full subjects, loaded on demand
   subjectSummaries?: SubjectSummary[]; // Summaries for dashboard performance
   sport?: string; // e.g., 'FUTBOL', 'DEBATE'

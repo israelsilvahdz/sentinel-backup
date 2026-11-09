@@ -5,7 +5,7 @@ $stage = Join-Path $projectRoot ('.deploy-run-' + [guid]::NewGuid().ToString('N'
 try {
   Push-Location $projectRoot
   try {
-    & npm run typecheck
+    & node (Join-Path $projectRoot 'node_modules/typescript/bin/tsc') --noEmit
     if ($LASTEXITCODE -ne 0) { throw 'La comprobación de tipos falló. No se publicará.' }
     & (Join-Path $PSScriptRoot 'New-SentinelSource.ps1') -Destination $stage | Out-Null
   } finally { Pop-Location }
