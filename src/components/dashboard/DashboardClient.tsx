@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import * as XLSX from 'xlsx';
 import { readPrincipalBase, mergeMonitoringStudent, type PrincipalBase } from '@/lib/principal-base';
@@ -107,8 +107,8 @@ interface DashboardContextType {
   leaders: string[];
   careers: string[];
   audience: 'prepa' | 'professional';
-  scopeType: 'leader' | 'tutor';
-  setScopeType: (type: 'leader' | 'tutor') => void;
+  scopeType: 'all' | 'leader' | 'tutor';
+  setScopeType: (type: 'all' | 'leader' | 'tutor') => void;
   scopeValue: string | null;
   setScopeValue: (value: string | null) => void;
   tutors: string[];
@@ -264,8 +264,11 @@ export function DashboardClient() {
   const [isMerging, setIsMerging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [filterType, setFilterType] = useState<FilterType>('leader');
-  const [scopeType, setScopeType] = useState<'leader' | 'tutor'>('leader');
+  const [scopeType, setScopeType] = useState<'all' | 'leader' | 'tutor'>('all');
   const [scopeValue, setScopeValue] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState(false);
+  const sidebarHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
@@ -295,7 +298,7 @@ export function DashboardClient() {
           setStudentContacts(saved.contacts || {}); setStudentLifeProfiles(saved.profiles || {}); setProfessorContacts(saved.professors || {});
           setTeams(saved.teams || []); setWeightingSchemes(saved.schemes || []); setPriorityCases(saved.priorityCases || {});
           setLatestComparison(saved.comparison || {});
-          setScopeType(saved.scopeType === 'tutor' ? 'tutor' : 'leader'); setScopeValue(saved.scopeValue || null);
+          setScopeType(saved.scopeType === 'tutor' ? 'tutor' : saved.scopeType === 'leader' ? 'leader' : 'all'); setScopeValue(saved.scopeValue || null);
           const info = monitoringInfo(saved.fileName || ''); if (info) setPlanType(info.plan);
           setEntryOpen(!saved.base || !saved.students?.length || (!!info && info.dateKey !== todayKey()));
         } else {
@@ -436,7 +439,7 @@ export function DashboardClient() {
   const subjects = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []).filter(Boolean))].sort(), [allStudents]);
   const professors = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjects?.map(sub => sub.professorName) || []).filter(Boolean))].sort(), [allStudents]);
   const groups = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.group) || []).filter(Boolean))].sort(), [allStudents]);
-  const scopedStudents = useMemo(() => !scopeValue ? allStudents : allStudents.filter(student => (scopeType === 'tutor' ? student.tutor : student.leader) === scopeValue), [allStudents, scopeType, scopeValue]);
+  const scopedStudents = useMemo(() => scopeType === 'all' || !scopeValue ? allStudents : allStudents.filter(student => (scopeType === 'tutor' ? student.tutor : student.leader) === scopeValue), [allStudents, scopeType, scopeValue]);
 
   const filteredStudents = useMemo(() => {
     if (contextualStudentIds) return scopedStudents.filter(s => contextualStudentIds.has(s.id));
@@ -534,8 +537,8 @@ export function DashboardClient() {
 
   return (
     <DashboardContext.Provider value={contextValue}>
-      <SidebarProvider defaultOpen={true} style={{ '--sidebar-width': '17.5rem' } as React.CSSProperties}>
-        <Sidebar className="border-r border-[#dce6e2] bg-white">
+      <SidebarProvider open={sidebarOpen} onOpenChange={(open) => { setSidebarPinned(open); setSidebarOpen(open); }} style={{ '--sidebar-width': '17.5rem' } as React.CSSProperties}>
+        <Sidebar className="border-r border-[#dce6e2] bg-white" onMouseEnter={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); if (!sidebarPinned) sidebarHoverTimer.current = setTimeout(() => setSidebarOpen(true), 160); }} onMouseLeave={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); if (!sidebarPinned) sidebarHoverTimer.current = setTimeout(() => setSidebarOpen(false), 180); }}>
           <SidebarHeader className="h-auto shrink-0 border-b border-[#edf1ee] bg-white">
              <div className="w-full min-w-0 px-4 py-4 group-data-[collapsible=icon]:px-1">
                 <img src={audience === 'professional' ? '/tecmilenio-profesional.png' : '/tecmilenio-logo.png'} alt={audience === 'professional' ? 'Tecmilenio Profesional' : 'Prepa Tecmilenio'} width={224} height={72} className="h-auto w-full object-contain group-data-[collapsible=icon]:hidden" />
@@ -578,7 +581,7 @@ export function DashboardClient() {
           </SidebarContent>
           <SidebarFooter className="border-t border-emerald-100 bg-emerald-50/60 p-2 group-data-[collapsible=icon]:p-1">
             <SidebarTrigger title="Contraer o expandir menú" aria-label="Contraer o expandir menú" className="h-10 w-full justify-start gap-2 rounded-xl px-3 text-emerald-900 hover:bg-emerald-100 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" />
-            <p className="px-3 pb-1 text-xs font-medium text-emerald-900 group-data-[collapsible=icon]:hidden">Contraer menú · Ctrl+B</p>
+            <button type="button" onClick={() => { if (sidebarHoverTimer.current) clearTimeout(sidebarHoverTimer.current); setSidebarPinned(!sidebarPinned); setSidebarOpen(!sidebarPinned); }} className="rounded-lg px-3 pb-1 text-left text-xs font-medium text-emerald-900 hover:text-emerald-700 group-data-[collapsible=icon]:hidden">{sidebarPinned ? 'Soltar menú' : 'Fijar menú abierto'} · Ctrl+B</button>
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
@@ -595,7 +598,7 @@ export function DashboardClient() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 max-w-48 gap-2 rounded-lg border-emerald-200 bg-emerald-50 px-3 text-emerald-900 shadow-none hover:bg-emerald-100"><Users className="h-4 w-4 shrink-0" /><span className="truncate">{scopeValue || (audience === 'professional' ? 'Todos los mentores' : scopeType === 'tutor' ? 'Todos los tutores' : 'Todos los líderes')}</span></Button></PopoverTrigger><PopoverContent align="end" className="w-72 rounded-xl p-4"><p className="mb-3 text-sm font-semibold text-emerald-950">Vista de acompañamiento</p><ScopeSwitcher compact /><p className="mt-3 text-xs text-slate-500">Esta selección se aplica al resumen, las carreras y el panel de alumnos.</p></PopoverContent></Popover>}
+                  {allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 max-w-48 gap-2 rounded-lg border-emerald-200 bg-emerald-50 px-3 text-emerald-900 shadow-none hover:bg-emerald-100"><Users className="h-4 w-4 shrink-0" /><span className="truncate">{scopeType === 'all' ? 'Vista general' : scopeValue || (audience === 'professional' ? 'Todos los mentores' : scopeType === 'tutor' ? 'Todos los tutores' : 'Todos los líderes')}</span></Button></PopoverTrigger><PopoverContent align="end" className="w-72 rounded-xl p-4"><p className="mb-3 text-sm font-semibold text-emerald-950">Vista de acompañamiento</p><ScopeSwitcher compact /><p className="mt-3 text-xs text-slate-500">Esta selección se aplica al resumen, las carreras y el panel de alumnos.</p></PopoverContent></Popover>}
                   <FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading || !hydrated} label="Cargar archivo base" variant="outline" className="h-9 min-w-0 rounded-lg border-slate-200 px-3 text-xs shadow-none" />
                   <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing || !hydrated} label="Cargar monitoreo" icon={<FileClock className="mr-2 h-4 w-4" />} className="h-9 min-w-0 rounded-lg bg-primary px-3 text-xs text-white shadow-none hover:bg-primary/90" />
                   {activeView !== 'welcome' && allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-slate-200 shadow-none"><SlidersHorizontal className="h-4 w-4" />Filtros{selectedValue && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}</Button></PopoverTrigger><PopoverContent align="end" className="w-[min(92vw,600px)] rounded-xl p-4"><p className="mb-3 text-sm font-semibold">Filtrar alumnos</p><DashboardFilters /></PopoverContent></Popover>}

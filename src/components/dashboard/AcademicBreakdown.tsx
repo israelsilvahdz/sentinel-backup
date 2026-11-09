@@ -82,7 +82,8 @@ export function AcademicBreakdown() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-xl border bg-slate-50 p-1" role="group" aria-label="Desglose académico">
             <Button size="sm" variant={view === 'professors' ? 'default' : 'ghost'} onClick={() => setView('professors')}><GraduationCap className="mr-1.5 h-4 w-4" />Maestros</Button>
-            <Button size="sm" variant={view === (audience === 'professional' ? 'careers' : 'groups') ? 'default' : 'ghost'} onClick={() => setView(audience === 'professional' ? 'careers' : 'groups')}><Users className="mr-1.5 h-4 w-4" />{audience === 'professional' ? 'Carreras' : 'Grupos'}</Button>
+            <Button size="sm" variant={view === 'groups' ? 'default' : 'ghost'} onClick={() => setView('groups')}><Users className="mr-1.5 h-4 w-4" />Grupos</Button>
+            {audience === 'professional' && <Button size="sm" variant={view === 'careers' ? 'default' : 'ghost'} onClick={() => setView('careers')}><GraduationCap className="mr-1.5 h-4 w-4" />Carreras</Button>}
           </div>
           <label className="relative min-w-48 flex-1 sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><span className="sr-only">Buscar {view === 'professors' ? 'maestro' : view === 'careers' ? 'carrera' : 'grupo'}</span><Input className="pl-9" value={query} onChange={event => setQuery(event.target.value)} placeholder={view === 'professors' ? 'Buscar maestro' : view === 'careers' ? 'Buscar carrera' : 'Buscar grupo'} /></label>
           <label className="text-sm text-slate-600">Ordenar <select value={sort} onChange={event => setSort(event.target.value as typeof sort)} className="ml-1 rounded-lg border bg-white px-2 py-2"><option value="name">Nombre</option><option value="average">Promedio</option><option value="sc">Más SC</option></select></label>
