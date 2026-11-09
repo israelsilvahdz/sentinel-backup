@@ -28,7 +28,7 @@ import { DashboardFilters } from './DashboardFilters';
 import { ScopeSwitcher } from './ScopeSwitcher';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { Button } from '@/components/ui/button';
-import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks, GraduationCap, BookText, FileQuestion, Flag, CloudDownload, Link2, Gavel } from 'lucide-react';
+import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks, GraduationCap, BookText, FileQuestion, Flag, CloudDownload, Link2, Gavel, BookOpenCheck } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
@@ -55,6 +55,7 @@ const VALID_VIEWS: ActiveView[] = [
   'change-stats',
   'professor-schedule',
   'academic-performance',
+  'kardex-progress',
 ];
 
 function PanelLoading() {
@@ -75,6 +76,7 @@ const PonderacionesDashboard = dynamic(() => import('./PonderacionesDashboard').
 const UnclassifiedSubjectsPanel = dynamic(() => import('./UnclassifiedSubjectsPanel').then((mod) => mod.UnclassifiedSubjectsPanel), { loading: () => <PanelLoading /> });
 const ProfessorSchedulePanel = dynamic(() => import('./ProfessorSchedulePanel').then((mod) => mod.ProfessorSchedulePanel), { loading: () => <PanelLoading /> });
 const AcademicPerformancePanel = dynamic(() => import('./AcademicPerformancePanel').then((mod) => mod.AcademicPerformancePanel), { loading: () => <PanelLoading /> });
+const KardexProgressPanel = dynamic(() => import('./KardexProgressPanel').then((mod) => mod.KardexProgressPanel), { loading: () => <PanelLoading /> });
 
 const PERSISTENCE_KEY = "sentinel_v2026_secure";
 
@@ -531,6 +533,7 @@ export function DashboardClient() {
         case 'unclassified': return <UnclassifiedSubjectsPanel />;
         case 'professor-schedule': return <ProfessorSchedulePanel />;
         case 'academic-performance': return <AcademicPerformancePanel />;
+        case 'kardex-progress': return <KardexProgressPanel />;
         default: return <WelcomeDashboard />;
     }
   }
@@ -566,6 +569,9 @@ export function DashboardClient() {
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Desempeño y seguimiento" isActive={activeView === 'academic-performance'} onClick={() => handleSetActiveView('academic-performance')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><BarChart3 /><span className="font-bold whitespace-normal leading-snug text-[13px]">Desempeño y seguimiento</span></SidebarMenuButton>
                 </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Avance del Kárdex" isActive={activeView === 'kardex-progress'} onClick={() => handleSetActiveView('kardex-progress')} className="min-h-11 h-auto rounded-lg px-3 py-2 text-emerald-100/90 data-[active=true]:text-white"><BookOpenCheck /><span className="text-[13px] font-semibold">Avance del Kárdex</span></SidebarMenuButton>
+                </SidebarMenuItem>
                 <div className="mb-2 mt-6 border-t border-white/10 px-3 pt-5 group-data-[collapsible=icon]:hidden"><p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-200/65">Planeación y gestión</p></div>
                 <SidebarMenuItem>
                    <SidebarMenuButton tooltip="Horarios de Profesores" isActive={activeView === 'professor-schedule'} onClick={() => handleSetActiveView('professor-schedule')} className="min-h-11 h-auto py-2 px-3 text-[#52645f] hover:bg-[#f1f6f3] hover:text-[#00534c] rounded-lg data-[active=true]:bg-[#00534c] data-[active=true]:text-white data-[active=true]:shadow-sm"><Contact /><span className="font-bold">Horarios de Profesores</span></SidebarMenuButton>
@@ -585,12 +591,12 @@ export function DashboardClient() {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-            <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
-              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+            <header className="sentinel-glass-header sticky top-3 z-20 mx-3 mt-3 overflow-visible rounded-2xl border border-white/80 bg-white/80 shadow-[0_16px_45px_-28px_rgba(0,64,55,.44)] backdrop-blur-2xl md:mx-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 md:px-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <SidebarTrigger title="Contraer o expandir menú" aria-label="Contraer o expandir menú" className="rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100" />
+                  <SidebarTrigger title="Contraer o expandir menú" aria-label="Contraer o expandir menú" className="sentinel-glass-button h-9 w-9 rounded-xl text-emerald-900" />
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{{welcome:'Inicio',dashboard:'Resumen académico','change-stats':'Análisis de cambios',students:'Panel de alumnos','academic-performance':'Desempeño y seguimiento','professor-schedule':'Horarios de profesores','weighting-schemes':'Gestor de ponderaciones',unclassified:'Materias sin clasificar'}[activeView]}</p>
+                    <p className="text-sm font-semibold text-emerald-950">{{welcome:'Inicio',dashboard:'Resumen académico','change-stats':'Análisis de cambios',students:'Panel de alumnos','academic-performance':'Desempeño y seguimiento','kardex-progress':'Avance del Kárdex','professor-schedule':'Horarios de profesores','weighting-schemes':'Gestor de ponderaciones',unclassified:'Materias sin clasificar'}[activeView]}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                       <span>{reportInfo ? reportInfo.date + ' · Periodo ' + reportInfo.period : currentFileName || 'Carga tus archivos para comenzar'}</span>
                       {reportInfo && reportInfo.dateKey !== todayKey() && <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800" title="Estás viendo el monitoreo de otro día.">Monitoreo de otro día</span>}
@@ -598,33 +604,34 @@ export function DashboardClient() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 max-w-48 gap-2 rounded-lg border-emerald-200 bg-emerald-50 px-3 text-emerald-900 shadow-none hover:bg-emerald-100"><Users className="h-4 w-4 shrink-0" /><span className="truncate">{scopeType === 'all' ? 'Vista general' : scopeValue || (audience === 'professional' ? 'Todos los mentores' : scopeType === 'tutor' ? 'Todos los tutores' : 'Todos los líderes')}</span></Button></PopoverTrigger><PopoverContent align="end" className="w-72 rounded-xl p-4"><p className="mb-3 text-sm font-semibold text-emerald-950">Vista de acompañamiento</p><ScopeSwitcher compact /><p className="mt-3 text-xs text-slate-500">Esta selección se aplica al resumen, las carreras y el panel de alumnos.</p></PopoverContent></Popover>}
-                  <FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading || !hydrated} label="Cargar archivo base" variant="outline" className="h-9 min-w-0 rounded-lg border-slate-200 px-3 text-xs shadow-none" />
-                  <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing || !hydrated} label="Cargar monitoreo" icon={<FileClock className="mr-2 h-4 w-4" />} className="h-9 min-w-0 rounded-lg bg-primary px-3 text-xs text-white shadow-none hover:bg-primary/90" />
-                  {activeView !== 'welcome' && allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-slate-200 shadow-none"><SlidersHorizontal className="h-4 w-4" />Filtros{selectedValue && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}</Button></PopoverTrigger><PopoverContent align="end" className="w-[min(92vw,600px)] rounded-xl p-4"><p className="mb-3 text-sm font-semibold">Filtrar alumnos</p><DashboardFilters /></PopoverContent></Popover>}
-                  <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-slate-500" aria-label="Archivos y opciones"><MoreHorizontal className="h-5 w-5" /></Button></PopoverTrigger><PopoverContent align="end" className="w-80 max-w-[90vw] rounded-xl p-4">
+                  {allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="sentinel-glass-button h-9 max-w-48 gap-2 rounded-xl px-3 text-emerald-900"><Users className="h-4 w-4 shrink-0" /><span className="truncate">{scopeType === 'all' ? 'Vista general' : scopeValue || (audience === 'professional' ? 'Todos los mentores' : scopeType === 'tutor' ? 'Todos los tutores' : 'Todos los líderes')}</span></Button></PopoverTrigger><PopoverContent align="end" className="w-72 rounded-xl p-4"><p className="mb-3 text-sm font-semibold text-emerald-950">Vista de acompañamiento</p><ScopeSwitcher compact /><p className="mt-3 text-xs text-slate-500">Esta selección se aplica al resumen, las carreras y el panel de alumnos.</p></PopoverContent></Popover>}
+                  <FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading || !hydrated} label="Cargar archivo base" variant="outline" className="sentinel-glass-button h-9 min-w-0 rounded-xl px-3 text-xs text-emerald-900" />
+                  <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing || !hydrated} label="Cargar monitoreo" icon={<FileClock className="mr-2 h-4 w-4" />} className="h-9 min-w-0 rounded-xl border border-emerald-600 bg-emerald-800 px-3 text-xs text-white shadow-[0_8px_20px_-12px_rgba(0,67,52,.8)] hover:bg-emerald-700" />
+                  {activeView !== 'welcome' && activeView !== 'kardex-progress' && allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="sentinel-glass-button h-9 gap-2 rounded-xl px-3 text-emerald-900"><SlidersHorizontal className="h-4 w-4" />Filtros{selectedValue && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}</Button></PopoverTrigger><PopoverContent align="end" className="w-[min(92vw,600px)] rounded-xl p-4"><p className="mb-3 text-sm font-semibold">Filtrar alumnos</p><DashboardFilters /></PopoverContent></Popover>}
+                  <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="sentinel-glass-button h-9 w-9 rounded-xl text-emerald-800" aria-label="Archivos y opciones"><MoreHorizontal className="h-5 w-5" /></Button></PopoverTrigger><PopoverContent align="end" className="w-80 max-w-[90vw] rounded-xl p-4">
                     <p className="text-sm font-semibold text-slate-900">Archivos de trabajo</p>
                     <div className="my-4 space-y-3 text-xs"><div><p className="mb-1 flex items-center gap-1.5 font-medium text-slate-500">{base && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}Archivo base</p><p className="break-words text-slate-800">{base?.name || 'Pendiente de cargar'}</p></div><div><p className="mb-1 flex items-center gap-1.5 font-medium text-slate-500">{monitorStudents.length > 0 && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}Monitoreo</p><p className="break-words text-slate-800">{currentFileName || 'Pendiente de cargar'}</p></div></div>
                     <div className="space-y-1 border-t pt-3">
                       {allStudents.length > 0 && <FileUpload onFileSelect={handleMergeFileUpload} selectedFile={mergeFile} isLoading={isMerging} label="Combinar monitoreo" variant="ghost" icon={<Link2 className="mr-2 h-4 w-4" />} className="h-9 w-full min-w-0 justify-start px-2 text-xs" />}
                       <Button variant="ghost" className="h-9 w-full justify-start px-2 text-xs" onClick={() => window.location.reload()}><RefreshCw className="mr-2 h-4 w-4" />Recargar página</Button>
-                      <Button variant="ghost" className="h-9 w-full justify-start px-2 text-xs text-destructive hover:text-destructive" onClick={async () => { if (!window.confirm('¿Eliminar la base y el monitoreo guardados en este navegador? Los Excel originales no se borran.')) return; await localWorkspace('workspace', {version: 1}); await localWorkspace('notices', []); Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key)); window.location.reload(); }}><Trash2 className="mr-2 h-4 w-4" />Eliminar archivos guardados</Button>
+                      <Button variant="ghost" className="h-9 w-full justify-start px-2 text-xs text-destructive hover:text-destructive" onClick={async () => { if (!window.confirm('¿Eliminar la base, el monitoreo y el Kárdex guardados en este navegador? Los Excel originales no se borran.')) return; await localWorkspace('workspace', {version: 1}); await localWorkspace('notices', []); await localWorkspace('kardex-progress', {name: '', students: []}); Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key)); window.location.reload(); }}><Trash2 className="mr-2 h-4 w-4" />Eliminar archivos guardados</Button>
                     </div>
                   </PopoverContent></Popover>
                 </div>
               </div>
-              {selectedValue && activeView !== 'welcome' && <div className="flex items-center gap-2 border-t border-slate-100 px-6 py-2 text-xs text-slate-600"><SlidersHorizontal className="h-3 w-3" /><span className="min-w-0 truncate">{selectedValue === '__unassigned__' ? 'Sin mentor asignado' : selectedValue}{groupId ? ' · Grupo ' + groupId : ''}</span><Button variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={()=>{setSelectedValue(null);setGroupId(null);}}>Limpiar filtro</Button></div>}
+              {selectedValue && activeView !== 'welcome' && activeView !== 'kardex-progress' && <div className="flex items-center gap-2 border-t border-emerald-100 px-4 py-2 text-xs text-emerald-900"><SlidersHorizontal className="h-3 w-3" /><span className="min-w-0 truncate">{selectedValue === '__unassigned__' ? 'Sin mentor asignado' : selectedValue}{groupId ? ' · Grupo ' + groupId : ''}</span><Button variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={()=>{setSelectedValue(null);setGroupId(null);}}>Limpiar filtro</Button></div>}
               {storageError && <p role="alert" className="border-t bg-red-50 px-6 py-2 text-xs text-red-700">{storageError}</p>}
               {audience === 'professional' && base && base.schemaVersion !== 2 && <p role="alert" className="border-t border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-900">Vuelve a cargar el archivo base para actualizar las carreras y asignaciones del monitoreo guardado.</p>}
             </header>
-            <div className="flex-1 min-w-0 overflow-x-hidden bg-[#f5f7f4]">{hydrated ? renderActiveView() : <PanelLoading />}</div>
+            <div className="sentinel-main min-w-0 flex-1 overflow-x-hidden">{hydrated ? renderActiveView() : <PanelLoading />}</div>
             <Dialog open={entryOpen} onOpenChange={setEntryOpen}><DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{base && monitorStudents.length ? 'Revisa la fecha de tu monitoreo' : 'Comienza con tus dos archivos'}</DialogTitle><DialogDescription>Carga la base principal y el monitoreo. Se guardan en este navegador para recuperarlos la próxima vez; solo vuelve a cargarlos cuando quieras actualizarlos.</DialogDescription></DialogHeader>
               <div className="space-y-4"><div className="rounded-xl border p-4"><h3 className="font-semibold">1. Archivo base</h3><p className="mb-3 text-sm text-muted-foreground">Alumnos y, si están disponibles, correos de profesores y ponderaciones. Se ignora Listas (2).</p><p className="mb-2 text-xs">{base?.name || 'Sin archivo base'}</p><FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading} label="Cargar archivo base" variant="outline" /></div>
               <div className="rounded-xl border p-4"><h3 className="font-semibold">2. Monitoreo de alumnos</h3><p className="mb-3 text-sm text-muted-foreground">Puede tener cualquier nombre. El cruce con la base se hace por matrícula.</p><p className="mb-2 text-xs">{currentFileName || 'Sin monitoreo'}</p><FileUpload onFileSelect={handleFileUpload} selectedFile={null} isLoading={isProcessing} label="Cargar monitoreo" variant="outline" /></div>
               {monitorStudents.length > 0 && reportInfo && reportInfo.dateKey !== todayKey() && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Estás viendo el monitoreo del {reportInfo.date}, no el de hoy. Puedes continuar o cargar uno actualizado.</p>}
               {monitorStudents.length > 0 && !reportInfo && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">El nombre de este monitoreo no indica una fecha. Puedes usarlo normalmente; verifica la fecha dentro del archivo.</p>}
               {storageError && <p role="alert" className="text-sm text-red-700">{storageError}</p>}
-              <Button className="w-full" onClick={()=>setEntryOpen(false)} disabled={!base || !monitorStudents.length}>Continuar con estos archivos</Button></div>
+              <Button className="w-full" onClick={()=>setEntryOpen(false)} disabled={!base || !monitorStudents.length}>Continuar con estos archivos</Button>
+              <Button variant="outline" className="w-full" onClick={() => { setActiveView('kardex-progress'); setEntryOpen(false); }}>Explorar prototipo de Kárdex</Button></div>
             </DialogContent></Dialog>
         </SidebarInset>
       </SidebarProvider>

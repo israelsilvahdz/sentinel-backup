@@ -23,7 +23,7 @@ function Copy-ProjectFile([string]$relativePath) {
   'package.json', 'package-lock.json', 'tsconfig.json', 'next.config.ts', 'tailwind.config.ts',
   'postcss.config.mjs', 'components.json', 'apphosting.yaml', '.firebaserc',
   '.gitignore', 'README.md', 'public/tecmilenio-logo.png', 'public/tecmilenio-profesional.png',
-  'docs/PROJECT_HANDOFF.md', 'tests/subject-risk.test.cjs', 'tests/professional-import.test.cjs',
+  'docs/PROJECT_HANDOFF.md', 'tests/subject-risk.test.cjs', 'tests/professional-import.test.cjs', 'tests/kardex-progress.test.cjs',
   'scripts/New-SentinelSource.ps1', 'scripts/Publish-Sentinel.ps1', 'scripts/Publish-Via-GitHub.ps1',
   'scripts/Export-Sentinel.ps1'
 ) | ForEach-Object { Copy-ProjectFile $_ }
