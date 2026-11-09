@@ -8,17 +8,18 @@ const source = fs.readFileSync(require.resolve('../src/lib/kardex-progress.ts'),
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const moduleUnderTest = { exports: {} };
 new Function('require', 'exports', 'module', compiled)(require, moduleUnderTest.exports, moduleUnderTest);
-const { readKardexWorkbook, kardexSummary, kardexSemester, englishSlots, expectedPlanCourses } = moduleUnderTest.exports;
+const { readKardexWorkbook, kardexSummary, kardexSemester, expectedPlanCourses } = moduleUnderTest.exports;
 
-test('documented plans preserve their own semester boundaries and manual English slots', () => {
+test('documented plans produce eight semester columns', () => {
   assert.equal(kardexSemester('IMT_S18', 21), 4);
   assert.equal(kardexSemester('IIN_S18', 21), 4);
   assert.equal(kardexSemester('LEM_S18', 21), 3);
   assert.equal(kardexSemester('LAE_S18', 35), 6);
-  assert.equal(kardexSemester('LAE_S18', 40), null);
+  assert.equal(kardexSemester('LAE_S18', 40), 6);
+  assert.equal(kardexSemester('LAE_S18', 41), 7);
+  assert.equal(kardexSemester('LAE_S18', 50), 8);
+  assert.equal(kardexSemester('LCI_S18', 49), 8);
   assert.equal(kardexSemester('OTHER', 21), null);
-  assert.deepEqual(englishSlots('IMT_S18').map(slot => slot.order), [7, 13, 20]);
-  assert.deepEqual(englishSlots('LEM_S18').map(slot => slot.order), [7, 14, 21]);
   assert.equal(expectedPlanCourses('LAE_S18'), 50);
   assert.equal(expectedPlanCourses('OTHER'), null);
 });

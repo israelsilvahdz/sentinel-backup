@@ -32,8 +32,10 @@ const semesterEnds: Record<string, number[]> = {
   IMT_S18: [7, 14, 20, 26, 33, 40, 42, 48],
   IIN_S18: [7, 13, 20, 26, 32, 39, 41, 48],
   LEM_S18: [7, 14, 21, 27, 34, 40, 43, 49],
-  LAE_S18: [7, 14, 21, 27, 34, 39],
-  LCI_S18: [7, 14, 21, 27, 34, 39],
+  // Los ejemplos muestran los primeros seis; el cierre de 7 y 8 se toma
+  // de la secuencia de órdenes del plan masivo y se debe validar con un PDF completo.
+  LAE_S18: [7, 14, 21, 27, 34, 40, 43, 50],
+  LCI_S18: [7, 14, 21, 27, 34, 40, 43, 49],
 };
 const planTotals: Record<string, number> = { IMT_S18: 48, IIN_S18: 48, LEM_S18: 49, LAE_S18: 50, LCI_S18: 49 };
 
@@ -46,17 +48,6 @@ export function kardexSemester(plan: string, order: number): number | null {
   if (!ends || !Number.isFinite(order)) return null;
   const index = ends.findIndex(end => order <= end);
   return index < 0 ? null : index + 1;
-}
-
-export function englishSlots(plan: string): { level: number; order: number; semester: number | null }[] {
-  const ends = semesterEnds[plan.toUpperCase()];
-  if (!ends) return [];
-  return [1, 2, 3].map((level) => {
-    const order = level === 2 && ['IMT_S18', 'IIN_S18'].includes(plan.toUpperCase()) ? 13
-      : level === 3 && ['IMT_S18', 'IIN_S18', 'LCI_S18'].includes(plan.toUpperCase()) ? 20
-      : ends[level - 1];
-    return { level, order, semester: level };
-  });
 }
 
 export function readKardexWorkbook(workbook: XLSX.WorkBook): KardexStudent[] {
