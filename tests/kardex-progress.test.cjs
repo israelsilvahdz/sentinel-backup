@@ -14,7 +14,8 @@ test('documented plans preserve their own semester boundaries and manual English
   assert.equal(kardexSemester('IMT_S18', 21), 4);
   assert.equal(kardexSemester('IIN_S18', 21), 4);
   assert.equal(kardexSemester('LEM_S18', 21), 3);
-  assert.equal(kardexSemester('LAE_S18', 35), null);
+  assert.equal(kardexSemester('LAE_S18', 35), 6);
+  assert.equal(kardexSemester('LAE_S18', 40), null);
   assert.equal(kardexSemester('OTHER', 21), null);
   assert.deepEqual(englishSlots('IMT_S18').map(slot => slot.order), [7, 13, 20]);
   assert.deepEqual(englishSlots('LEM_S18').map(slot => slot.order), [7, 14, 21]);
