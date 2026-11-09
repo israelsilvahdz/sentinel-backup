@@ -92,4 +92,7 @@
 }
 @keyframes academic-bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .academic-bar { transform-origin: left center; animation: academic-bar-grow 550ms cubic-bezier(.2,.7,.2,1) both; }
+.welcome-card { transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease; }
+.welcome-card:hover { transform: translateY(-3px); border-color: #a7d8c3; box-shadow: 0 18px 38px -25px rgba(0,70,53,.42); }
 @media (prefers-reduced-motion: reduce) { .academic-bar { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .welcome-card, .welcome-card:hover { transition: none; transform: none; } }

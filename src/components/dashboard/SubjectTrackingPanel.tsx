@@ -135,7 +135,7 @@ function SubjectStudentItem({ student, subjectName, weightingSchemes, loadStuden
 
 
 export function SubjectTrackingPanel({ embedded = false }: { embedded?: boolean }) {
-  const { allStudents, allStudentsMap, leaders, audience, weightingSchemes, isLoading, loadStudentSubjects, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
+  const { scopedStudents: allStudents, allStudentsMap, leaders, audience, weightingSchemes, isLoading, loadStudentSubjects, setFilterType, setSelectedValue, setGroupId } = useDashboardFilters();
   const [selectedLeader, setSelectedLeader] = useState<string | 'all'>('all');
   const [viewState, setViewState] = useState<ViewState>('subjects');
   const [selectedSubjectName, setSelectedSubjectName] = useState<string | null>(null);

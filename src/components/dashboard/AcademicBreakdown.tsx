@@ -21,7 +21,7 @@ export function AverageComparisonBar({ average, comparison, metric = 'Promedio' 
 }
 
 export function AcademicBreakdown() {
-  const { allStudents, audience, setActiveView, setFilterType, setSelectedValue } = useDashboardFilters();
+  const { filteredStudents: allStudents, audience, scopeValue, setActiveView, setFilterType, setSelectedValue } = useDashboardFilters();
   const [view, setView] = useState<View>('professors');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'name' | 'average' | 'sc'>('name');
@@ -54,7 +54,7 @@ export function AcademicBreakdown() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id="academic-breakdown-title" className="text-lg font-semibold text-slate-900">Indicadores del monitoreo</h2>
-        <p className="text-sm text-slate-500">Promedios del monitoreo y actividades marcadas SC. Las materias sin calificación no cuentan como cero.</p>
+        <p className="text-sm text-slate-500">{scopeValue ? `Resultados de ${scopeValue}. ` : ''}Promedios del monitoreo y actividades marcadas SC. Las materias sin calificación no cuentan como cero.</p>
       </div>
       <div className="flex flex-wrap gap-2 text-xs">
         <span className="rounded-full border bg-white px-3 py-1.5">{totals.graded} calificaciones</span>

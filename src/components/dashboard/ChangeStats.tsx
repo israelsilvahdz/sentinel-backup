@@ -38,7 +38,7 @@ const legendFormatter = (value: string) => {
 }
 
 export function ChangeStats() {
-    const { allStudents, hasData: hasCurrentData, setActiveView, setContextualStudentIds, latestComparison, setLatestComparison, filterType, selectedValue } = useDashboardFilters();
+    const { allStudents, scopedStudents, hasData: hasCurrentData, setActiveView, setContextualStudentIds, latestComparison, setLatestComparison, filterType, selectedValue } = useDashboardFilters();
     const { toast } = useToast();
 
     const [previousFile, setPreviousFile] = useState<File | null>(null);
@@ -200,11 +200,13 @@ export function ChangeStats() {
             };
         }
         
-        let studentsToConsider = allStudents;
+        let studentsToConsider = scopedStudents;
         if (filterType === 'leader' && selectedValue) {
-            studentsToConsider = allStudents.filter(student => student.leader === selectedValue);
+            studentsToConsider = scopedStudents.filter(student => student.leader === selectedValue);
         } else if (filterType === 'tutor' && selectedValue) {
-            studentsToConsider = allStudents.filter(student => student.tutor === selectedValue);
+            studentsToConsider = scopedStudents.filter(student => student.tutor === selectedValue);
+        } else if (filterType === 'career' && selectedValue) {
+            studentsToConsider = scopedStudents.filter(student => (student.academicCodeDescription || student.academicCode) === selectedValue);
         }
         const studentIdsToConsider = new Set(studentsToConsider.map(s => s.id));
         
@@ -241,7 +243,7 @@ export function ChangeStats() {
         for (const change of allIncreaseChanges) {
             const increment = (change.newValue as number) - (change.oldValue as number);
             
-            const student = allStudents.find(s => s.id === change.studentId);
+            const student = studentsToConsider.find(s => s.id === change.studentId);
             if (!student) continue;
 
             const subject = student.subjects?.find(s => s.id === change.subjectId);
@@ -277,7 +279,7 @@ export function ChangeStats() {
             studentsWithNewMissedAssignmentsSet,
         };
 
-    }, [latestComparison, allStudents, filterType, selectedValue]);
+    }, [latestComparison, scopedStudents, filterType, selectedValue]);
 
     const handleCaseClick = (caseType: 'changes' | 'newAbsences' | 'newMissedAssignments') => {
         let studentSet: Set<string>;
