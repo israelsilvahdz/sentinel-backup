@@ -396,6 +396,8 @@ export function StudentCard({
   const societyStyle = getSocietyStyle(lifeProfile);
   const SocietyIcon = societyStyle.icon;
   const hasSociety = !!lifeProfile?.society;
+  const planLabel = student.planType?.trim().toUpperCase() || 'SIN PLAN';
+  const planBadgeClass = planLabel === 'MAPS' ? 'bg-emerald-100 text-emerald-900 border-emerald-200' : planLabel === '2018' ? 'bg-sky-100 text-sky-900 border-sky-200' : 'bg-slate-100 text-slate-700 border-slate-200';
 
   if (isDialog) {
     return (
@@ -428,7 +430,7 @@ export function StudentCard({
                 <StudentNameAndIdCopy studentName={student.name} studentId={student.id} />
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">• {audience === 'professional' ? 'Mentor' : 'Líder'}: {student.leader || 'Sin asignar'}</span>
                 {audience === 'professional' && <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-900">Carrera: {student.academicCodeDescription || student.academicCode || 'Sin clasificar'}</span>}
-                {audience === 'professional' && <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Tipo de plan: {student.planType || 'Sin dato'}</span>}
+                {audience === 'professional' && <span title="Tipo de plan" className={cn('rounded-md border px-2 py-1 text-xs font-bold', planBadgeClass)}>{planLabel}</span>}
               </CardDescription>
             </div>
           </div>
@@ -480,7 +482,7 @@ export function StudentCard({
                 {audience === 'professional' && !student.leader?.trim() && <Badge className="border border-amber-200 bg-amber-50 text-[10px] font-semibold text-amber-800 hover:bg-amber-50">Sin mentor</Badge>}
               </div>
 
-              {audience === 'professional' && <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold"><span className="rounded-md bg-teal-50 px-2 py-0.5 text-teal-900">{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span><span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700">Plan {student.planType || 'sin dato'}</span></div>}
+              {audience === 'professional' && <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold"><span className="rounded-md bg-teal-50 px-2 py-0.5 text-teal-900">{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span><span title="Tipo de plan" className={cn('rounded-md border px-2 py-0.5 font-bold', planBadgeClass)}>{planLabel}</span></div>}
 
               <div className="flex flex-wrap items-center gap-2">
                 <MatriculaCopy studentId={student.id} />

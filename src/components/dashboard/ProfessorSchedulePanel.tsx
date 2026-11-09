@@ -74,7 +74,7 @@ function ProfessorSearchPopover({ professorList, onProfessorSelect, selectedProf
 }
 
 export function ProfessorSchedulePanel() {
-  const { allStudents, isLoading, selectedValue, professorContacts, setProfessorContacts, filterType } = useDashboardFilters();
+  const { scopedStudents: allStudents, isLoading, selectedValue, professorContacts, setProfessorContacts, filterType } = useDashboardFilters();
   const [selectedProfessorName, setSelectedProfessorName] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('all');
   const [isEditing, setIsEditing] = useState(false);

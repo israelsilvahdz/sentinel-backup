@@ -14,6 +14,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
+  SidebarFooter,
   SidebarInset,
   SidebarTrigger,
   SidebarGroup,
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/sidebar';
 import { FileUpload } from './FileUpload';
 import { DashboardFilters } from './DashboardFilters';
+import { ScopeSwitcher } from './ScopeSwitcher';
 import { WelcomeDashboard } from './WelcomeDashboard';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw, LayoutDashboard, Users, BookCopy, HelpCircle, Map as MapIcon, FileClock, BarChart3, Contact, Shield, BookOpen, Calendar, ClipboardList, Download, Smartphone, TrendingUp, Home, Zap, ListChecks, GraduationCap, BookText, FileQuestion, Flag, CloudDownload, Link2, Gavel } from 'lucide-react';
@@ -78,6 +80,7 @@ const PERSISTENCE_KEY = "sentinel_v2026_secure";
 
 interface DashboardContextType {
   filteredStudents: Student[];
+  scopedStudents: Student[];
   allStudents: Student[];
   allStudentsMap: Map<string, Student>;
   setAllStudents: React.Dispatch<React.SetStateAction<Student[]>>;
@@ -104,6 +107,10 @@ interface DashboardContextType {
   leaders: string[];
   careers: string[];
   audience: 'prepa' | 'professional';
+  scopeType: 'leader' | 'tutor';
+  setScopeType: (type: 'leader' | 'tutor') => void;
+  scopeValue: string | null;
+  setScopeValue: (value: string | null) => void;
   tutors: string[];
   subjects: string[];
   professors: string[];
@@ -257,6 +264,8 @@ export function DashboardClient() {
   const [isMerging, setIsMerging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [filterType, setFilterType] = useState<FilterType>('leader');
+  const [scopeType, setScopeType] = useState<'leader' | 'tutor'>('leader');
+  const [scopeValue, setScopeValue] = useState<string | null>(null);
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [caseType, setCaseType] = useState<CaseType | null>(null);
@@ -286,6 +295,7 @@ export function DashboardClient() {
           setStudentContacts(saved.contacts || {}); setStudentLifeProfiles(saved.profiles || {}); setProfessorContacts(saved.professors || {});
           setTeams(saved.teams || []); setWeightingSchemes(saved.schemes || []); setPriorityCases(saved.priorityCases || {});
           setLatestComparison(saved.comparison || {});
+          setScopeType(saved.scopeType === 'tutor' ? 'tutor' : 'leader'); setScopeValue(saved.scopeValue || null);
           const info = monitoringInfo(saved.fileName || ''); if (info) setPlanType(info.plan);
           setEntryOpen(!saved.base || !saved.students?.length || (!!info && info.dateKey !== todayKey()));
         } else {
@@ -303,9 +313,9 @@ export function DashboardClient() {
 
   useEffect(() => {
     if (!hydrated) return;
-    localWorkspace('workspace', { version: 1, base, students: monitorStudents, fileName: currentFileName, contacts: studentContacts, profiles: studentLifeProfiles, professors: professorContacts, teams, schemes: weightingSchemes, priorityCases, comparison: latestComparison })
+    localWorkspace('workspace', { version: 1, base, students: monitorStudents, fileName: currentFileName, contacts: studentContacts, profiles: studentLifeProfiles, professors: professorContacts, teams, schemes: weightingSchemes, priorityCases, comparison: latestComparison, scopeType, scopeValue })
       .then(() => setStorageError('')).catch(() => setStorageError('No se pudo guardar en este navegador. No cierres la página sin conservar tus archivos originales.'));
-  }, [hydrated, base, monitorStudents, currentFileName, studentContacts, studentLifeProfiles, professorContacts, teams, weightingSchemes, priorityCases, latestComparison]);
+  }, [hydrated, base, monitorStudents, currentFileName, studentContacts, studentLifeProfiles, professorContacts, teams, weightingSchemes, priorityCases, latestComparison, scopeType, scopeValue]);
 
   const reportInfo = useMemo(() => monitoringInfo(currentFileName || ''), [currentFileName]);
   const handleBaseUpload = async (file: File | null) => {
@@ -426,10 +436,11 @@ export function DashboardClient() {
   const subjects = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.name) || []).filter(Boolean))].sort(), [allStudents]);
   const professors = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjects?.map(sub => sub.professorName) || []).filter(Boolean))].sort(), [allStudents]);
   const groups = useMemo(() => [...new Set(allStudents.flatMap(s => s.subjectSummaries?.map(sub => sub.group) || []).filter(Boolean))].sort(), [allStudents]);
+  const scopedStudents = useMemo(() => !scopeValue ? allStudents : allStudents.filter(student => (scopeType === 'tutor' ? student.tutor : student.leader) === scopeValue), [allStudents, scopeType, scopeValue]);
 
   const filteredStudents = useMemo(() => {
-    if (contextualStudentIds) return allStudents.filter(s => contextualStudentIds.has(s.id));
-    let students = allStudents;
+    if (contextualStudentIds) return scopedStudents.filter(s => contextualStudentIds.has(s.id));
+    let students = scopedStudents;
     if (selectedValue) {
         if (filterType === 'leader') students = students.filter(s => selectedValue === '__unassigned__' ? !s.leader?.trim() : s.leader === selectedValue);
         if (filterType === 'career') students = students.filter(s => (s.academicCodeDescription || s.academicCode) === selectedValue);
@@ -482,14 +493,15 @@ export function DashboardClient() {
     }
     if (subjectRiskFilter) return findRiskCasesBySubject(students, subjectRiskFilter.subjectName, subjectRiskFilter.riskType);
     return students;
-  }, [allStudents, filterType, selectedValue, caseType, subjectRiskFilter, latestComparison, groupId, contextualStudentIds, weightingSchemes, priorityCases]);
+  }, [scopedStudents, filterType, selectedValue, caseType, subjectRiskFilter, latestComparison, groupId, contextualStudentIds, weightingSchemes, priorityCases]);
   
 
   const contextValue: DashboardContextType = useMemo(() => ({
-    filteredStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, studentLifeProfiles, setStudentLifeProfiles, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, weightingSchemes, setWeightingSchemes, fetchWeightingSchemes,
+    filteredStudents, scopedStudents, allStudents, allStudentsMap, setAllStudents, latestComparison, setLatestComparison, studentContacts, setStudentContacts, studentLifeProfiles, setStudentLifeProfiles, fetchStudentContact, professorContacts, setProfessorContacts, teams, fetchTeams, teamTasks, fetchTeamTasks, weightingSchemes, setWeightingSchemes, fetchWeightingSchemes,
     priorityCases, togglePriorityCase,
     isLoading: isLoading || isProcessing, hasData: allStudents.length > 0,
     leaders, careers, audience, tutors, subjects, professors, groups, groupsForSubject: (sub) => [],
+    scopeType, setScopeType: (type) => { setScopeType(type); setScopeValue(null); if (filterType === 'leader' || filterType === 'tutor') setSelectedValue(null); }, scopeValue, setScopeValue: (value) => { setScopeValue(value); if (filterType === 'leader' || filterType === 'tutor') setSelectedValue(null); },
     filterType, setFilterType: handleSetFilterType,
     selectedValue, setSelectedValue,
     groupId, setGroupId,
@@ -503,7 +515,7 @@ export function DashboardClient() {
     continuityStudents, setContinuityStudents,
     continuityCatalog, setContinuityCatalog, toast, syncContacts
   }), [
-    filteredStudents, allStudents, allStudentsMap, latestComparison, studentContacts, studentLifeProfiles, professorContacts, teams, teamTasks, weightingSchemes, priorityCases, isLoading, isProcessing, leaders, careers, audience, tutors, subjects, professors, groups, filterType, selectedValue, groupId, caseType, subjectRiskFilter, contextualStudentIds, activeView, planType, ofertaAcademica, continuityStudents, continuityCatalog, toast, syncContacts
+    filteredStudents, scopedStudents, allStudents, allStudentsMap, latestComparison, studentContacts, studentLifeProfiles, professorContacts, teams, teamTasks, weightingSchemes, priorityCases, isLoading, isProcessing, leaders, careers, audience, tutors, subjects, professors, groups, scopeType, scopeValue, filterType, selectedValue, groupId, caseType, subjectRiskFilter, contextualStudentIds, activeView, planType, ofertaAcademica, continuityStudents, continuityCatalog, toast, syncContacts
   ]);
 
   const renderActiveView = () => {
@@ -564,12 +576,16 @@ export function DashboardClient() {
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
+          <SidebarFooter className="border-t border-emerald-100 bg-emerald-50/60 p-2 group-data-[collapsible=icon]:p-1">
+            <SidebarTrigger title="Contraer o expandir menú" aria-label="Contraer o expandir menú" className="h-10 w-full justify-start gap-2 rounded-xl px-3 text-emerald-900 hover:bg-emerald-100 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" />
+            <p className="px-3 pb-1 text-xs font-medium text-emerald-900 group-data-[collapsible=icon]:hidden">Contraer menú · Ctrl+B</p>
+          </SidebarFooter>
         </Sidebar>
         <SidebarInset>
             <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
                 <div className="flex min-w-0 items-center gap-3">
-                  <SidebarTrigger className="text-slate-500" />
+                  <SidebarTrigger title="Contraer o expandir menú" aria-label="Contraer o expandir menú" className="rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100" />
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{{welcome:'Inicio',dashboard:'Resumen académico','change-stats':'Análisis de cambios',students:'Panel de alumnos','academic-performance':'Desempeño y seguimiento','professor-schedule':'Horarios de profesores','weighting-schemes':'Gestor de ponderaciones',unclassified:'Materias sin clasificar'}[activeView]}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
@@ -579,6 +595,7 @@ export function DashboardClient() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 max-w-48 gap-2 rounded-lg border-emerald-200 bg-emerald-50 px-3 text-emerald-900 shadow-none hover:bg-emerald-100"><Users className="h-4 w-4 shrink-0" /><span className="truncate">{scopeValue || (audience === 'professional' ? 'Todos los mentores' : scopeType === 'tutor' ? 'Todos los tutores' : 'Todos los líderes')}</span></Button></PopoverTrigger><PopoverContent align="end" className="w-72 rounded-xl p-4"><p className="mb-3 text-sm font-semibold text-emerald-950">Vista de acompañamiento</p><ScopeSwitcher compact /><p className="mt-3 text-xs text-slate-500">Esta selección se aplica al resumen, las carreras y el panel de alumnos.</p></PopoverContent></Popover>}
                   <FileUpload onFileSelect={handleBaseUpload} selectedFile={null} isLoading={baseLoading || !hydrated} label="Cargar archivo base" variant="outline" className="h-9 min-w-0 rounded-lg border-slate-200 px-3 text-xs shadow-none" />
                   <FileUpload onFileSelect={handleFileUpload} selectedFile={currentFile} isLoading={isProcessing || !hydrated} label="Cargar monitoreo" icon={<FileClock className="mr-2 h-4 w-4" />} className="h-9 min-w-0 rounded-lg bg-primary px-3 text-xs text-white shadow-none hover:bg-primary/90" />
                   {activeView !== 'welcome' && allStudents.length > 0 && <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-slate-200 shadow-none"><SlidersHorizontal className="h-4 w-4" />Filtros{selectedValue && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}</Button></PopoverTrigger><PopoverContent align="end" className="w-[min(92vw,600px)] rounded-xl p-4"><p className="mb-3 text-sm font-semibold">Filtrar alumnos</p><DashboardFilters /></PopoverContent></Popover>}

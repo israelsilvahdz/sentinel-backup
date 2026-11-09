@@ -111,7 +111,7 @@ function SubModuleCard({ title, description, icon: Icon, color, value, onClick }
 }
 
 export function Dashboard() {
-  const { filteredStudents, allStudents, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue, weightingSchemes } = useDashboardFilters();
+  const { filteredStudents, scopeValue, isLoading, hasData, setActiveView, setCaseType, setFilterType, setSelectedValue, weightingSchemes } = useDashboardFilters();
 
   const metrics = useMemo(() => {
     if (isLoading || !hasData) {
@@ -124,7 +124,7 @@ export function Dashboard() {
             req100: [], req90: [], req80: [], req70: []
         };
     }
-    const studentSource = filteredStudents.length > 0 ? filteredStudents : allStudents;
+    const studentSource = filteredStudents;
     
     // Potencial ranges
     const pot7075 = findPotentialRangeCases(studentSource, weightingSchemes, 70, 75.99);
@@ -174,7 +174,7 @@ export function Dashboard() {
       pot7075, pot7680, pot8185,
       req100, req90, req80, req70
     };
-  }, [filteredStudents, allStudents, isLoading, hasData, weightingSchemes]);
+  }, [filteredStudents, isLoading, hasData, weightingSchemes]);
 
   const handleCaseClick = (caseType: any) => {
     setCaseType(caseType);
@@ -202,7 +202,7 @@ export function Dashboard() {
 <WorkspaceHeader eyebrow="Resumen académico" title="Tu monitoreo comienza aquí" description="Carga el archivo base y el monitoreo desde los botones superiores para consultar el desempeño de tus alumnos." />
       ) : (
         <>
-<WorkspaceHeader eyebrow="Resumen académico" title="Lo que necesita atención" description="Faltas, actividades pendientes y esfuerzo requerido para aprobar."><Button variant="outline" onClick={() => setActiveView('change-stats')}><TrendingUp className="h-4 w-4" />Ver evolución</Button></WorkspaceHeader>
+<WorkspaceHeader eyebrow="Resumen académico" title="Lo que necesita atención" description={`${scopeValue ? `${filteredStudents.length} alumnos de ${scopeValue}. ` : ''}Faltas, actividades pendientes y esfuerzo requerido para aprobar.`}><Button variant="outline" onClick={() => setActiveView('change-stats')}><TrendingUp className="h-4 w-4" />Ver evolución</Button></WorkspaceHeader>
 
           <section className="space-y-6">
             <div className="flex items-center gap-2 px-2 text-muted-foreground">
