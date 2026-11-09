@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import * as XLSX from 'xlsx';
-import { readPrincipalBase, type PrincipalBase } from '@/lib/principal-base';
+import { readPrincipalBase, mergeMonitoringStudent, type PrincipalBase } from '@/lib/principal-base';
 import { localWorkspace, monitoringInfo, todayKey } from '@/lib/local-workspace';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import Image from 'next/image';
@@ -234,7 +234,7 @@ export function DashboardClient() {
   const [entryOpen, setEntryOpen] = useState(false);
   const [baseLoading, setBaseLoading] = useState(false);
   const [storageError, setStorageError] = useState('');
-  const allStudents = useMemo(() => monitorStudents.map(student => ({ ...student, ...(base?.students[student.id.trim().toUpperCase()] || {}) })), [monitorStudents, base]);
+  const allStudents = useMemo(() => monitorStudents.map(student => mergeMonitoringStudent(student, base?.students[student.id.trim().toUpperCase()])), [monitorStudents, base]);
   const audience = base?.audience || (Object.values(base?.students || {}).some(student => student.academicCode || student.academicCodeDescription) ? 'professional' : 'prepa');
   const [latestComparison, setLatestComparison] = useState<Record<string, Change[]>>({});
   const [studentContacts, setStudentContacts] = useState<Record<string, StudentContact>>({});
@@ -314,7 +314,8 @@ export function DashboardClient() {
     try {
       const parsed = readPrincipalBase(XLSX.read(await file.arrayBuffer(), { type: 'array' }), file.name);
       setBase(parsed); setStudentContacts(parsed.contacts); setStudentLifeProfiles(parsed.profiles); setProfessorContacts(parsed.professors); setTeams(parsed.teams); setWeightingSchemes(parsed.schemes);
-      toast({ title: 'Base principal cargada', description: Object.keys(parsed.students).length + ' alumnos. La hoja temporal no se importó.' });
+      const assigned = Object.values(parsed.students).filter(student => student.leader?.trim()).length;
+      toast({ title: 'Base principal cargada', description: `${Object.keys(parsed.students).length} alumnos; ${assigned} con ${parsed.audience === 'professional' ? 'mentor' : 'líder'} asignado. Cruce por matrícula listo.` });
     } catch (error) { toast({ variant: 'destructive', title: 'No se reemplazó la base', description: error instanceof Error ? error.message : 'Revisa el formato del archivo.' }); }
     finally { setBaseLoading(false); }
   };
@@ -594,6 +595,7 @@ export function DashboardClient() {
               </div>
               {selectedValue && activeView !== 'welcome' && <div className="flex items-center gap-2 border-t border-slate-100 px-6 py-2 text-xs text-slate-600"><SlidersHorizontal className="h-3 w-3" /><span className="min-w-0 truncate">{selectedValue === '__unassigned__' ? 'Sin mentor asignado' : selectedValue}{groupId ? ' · Grupo ' + groupId : ''}</span><Button variant="ghost" className="ml-auto h-6 px-2 text-xs" onClick={()=>{setSelectedValue(null);setGroupId(null);}}>Limpiar filtro</Button></div>}
               {storageError && <p role="alert" className="border-t bg-red-50 px-6 py-2 text-xs text-red-700">{storageError}</p>}
+              {audience === 'professional' && base && base.schemaVersion !== 2 && <p role="alert" className="border-t border-amber-200 bg-amber-50 px-6 py-2 text-xs text-amber-900">Vuelve a cargar el archivo base para actualizar las carreras y asignaciones del monitoreo guardado.</p>}
             </header>
             <div className="flex-1 min-w-0 overflow-x-hidden bg-[#f5f7f4]">{hydrated ? renderActiveView() : <PanelLoading />}</div>
             <Dialog open={entryOpen} onOpenChange={setEntryOpen}><DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{base && monitorStudents.length ? 'Revisa la fecha de tu monitoreo' : 'Comienza con tus dos archivos'}</DialogTitle><DialogDescription>Carga la base principal y el monitoreo. Se guardan en este navegador para recuperarlos la próxima vez; solo vuelve a cargarlos cuando quieras actualizarlos.</DialogDescription></DialogHeader>

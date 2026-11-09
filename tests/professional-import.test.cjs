@@ -12,7 +12,7 @@ function load(relativePath, dependencies = {}) {
   return module.exports;
 }
 
-const { readPrincipalBase } = load('src/lib/principal-base.ts', {
+const { readPrincipalBase, mergeMonitoringStudent } = load('src/lib/principal-base.ts', {
   './weighting-export': { readWeightingWorkbook: () => [] },
   './student-base-fields': { describeGraduationPeriod: () => ({}), institutionalStudentEmail: id => `al${id.slice(1)}@tecmilenio.mx` },
 });
@@ -22,17 +22,26 @@ const { monitoringInfo } = load('src/lib/local-workspace.ts');
 test('professional base loads with mentor and career fields and no parent or professor sheets', () => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
-    ['Matrícula', 'Nombre del alumno', 'Mentor', 'Código académico', 'Tipo Plan', 'Descripción de Código académico', 'Celular alumno'],
+    ['Matrícula', 'Nombre del alumno', 'Mentor', 'Código académico', 'Tipo Plan', 'Descripción Código académico', 'Celular alumno'],
     ['t00000001', 'Ana', 'Laura', 'LAD', '2026', 'Administración', '8111111111'],
     ['T00000002', 'Luis', '', 'LAD', '2026', 'Administración', '8222222222'],
   ]), 'Alumnos');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+    ['Matrícula', 'Nombre del alumno', 'Código académico', 'Tipo Plan', 'Descripción Código académico'],
+    ['T00000001', 'Ana', 'LAD', '2018', 'Administración'],
+    ['T00000003', 'Sol', 'IIS', 'MAPS', 'Ingeniería'],
+  ]), 'Datos');
   const base = readPrincipalBase(workbook, 'base.xlsx');
   assert.equal(base.audience, 'professional');
   assert.equal(base.students.T00000001.leader, 'Laura');
   assert.equal(base.students.T00000001.academicCodeDescription, 'Administración');
   assert.equal(base.students.T00000002.leader, '');
   assert.equal(base.students.T00000002.tutor, '');
+  assert.equal(base.students.T00000003.academicCodeDescription, 'Ingeniería');
+  assert.equal(base.students.T00000003.leader, undefined);
   assert.equal(base.contacts.T00000001.studentPhone, '8111111111');
+  assert.equal(mergeMonitoringStudent({ id: 'T00000001', name: 'Ana', leader: '', subjects: [] }, base.students.T00000001).leader, 'Laura');
+  assert.equal(mergeMonitoringStudent({ id: 'T00000001', name: 'Ana', leader: 'Monitor', subjects: [] }, base.students.T00000001).leader, 'Monitor');
 });
 
 test('career groups distinguish shared class groups within the same subject', () => {

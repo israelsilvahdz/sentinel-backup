@@ -427,7 +427,8 @@ export function StudentCard({
                 <StudentNameCopy studentName={student.name} />
                 <StudentNameAndIdCopy studentName={student.name} studentId={student.id} />
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">• {audience === 'professional' ? 'Mentor' : 'Líder'}: {student.leader || 'Sin asignar'}</span>
-                {audience === 'professional' && <span className="text-xs text-slate-500">{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span>}
+                {audience === 'professional' && <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-900">Carrera: {student.academicCodeDescription || student.academicCode || 'Sin clasificar'}</span>}
+                {audience === 'professional' && <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Tipo de plan: {student.planType || 'Sin dato'}</span>}
               </CardDescription>
             </div>
           </div>
@@ -476,7 +477,10 @@ export function StudentCard({
                   </Badge>
                 )}
                 {student.subjectSummaries && <OverallRiskBadge student={student} subjects={student.subjectSummaries} />}
+                {audience === 'professional' && !student.leader?.trim() && <Badge className="border border-amber-200 bg-amber-50 text-[10px] font-semibold text-amber-800 hover:bg-amber-50">Sin mentor</Badge>}
               </div>
+
+              {audience === 'professional' && <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold"><span className="rounded-md bg-teal-50 px-2 py-0.5 text-teal-900">{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span><span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700">Plan {student.planType || 'sin dato'}</span></div>}
 
               <div className="flex flex-wrap items-center gap-2">
                 <MatriculaCopy studentId={student.id} />
@@ -485,7 +489,6 @@ export function StudentCard({
                 <span className={cn("hidden text-[10px] font-black uppercase tracking-widest sm:inline", "text-muted-foreground/50")}>
                   {audience === 'professional' ? 'Mentor' : 'Líder'}: {student.leader || 'Sin asignar'}
                 </span>
-                {audience === 'professional' && <span className="truncate text-xs font-medium text-teal-700" title={`${student.academicCode || ''} · ${student.planType || ''}`}>{student.academicCodeDescription || student.academicCode || 'Carrera sin clasificar'}</span>}
                 {lifeProfile?.purpose && (
                   <span className={cn("hidden text-[10px] font-black uppercase tracking-widest md:inline", societyStyle.accentTextClassName)}>
                     Proposito cargado
