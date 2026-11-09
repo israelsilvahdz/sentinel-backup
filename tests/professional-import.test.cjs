@@ -18,6 +18,22 @@ const { readPrincipalBase, mergeMonitoringStudent } = load('src/lib/principal-ba
 });
 const { aggregateAcademics, subjectAveragesFor, careerClassmates } = load('src/lib/academic-aggregates.ts');
 const { monitoringInfo } = load('src/lib/local-workspace.ts');
+const { normalizeSubjectName, restoreCachedMonitoringNames } = load('src/lib/excelParser.ts', {
+  './utils': { generateKeyFromData: () => '' },
+});
+
+test('monitoring keeps distinct professional subject names from Excel', () => {
+  assert.equal(normalizeSubjectName(' Taller de planeación y toma de decisiones '), 'Taller de planeación y toma de decisiones');
+  assert.equal(normalizeSubjectName('Modelación para la toma de decisiones'), 'Modelación para la toma de decisiones');
+  assert.equal(normalizeSubjectName('Habilidades para la venta'), 'Habilidades para la venta');
+  const [student] = restoreCachedMonitoringNames([{
+    id: 'T1',
+    subjects: [{ id: '123', key: 'LSHP1801', name: 'Habilidades y valores VI: toma de decisiones', group: '1' }],
+    subjectSummaries: [{ id: '123', name: 'Habilidades y valores VI: toma de decisiones', group: '1' }],
+  }]);
+  assert.equal(student.subjects[0].name, 'Taller de planeación y toma de decisiones');
+  assert.equal(student.subjectSummaries[0].name, 'Taller de planeación y toma de decisiones');
+});
 
 test('professional base loads with mentor and career fields and no parent or professor sheets', () => {
   const workbook = XLSX.utils.book_new();

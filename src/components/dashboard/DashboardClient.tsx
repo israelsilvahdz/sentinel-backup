@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 
 
 import type { Student, Change, Subject, StudentData, StudentContact, TeamTask, ProfessorContact, OfertaAcademicaItem, Team, WeightingScheme, ContinuityStudent, ContinuityCatalog, ActiveView, StudentLifeProfile } from '@/types/student';
-import { parseExcel, getHeaderKey } from '@/lib/excelParser';
+import { parseExcel, getHeaderKey, restoreCachedMonitoringNames } from '@/lib/excelParser';
 import { useToast } from '@/hooks/use-toast';
 import { findExtraordinaryCases, findIncompleteGradeCases, findLostCases, findObservationCases, findRiskCasesBySubject, findUrgentCases, findSDAbsencesCases, findSDAssignmentsCases, findAtLimitAbsencesCases, findAtLimitAssignmentsCases, findPotentialRiskCases, findPotentialRangeCases, findRequiredScoreRangeCases } from '@/lib/dataProcessor';
 import { xorCipher } from '@/lib/utils';
@@ -294,7 +294,7 @@ export function DashboardClient() {
         const saved = await localWorkspace<any>('workspace');
         if (cancelled) return;
         if (saved?.version === 1) {
-          setBase(saved.base || null); setAllStudents(saved.students || []); setCurrentFileName(saved.fileName || null);
+          setBase(saved.base || null); setAllStudents(restoreCachedMonitoringNames(saved.students || [])); setCurrentFileName(saved.fileName || null);
           setStudentContacts(saved.contacts || {}); setStudentLifeProfiles(saved.profiles || {}); setProfessorContacts(saved.professors || {});
           setTeams(saved.teams || []); setWeightingSchemes(saved.schemes || []); setPriorityCases(saved.priorityCases || {});
           setLatestComparison(saved.comparison || {});
@@ -305,7 +305,7 @@ export function DashboardClient() {
           // Recover the previous local monitoring without consulting Firebase.
           const key = localStorage.getItem(LOCAL_STORAGE_KEYS.DATA_KEY);
           const data = localStorage.getItem(LOCAL_STORAGE_KEYS.STUDENTS);
-          if (key && data) { setAllStudents(JSON.parse(xorCipher(data, key))); setCurrentFileName(localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME)); }
+          if (key && data) { setAllStudents(restoreCachedMonitoringNames(JSON.parse(xorCipher(data, key)))); setCurrentFileName(localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_FILE_NAME)); }
           setEntryOpen(true);
         }
       } catch { setStorageError('No se pudieron recuperar los archivos guardados. Puedes cargarlos nuevamente.'); setEntryOpen(true); }

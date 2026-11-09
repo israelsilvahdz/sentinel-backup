@@ -25,16 +25,38 @@ function findColumnIndex(headerMap: Record<string, number>, headers: string[], p
     return undefined;
 }
 
-function normalizeSubjectName(name: string): string {
-    if (!name) return '';
-    const cleanedName = name.toLowerCase().trim();
-    // Prioridad absoluta a VI para evitar colisión con V
-    if (cleanedName.includes('habilidades y valores vi') || cleanedName.includes('toma de decisiones')) return 'Habilidades y valores VI: toma de decisiones';
-    if (cleanedName.includes('habilidades y valores v') || cleanedName.includes('lenguaje, emocion')) return 'Habilidades y valores V: lenguaje';
-    if (cleanedName.includes('habilidades y valores ii') || cleanedName.includes('ser critico')) return 'Habilidades y valores II: pensamiento crítico';
-    if (cleanedName.includes('contemporary world') || cleanedName.includes('mundo contemporaneo')) return 'El mundo contemporáneo';
-    if (cleanedName.includes('life science') || cleanedName.includes('ciencias de la vida')) return 'Ciencias de la Vida';
-    return name;
+// El monitoreo es la fuente de verdad del nombre. Las equivalencias del currículo
+// no deben alterar materias distintas que comparten palabras en el título.
+export function normalizeSubjectName(name: string): string {
+    return name?.trim() || '';
+}
+
+// Corrige únicamente registros locales creados con la regla anterior, usando
+// claves verificadas en el monitoreo de Profesional. Otros nombres requieren
+// volver a cargar el Excel para recuperar el texto exacto de origen.
+export function restoreCachedMonitoringNames(students: Student[]): Student[] {
+    const namesByKey: Record<string, string> = {
+        LSCD1801: 'Modelación para la toma de decisiones',
+        LSHP1801: 'Taller de planeación y toma de decisiones',
+    };
+    const restore = <T extends { key?: string; name: string }>(subject: T): T => {
+        const original = namesByKey[String(subject.key || '').trim().toUpperCase()];
+        return original && subject.name === 'Habilidades y valores VI: toma de decisiones' ? { ...subject, name: original } : subject;
+    };
+    return students.map(student => {
+        const subjects = student.subjects?.map(restore);
+        const restoredByCrn = new Map(subjects?.map(subject => [subject.id, subject.name]));
+        return {
+            ...student,
+            subjects,
+            subjectSummaries: student.subjectSummaries?.map(summary => {
+                const original = restoredByCrn.get(summary.id);
+                return original && summary.name === 'Habilidades y valores VI: toma de decisiones'
+                    ? { ...summary, name: original }
+                    : summary;
+            }),
+        };
+    });
 }
 
 function normalizeStudentIdFromSurveyValue(value: string): string {
