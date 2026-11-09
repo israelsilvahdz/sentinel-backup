@@ -6,12 +6,12 @@ import { type Student, type Subject } from "@/types/student";
 import { getRisk, isWithoutRight } from '@/lib/dataProcessor';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
-import { useDashboardFilters } from './DashboardClient';
 
 
 interface StudentReportImageProps {
   student: Student;
   subjects: Subject[] | undefined;
+  audience: 'prepa' | 'professional';
 }
 
 const hasActivityValue = (value: number | string | null | undefined) =>
@@ -39,8 +39,7 @@ function ReportRisk({ label, value, limit }: { label: string; value: number; lim
 }
 
 export const StudentReportImage = React.forwardRef<HTMLDivElement, StudentReportImageProps>(
-  ({ student, subjects }, ref) => {
-    const { audience } = useDashboardFilters();
+  ({ student, subjects, audience }, ref) => {
     
     // Read the imported columns directly: weighting schemes can omit or reorder them.
     const activityHeaders = Array.from(new Set(

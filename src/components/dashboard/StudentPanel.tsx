@@ -1021,7 +1021,7 @@ interface MailerDialogProps {
 function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: MailerDialogProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const { weightingSchemes } = useDashboardFilters(); // Get schemes here
+    const { weightingSchemes, audience } = useDashboardFilters(); // Get schemes here
     const { toast } = useToast();
     const [dialogContent, setDialogContent] = useState<React.ReactNode>(null);
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -1069,7 +1069,7 @@ function MailerDialog({ open, onOpenChange, students, loadStudentSubjects }: Mai
                 <div>
                      <div className="overflow-x-auto bg-muted/20 p-2 rounded-md">
                         <div className="w-max min-w-[800px]">
-                            <StudentReportImage ref={innerRef} student={student} subjects={subjects} />
+                            <StudentReportImage ref={innerRef} student={student} subjects={subjects} audience={audience} />
                         </div>
                     </div>
                     <DialogFooter className="mt-4 gap-2">
@@ -1605,22 +1605,28 @@ export function StudentPanel() {
     const handleDownloadZip = async () => {
         if (selectedStudents.size === 0) return;
         
-        const studentArray = Array.from(selectedStudents);
+        const studentArray = Array.from(selectedStudents).filter(id => allStudentsMap.has(id));
+        if (studentArray.length === 0) {
+            toast({ variant: 'destructive', title: 'Sin alumnos disponibles', description: 'Vuelve a seleccionar los alumnos para generar sus reportes.' });
+            return;
+        }
         setDownloadStatus(`Iniciando generación de ${studentArray.length} reportes PDF...`);
         setDownloadProgress(1);
 
         const { createRoot } = await import('react-dom/client');
         const zip = new JSZip();
 
-        if (!workerContainerRef.current) return;
+        if (!workerContainerRef.current) {
+            setDownloadStatus('');
+            setDownloadProgress(0);
+            return;
+        }
         const container = workerContainerRef.current;
         const root = createRoot(container);
 
         let totalCompleted = 0;
         let failedCount = 0;
         
-        const CHUNK_SIZE = 1; // Un solo PDF a la vez para máxima estabilidad
-
         const processStudent = async (studentId: string): Promise<void> => {
             const student = allStudentsMap.get(studentId);
             if (!student) return;
@@ -1629,13 +1635,13 @@ export function StudentPanel() {
                 const subjects = await loadStudentSubjects(student.id);
 
                     // Commit this student's report before capture; wait for assets rather than a fixed delay.
-                    flushSync(() => root.render(<StudentReportImage student={student} subjects={subjects} />));
+                    flushSync(() => root.render(<StudentReportImage student={student} subjects={subjects} audience={audience} />));
                         try {
                             const report = container.firstElementChild as HTMLElement | null;
                             if (!report) throw new Error('No se pudo renderizar el reporte.');
                             await prepareReportCapture(report);
                             const canvas = await html2canvas(report, {
-                                scale: 2, // Mayor calidad
+                                scale: 1.5,
                                 useCORS: true,
                                 logging: false,
                                 allowTaint: true,
@@ -1654,8 +1660,8 @@ export function StudentPanel() {
                             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
                             
                             const pdfBlob = pdf.output('blob');
-                            const sanitizedName = student.name.replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, '_');
-                            zip.file(`${sanitizedName}_reporte.pdf`, pdfBlob);
+                            const sanitizedName = student.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/gi, '').trim().replace(/\s+/g, '_') || 'Alumno';
+                            zip.file(`${student.id}_${sanitizedName}_reporte.pdf`, pdfBlob);
 
                         } catch (err) {
                             console.error(`Error generating PDF for ${student.name}:`, err);
@@ -1664,7 +1670,7 @@ export function StudentPanel() {
                         
                         totalCompleted++;
                         setDownloadStatus(`Procesando PDFs: ${totalCompleted}/${studentArray.length}`);
-                        setDownloadProgress((totalCompleted / studentArray.length) * 100);
+                        setDownloadProgress(Math.min(95, (totalCompleted / studentArray.length) * 95));
             } catch (err) {
                 console.error(`Critical failure for ${studentId}:`, err);
                 totalCompleted++;
@@ -1672,7 +1678,7 @@ export function StudentPanel() {
             }
         };
 
-        for (let i = 0; i < studentArray.length; i += CHUNK_SIZE) {
+        for (let i = 0; i < studentArray.length; i++) {
             const id = studentArray[i];
             await processStudent(id);
         }
@@ -1680,21 +1686,24 @@ export function StudentPanel() {
         setDownloadStatus(`Empaquetando ${totalCompleted - failedCount} PDFs...`);
         
         try {
-            const zipContent = await zip.generateAsync({ type: "blob" });
+            if (Object.keys(zip.files).length === 0) throw new Error('No se pudo generar ningún PDF.');
+            const zipContent = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
             const link = document.createElement('a');
-            link.href = URL.createObjectURL(zipContent);
+            const objectUrl = URL.createObjectURL(zipContent);
+            link.href = objectUrl;
             link.download = `Reportes_PDF_Sentinel_${format(new Date(), 'yyyyMMdd_HHmm')}.zip`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
+            window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
 
             toast({
-                title: "Descarga Exitosa",
-                description: `Se han generado los PDFs correctamente.`,
+                title: 'ZIP descargado',
+                description: `${Object.keys(zip.files).length} PDF${Object.keys(zip.files).length === 1 ? '' : 's'} generado${Object.keys(zip.files).length === 1 ? '' : 's'}${failedCount ? `; ${failedCount} no se pudieron generar` : ''}.`,
             });
         } catch (err) {
-            toast({ variant: "destructive", title: "Error", description: "No se pudo generar el ZIP." });
+            console.error('Error generating ZIP:', err);
+            toast({ variant: 'destructive', title: 'No se pudo generar el ZIP', description: err instanceof Error ? err.message : 'Revisa los reportes seleccionados e inténtalo de nuevo.' });
         } finally {
             root.unmount();
             setDownloadStatus('');
