@@ -12,6 +12,7 @@ export interface KardexCourse {
   prerequisites: string;
   optative: string;
   attempts: number;
+  semester: number | null;
 }
 
 export interface KardexStudent {
@@ -24,6 +25,39 @@ export interface KardexStudent {
 const clean = (value: unknown) => String(value ?? '').trim();
 const header = (value: unknown) => clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 const priority: Record<KardexStatus, number> = { accredited: 5, inProgress: 4, notAccredited: 3, review: 2, pending: 1 };
+
+// Límites leídos de los Kárdex individuales de los planes S18. El Excel masivo
+// conserva el orden curricular, pero no incluye la columna Semestre ni Inglés.
+const semesterEnds: Record<string, number[]> = {
+  IMT_S18: [7, 14, 20, 26, 33, 40, 42, 48],
+  IIN_S18: [7, 13, 20, 26, 32, 39, 41, 48],
+  LEM_S18: [7, 14, 21, 27, 34, 40, 43, 49],
+  LAE_S18: [7, 14, 21, 27, 34],
+  LCI_S18: [7, 14, 21, 27, 34],
+};
+const planTotals: Record<string, number> = { IMT_S18: 48, IIN_S18: 48, LEM_S18: 49, LAE_S18: 50, LCI_S18: 49 };
+
+export function expectedPlanCourses(plan: string): number | null {
+  return planTotals[plan.toUpperCase()] ?? null;
+}
+
+export function kardexSemester(plan: string, order: number): number | null {
+  const ends = semesterEnds[plan.toUpperCase()];
+  if (!ends || !Number.isFinite(order)) return null;
+  const index = ends.findIndex(end => order <= end);
+  return index < 0 ? null : index + 1;
+}
+
+export function englishSlots(plan: string): { level: number; order: number; semester: number | null }[] {
+  const ends = semesterEnds[plan.toUpperCase()];
+  if (!ends) return [];
+  return [1, 2, 3].map((level) => {
+    const order = level === 2 && ['IMT_S18', 'IIN_S18'].includes(plan.toUpperCase()) ? 13
+      : level === 3 && ['IMT_S18', 'IIN_S18', 'LCI_S18'].includes(plan.toUpperCase()) ? 20
+      : ends[level - 1];
+    return { level, order, semester: level };
+  });
+}
 
 export function readKardexWorkbook(workbook: XLSX.WorkBook): KardexStudent[] {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -56,6 +90,7 @@ export function readKardexWorkbook(workbook: XLSX.WorkBook): KardexStudent[] {
       key, name: value(row, 'Nombre Materia'), order: Number(value(row, 'Órden')) || 999,
       status, grade, period: value(row, 'Periodo'), prerequisites: value(row, 'Prerrequisitos'),
       optative: value(row, 'Nombre Optativa'), attempts: 1,
+      semester: kardexSemester(plan, Number(value(row, 'Órden'))),
     };
     const current = student.courses.get(courseId);
     if (!current) student.courses.set(courseId, candidate);
