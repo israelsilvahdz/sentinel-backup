@@ -5,6 +5,7 @@ import { describeGraduationPeriod, institutionalStudentEmail } from './student-b
 
 export interface PrincipalBase {
   name: string;
+  schemaVersion?: number;
   audience?: 'prepa' | 'professional';
   students: Record<string, Partial<Student>>;
   contacts: Record<string, StudentContact>;
@@ -21,16 +22,17 @@ export function readPrincipalBase(workbook: XLSX.WorkBook, name: string): Princi
   const headers = rows[0]?.map(normalize) || [];
   for (const required of ['matricula', 'nombre del alumno']) if (!headers.includes(required)) throw new Error(`Falta la columna ${required} en la primera hoja.`);
   const audience = ['mentor', 'codigo academico', 'tipo plan', 'descripcion de codigo academico'].some(header => headers.includes(header)) ? 'professional' : 'prepa';
-  const base: PrincipalBase = { name, audience, students: {}, contacts: {}, profiles: {}, professors: {}, teams: [], schemes: [] };
+  const base: PrincipalBase = { name, schemaVersion: 2, audience, students: {}, contacts: {}, profiles: {}, professors: {}, teams: [], schemes: [] };
   for (const [index, row] of rows.slice(1).entries()) {
     if (row.every(cell => String(cell).trim() === '')) continue;
     const get = (header: string) => String(row[headers.indexOf(normalize(header))] ?? '').trim();
+    const getAny = (...names: string[]) => names.map(get).find(Boolean) || '';
     const id = get('Matrícula').toUpperCase();
     if (!id) throw new Error(`Fila ${index + 2}: falta la matrícula.`);
     if (base.students[id]) throw new Error(`Fila ${index + 2}: matrícula duplicada. Revisa la base.`);
     const graduationPeriod = get('Periodo de graduación');
     if (graduationPeriod && graduationPeriod !== '0' && !describeGraduationPeriod(graduationPeriod)) throw new Error(`Fila ${index + 2}: periodo de graduación inválido. Ejemplo: 2630 o 2630*.`);
-    base.students[id] = { id, name: get('Nombre del alumno'), leader: audience === 'professional' ? get('Mentor') : get('Líder'), tutor: audience === 'professional' ? '' : get('Tutor'), graduationPeriod, pendingSubjects: get('Materias pendientes'), academicCode: get('Código académico'), planType: get('Tipo Plan'), academicCodeDescription: get('Descripción de Código académico') };
+    base.students[id] = { id, name: get('Nombre del alumno'), leader: audience === 'professional' ? getAny('Mentor', 'Líder') : getAny('Líder', 'Mentor'), tutor: audience === 'professional' ? '' : get('Tutor'), graduationPeriod, pendingSubjects: get('Materias pendientes'), academicCode: get('Código académico'), planType: get('Tipo Plan'), academicCodeDescription: getAny('Descripción de Código académico', 'Descripción Código académico') };
     base.contacts[id] = { studentId: id, name: get('Nombre del alumno'), studentPhone: get('Celular alumno'), studentEmail: institutionalStudentEmail(id), tutorPhone: get('Tel. Tutor'), dadName: get('Nombre papá'), dadPhone: get('Cel papá'), dadEmail: get('Correo papá'), momName: get('Nombre mamá'), momPhone: get('Cel mamá'), momEmail: get('Correo mamá'), sedena: get('SEDENA'), group: '', mentoringId: '' };
     base.profiles[id] = { studentId: id, email: institutionalStudentEmail(id), society: get('Sociedad'), purpose: get('Propósito de vida') };
     for (const column of ['Equipos deportivos', 'Equipos culturales', 'Otros equipos', 'Embajadores']) {
@@ -43,6 +45,24 @@ export function readPrincipalBase(workbook: XLSX.WorkBook, name: string): Princi
     }
   }
   if (!Object.keys(base.students).length) throw new Error('La base no contiene alumnos.');
+  const dataSheetName = names.find(sheetName => normalize(sheetName) === 'datos');
+  if (dataSheetName) {
+    const dataRows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[dataSheetName], { header: 1, defval: '', raw: false });
+    const dataHeaders = (dataRows[0] || []).map(normalize);
+    const dataValue = (row: unknown[], ...labels: string[]) => labels.map(label => String(row[dataHeaders.indexOf(normalize(label))] ?? '').trim()).find(Boolean) || '';
+    if (dataHeaders.includes('matricula') && dataHeaders.includes('codigo academico')) for (const row of dataRows.slice(1)) {
+      const id = dataValue(row, 'Matrícula').toUpperCase();
+      if (!id) continue;
+      const existing = base.students[id] || {};
+      base.students[id] = {
+        ...existing, id,
+        name: existing.name || dataValue(row, 'Nombre del alumno'),
+        academicCode: existing.academicCode || dataValue(row, 'Código académico'),
+        planType: existing.planType || dataValue(row, 'Tipo Plan'),
+        academicCodeDescription: existing.academicCodeDescription || dataValue(row, 'Descripción de Código académico', 'Descripción Código académico'),
+      };
+    }
+  }
   const supplemental = names.slice(1);
   const weightingName = supplemental.find(sheetName => normalize(sheetName) === 'ponderaciones') || supplemental.find(sheetName => {
     const firstRows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, defval: '' });
@@ -59,4 +79,14 @@ export function readPrincipalBase(workbook: XLSX.WorkBook, name: string): Princi
   }
   if (weightingName) base.schemes = readWeightingWorkbook({ ...workbook, Sheets: { ...workbook.Sheets, Ponderaciones: workbook.Sheets[weightingName] } }).map((scheme, index) => ({ ...scheme, id: `base-${index + 1}` }));
   return base;
+}
+
+export function mergeMonitoringStudent(student: Student, baseStudent?: Partial<Student>): Student {
+  if (!baseStudent) return student;
+  return {
+    ...student, ...baseStudent,
+    id: student.id,
+    name: student.name?.trim() || baseStudent.name || student.id,
+    leader: student.leader?.trim() || baseStudent.leader?.trim() || '',
+  };
 }
