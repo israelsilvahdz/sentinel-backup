@@ -141,7 +141,7 @@ function buildDefaultStudentEmail(studentId: string) {
 function ReportImageDialog({ student, subjects }: { student: Student, subjects: Subject[] | undefined }) {
     const reportRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const { toast } = useDashboardFilters();
+    const { toast, audience } = useDashboardFilters();
 
     const handleDownload = async () => {
         if (!reportRef.current) return;
@@ -169,7 +169,7 @@ function ReportImageDialog({ student, subjects }: { student: Student, subjects: 
             </DialogHeader>
             <div className="py-4 overflow-x-auto bg-muted/20 rounded-2xl">
                 <div className="w-max min-w-full flex justify-center p-4">
-                    <StudentReportImage ref={reportRef} student={student} subjects={subjects} />
+                    <StudentReportImage ref={reportRef} student={student} subjects={subjects} audience={audience} />
                 </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
